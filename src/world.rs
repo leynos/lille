@@ -1,5 +1,6 @@
 use std::time::{Instant, Duration};
 use hashbrown::HashMap;
+use glam::Vec3;
 use crate::entity::{Entity, CausesFear, BadGuy};
 use crate::actor::Actor;
 use crate::log;
@@ -26,17 +27,14 @@ impl GameWorld {
 
         // Create initial actor
         world.actors.push(Actor::new(
-            (199.0, 199.0, 0.0),  // starting position
-            (202.0, 200.0, 0.0),    // target position
-            5.0,                     // speed (units per tick)
-            1.0,                // fraidiness factor
+            Vec3::new(125.0, 125.0, 0.0),
+            Vec3::new(202.0, 200.0, 0.0),
+            5.0,
+            1.0,
         ));
 
         // Create BadGuy - positioned between actor and target
-        world.bad_guys.push(BadGuy {
-            entity: Entity { position: (200.0, 199.5, 0.0) },
-            meanness: 10.0,
-        });
+        world.bad_guys.push(BadGuy::new(150.0, 150.5, 0.0, 10.0));
 
         world
     }
@@ -52,7 +50,7 @@ impl GameWorld {
                 threats.push(bad_guy as &dyn CausesFear);
             }
             
-            let threat_positions: Vec<(f32, f32, f32)> = self.bad_guys.iter()
+            let threat_positions: Vec<Vec3> = self.bad_guys.iter()
                 .map(|bg| bg.entity.position)
                 .collect();
             
@@ -71,9 +69,9 @@ impl GameWorld {
         // Add regular entities
         for entity in &self.entities {
             let grid_pos = (
-                entity.position.0.round() as i32,
-                entity.position.1.round() as i32,
-                entity.position.2.round() as i32,
+                entity.position.x.round() as i32,
+                entity.position.y.round() as i32,
+                entity.position.z.round() as i32,
             );
             *positions.entry(grid_pos).or_insert(0) += 1;
         }
@@ -81,9 +79,9 @@ impl GameWorld {
         // Add actors
         for actor in &self.actors {
             let grid_pos = (
-                actor.entity.position.0.round() as i32,
-                actor.entity.position.1.round() as i32,
-                actor.entity.position.2.round() as i32,
+                actor.entity.position.x.round() as i32,
+                actor.entity.position.y.round() as i32,
+                actor.entity.position.z.round() as i32,
             );
             *positions.entry(grid_pos).or_insert(0) += 1;
         }
@@ -91,9 +89,9 @@ impl GameWorld {
         // Add bad guys (in red)
         for bad_guy in &self.bad_guys {
             let grid_pos = (
-                bad_guy.entity.position.0.round() as i32,
-                bad_guy.entity.position.1.round() as i32,
-                bad_guy.entity.position.2.round() as i32,
+                bad_guy.entity.position.x.round() as i32,
+                bad_guy.entity.position.y.round() as i32,
+                bad_guy.entity.position.z.round() as i32,
             );
             // Use a large count to make them appear bright red
             *positions.entry(grid_pos).or_insert(0) += 5;

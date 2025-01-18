@@ -1,38 +1,68 @@
+use glam::Vec3;
 use crate::entity::{Entity, CausesFear};
 use crate::log;
 
 pub struct Actor {
     pub entity: Entity,
-    pub target: (f32, f32, f32),
+    pub target: Vec3,
     pub speed: f32,
     pub fraidiness_factor: f32,
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::entity::BadGuy;
+
+    #[test]
+    fn update_maintains_fear_radius() {
+        // Create an actor that starts at origin
+        let mut actor = Actor::new(
+            Vec3::ZERO,
+            Vec3::new(10.0, 0.0, 0.0), // Target is 10 units along x-axis
+            5.0,  // Speed
+            1.0,  // Fraidiness factor
+        );
+
+        // Create a badguy at position (5, 0, 0) with meanness 1.0
+        let badguy = BadGuy::new(5.0, 0.0, 0.0, 1.0);
+        
+        // The fear radius should be: fraidiness (1.0) * meanness (1.0) * 2.0 = 2.0 units
+        let fear_radius = 2.0;
+
+        // Update the actor's position
+        actor.update(&[&badguy], &[badguy.entity.position]);
+
+        // Calculate distance between actor and badguy after update
+        let distance = (actor.entity.position - badguy.entity.position).length();
+
+        // Assert that the actor maintains at least the fear radius distance
+        assert!(
+            distance >= fear_radius,
+            "Actor is too close to badguy. Distance: {}, Required minimum: {}",
+            distance,
+            fear_radius
+        );
+    }
+}
+
 impl Actor {
-    pub fn new(position: (f32, f32, f32), target: (f32, f32, f32), speed: f32, fraidiness: f32) -> Self {
+    pub fn new(position: Vec3, target: Vec3, speed: f32, fraidiness: f32) -> Self {
         log!("Creating actor at {:?} targeting {:?} with speed {}", position, target, speed);
         Self {
-            entity: Entity { position },
+            entity: Entity::new(position.x, position.y, position.z),
             target,
             speed,
             fraidiness_factor: fraidiness,
         }
     }
 
-    fn calculate_fear_vector(&self, threats: &[&dyn CausesFear], threat_positions: &[(f32, f32, f32)]) -> (f32, f32, f32) {
-        let mut fear_x = 0.0;
-        let mut fear_y = 0.0;
-        let mut fear_z = 0.0;
+    fn calculate_fear_vector(&self, threats: &[&dyn CausesFear], threat_positions: &[Vec3]) -> Vec3 {
+        let mut fear_vector = Vec3::ZERO;
 
-        for (threat, &pos) in threats.iter().zip(threat_positions) {
-            let (tx, ty, tz) = pos;
-            let (x, y, z) = self.entity.position;
-            
-            // Calculate distance to threat
-            let dx = x - tx;
-            let dy = y - ty;
-            let dz = z - tz;
-            let distance = (dx * dx + dy * dy + dz * dz).sqrt();
+        for (threat, &threat_pos) in threats.iter().zip(threat_positions) {
+            let to_actor = self.entity.position - threat_pos;
+            let distance = to_actor.length();
             
             // Calculate fear radius
             let fear_radius = self.fraidiness_factor * threat.meanness_factor() * 2.0;
@@ -43,56 +73,40 @@ impl Actor {
             if distance < fear_radius {
                 // Normalize direction and scale by how close we are to the threat
                 let fear_scale = (fear_radius - distance) / fear_radius;
-                fear_x += dx / distance * fear_scale;
-                fear_y += dy / distance * fear_scale;
-                fear_z += dz / distance * fear_scale;
+                fear_vector += to_actor.normalize() * fear_scale;
                 
-                log!("Fear vector: ({:.2}, {:.2}, {:.2})", fear_x, fear_y, fear_z);
+                log!("Fear vector: {:?}", fear_vector);
             }
         }
         
-        (fear_x, fear_y, fear_z)
+        fear_vector
     }
 
-    pub fn update(&mut self, threats: &[&dyn CausesFear], threat_positions: &[(f32, f32, f32)]) {
-        let (x, y, z) = self.entity.position;
-        let (target_x, target_y, target_z) = self.target;
-        
+    pub fn update(&mut self, threats: &[&dyn CausesFear], threat_positions: &[Vec3]) {
         // Calculate direction vector to target
-        let dx = target_x - x;
-        let dy = target_y - y;
-        let dz = target_z - z;
+        let to_target = self.target - self.entity.position;
         
         // Get fear vector
-        let (fear_x, fear_y, fear_z) = self.calculate_fear_vector(threats, threat_positions);
+        let fear_vector = self.calculate_fear_vector(threats, threat_positions);
         
-        // Combine target direction with fear vector
-        let final_dx = dx + fear_x * self.speed * 2.0; // Fear is a stronger motivator
-        let final_dy = dy + fear_y * self.speed * 2.0;
-        let final_dz = dz + fear_z * self.speed * 2.0;
+        // Combine target direction with fear vector (fear is a stronger motivator)
+        let final_direction = to_target + fear_vector * self.speed * 2.0;
         
         // Calculate total distance for final movement vector
-        let distance = (final_dx * final_dx + final_dy * final_dy + final_dz * final_dz).sqrt();
+        let distance = final_direction.length();
         
-        log!("Actor at ({:.2}, {:.2}, {:.2}) distance to move: {:.2}", x, y, z, distance);
+        log!("Actor at {:?} distance to move: {:.2}", self.entity.position, distance);
         
         if distance > 0.0 {
             // If we're closer than our max movement distance, just move to the target
             let movement_distance = distance.min(self.speed);
             
             // Calculate actual movement
-            let move_x = final_dx / distance * movement_distance;
-            let move_y = final_dy / distance * movement_distance;
-            let move_z = final_dz / distance * movement_distance;
+            let movement = final_direction.normalize() * movement_distance;
             
-            let new_pos = (
-                x + move_x,
-                y + move_y,
-                z + move_z,
-            );
+            let new_pos = self.entity.position + movement;
             
-            log!("Moving by ({:.2}, {:.2}, {:.2}) to {:?}", 
-                move_x, move_y, move_z, new_pos);
+            log!("Moving by {:?} to {:?}", movement, new_pos);
             
             self.entity.position = new_pos;
         }
