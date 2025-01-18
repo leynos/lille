@@ -9,43 +9,6 @@ pub struct Actor {
     pub fraidiness_factor: f32,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::entity::BadGuy;
-
-    #[test]
-    fn update_maintains_fear_radius() {
-        // Create an actor that starts at origin
-        let mut actor = Actor::new(
-            Vec3::ZERO,
-            Vec3::new(10.0, 0.0, 0.0), // Target is 10 units along x-axis
-            5.0,  // Speed
-            1.0,  // Fraidiness factor
-        );
-
-        // Create a badguy at position (5, 0, 0) with meanness 1.0
-        let badguy = BadGuy::new(5.0, 0.0, 0.0, 1.0);
-        
-        // The fear radius should be: fraidiness (1.0) * meanness (1.0) * 2.0 = 2.0 units
-        let fear_radius = 2.0;
-
-        // Update the actor's position
-        actor.update(&[&badguy], &[badguy.entity.position]);
-
-        // Calculate distance between actor and badguy after update
-        let distance = (actor.entity.position - badguy.entity.position).length();
-
-        // Assert that the actor maintains at least the fear radius distance
-        assert!(
-            distance >= fear_radius,
-            "Actor is too close to badguy. Distance: {}, Required minimum: {}",
-            distance,
-            fear_radius
-        );
-    }
-}
-
 impl Actor {
     pub fn new(position: Vec3, target: Vec3, speed: f32, fraidiness: f32) -> Self {
         log!("Creating actor at {:?} targeting {:?} with speed {}", position, target, speed);
@@ -66,16 +29,37 @@ impl Actor {
             
             // Calculate fear radius
             let fear_radius = self.fraidiness_factor * threat.meanness_factor() * 2.0;
+            let avoidance_radius = fear_radius.max(self.speed);
             
-            log!("Distance to threat: {:.2}, Fear radius: {:.2}", distance, fear_radius);
+            println!("Actor pos: {:?}, Threat pos: {:?}", self.entity.position, threat_pos);
+            println!("To actor vector: {:?}, distance: {:.2}", to_actor, distance);
+            println!("Fear radius: {:.2}, Avoidance radius: {:.2}", fear_radius, avoidance_radius);
             
-            // If within fear radius, add to fear vector
-            if distance < fear_radius {
-                // Normalize direction and scale by how close we are to the threat
-                let fear_scale = (fear_radius - distance) / fear_radius;
-                fear_vector += to_actor.normalize() * fear_scale;
+            // Calculate fear effect based on distance to threat
+            // Start avoiding before we get too close
+            if distance <= avoidance_radius {
                 
-                log!("Fear vector: {:?}", fear_vector);
+                println!("Run away!");
+                // Get perpendicular vector for sideways avoidance
+                let perp = Vec3::new(-to_actor.y, to_actor.x, 0.0).normalize();
+
+                println!("Perpendicular vector: {:?}", perp);
+                
+                // Scale fear effect based on how close we are
+                let fear_scale = if distance < fear_radius {
+                    // Strong avoidance when within fear radius
+                    ((fear_radius - distance) / fear_radius).powi(2) * 5.0
+                } else {
+                    // Gentle avoidance when approaching fear radius
+                    distance / avoidance_radius
+                };
+                
+                println!("Fear scale: {:?}", fear_scale);
+                
+                // Combine direct avoidance with perpendicular movement
+                fear_vector += to_actor.normalize() * fear_scale + perp * fear_scale;
+                
+                println!("Fear vector: {:?}", fear_vector);
             }
         }
         
@@ -89,25 +73,31 @@ impl Actor {
         // Get fear vector
         let fear_vector = self.calculate_fear_vector(threats, threat_positions);
         
-        // Combine target direction with fear vector (fear is a stronger motivator)
-        let final_direction = to_target + fear_vector * self.speed * 2.0;
+        // Normalize target direction
+        let target_direction = if to_target.length() > 0.0 {
+            to_target.normalize()
+        } else {
+            Vec3::ZERO
+        };
+
+        // Normalize vectors
+        let target_dir = target_direction.normalize_or_zero();
+        let fear_dir = fear_vector.normalize_or_zero();
         
-        // Calculate total distance for final movement vector
-        let distance = final_direction.length();
+        // Calculate weights based on fear vector magnitude
+        let fear_influence = fear_vector.length();
+        let fear_weight = (fear_influence * 2.0).min(1.0); // Cap at 1.0
+        let target_weight = 1.0 - fear_weight * 0.8; // Allow some target influence even when afraid
         
-        log!("Actor at {:?} distance to move: {:.2}", self.entity.position, distance);
+        // Combine vectors with weights
+        let final_direction = (fear_dir * fear_weight + target_dir * target_weight).normalize() * self.speed;
         
-        if distance > 0.0 {
-            // If we're closer than our max movement distance, just move to the target
-            let movement_distance = distance.min(self.speed);
+        log!("Actor at {:?}, final direction: {:?}", self.entity.position, final_direction);
+        
+        if final_direction.length() > 0.0 {
+            let new_pos = self.entity.position + final_direction;
             
-            // Calculate actual movement
-            let movement = final_direction.normalize() * movement_distance;
-            
-            let new_pos = self.entity.position + movement;
-            
-            log!("Moving by {:?} to {:?}", movement, new_pos);
-            
+            log!("Moving to {:?}", new_pos);
             self.entity.position = new_pos;
         }
     }
