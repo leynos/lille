@@ -1,0 +1,6 @@
+// Minimal DDlog program for Phase 0
+
+input relation HelloWorld(dummy: signed32)
+output relation HelloOut(dummy: signed32)
+
+HelloOut(d) :- HelloWorld(d).

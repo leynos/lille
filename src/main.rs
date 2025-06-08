@@ -1,9 +1,7 @@
+use bevy::log::LogPlugin;
+use bevy::prelude::*;
 use clap::Parser;
-use lille::graphics::GraphicsContext;
-use lille::world::GameWorld;
-use lille::init_logging;
-use piston_window::*;
-use std::error::Error;
+use lille::{init_ddlog_system, init_logging};
 
 /// A realtime strategy game
 #[derive(Parser)]
@@ -14,21 +12,16 @@ struct Args {
     verbose: bool,
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn hello_world() {
+    info!("Hello Bevy!");
+}
+
+fn main() {
     let args = Args::parse();
     init_logging(args.verbose);
 
-    let mut world = GameWorld::new();
-    let mut graphics = GraphicsContext::new()?;
-
-    while let Some(e) = graphics.next() {
-        if let Some(_) = e.render_args() {
-            graphics.render(&e, &world);
-        }
-
-        // Update game state
-        world.update();
-    }
-
-    Ok(())
+    App::new()
+        .add_plugins(DefaultPlugins.build().disable::<LogPlugin>())
+        .add_systems(Startup, (init_ddlog_system, hello_world))
+        .run();
 }
