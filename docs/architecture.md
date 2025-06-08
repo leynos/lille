@@ -36,7 +36,9 @@ The movement calculation considers:
 ### Graphics and Rendering
 - The legacy prototype uses the Piston game engine for window management and rendering.
 - Phase 0 introduced Bevy as the new runtime. The current binary starts a Bevy window and prints a greeting.
-- The `build.rs` script compiles `src/lille.dl` into a `ddlog_lille` crate when the `ddlog` compiler is installed.
+- The `build.rs` script downloads the Fira Sans font if needed and compiles
+  `src/lille.dl` with the `ddlog` compiler. The generated crate is written to
+  Cargo's `OUT_DIR` to keep the project root clean.
 - A placeholder `DdlogHandle` resource is inserted during startup.
 - `DefaultPlugins` are loaded with `LogPlugin` disabled so the custom logger
   from `logging.rs` controls output.
