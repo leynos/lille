@@ -22,38 +22,28 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 fn download_font(manifest_dir: &str) -> Result<PathBuf, Box<dyn Error>> {
     let assets_dir = Path::new(manifest_dir).join("assets");
-    fs::create_dir_all(&assets_dir).ok();
-
+    fs::create_dir_all(&assets_dir)?;
     let font_path = assets_dir.join("FiraSans-Regular.ttf");
-    if !font_path.exists() {
-        let font_url = "https://github.com/mozilla/Fira/raw/master/ttf/FiraSans-Regular.ttf";
-        match reqwest::blocking::get(font_url) {
-            Ok(resp) => match resp.bytes() {
-                Ok(data) => {
-                    if let Err(e) = fs::write(&font_path, data) {
-                        println!("cargo:warning=Failed to write font file: {}", e);
-                        return Ok(PathBuf::from(
-                            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-                        ));
-                    }
-                }
-                Err(e) => {
-                    println!("cargo:warning=Failed to get font data: {}", e);
-                    return Ok(PathBuf::from(
-                        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-                    ));
-                }
-            },
-            Err(e) => {
-                println!("cargo:warning=Failed to download font: {}", e);
-                return Ok(PathBuf::from(
-                    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-                ));
-            }
-        }
+
+    if font_path.exists() {
+        return Ok(font_path);
     }
 
-    Ok(font_path)
+    let font_url = "https://github.com/mozilla/Fira/raw/master/ttf/FiraSans-Regular.ttf";
+
+    let write_result = reqwest::blocking::get(font_url)
+        .and_then(|resp| resp.bytes())
+        .and_then(|data| fs::write(&font_path, data));
+
+    match write_result {
+        Ok(()) => Ok(font_path),
+        Err(e) => {
+            println!("cargo:warning=Failed to download/write font: {}", e);
+            Ok(PathBuf::from(
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            ))
+        }
+    }
 }
 
 fn compile_ddlog(manifest_dir: &str, out_dir: &Path) -> Result<(), Box<dyn Error>> {
@@ -77,6 +67,8 @@ fn compile_ddlog(manifest_dir: &str, out_dir: &Path) -> Result<(), Box<dyn Error
                     status
                 );
             }
+        } else {
+            println!("cargo:warning=src/lille.dl missing; skipping ddlog compilation");
         }
     } else {
         println!("cargo:warning=ddlog compiler not found; skipping ddlog generation");
