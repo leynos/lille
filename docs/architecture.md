@@ -37,6 +37,7 @@ The movement calculation considers:
 - The legacy prototype uses the Piston game engine for window management and rendering.
 - Phase 0 introduced Bevy as the new runtime. The current binary starts a Bevy window and prints a greeting.
 - The `build.rs` script compiles `src/lille.dl` into a `ddlog_lille` crate when the `ddlog` compiler is installed.
+- The script also prints `cargo:rerun-if-changed=src/lille.dl` so Cargo rebuilds if the DDlog source changes.
 - A placeholder `DdlogHandle` resource is inserted during startup.
 - The grid-based visualization system from the original code remains, but will be ported to Bevy in later phases.
 - Threats are rendered in red with higher intensity in the Piston implementation.
@@ -50,7 +51,7 @@ The movement calculation considers:
 - `glam` (0.24): Vector mathematics and linear algebra
 - `clap` (4.4): Command-line argument parsing
 - `bevy` (0.12): ECS and rendering framework introduced in Phase 0
-- `differential-datalog` (0.53): Runtime library for the DDlog rules (generated as `ddlog_lille`)
+- `ddlog_lille` (generated): Runtime crate produced by the DDlog compiler
 
 ### Update Cycle
 1. The game runs on a fixed tick rate of 500ms

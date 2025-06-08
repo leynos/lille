@@ -13,7 +13,6 @@ clap = { version = "4.4", features = ["derive"] }  # Command line argument parsi
 once_cell = "1.19"  # For lazy static initialization
 glam = "0.24"  # Linear algebra for games
 bevy = { version = "0.12", default-features = false, features = ["bevy_winit"] }  # Bevy engine for new architecture scaffolding
-differential-datalog = "0.53"  # DDlog runtime (placeholder)
 
 [build-dependencies]
 reqwest = { version = "0.11", features = ["blocking"] }  # For downloading font in build script
