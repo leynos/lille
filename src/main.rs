@@ -1,3 +1,4 @@
+use bevy::log::LogPlugin;
 use bevy::prelude::*;
 use clap::Parser;
 use lille::{init_ddlog_system, init_logging};
@@ -20,8 +21,7 @@ fn main() {
     init_logging(args.verbose);
 
     App::new()
-        .add_plugins(DefaultPlugins)
-        .add_startup_system(init_ddlog_system)
-        .add_systems(Startup, hello_world)
+        .add_plugins(DefaultPlugins.build().disable::<LogPlugin>())
+        .add_systems(Startup, (init_ddlog_system, hello_world))
         .run();
 }
