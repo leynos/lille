@@ -7,6 +7,7 @@ use std::process::Command;
 fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=assets");
+    println!("cargo:rerun-if-changed=src/lille.dl");
 
     // Get manifest directory
     let manifest_dir = env::var("CARGO_MANIFEST_DIR")?;
@@ -57,7 +58,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rustc-env=FONT_PATH={}", font_path.display());
 
     // Compile DDlog program if `ddlog` executable is available
-    if Command::new("ddlog").arg("--version").output().is_ok() {
+    if Command::new("ddlog")
+        .arg("--version")
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+    {
         let ddlog_file = Path::new(&manifest_dir).join("src/lille.dl");
         if ddlog_file.exists() {
             let status = Command::new("ddlog")
@@ -65,8 +71,18 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .arg("-o")
                 .arg("ddlog_lille")
                 .status();
-            if let Err(e) = status {
-                println!("cargo:warning=Failed to run ddlog compiler: {}", e);
+            match status {
+                Err(e) => {
+                    println!("cargo:warning=Failed to run ddlog compiler: {}", e);
+                }
+                Ok(exit_status) => {
+                    if !exit_status.success() {
+                        println!(
+                            "cargo:warning=ddlog compiler exited with status: {}",
+                            exit_status
+                        );
+                    }
+                }
             }
         }
     } else {

@@ -36,6 +36,8 @@ The movement calculation considers:
 ### Graphics and Rendering
 - The legacy prototype uses the Piston game engine for window management and rendering.
 - Phase 0 introduced Bevy as the new runtime. The current binary starts a Bevy window and prints a greeting.
+- The `build.rs` script compiles `src/lille.dl` into a `ddlog_lille` crate when the `ddlog` compiler is installed.
+- A placeholder `DdlogHandle` resource is inserted during startup.
 - The grid-based visualization system from the original code remains, but will be ported to Bevy in later phases.
 - Threats are rendered in red with higher intensity in the Piston implementation.
 
