@@ -2,7 +2,7 @@
 
 ## Overview
 
-Lille is a real-time strategy game built in Rust that implements an entity-based architecture with autonomous actors navigating around threats. The game uses a tick-based update system and 2D graphics rendering.
+Lille is a real-time strategy game built in Rust.  The original prototype used a custom tick-based loop with the Piston engine.  The project is now transitioning toward a Bevy and DDlog driven design.  Phase 0 established the new scaffolding with a minimal Bevy `App` and a placeholder DDlog handle.
 
 ## Core Components
 
@@ -34,19 +34,24 @@ The movement calculation considers:
 - Combined vector influence from both target direction and threat avoidance
 
 ### Graphics and Rendering
-- Uses the Piston game engine for window management and rendering
-- Implements a grid-based visualization system
-- Density-based rendering for entity visualization
-- Special rendering for threats (appearing in red with higher intensity)
+- The legacy prototype uses the Piston game engine for window management and rendering.
+- Phase 0 introduced Bevy as the new runtime. The current binary starts a Bevy window and prints a greeting.
+- The `build.rs` script compiles `src/lille.dl` into a `ddlog_lille` crate when the `ddlog` compiler is installed.
+- The script also prints `cargo:rerun-if-changed=src/lille.dl` so Cargo rebuilds if the DDlog source changes.
+- A placeholder `DdlogHandle` resource is inserted during startup.
+- The grid-based visualization system from the original code remains, but will be ported to Bevy in later phases.
+- Threats are rendered in red with higher intensity in the Piston implementation.
 
 ## Technical Architecture
 
 ### Core Dependencies
-- `piston_window` (0.131): Window creation and event loop
-- `piston2d-graphics` (0.45): 2D graphics rendering
+- `piston_window` (0.131): Window creation and event loop (legacy)
+- `piston2d-graphics` (0.45): 2D graphics rendering (legacy)
 - `hashbrown` (0.14): High-performance HashMap implementation
 - `glam` (0.24): Vector mathematics and linear algebra
 - `clap` (4.4): Command-line argument parsing
+- `bevy` (0.12): ECS and rendering framework introduced in Phase 0
+- `ddlog_lille` (generated): Runtime crate produced by the DDlog compiler
 
 ### Update Cycle
 1. The game runs on a fixed tick rate of 500ms
