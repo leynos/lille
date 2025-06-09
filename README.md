@@ -14,5 +14,7 @@ To install the DDlog toolchain required for development run:
 source ~/.ddlog_env
 ```
 
-This downloads DDlog v1.2.3 into `~/.local/ddlog` and updates
-`PATH` and `DDLOG_HOME` via `~/.ddlog_env`.
+The script downloads DDlog v1.2.3 into `~/.local/ddlog` and writes
+environment variable assignments to `~/.ddlog_env`. If that file
+already exists it will be backed up with a `.bak` suffix before
+being replaced.

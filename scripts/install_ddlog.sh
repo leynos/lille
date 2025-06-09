@@ -9,15 +9,50 @@ ARCHIVE_URL="https://github.com/vmware-archive/differential-datalog/releases/dow
 INSTALL_DIR="$HOME/.local/ddlog"
 ENV_FILE="$HOME/.ddlog_env"
 
+# --- Preflight checks -------------------------------------------------------
+for tool in curl tar mktemp; do
+    if ! command -v "$tool" >/dev/null 2>&1; then
+        echo "Error: required tool '$tool' not found in PATH" >&2
+        exit 1
+    fi
+done
+
+case "$(uname -s)" in
+    Linux) ;;
+    *) echo "Error: this installer only supports Linux" >&2; exit 1 ;;
+esac
+
+case "$(uname -m)" in
+    x86_64|amd64) ;;
+    *) echo "Error: prebuilt DDlog archive only available for x86_64" >&2; exit 1 ;;
+esac
+
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-curl -L "$ARCHIVE_URL" -o "$TMP_DIR/ddlog.tgz"
+echo "Downloading DDlog archive..."
+curl --fail -L "$ARCHIVE_URL" -o "$TMP_DIR/ddlog.tgz"
 
 rm -rf "$INSTALL_DIR"
 mkdir -p "$INSTALL_DIR"
+
+echo "Extracting..."
 tar -xzf "$TMP_DIR/ddlog.tgz" -C "$TMP_DIR"
-mv "$TMP_DIR/ddlog" "$INSTALL_DIR"
+
+# Determine the extracted directory name (e.g. ddlog-v1.2.3-...) and move it
+EXTRACTED_DIR=$(find "$TMP_DIR" -maxdepth 1 -mindepth 1 -type d -name 'ddlog*' | head -n 1)
+if [ -z "$EXTRACTED_DIR" ]; then
+    echo "Error: failed to locate extracted ddlog directory" >&2
+    exit 1
+fi
+mv "$EXTRACTED_DIR" "$INSTALL_DIR"
+
+# Backup existing environment file if present
+if [ -f "$ENV_FILE" ]; then
+    BACKUP="${ENV_FILE}.bak"
+    echo "Backing up existing $ENV_FILE to $BACKUP"
+    cp "$ENV_FILE" "$BACKUP"
+fi
 
 cat > "$ENV_FILE" <<EOV
 export DDLOG_HOME="$INSTALL_DIR"
