@@ -14,6 +14,8 @@ pub fn push_state_to_ddlog_system(
 
     for (id, transform, health, unit, target) in &query {
         new_entities.insert(
+        log::trace!(
+            "Sync Entity {} pos=({:.1},{:.1}) hp={} type={:?} has_target={}",
             id.0,
             DdlogEntity {
                 position: transform.translation.truncate(),

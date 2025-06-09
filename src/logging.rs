@@ -1,21 +1,21 @@
-use once_cell::sync::Lazy;
-use std::sync::atomic::{AtomicBool, Ordering};
+use env_logger::{Builder, Env};
+use log::LevelFilter;
 
-static VERBOSE: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(false));
-
+/// Initializes the global logger.
+///
+/// When `verbose` is `true`, all debug messages are printed. Otherwise only
+/// info level and above are shown.
 pub fn init(verbose: bool) {
-    VERBOSE.store(verbose, Ordering::SeqCst);
-}
-
-#[macro_export]
-macro_rules! log {
-    ($($arg:tt)*) => {
-        if $crate::logging::is_verbose() {
-            eprintln!($($arg)*);
-        }
+    let level = if verbose {
+        LevelFilter::Trace
+    } else {
+        LevelFilter::Info
     };
-}
 
-pub fn is_verbose() -> bool {
-    VERBOSE.load(Ordering::SeqCst)
+    let mut builder = Builder::from_env(Env::default());
+    builder.filter_level(level);
+    builder.format_timestamp_secs().format_module_path(true);
+
+    // Ignore the error if the logger has already been initialized.
+    let _ = builder.try_init();
 }
