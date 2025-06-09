@@ -6,7 +6,7 @@ use lille::{spawn_world_system, DdlogId, GameWorld, Health, Target, UnitType};
 fn spawns_world_entities() {
     let mut app = App::new();
     app.add_plugins(MinimalPlugins);
-    let mut world_state = GameWorld::default();
+    let mut world_state = GameWorld::new();
     world_state.entities.push(LilleEntity::new(50.0, 50.0, 0.0));
     app.world.insert_resource(world_state);
     app.add_systems(Startup, spawn_world_system);

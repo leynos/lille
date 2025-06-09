@@ -44,17 +44,22 @@ impl Default for GameWorld {
 }
 
 impl GameWorld {
+    /// Construct an initial `GameWorld` containing the starting units.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     pub fn update(&mut self) {
         if self.last_tick.elapsed() >= TICK_DURATION {
             self.tick_count += 1;
             log!("\nTick {}", self.tick_count);
 
             // Collect threats and their positions
-            let mut threats: Vec<&dyn CausesFear> = Vec::with_capacity(self.bad_guys.len());
-            for bad_guy in &self.bad_guys {
-                threats.push(bad_guy as &dyn CausesFear);
-            }
-
+            let threats: Vec<&dyn CausesFear> = self
+                .bad_guys
+                .iter()
+                .map(|bg| bg as &dyn CausesFear)
+                .collect();
             let threat_positions: Vec<Vec3> =
                 self.bad_guys.iter().map(|bg| bg.entity.position).collect();
 
@@ -68,39 +73,32 @@ impl GameWorld {
     }
 
     pub fn get_all_positions(&self) -> HashMap<(i32, i32, i32), u32> {
-        let mut positions = HashMap::new();
-
-        // Add regular entities
-        for entity in &self.entities {
-            let grid_pos = (
-                entity.position.x.round() as i32,
-                entity.position.y.round() as i32,
-                entity.position.z.round() as i32,
-            );
-            *positions.entry(grid_pos).or_insert(0) += 1;
-        }
-
-        // Add actors
-        for actor in &self.actors {
-            let grid_pos = (
-                actor.entity.position.x.round() as i32,
-                actor.entity.position.y.round() as i32,
-                actor.entity.position.z.round() as i32,
-            );
-            *positions.entry(grid_pos).or_insert(0) += 1;
-        }
-
-        // Add bad guys (in red)
-        for bad_guy in &self.bad_guys {
-            let grid_pos = (
-                bad_guy.entity.position.x.round() as i32,
-                bad_guy.entity.position.y.round() as i32,
-                bad_guy.entity.position.z.round() as i32,
-            );
-            // Use a large count to make them appear bright red
-            *positions.entry(grid_pos).or_insert(0) += 5;
-        }
-
-        positions
+        self.entities
+            .iter()
+            .map(|e| {
+                let p = e.position;
+                (
+                    (p.x.round() as i32, p.y.round() as i32, p.z.round() as i32),
+                    1,
+                )
+            })
+            .chain(self.actors.iter().map(|a| {
+                let p = a.entity.position;
+                (
+                    (p.x.round() as i32, p.y.round() as i32, p.z.round() as i32),
+                    1,
+                )
+            }))
+            .chain(self.bad_guys.iter().map(|bg| {
+                let p = bg.entity.position;
+                (
+                    (p.x.round() as i32, p.y.round() as i32, p.z.round() as i32),
+                    5,
+                )
+            }))
+            .fold(HashMap::new(), |mut acc, (pos, count)| {
+                *acc.entry(pos).or_insert(0) += count;
+                acc
+            })
     }
 }

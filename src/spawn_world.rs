@@ -3,10 +3,12 @@ use bevy::prelude::*;
 use crate::components::{DdlogId, Health, Target, UnitType};
 use crate::world::GameWorld;
 
-/// Spawns the entities defined in the legacy `GameWorld` into the Bevy ECS.
-/// Inserts a new `GameWorld` resource.
+/// Inserts the initial `GameWorld` resource used to spawn entities.
+///
+/// This system does not spawn any entities; it only prepares the world
+/// state for later systems.
 pub fn init_world_system(mut commands: Commands) {
-    commands.insert_resource(GameWorld::default());
+    commands.insert_resource(GameWorld::new());
 }
 
 /// Spawns the entities defined in the legacy `GameWorld` into the Bevy ECS.

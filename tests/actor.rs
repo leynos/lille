@@ -41,6 +41,28 @@ fn update_maintains_fear_radius() {
 }
 
 #[test]
+fn moves_out_of_starting_fear_radius() {
+    // Actor begins inside the fear radius of a bad guy
+    let mut actor = Actor::new(
+        Vec3::new(1.0, 0.0, 0.0),
+        Vec3::new(10.0, 0.0, 0.0),
+        5.0,
+        1.0,
+    );
+
+    let badguy = BadGuy::new(0.0, 0.0, 0.0, 1.0);
+
+    actor.update(&[&badguy], &[badguy.entity.position]);
+
+    let dist = (actor.entity.position - badguy.entity.position).length();
+    assert!(
+        dist >= 2.0,
+        "Actor did not move out of fear radius: {}",
+        dist
+    );
+}
+
+#[test]
 fn avoids_multiple_threats() {
     // Actor heading towards +X axis
     let mut actor = Actor::new(Vec3::ZERO, Vec3::new(10.0, 0.0, 0.0), 5.0, 1.0);

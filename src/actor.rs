@@ -105,9 +105,13 @@ impl Actor {
         let fear_weight = (fear_influence * 2.0).min(1.0); // Cap at 1.0
         let target_weight = 1.0 - fear_weight * 0.8; // Allow some target influence even when afraid
 
-        // Combine vectors with weights
-        let final_direction =
-            (fear_dir * fear_weight + target_dir * target_weight).normalize() * self.speed;
+        // Combine vectors with weights, avoiding NaNs if the result is zero
+        let move_vec = fear_dir * fear_weight + target_dir * target_weight;
+        let final_direction = if move_vec.length_squared() > 0.0 {
+            move_vec.normalize() * self.speed
+        } else {
+            Vec3::ZERO
+        };
 
         log!(
             "Actor at {:?}, final direction: {:?}",
