@@ -31,25 +31,30 @@ fn download_font(manifest_dir: &str) -> Result<PathBuf, Box<dyn Error>> {
 
     let font_url = "https://github.com/mozilla/Fira/raw/master/ttf/FiraSans-Regular.ttf";
 
-    let write_result = reqwest::blocking::get(font_url)
-        .and_then(|resp| resp.bytes())
-        .map(|data| fs::write(&font_path, data));
-
-    match write_result {
-        Ok(Ok(())) => Ok(font_path),
-        Ok(Err(e)) => {
-            println!("cargo:warning=Failed to write font: {}", e);
-            Ok(PathBuf::from(
-                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-            ))
-        }
+    let data = match reqwest::blocking::get(font_url) {
+        Ok(resp) => match resp.bytes() {
+            Ok(bytes) => bytes,
+            Err(e) => {
+                println!("cargo:warning=Failed to read downloaded font: {}", e);
+                return Ok(PathBuf::from(
+                    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                ));
+            }
+        },
         Err(e) => {
             println!("cargo:warning=Failed to download font: {}", e);
-            Ok(PathBuf::from(
+            return Ok(PathBuf::from(
                 "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-            ))
+            ));
         }
+    };
+
+    if let Err(e) = fs::write(&font_path, data) {
+        println!("cargo:warning=Failed to write font: {}", e);
+        return Err(Box::new(e));
     }
+
+    Ok(font_path)
 }
 
 fn compile_ddlog(manifest_dir: &str, out_dir: &Path) -> Result<(), Box<dyn Error>> {
