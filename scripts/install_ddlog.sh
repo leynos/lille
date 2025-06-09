@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Cleanup temporary directory on exit if it was created
+TMP_DIR=""
+trap 'if [ -n "${TMP_DIR:-}" ]; then rm -rf "$TMP_DIR"; fi' EXIT
+
 # Install DDlog from the v1.2.3 release archive into ~/.local/ddlog.
 # After installation, environment variables required for DDlog
 # are written to ~/.ddlog_env in a form suitable for sourcing.
@@ -28,7 +32,6 @@ case "$(uname -m)" in
 esac
 
 TMP_DIR="$(mktemp -d)"
-trap 'rm -rf "$TMP_DIR"' EXIT
 
 echo "Downloading DDlog archive..."
 curl --fail -L "$ARCHIVE_URL" -o "$TMP_DIR/ddlog.tgz"
