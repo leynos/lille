@@ -89,15 +89,8 @@ impl Actor {
         // Get fear vector
         let fear_vector = self.calculate_fear_vector(threats, threat_positions);
 
-        // Normalize target direction
-        let target_direction = if to_target.length() > 0.0 {
-            to_target.normalize()
-        } else {
-            Vec3::ZERO
-        };
-
         // Normalize vectors
-        let target_dir = target_direction.normalize_or_zero();
+        let target_dir = to_target.normalize_or_zero();
         let fear_dir = fear_vector.normalize_or_zero();
 
         // Calculate weights based on fear vector magnitude
