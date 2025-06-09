@@ -44,11 +44,6 @@ impl Default for GameWorld {
 }
 
 impl GameWorld {
-    /// Construct an initial `GameWorld` containing the starting units.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     pub fn update(&mut self) {
         if self.last_tick.elapsed() >= TICK_DURATION {
             self.tick_count += 1;

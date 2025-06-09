@@ -21,15 +21,12 @@ fn main() {
 
     App::new()
         .add_plugins(DefaultPlugins.build().disable::<LogPlugin>())
+        .add_systems(Startup, init_ddlog_system)
+        .add_systems(Startup, init_world_system.after(init_ddlog_system))
+        .add_systems(Startup, spawn_world_system.after(init_world_system))
         .add_systems(
             Startup,
-            (
-                init_ddlog_system,
-                init_world_system,
-                spawn_world_system,
-                push_state_to_ddlog_system,
-            )
-                .chain(),
+            push_state_to_ddlog_system.after(spawn_world_system),
         )
         .run();
 }

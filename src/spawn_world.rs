@@ -8,7 +8,7 @@ use crate::world::GameWorld;
 /// This system does not spawn any entities; it only prepares the world
 /// state for later systems.
 pub fn init_world_system(mut commands: Commands) {
-    commands.insert_resource(GameWorld::new());
+    commands.insert_resource(GameWorld::default());
 }
 
 /// Spawns the entities defined in the legacy `GameWorld` into the Bevy ECS.
