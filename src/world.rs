@@ -1,9 +1,9 @@
-use std::time::{Instant, Duration};
-use hashbrown::HashMap;
-use glam::Vec3;
-use crate::entity::{Entity, CausesFear, BadGuy};
 use crate::actor::Actor;
+use crate::entity::{BadGuy, CausesFear, Entity};
 use crate::log;
+use glam::Vec3;
+use hashbrown::HashMap;
+use std::time::{Duration, Instant};
 
 const TICK_DURATION: Duration = Duration::from_millis(500);
 
@@ -16,6 +16,7 @@ pub struct GameWorld {
 }
 
 impl GameWorld {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         let mut world = Self {
             entities: Vec::new(),
@@ -43,29 +44,28 @@ impl GameWorld {
         if self.last_tick.elapsed() >= TICK_DURATION {
             self.tick_count += 1;
             log!("\nTick {}", self.tick_count);
-            
+
             // Collect threats and their positions
             let mut threats: Vec<&dyn CausesFear> = Vec::with_capacity(self.bad_guys.len());
             for bad_guy in &self.bad_guys {
                 threats.push(bad_guy as &dyn CausesFear);
             }
-            
-            let threat_positions: Vec<Vec3> = self.bad_guys.iter()
-                .map(|bg| bg.entity.position)
-                .collect();
-            
+
+            let threat_positions: Vec<Vec3> =
+                self.bad_guys.iter().map(|bg| bg.entity.position).collect();
+
             // Update all actors
             for actor in &mut self.actors {
                 actor.update(&threats, &threat_positions);
             }
-            
+
             self.last_tick = Instant::now();
         }
     }
 
     pub fn get_all_positions(&self) -> HashMap<(i32, i32, i32), u32> {
         let mut positions = HashMap::new();
-        
+
         // Add regular entities
         for entity in &self.entities {
             let grid_pos = (
@@ -75,7 +75,7 @@ impl GameWorld {
             );
             *positions.entry(grid_pos).or_insert(0) += 1;
         }
-        
+
         // Add actors
         for actor in &self.actors {
             let grid_pos = (
@@ -96,7 +96,7 @@ impl GameWorld {
             // Use a large count to make them appear bright red
             *positions.entry(grid_pos).or_insert(0) += 5;
         }
-        
+
         positions
     }
 }

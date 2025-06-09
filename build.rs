@@ -33,12 +33,18 @@ fn download_font(manifest_dir: &str) -> Result<PathBuf, Box<dyn Error>> {
 
     let write_result = reqwest::blocking::get(font_url)
         .and_then(|resp| resp.bytes())
-        .and_then(|data| fs::write(&font_path, data));
+        .map(|data| fs::write(&font_path, data));
 
     match write_result {
-        Ok(()) => Ok(font_path),
+        Ok(Ok(())) => Ok(font_path),
+        Ok(Err(e)) => {
+            println!("cargo:warning=Failed to write font: {}", e);
+            Ok(PathBuf::from(
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            ))
+        }
         Err(e) => {
-            println!("cargo:warning=Failed to download/write font: {}", e);
+            println!("cargo:warning=Failed to download font: {}", e);
             Ok(PathBuf::from(
                 "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
             ))

@@ -1,6 +1,6 @@
+use glam::Vec3;
 use lille::actor::Actor;
 use lille::entity::BadGuy;
-use glam::Vec3;
 
 #[test]
 fn update_maintains_fear_radius() {
@@ -8,13 +8,13 @@ fn update_maintains_fear_radius() {
     let mut actor = Actor::new(
         Vec3::ZERO,
         Vec3::new(10.0, 0.0, 0.0), // Target is 10 units along x-axis
-        5.0,  // Speed
-        1.0,  // Fraidiness factor
+        5.0,                       // Speed
+        1.0,                       // Fraidiness factor
     );
 
     // Create a badguy at position (5, 0, 0) with meanness 1.0
     let badguy = BadGuy::new(5.0, 0.0, 0.0, 1.0);
-    
+
     // The fear radius should be: fraidiness (1.0) * meanness (1.0) * 2.0 = 2.0 units
     let fear_radius = 2.0;
 
@@ -46,8 +46,8 @@ fn walks_towards_target() {
     let mut actor = Actor::new(
         Vec3::ZERO,
         Vec3::new(5.0, 0.0, 0.0),
-        5.0,  // Speed
-        1.0,  // Fraidiness factor (irrelevant for this test)
+        5.0, // Speed
+        1.0, // Fraidiness factor (irrelevant for this test)
     );
 
     // Update position (no threats)
@@ -63,8 +63,8 @@ fn walks_towards_target() {
 
     // Y and Z coordinates should remain unchanged
     assert!(
-        actor.entity.position.y.abs() < f32::EPSILON &&
-        actor.entity.position.z.abs() < f32::EPSILON,
+        actor.entity.position.y.abs() < f32::EPSILON
+            && actor.entity.position.z.abs() < f32::EPSILON,
         "Actor should only move along X axis, but position is {:?}",
         actor.entity.position
     );
@@ -73,13 +73,11 @@ fn walks_towards_target() {
 #[test]
 fn stationary_when_at_target() {
     let target_pos = Vec3::new(3.0, 2.0, 1.0);
-    
+
     // Create actor already at target position
     let mut actor = Actor::new(
-        target_pos,
-        target_pos,
-        1.0,  // Speed (irrelevant since we shouldn't move)
-        1.0,  // Fraidiness factor (irrelevant for this test)
+        target_pos, target_pos, 1.0, // Speed (irrelevant since we shouldn't move)
+        1.0, // Fraidiness factor (irrelevant for this test)
     );
 
     // Store initial position

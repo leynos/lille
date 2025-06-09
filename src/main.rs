@@ -1,7 +1,7 @@
 use bevy::log::LogPlugin;
 use bevy::prelude::*;
 use clap::Parser;
-use lille::{init_ddlog_system, init_logging};
+use lille::{init_ddlog_system, init_logging, push_state_to_ddlog_system, spawn_world_system};
 
 /// A realtime strategy game
 #[derive(Parser)]
@@ -12,16 +12,19 @@ struct Args {
     verbose: bool,
 }
 
-fn hello_world() {
-    info!("Hello Bevy!");
-}
-
 fn main() {
     let args = Args::parse();
     init_logging(args.verbose);
 
     App::new()
         .add_plugins(DefaultPlugins.build().disable::<LogPlugin>())
-        .add_systems(Startup, (init_ddlog_system, hello_world))
+        .add_systems(
+            Startup,
+            (
+                init_ddlog_system,
+                spawn_world_system,
+                push_state_to_ddlog_system,
+            ),
+        )
         .run();
 }
