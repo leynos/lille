@@ -18,12 +18,6 @@ pub struct GameWorld {
     last_tick: Instant,
 }
 
-impl GameWorld {
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-
 impl Default for GameWorld {
     fn default() -> Self {
         let mut world = Self {

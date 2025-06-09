@@ -13,6 +13,22 @@ pub fn init_world_system(mut commands: Commands) {
 pub fn spawn_world_system(mut commands: Commands, mut world: ResMut<GameWorld>) {
     let mut next_id: i64 = 1;
 
+    // Spawn static entities
+    for entity in world.entities.drain(..) {
+        commands.spawn((
+            SpriteBundle {
+                sprite: Sprite {
+                    color: Color::GRAY,
+                    ..default()
+                },
+                transform: Transform::from_translation(entity.position),
+                ..default()
+            },
+            DdlogId(next_id),
+        ));
+        next_id += 1;
+    }
+
     // Spawn actors
     for actor in world.actors.drain(..) {
         commands.spawn((
