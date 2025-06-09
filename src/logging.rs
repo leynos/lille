@@ -15,6 +15,7 @@ pub fn init(verbose: bool) {
     let env = Env::default().default_filter_or(level.to_string());
     let mut builder = Builder::from_env(env);
 
-    // Ignore repeated initialization attempts.
+    // `try_init` only fails if a logger was already set. Ignore that case so
+    // tests can call `init` multiple times without panicking.
     let _ = builder.try_init();
 }
