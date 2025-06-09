@@ -1,6 +1,6 @@
 use crate::actor::Actor;
+use crate::debug_log;
 use crate::entity::{BadGuy, CausesFear, Entity};
-use crate::log;
 use bevy::prelude::{ResMut, Resource};
 use glam::Vec3;
 use hashbrown::HashMap;
@@ -47,7 +47,7 @@ impl GameWorld {
     pub fn update(&mut self) {
         if self.last_tick.elapsed() >= TICK_DURATION {
             self.tick_count += 1;
-            log!("\nTick {}", self.tick_count);
+            debug_log!("\nTick {}", self.tick_count);
 
             // Collect threats and their positions
             let threats: Vec<&dyn CausesFear> = self
