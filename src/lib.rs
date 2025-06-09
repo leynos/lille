@@ -17,4 +17,4 @@ pub use entity::{BadGuy, CausesFear, Entity};
 pub use graphics::{GraphicsContext, PIXEL_SIZE, WINDOW_SIZE};
 pub use logging::init as init_logging;
 pub use spawn_world::{init_world_system, spawn_world_system};
-pub use world::GameWorld;
+pub use world::{update_world_system, GameWorld};

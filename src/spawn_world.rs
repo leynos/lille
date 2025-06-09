@@ -12,11 +12,11 @@ pub fn init_world_system(mut commands: Commands) {
 }
 
 /// Spawns the entities defined in the legacy `GameWorld` into the Bevy ECS.
-pub fn spawn_world_system(mut commands: Commands, mut world: ResMut<GameWorld>) {
+pub fn spawn_world_system(mut commands: Commands, world: Res<GameWorld>) {
     let mut next_id: i64 = 1;
 
     // Spawn static entities
-    for entity in world.entities.drain(..) {
+    for entity in &world.entities {
         commands.spawn((
             SpriteBundle {
                 sprite: Sprite {
@@ -32,7 +32,7 @@ pub fn spawn_world_system(mut commands: Commands, mut world: ResMut<GameWorld>) 
     }
 
     // Spawn actors
-    for actor in world.actors.drain(..) {
+    for actor in &world.actors {
         commands.spawn((
             SpriteBundle {
                 sprite: Sprite {
@@ -53,7 +53,7 @@ pub fn spawn_world_system(mut commands: Commands, mut world: ResMut<GameWorld>) 
     }
 
     // Spawn bad guys
-    for bad in world.bad_guys.drain(..) {
+    for bad in &world.bad_guys {
         commands.spawn((
             SpriteBundle {
                 sprite: Sprite {

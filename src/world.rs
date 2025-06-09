@@ -1,7 +1,7 @@
 use crate::actor::Actor;
 use crate::entity::{BadGuy, CausesFear, Entity};
 use crate::log;
-use bevy::prelude::Resource;
+use bevy::prelude::{ResMut, Resource};
 use glam::Vec3;
 use hashbrown::HashMap;
 use std::time::{Duration, Instant};
@@ -96,4 +96,9 @@ impl GameWorld {
                 acc
             })
     }
+}
+
+/// Bevy system wrapper that updates the [`GameWorld`] each frame.
+pub fn update_world_system(mut world: ResMut<GameWorld>) {
+    world.update();
 }
