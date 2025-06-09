@@ -4,6 +4,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+const FALLBACK_FONT_PATH: &str = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
+
 fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=assets");
@@ -31,27 +33,23 @@ fn download_font(manifest_dir: &str) -> Result<PathBuf, Box<dyn Error>> {
 
     let font_url = "https://github.com/mozilla/Fira/raw/master/ttf/FiraSans-Regular.ttf";
 
-    let data = match reqwest::blocking::get(font_url) {
+    let data = match reqwest::blocking::get(font_url).and_then(|resp| resp.error_for_status()) {
         Ok(resp) => match resp.bytes() {
             Ok(bytes) => bytes,
             Err(e) => {
                 println!("cargo:warning=Failed to read downloaded font: {}", e);
-                return Ok(PathBuf::from(
-                    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-                ));
+                return Ok(PathBuf::from(FALLBACK_FONT_PATH));
             }
         },
         Err(e) => {
             println!("cargo:warning=Failed to download font: {}", e);
-            return Ok(PathBuf::from(
-                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-            ));
+            return Ok(PathBuf::from(FALLBACK_FONT_PATH));
         }
     };
 
     if let Err(e) = fs::write(&font_path, data) {
         println!("cargo:warning=Failed to write font: {}", e);
-        return Err(Box::new(e));
+        return Ok(PathBuf::from(FALLBACK_FONT_PATH));
     }
 
     Ok(font_path)
