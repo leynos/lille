@@ -1,10 +1,11 @@
 use bevy::prelude::*;
-use lille::{spawn_world_system, UnitType};
+use lille::{spawn_world_system, GameWorld, UnitType};
 
 #[test]
 fn spawns_world_entities() {
     let mut app = App::new();
     app.add_plugins(MinimalPlugins);
+    app.world.insert_resource(GameWorld::default());
     app.add_systems(Startup, spawn_world_system);
     app.update();
 

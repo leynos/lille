@@ -4,12 +4,17 @@ use crate::components::{DdlogId, Health, Target, UnitType};
 use crate::world::GameWorld;
 
 /// Spawns the entities defined in the legacy `GameWorld` into the Bevy ECS.
-pub fn spawn_world_system(mut commands: Commands) {
-    let world = GameWorld::new();
+/// Inserts a new `GameWorld` resource.
+pub fn init_world_system(mut commands: Commands) {
+    commands.insert_resource(GameWorld::default());
+}
+
+/// Spawns the entities defined in the legacy `GameWorld` into the Bevy ECS.
+pub fn spawn_world_system(mut commands: Commands, mut world: ResMut<GameWorld>) {
     let mut next_id: i64 = 1;
 
     // Spawn actors
-    for actor in world.actors {
+    for actor in world.actors.drain(..) {
         commands.spawn((
             SpriteBundle {
                 sprite: Sprite {
@@ -30,7 +35,7 @@ pub fn spawn_world_system(mut commands: Commands) {
     }
 
     // Spawn bad guys
-    for bad in world.bad_guys {
+    for bad in world.bad_guys.drain(..) {
         commands.spawn((
             SpriteBundle {
                 sprite: Sprite {

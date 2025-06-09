@@ -40,24 +40,26 @@ impl Actor {
             let fear_radius = self.fraidiness_factor * threat.meanness_factor() * 2.0;
             let avoidance_radius = fear_radius.max(self.speed);
 
-            println!(
+            log!(
                 "Actor pos: {:?}, Threat pos: {:?}",
-                self.entity.position, threat_pos
+                self.entity.position,
+                threat_pos
             );
-            println!("To actor vector: {:?}, distance: {:.2}", to_actor, distance);
-            println!(
+            log!("To actor vector: {:?}, distance: {:.2}", to_actor, distance);
+            log!(
                 "Fear radius: {:.2}, Avoidance radius: {:.2}",
-                fear_radius, avoidance_radius
+                fear_radius,
+                avoidance_radius
             );
 
             // Calculate fear effect based on distance to threat
             // Start avoiding before we get too close
             if distance <= avoidance_radius {
-                println!("Run away!");
+                log!("Run away!");
                 // Get perpendicular vector for sideways avoidance
                 let perp = Vec3::new(-to_actor.y, to_actor.x, 0.0).normalize();
 
-                println!("Perpendicular vector: {:?}", perp);
+                log!("Perpendicular vector: {:?}", perp);
 
                 // Scale fear effect based on how close we are
                 let fear_scale = if distance < fear_radius {
@@ -68,12 +70,12 @@ impl Actor {
                     distance / avoidance_radius
                 };
 
-                println!("Fear scale: {:?}", fear_scale);
+                log!("Fear scale: {:?}", fear_scale);
 
                 // Combine direct avoidance with perpendicular movement
                 fear_vector += to_actor.normalize() * fear_scale + perp * fear_scale;
 
-                println!("Fear vector: {:?}", fear_vector);
+                log!("Fear vector: {:?}", fear_vector);
             }
         }
 

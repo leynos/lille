@@ -1,12 +1,14 @@
 use crate::actor::Actor;
 use crate::entity::{BadGuy, CausesFear, Entity};
 use crate::log;
+use bevy::prelude::Resource;
 use glam::Vec3;
 use hashbrown::HashMap;
 use std::time::{Duration, Instant};
 
 const TICK_DURATION: Duration = Duration::from_millis(500);
 
+#[derive(Resource)]
 pub struct GameWorld {
     pub entities: Vec<Entity>,
     pub actors: Vec<Actor>,
@@ -16,8 +18,13 @@ pub struct GameWorld {
 }
 
 impl GameWorld {
-    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl Default for GameWorld {
+    fn default() -> Self {
         let mut world = Self {
             entities: Vec::new(),
             actors: Vec::new(),
@@ -39,7 +46,9 @@ impl GameWorld {
 
         world
     }
+}
 
+impl GameWorld {
     pub fn update(&mut self) {
         if self.last_tick.elapsed() >= TICK_DURATION {
             self.tick_count += 1;
