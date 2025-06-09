@@ -17,4 +17,5 @@ source ~/.ddlog_env
 The script downloads DDlog v1.2.3 into `~/.local/ddlog` and writes
 environment variable assignments to `~/.ddlog_env`. If that file
 already exists it will be backed up with a `.bak` suffix before
-being replaced.
+being replaced. Any existing directory at `~/.local/ddlog` will be
+removed prior to extraction.
