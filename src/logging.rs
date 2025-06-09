@@ -1,5 +1,5 @@
 use env_logger::{Builder, Env};
-use log::LevelFilter;
+use log::{LevelFilter, SetLoggerError};
 
 /// Initializes the global logger.
 ///
@@ -12,10 +12,15 @@ pub fn init(verbose: bool) {
         LevelFilter::Info
     };
 
-    let env = Env::default().default_filter_or(level.to_string());
+    let env = Env::default().default_filter_or(level.to_string().to_lowercase());
     let mut builder = Builder::from_env(env);
+    builder.format_timestamp_secs().format_module_path(true);
 
-    // `try_init` only fails if a logger was already set. Ignore that case so
-    // tests can call `init` multiple times without panicking.
-    let _ = builder.try_init();
+    if let Err(e) = builder.try_init() {
+        // Only suppress the AlreadyInit error so tests can call `init` multiple
+        // times. Log any other error so it's not silently ignored.
+        if !matches!(e, SetLoggerError { .. }) {
+            eprintln!("Failed to initialize logger: {e}");
+        }
+    }
 }
