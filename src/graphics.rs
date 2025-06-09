@@ -1,4 +1,3 @@
-use crate::log;
 use crate::world::GameWorld;
 use piston_window::*;
 use std::error::Error;
@@ -19,7 +18,7 @@ impl GraphicsContext {
 
         // Get font path from build script
         let font_path = env!("FONT_PATH");
-        log!("Loading font from: {}", font_path);
+        log::debug!("Loading font from: {}", font_path);
 
         // Load font using window's built-in method
         let glyphs = window.load_font(font_path)?;
@@ -68,7 +67,7 @@ impl GraphicsContext {
                 c.transform.trans(10.0, 30.0),
                 g,
             ) {
-                log!("Failed to render text: {}", e);
+                log::debug!("Failed to render text: {}", e);
             }
 
             // Ensure glyphs are updated

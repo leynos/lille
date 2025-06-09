@@ -1,5 +1,4 @@
 use crate::entity::{CausesFear, Entity};
-use crate::log;
 use glam::Vec3;
 
 pub struct Actor {
@@ -11,7 +10,7 @@ pub struct Actor {
 
 impl Actor {
     pub fn new(position: Vec3, target: Vec3, speed: f32, fraidiness: f32) -> Self {
-        log!(
+        log::debug!(
             "Creating actor at {:?} targeting {:?} with speed {}",
             position,
             target,
@@ -40,13 +39,13 @@ impl Actor {
             let fear_radius = self.fraidiness_factor * threat.meanness_factor() * 2.0;
             let avoidance_radius = fear_radius.max(self.speed);
 
-            log!(
+            log::debug!(
                 "Actor pos: {:?}, Threat pos: {:?}",
                 self.entity.position,
                 threat_pos
             );
-            log!("To actor vector: {:?}, distance: {:.2}", to_actor, distance);
-            log!(
+            log::debug!("To actor vector: {:?}, distance: {:.2}", to_actor, distance);
+            log::debug!(
                 "Fear radius: {:.2}, Avoidance radius: {:.2}",
                 fear_radius,
                 avoidance_radius
@@ -55,11 +54,11 @@ impl Actor {
             // Calculate fear effect based on distance to threat
             // Start avoiding before we get too close
             if distance <= avoidance_radius {
-                log!("Run away!");
+                log::debug!("Run away!");
                 // Get perpendicular vector for sideways avoidance
                 let perp = Vec3::new(-to_actor.y, to_actor.x, 0.0).normalize();
 
-                log!("Perpendicular vector: {:?}", perp);
+                log::debug!("Perpendicular vector: {:?}", perp);
 
                 // Scale fear effect based on how close we are
                 let fear_scale = if distance < fear_radius {
@@ -70,12 +69,12 @@ impl Actor {
                     distance / avoidance_radius
                 };
 
-                log!("Fear scale: {:?}", fear_scale);
+                log::debug!("Fear scale: {:?}", fear_scale);
 
                 // Combine direct avoidance with perpendicular movement
                 fear_vector += to_actor.normalize() * fear_scale + perp * fear_scale;
 
-                log!("Fear vector: {:?}", fear_vector);
+                log::debug!("Fear vector: {:?}", fear_vector);
             }
         }
 
@@ -106,7 +105,7 @@ impl Actor {
             Vec3::ZERO
         };
 
-        log!(
+        log::debug!(
             "Actor at {:?}, final direction: {:?}",
             self.entity.position,
             final_direction
@@ -115,7 +114,7 @@ impl Actor {
         if final_direction.length() > 0.0 {
             let new_pos = self.entity.position + final_direction;
 
-            log!("Moving to {:?}", new_pos);
+            log::debug!("Moving to {:?}", new_pos);
             self.entity.position = new_pos;
         }
     }
