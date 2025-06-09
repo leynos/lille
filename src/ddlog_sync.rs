@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use hashbrown::HashMap;
 
 use crate::components::{DdlogId, Health, Target, UnitType};
 use crate::ddlog_handle::{DdlogEntity, DdlogHandle};
@@ -9,30 +10,21 @@ pub fn push_state_to_ddlog_system(
     mut ddlog: ResMut<DdlogHandle>,
     query: Query<(&DdlogId, &Transform, &Health, &UnitType, Option<&Target>)>,
 ) {
-    use hashbrown::HashSet;
-
-    let mut seen: HashSet<i64> = HashSet::with_capacity(ddlog.entities.len());
+    let mut new_entities = HashMap::with_capacity(query.iter().len());
 
     for (id, transform, health, unit, target) in &query {
-        seen.insert(id.0);
-        ddlog
-            .entities
-            .entry(id.0)
-            .and_modify(|e| {
-                e.position = transform.translation.truncate();
-                e.unit = unit.clone();
-                e.health = health.0;
-                e.target = target.map(|t| **t);
-            })
-            .or_insert_with(|| DdlogEntity {
+        new_entities.insert(
+            id.0,
+            DdlogEntity {
                 position: transform.translation.truncate(),
                 unit: unit.clone(),
                 health: health.0,
                 target: target.map(|t| **t),
-            });
+            },
+        );
     }
 
-    ddlog.entities.retain(|id, _| seen.contains(id));
+    ddlog.entities = new_entities;
 }
 
 /// Applies the inferred movement deltas from the DDlog stub.

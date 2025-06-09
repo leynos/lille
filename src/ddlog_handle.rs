@@ -49,24 +49,38 @@ pub fn init_ddlog_system(mut commands: Commands) {
 impl DdlogHandle {
     /// Updates internal entity positions based on the declarative movement rules.
     pub fn infer_movement(&mut self) {
-        for entity in self.entities.values_mut() {
+        // Collect baddie information up front to avoid borrow conflicts
+        let baddies: Vec<(i64, Vec2, f32)> = self
+            .entities
+            .iter()
+            .filter_map(|(&id, e)| match e.unit {
+                UnitType::Baddie { meanness } => Some((id, e.position, meanness)),
+                _ => None,
+            })
+            .collect();
+
+        // Compute new positions without mutating the map during iteration
+        let mut updates = Vec::with_capacity(self.entities.len());
+
+        for (&id, entity) in self.entities.iter() {
             if let UnitType::Civvy { fraidiness } = entity.unit {
                 let mut min_d2 = f32::INFINITY;
                 let mut closest = None;
                 let mut total_fear = 0.0;
 
-                for other in self.entities.values() {
-                    if let UnitType::Baddie { meanness } = other.unit {
-                        let to_actor = entity.position - other.position;
-                        let d2 = to_actor.length_squared();
-                        let fear_radius = fraidiness * meanness * 2.0;
-                        if d2 < fear_radius * fear_radius {
-                            total_fear += 1.0 / (d2 + 0.001);
-                        }
-                        if d2 < min_d2 {
-                            min_d2 = d2;
-                            closest = Some(other.position);
-                        }
+                for &(bid, b_pos, meanness) in &baddies {
+                    if bid == id {
+                        continue;
+                    }
+                    let to_actor = entity.position - b_pos;
+                    let d2 = to_actor.length_squared();
+                    let fear_radius = fraidiness * meanness * 2.0;
+                    if d2 < fear_radius * fear_radius {
+                        total_fear += 1.0 / (d2 + 0.001);
+                    }
+                    if d2 < min_d2 {
+                        min_d2 = d2;
+                        closest = Some(b_pos);
                     }
                 }
 
@@ -82,8 +96,13 @@ impl DdlogHandle {
                     dy = (target.y - entity.position.y).signum();
                 }
 
-                entity.position.x += dx;
-                entity.position.y += dy;
+                updates.push((id, entity.position + Vec2::new(dx, dy)));
+            }
+        }
+
+        for (id, new_pos) in updates {
+            if let Some(ent) = self.entities.get_mut(&id) {
+                ent.position = new_pos;
             }
         }
     }
