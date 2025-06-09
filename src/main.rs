@@ -2,8 +2,8 @@ use bevy::log::LogPlugin;
 use bevy::prelude::*;
 use clap::Parser;
 use lille::{
-    init_ddlog_system, init_logging, init_world_system, push_state_to_ddlog_system,
-    spawn_world_system, update_world_system,
+    apply_ddlog_deltas_system, init_ddlog_system, init_logging, init_world_system,
+    push_state_to_ddlog_system, spawn_world_system,
 };
 
 /// A realtime strategy game
@@ -28,6 +28,9 @@ fn main() {
             Startup,
             push_state_to_ddlog_system.after(spawn_world_system),
         )
-        .add_systems(Update, update_world_system)
+        .add_systems(
+            Update,
+            (push_state_to_ddlog_system, apply_ddlog_deltas_system).chain(),
+        )
         .run();
 }

@@ -12,7 +12,7 @@ pub mod world;
 pub use actor::Actor;
 pub use components::{DdlogId, Health, Target, UnitType};
 pub use ddlog_handle::{init_ddlog_system, DdlogHandle};
-pub use ddlog_sync::push_state_to_ddlog_system;
+pub use ddlog_sync::{apply_ddlog_deltas_system, push_state_to_ddlog_system};
 pub use entity::{BadGuy, CausesFear, Entity};
 pub use graphics::{GraphicsContext, PIXEL_SIZE, WINDOW_SIZE};
 pub use logging::init as init_logging;
