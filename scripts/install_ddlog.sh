@@ -34,7 +34,6 @@ echo "Downloading DDlog archive..."
 curl --fail -L "$ARCHIVE_URL" -o "$TMP_DIR/ddlog.tgz"
 
 rm -rf "$INSTALL_DIR"
-mkdir -p "$INSTALL_DIR"
 
 echo "Extracting..."
 tar -xzf "$TMP_DIR/ddlog.tgz" -C "$TMP_DIR"
