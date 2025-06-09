@@ -8,6 +8,7 @@ use std::time::{Duration, Instant};
 
 const TICK_DURATION: Duration = Duration::from_millis(500);
 
+/// Collection of entities and state for the legacy Lille world.
 #[derive(Resource)]
 pub struct GameWorld {
     pub entities: Vec<Entity>,

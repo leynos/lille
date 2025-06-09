@@ -1,6 +1,6 @@
 use glam::Vec3;
 use lille::actor::Actor;
-use lille::entity::BadGuy;
+use lille::entity::{BadGuy, CausesFear};
 
 #[test]
 fn update_maintains_fear_radius() {
@@ -38,6 +38,29 @@ fn update_maintains_fear_radius() {
         "Actor should move around the badguy, not just stop. Position: {:?}",
         actor.entity.position
     );
+}
+
+#[test]
+fn avoids_multiple_threats() {
+    // Actor heading towards +X axis
+    let mut actor = Actor::new(Vec3::ZERO, Vec3::new(10.0, 0.0, 0.0), 5.0, 1.0);
+
+    // Two threats close to the actor
+    let bad1 = BadGuy::new(4.0, 0.0, 0.0, 1.0);
+    let bad2 = BadGuy::new(5.0, 0.5, 0.0, 1.0);
+    let threats = [&bad1 as &dyn CausesFear, &bad2 as &dyn CausesFear];
+    let positions = [bad1.entity.position, bad2.entity.position];
+
+    actor.update(&threats, &positions);
+
+    // Fear radius = 2.0
+    for pos in positions {
+        let dist = (actor.entity.position - pos).length();
+        assert!(dist >= 2.0, "Actor too close to threat: {}", dist);
+    }
+
+    // Should have deviated from a straight line towards the target
+    assert!(actor.entity.position.y.abs() > 0.0);
 }
 
 #[test]
