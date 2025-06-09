@@ -1,6 +1,16 @@
-// Minimal DDlog program for Phase 0
+typedef EntityID = signed64
+typedef Coord = signed32
+typedef Health = signed32
+typedef UnitType = string
 
-input relation HelloWorld(dummy: signed32)
-output relation HelloOut(dummy: signed32)
+input relation Position(entity: EntityID, x: Coord, y: Coord)
+input relation HealthRel(entity: EntityID, hp: Health)
+input relation Unit(entity: EntityID, type: UnitType)
+input relation Target(entity: EntityID, tx: Coord, ty: Coord)
+input relation Fraidiness(entity: EntityID, factor: float)
+input relation Meanness(entity: EntityID, factor: float)
 
-HelloOut(d) :- HelloWorld(d).
+output relation NewPosition(entity: EntityID, x: Coord, y: Coord)
+output relation Damage(target: EntityID, amount: Health)
+output relation Despawn(entity: EntityID)
+

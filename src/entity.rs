@@ -1,5 +1,5 @@
-use std::fmt::Debug;
 use glam::Vec3;
+use std::fmt::Debug;
 
 #[derive(Clone, Debug)]
 pub struct Entity {

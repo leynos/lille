@@ -1,12 +1,15 @@
-use std::time::{Instant, Duration};
-use hashbrown::HashMap;
-use glam::Vec3;
-use crate::entity::{Entity, CausesFear, BadGuy};
 use crate::actor::Actor;
+use crate::entity::{BadGuy, CausesFear, Entity};
 use crate::log;
+use bevy::prelude::{ResMut, Resource};
+use glam::Vec3;
+use hashbrown::HashMap;
+use std::time::{Duration, Instant};
 
 const TICK_DURATION: Duration = Duration::from_millis(500);
 
+/// Collection of entities and state for the legacy Lille world.
+#[derive(Resource)]
 pub struct GameWorld {
     pub entities: Vec<Entity>,
     pub actors: Vec<Actor>,
@@ -15,8 +18,8 @@ pub struct GameWorld {
     last_tick: Instant,
 }
 
-impl GameWorld {
-    pub fn new() -> Self {
+impl Default for GameWorld {
+    fn default() -> Self {
         let mut world = Self {
             entities: Vec::new(),
             actors: Vec::new(),
@@ -38,65 +41,64 @@ impl GameWorld {
 
         world
     }
+}
 
+impl GameWorld {
     pub fn update(&mut self) {
         if self.last_tick.elapsed() >= TICK_DURATION {
             self.tick_count += 1;
             log!("\nTick {}", self.tick_count);
-            
+
             // Collect threats and their positions
-            let mut threats: Vec<&dyn CausesFear> = Vec::with_capacity(self.bad_guys.len());
-            for bad_guy in &self.bad_guys {
-                threats.push(bad_guy as &dyn CausesFear);
-            }
-            
-            let threat_positions: Vec<Vec3> = self.bad_guys.iter()
-                .map(|bg| bg.entity.position)
+            let threats: Vec<&dyn CausesFear> = self
+                .bad_guys
+                .iter()
+                .map(|bg| bg as &dyn CausesFear)
                 .collect();
-            
+            let threat_positions: Vec<Vec3> =
+                self.bad_guys.iter().map(|bg| bg.entity.position).collect();
+
             // Update all actors
             for actor in &mut self.actors {
                 actor.update(&threats, &threat_positions);
             }
-            
+
             self.last_tick = Instant::now();
         }
     }
 
     pub fn get_all_positions(&self) -> HashMap<(i32, i32, i32), u32> {
-        let mut positions = HashMap::new();
-        
-        // Add regular entities
-        for entity in &self.entities {
-            let grid_pos = (
-                entity.position.x.round() as i32,
-                entity.position.y.round() as i32,
-                entity.position.z.round() as i32,
-            );
-            *positions.entry(grid_pos).or_insert(0) += 1;
-        }
-        
-        // Add actors
-        for actor in &self.actors {
-            let grid_pos = (
-                actor.entity.position.x.round() as i32,
-                actor.entity.position.y.round() as i32,
-                actor.entity.position.z.round() as i32,
-            );
-            *positions.entry(grid_pos).or_insert(0) += 1;
-        }
-
-        // Add bad guys (in red)
-        for bad_guy in &self.bad_guys {
-            let grid_pos = (
-                bad_guy.entity.position.x.round() as i32,
-                bad_guy.entity.position.y.round() as i32,
-                bad_guy.entity.position.z.round() as i32,
-            );
-            // Use a large count to make them appear bright red
-            *positions.entry(grid_pos).or_insert(0) += 5;
-        }
-        
-        positions
+        self.entities
+            .iter()
+            .map(|e| {
+                let p = e.position;
+                (
+                    (p.x.round() as i32, p.y.round() as i32, p.z.round() as i32),
+                    1,
+                )
+            })
+            .chain(self.actors.iter().map(|a| {
+                let p = a.entity.position;
+                (
+                    (p.x.round() as i32, p.y.round() as i32, p.z.round() as i32),
+                    1,
+                )
+            }))
+            .chain(self.bad_guys.iter().map(|bg| {
+                let p = bg.entity.position;
+                (
+                    (p.x.round() as i32, p.y.round() as i32, p.z.round() as i32),
+                    5,
+                )
+            }))
+            .fold(HashMap::new(), |mut acc, (pos, count)| {
+                *acc.entry(pos).or_insert(0) += count;
+                acc
+            })
     }
+}
+
+/// Bevy system wrapper that updates the [`GameWorld`] each frame.
+pub fn update_world_system(mut world: ResMut<GameWorld>) {
+    world.update();
 }
