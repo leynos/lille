@@ -6,7 +6,8 @@ trap 'if [ -n "${TMP_DIR:-}" ]; then rm -rf "$TMP_DIR"; fi' EXIT
 
 # Install DDlog from the v1.2.3 release archive into ~/.local/ddlog.
 # After installation, environment variables required for DDlog
-# are written to ~/.ddlog_env in a form suitable for sourcing.
+# are written to a `.env` file in this repository so that the
+# build script can load them with `dotenvy`.
 
 ARCHIVE_URL="https://github.com/vmware-archive/differential-datalog/releases/download/v1.2.3/ddlog-v1.2.3-20211213235218-Linux.tar.gz"
 INSTALL_DIR="$HOME/.local/ddlog"
@@ -57,8 +58,8 @@ if [ -f "$ENV_FILE" ]; then
 fi
 
 cat > "$ENV_FILE" <<EOV
-DDLOG_HOME="$INSTALL_DIR"
-PATH="${INSTALL_DIR}/bin:\$PATH"
+DDLOG_HOME=$INSTALL_DIR
+PATH=$INSTALL_DIR/bin:$PATH
 EOV
 
 echo "DDlog installed to $INSTALL_DIR"
