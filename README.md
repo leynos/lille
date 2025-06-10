@@ -17,6 +17,10 @@ source ./.env
 The `source` command loads the DDlog environment variables into the
 current shell session.
 
+The build script also loads this `.env` automatically using the
+`dotenvy` crate so that `cargo build` can locate the `ddlog` compiler
+and standard library without additional setup.
+
 The script downloads DDlog v1.2.3 into `~/.local/ddlog` and writes
 environment variable assignments to `.env`. If that file
 already exists it will be backed up with a `.bak` suffix before
