@@ -4,7 +4,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-
 const FALLBACK_FONT_PATH: &str = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -67,7 +66,12 @@ fn compile_ddlog(manifest_dir: &str, out_dir: &Path) -> Result<(), Box<dyn Error
         let ddlog_file = Path::new(manifest_dir).join("src/lille.dl");
         if ddlog_file.exists() {
             let target_dir = out_dir.join("ddlog_lille");
-            let status = Command::new("ddlog")
+            let mut cmd = Command::new("ddlog");
+            if let Ok(home) = env::var("DDLOG_HOME") {
+                cmd.arg("-L").arg(format!("{}/lib", home));
+            }
+            let status = cmd
+                .arg("-i")
                 .arg(ddlog_file.to_string_lossy().to_string())
                 .arg("-o")
                 .arg(&target_dir)

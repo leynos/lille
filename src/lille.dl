@@ -1,69 +1,7 @@
-typedef EntityID = signed64
-typedef Coord = signed32
-typedef Health = signed32
-typedef UnitType = string
+typedef EntityID = signed<64>
+typedef Coord = signed<32>
 
 input relation Position(entity: EntityID, x: Coord, y: Coord)
-input relation HealthRel(entity: EntityID, hp: Health)
-input relation Unit(entity: EntityID, type: UnitType)
-input relation Target(entity: EntityID, tx: Coord, ty: Coord)
-input relation Fraidiness(entity: EntityID, factor: float)
-input relation Meanness(entity: EntityID, factor: float)
-
 output relation NewPosition(entity: EntityID, x: Coord, y: Coord)
-output relation Damage(target: EntityID, amount: Health)
-output relation Despawn(entity: EntityID)
 
-
-// extern function provided by the Rust host
-extern function sqrt(f: float): float
-extern function sign(c: Coord): Coord
-
-relation Dist2(e1: EntityID, e2: EntityID, d2: float) :-
-    Position(e1, x1, y1),
-    Position(e2, x2, y2),
-    var dx = float(x1 - x2),
-    var dy = float(y1 - y2),
-    d2 = dx*dx + dy*dy.
-
-relation FearContribution(actor: EntityID, baddie: EntityID, fear: float) :-
-    Unit(actor, "Civvy"), Unit(baddie, "Baddie"),
-    Dist2(actor, baddie, d2),
-    Fraidiness(actor, fraidiness), Meanness(baddie, meanness),
-    var fear_radius = fraidiness * meanness * 2.0,
-    d2 < fear_radius*fear_radius,
-    fear = (1.0 / (d2 + 0.001)).
-
-relation TotalFear(actor: EntityID, total_fear: float) :-
-    agg(total) = sum(f) from FearContribution(actor, _, f),
-    total_fear = total.
-
-relation FleeVector(actor: EntityID, dx: Coord, dy: Coord) :-
-    TotalFear(actor, _),
-    Dist2(actor, baddie, d2),
-    min(d2) = min_d2,
-    Dist2(actor, baddie, min_d2),
-    Position(actor, ax, ay), Position(baddie, bx, by),
-    dx = sign(ax - bx),
-    dy = sign(ay - by).
-
-relation TargetVector(actor: EntityID, dx: Coord, dy: Coord) :-
-    Unit(actor, "Civvy"),
-    Target(actor, tx, ty),
-    Position(actor, ax, ay),
-    dx = sign(tx - ax),
-    dy = sign(ty - ay).
-
-relation MoveVector(actor: EntityID, dx: Coord, dy: Coord) :-
-    TotalFear(actor, f), f > 0.2,
-    FleeVector(actor, dx, dy).
-
-relation MoveVector(actor: EntityID, dx: Coord, dy: Coord) :-
-    not TotalFear(actor, _),
-    TargetVector(actor, dx, dy).
-
-output relation NewPosition(e, nx, ny) :-
-    MoveVector(e, dx, dy),
-    Position(e, x, y),
-    nx = x + dx,
-    ny = y + dy.
+NewPosition(e, x, y) :- Position(e, x, y).
