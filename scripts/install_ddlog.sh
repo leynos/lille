@@ -2,7 +2,6 @@
 set -euo pipefail
 
 # Cleanup temporary directory on exit if it was created
-TMP_DIR=""
 trap 'if [ -n "${TMP_DIR:-}" ]; then rm -rf "$TMP_DIR"; fi' EXIT
 
 # Install DDlog from the v1.2.3 release archive into ~/.local/ddlog.
@@ -11,7 +10,8 @@ trap 'if [ -n "${TMP_DIR:-}" ]; then rm -rf "$TMP_DIR"; fi' EXIT
 
 ARCHIVE_URL="https://github.com/vmware-archive/differential-datalog/releases/download/v1.2.3/ddlog-v1.2.3-20211213235218-Linux.tar.gz"
 INSTALL_DIR="$HOME/.local/ddlog"
-ENV_FILE="$HOME/.ddlog_env"
+#ENV_FILE="$HOME/.ddlog_env"
+ENV_FILE=".env"
 
 # --- Preflight checks -------------------------------------------------------
 for tool in curl tar mktemp; do
@@ -57,10 +57,10 @@ if [ -f "$ENV_FILE" ]; then
 fi
 
 cat > "$ENV_FILE" <<EOV
-export DDLOG_HOME="$INSTALL_DIR"
-export PATH="${INSTALL_DIR}/bin:\$PATH"
+DDLOG_HOME="$INSTALL_DIR"
+PATH="${INSTALL_DIR}/bin:\$PATH"
 EOV
 
 echo "DDlog installed to $INSTALL_DIR"
-echo "Source $ENV_FILE to update your environment"
+echo "Dotenv file created at $ENV_FILE"
 
