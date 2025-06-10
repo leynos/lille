@@ -3,7 +3,7 @@ use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use dotenvy::dotenv;
+
 
 const FALLBACK_FONT_PATH: &str = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
 
@@ -57,6 +57,7 @@ fn download_font(manifest_dir: &str) -> Result<PathBuf, Box<dyn Error>> {
 }
 
 fn compile_ddlog(manifest_dir: &str, out_dir: &Path) -> Result<(), Box<dyn Error>> {
+    dotenvy::dotenv().ok();
     if Command::new("ddlog")
         .arg("--version")
         .status()
