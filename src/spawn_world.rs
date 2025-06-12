@@ -2,34 +2,29 @@ use bevy::prelude::*;
 
 use crate::components::{DdlogId, Health, Target, UnitType};
 
+/// Convenience builder for a colored sprite at the given position.
+fn basic_sprite(color: Color, translation: Vec3) -> SpriteBundle {
+    SpriteBundle {
+        sprite: Sprite { color, ..default() },
+        transform: Transform::from_translation(translation),
+        ..default()
+    }
+}
+
 /// Spawns a minimal demo world directly into the Bevy ECS.
 pub fn spawn_world_system(mut commands: Commands) {
     let mut next_id: i64 = 1;
 
     // Static landmark entity
     commands.spawn((
-        SpriteBundle {
-            sprite: Sprite {
-                color: Color::GRAY,
-                ..default()
-            },
-            transform: Transform::from_translation(Vec3::new(50.0, 50.0, 0.0)),
-            ..default()
-        },
+        basic_sprite(Color::GRAY, Vec3::new(50.0, 50.0, 0.0)),
         DdlogId(next_id),
     ));
     next_id += 1;
 
     // Civilian unit with a movement target
     commands.spawn((
-        SpriteBundle {
-            sprite: Sprite {
-                color: Color::WHITE,
-                ..default()
-            },
-            transform: Transform::from_translation(Vec3::new(125.0, 125.0, 0.0)),
-            ..default()
-        },
+        basic_sprite(Color::WHITE, Vec3::new(125.0, 125.0, 0.0)),
         DdlogId(next_id),
         Health(100),
         UnitType::Civvy { fraidiness: 1.0 },
@@ -39,18 +34,13 @@ pub fn spawn_world_system(mut commands: Commands) {
 
     // Threatening baddie
     commands.spawn((
-        SpriteBundle {
-            sprite: Sprite {
-                color: Color::RED,
-                ..default()
-            },
-            transform: Transform::from_translation(Vec3::new(150.0, 150.5, 0.0)),
-            ..default()
-        },
+        basic_sprite(Color::RED, Vec3::new(150.0, 150.5, 0.0)),
         DdlogId(next_id),
         Health(100),
         UnitType::Baddie { meanness: 10.0 },
     ));
+    next_id += 1;
+    let _ = next_id;
 
     // Camera
     commands.spawn(Camera2dBundle::default());
