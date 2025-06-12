@@ -43,5 +43,8 @@ fn ddlog_flees_from_baddie() {
 
     handle.infer_movement();
     let ent = handle.entities.get(&1).unwrap();
-    assert!(ent.position.x <= 0.0);
+    assert!(
+        ent.position.x < 0.0,
+        "Civvy did not flee from nearby baddie"
+    );
 }

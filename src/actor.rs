@@ -7,5 +7,6 @@ pub struct Actor {
     pub entity: Entity,
     pub target: Vec3,
     pub speed: f32,
-    pub fraidiness_factor: f32,
+    /// How easily this actor becomes scared.
+    pub fraidiness: f32,
 }
