@@ -1,27 +1,10 @@
 use bevy::prelude::*;
-use lille::Entity as LilleEntity;
-use lille::{spawn_world_system, Actor, BadGuy, DdlogId, GameWorld, Health, Target, UnitType};
+use lille::{spawn_world_system, DdlogId, Health, Target, UnitType};
 
 #[test]
 fn spawns_world_entities() {
     let mut app = App::new();
     app.add_plugins(MinimalPlugins);
-    let mut world_state = GameWorld::default();
-    world_state.entities.clear();
-    world_state.actors.clear();
-    world_state.bad_guys.clear();
-
-    world_state.entities.push(LilleEntity::new(50.0, 50.0, 0.0));
-    world_state.actors.push(Actor::new(
-        Vec3::new(125.0, 125.0, 0.0),
-        Vec3::new(202.0, 200.0, 0.0),
-        5.0,
-        1.0,
-    ));
-    world_state
-        .bad_guys
-        .push(BadGuy::new(150.0, 150.5, 0.0, 10.0));
-    app.world.insert_resource(world_state);
     app.add_systems(Startup, spawn_world_system);
     app.update();
 
@@ -31,7 +14,6 @@ fn spawns_world_entities() {
     let mut baddie = 0;
     let mut static_count = 0;
 
-    // Query spawned units and verify their components
     let mut query = world.query::<(
         Entity,
         Option<&DdlogId>,
@@ -40,8 +22,8 @@ fn spawns_world_entities() {
         Option<&Health>,
         Option<&Target>,
     )>();
+
     for (entity, dd_id, unit, transform, health, target) in query.iter(world) {
-        // All units should have a Transform and Health
         if let Some(h) = health {
             assert!(h.0 > 0, "Entity {:?} missing health", entity);
         }
@@ -60,7 +42,6 @@ fn spawns_world_entities() {
                 assert_eq!(transform.translation, Vec3::new(150.0, 150.5, 0.0));
             }
             None => {
-                // Skip camera entities
                 if dd_id.is_none() {
                     continue;
                 }
