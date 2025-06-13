@@ -6,7 +6,7 @@ This roadmap outlines the steps required to implement the physics engine describ
 
 - **Goal:** Realise the gravity and floor-height model.
 - **Key Tasks:**
-  - [ ] Define DDlog types and relations for positions, blocks and slopes as detailed in the design document.
+  - [x] Define DDlog types and relations for positions, blocks and slopes as detailed in the design document.
   - [ ] Implement rules calculating `FloorHeightAt` and entity state (`IsUnsupported`/`IsStanding`).
   - [ ] Write Rust integration code to feed world data into DDlog and apply `NewPosition` outputs.
   - [ ] **Behavioural Tests:** Use the BDD approach to verify that entities correctly transition between standing and falling when terrain heights change. Snapshot the resulting DDlog deltas for regression tests.
