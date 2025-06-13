@@ -2,6 +2,20 @@ use bevy::prelude::*;
 use lille::{spawn_world_system, DdlogId, Health, Target, UnitType};
 
 #[test]
+/// Tests that the `spawn_world_system` correctly spawns Civvy, Baddie, static, and camera entities with expected properties.
+///
+/// This test initialises a minimal Bevy app, runs the world-spawning system, and verifies that:
+/// - Exactly one Civvy entity is spawned with `fraidiness` 1.0, a `Target` component, and position near (125.0, 125.0, 0.0).
+/// - Exactly one Baddie entity is spawned with `meanness` 10.0, no `Target` component, and position near (150.0, 150.5, 0.0).
+/// - Exactly one static entity is spawned at position near (50.0, 50.0, 0.0).
+/// - Exactly one camera entity is present.
+/// The test also asserts that all entities with a `Health` component have positive health.
+///
+/// # Examples
+///
+/// ```
+/// spawns_world_entities();
+/// ```
 fn spawns_world_entities() {
     let mut app = App::new();
     app.add_plugins(MinimalPlugins);

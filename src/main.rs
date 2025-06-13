@@ -15,6 +15,9 @@ struct Args {
     verbose: bool,
 }
 
+/// Entry point for the realtime strategy game application.
+///
+/// Parses command-line arguments, configures logging, and launches the Bevy app with custom system scheduling for DDlog integration and world setup.
 fn main() {
     let args = Args::parse();
     init_logging(args.verbose);

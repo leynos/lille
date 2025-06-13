@@ -2,7 +2,24 @@ use bevy::prelude::*;
 
 use crate::components::{DdlogId, Health, Target, UnitType};
 
-/// Convenience builder for a colored sprite at the given position.
+/// Creates a `SpriteBundle` with the specified colour and position.
+///
+/// # Parameters
+///
+/// - `color`: The colour to apply to the sprite.
+/// - `translation`: The position of the sprite in world coordinates.
+///
+/// # Returns
+///
+/// A `SpriteBundle` with the given colour and translation, using default values for other fields.
+///
+/// # Examples
+///
+/// ```
+/// let sprite = basic_sprite(Color::RED, Vec3::new(10.0, 20.0, 0.0));
+/// assert_eq!(sprite.sprite.color, Color::RED);
+/// assert_eq!(sprite.transform.translation, Vec3::new(10.0, 20.0, 0.0));
+/// ```
 fn basic_sprite(color: Color, translation: Vec3) -> SpriteBundle {
     SpriteBundle {
         sprite: Sprite { color, ..default() },
@@ -11,7 +28,17 @@ fn basic_sprite(color: Color, translation: Vec3) -> SpriteBundle {
     }
 }
 
-/// Spawns a minimal demo world directly into the Bevy ECS.
+/// Spawns a fixed set of demo entities and a camera into the Bevy ECS world.
+///
+/// This system creates three entities with unique IDs: a static landmark, a civilian unit with a movement target, and a hostile baddie, each with distinct properties and sprite colours. A default 2D camera is also spawned.
+///
+/// # Examples
+///
+/// ```
+/// App::new()
+///     .add_startup_system(spawn_world_system)
+///     .run();
+/// ```
 pub fn spawn_world_system(mut commands: Commands) {
     let mut next_id: i64 = 1;
 
