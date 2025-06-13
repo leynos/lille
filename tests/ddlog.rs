@@ -16,7 +16,11 @@ fn ddlog_moves_towards_target() {
 
     handle.infer_movement();
     let ent = handle.entities.get(&1).unwrap();
-    assert!(ent.position.x > 0.0);
+    assert!(
+        ent.position.x > 0.1,
+        "Entity did not advance towards target: x={}",
+        ent.position.x
+    );
 }
 
 #[test]
@@ -44,7 +48,8 @@ fn ddlog_flees_from_baddie() {
     handle.infer_movement();
     let ent = handle.entities.get(&1).unwrap();
     assert!(
-        ent.position.x < 0.0,
-        "Civvy did not flee from nearby baddie"
+        ent.position.x < -0.1,
+        "Civvy did not flee from nearby baddie: x={}",
+        ent.position.x
     );
 }

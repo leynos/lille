@@ -13,6 +13,7 @@ fn spawns_world_entities() {
     let mut civvy = 0;
     let mut baddie = 0;
     let mut static_count = 0;
+    let mut cameras = 0;
 
     let mut query = world.query::<(
         Entity,
@@ -33,20 +34,40 @@ fn spawns_world_entities() {
                 civvy += 1;
                 assert!((fraidiness - 1.0).abs() < f32::EPSILON);
                 assert!(target.is_some(), "Civvy missing target");
-                assert_eq!(transform.translation, Vec3::new(125.0, 125.0, 0.0));
+                assert!(
+                    transform
+                        .translation
+                        .abs_diff_eq(Vec3::new(125.0, 125.0, 0.0), f32::EPSILON),
+                    "Unexpected Civvy position: {:?}",
+                    transform.translation
+                );
             }
             Some(UnitType::Baddie { meanness }) => {
                 baddie += 1;
                 assert!((meanness - 10.0).abs() < f32::EPSILON);
                 assert!(target.is_none());
-                assert_eq!(transform.translation, Vec3::new(150.0, 150.5, 0.0));
+                assert!(
+                    transform
+                        .translation
+                        .abs_diff_eq(Vec3::new(150.0, 150.5, 0.0), f32::EPSILON),
+                    "Unexpected Baddie position: {:?}",
+                    transform.translation
+                );
             }
             None => {
                 if dd_id.is_none() {
+                    cameras += 1;
+                    assert!(unit.is_none());
                     continue;
                 }
                 static_count += 1;
-                assert_eq!(transform.translation, Vec3::new(50.0, 50.0, 0.0));
+                assert!(
+                    transform
+                        .translation
+                        .abs_diff_eq(Vec3::new(50.0, 50.0, 0.0), f32::EPSILON),
+                    "Unexpected static position: {:?}",
+                    transform.translation
+                );
             }
         }
     }
@@ -54,4 +75,5 @@ fn spawns_world_entities() {
     assert_eq!(civvy, 1);
     assert_eq!(baddie, 1);
     assert_eq!(static_count, 1);
+    assert_eq!(cameras, 1, "Expected exactly one camera entity");
 }

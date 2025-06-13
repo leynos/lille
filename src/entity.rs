@@ -7,6 +7,7 @@ pub struct Entity {
 
 #[derive(Clone, Debug)]
 pub struct BadGuy {
-    pub entity: Entity,
+    /// The baddie's world position.
+    pub position: Vec3,
     pub meanness: f32,
 }

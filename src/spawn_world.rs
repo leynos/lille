@@ -16,29 +16,30 @@ pub fn spawn_world_system(mut commands: Commands) {
     let mut next_id: i64 = 1;
 
     // Static landmark entity
-    commands.spawn((
-        basic_sprite(Color::GRAY, Vec3::new(50.0, 50.0, 0.0)),
-        DdlogId(next_id),
-    ));
+    commands
+        .spawn(basic_sprite(Color::GRAY, Vec3::new(50.0, 50.0, 0.0)))
+        .insert(DdlogId(next_id));
     next_id += 1;
 
     // Civilian unit with a movement target
-    commands.spawn((
-        basic_sprite(Color::WHITE, Vec3::new(125.0, 125.0, 0.0)),
-        DdlogId(next_id),
-        Health(100),
-        UnitType::Civvy { fraidiness: 1.0 },
-        Target(Vec2::new(202.0, 200.0)),
-    ));
+    commands
+        .spawn(basic_sprite(Color::WHITE, Vec3::new(125.0, 125.0, 0.0)))
+        .insert((
+            DdlogId(next_id),
+            Health(100),
+            UnitType::Civvy { fraidiness: 1.0 },
+            Target(Vec2::new(202.0, 200.0)),
+        ));
     next_id += 1;
 
     // Threatening baddie
-    commands.spawn((
-        basic_sprite(Color::RED, Vec3::new(150.0, 150.5, 0.0)),
-        DdlogId(next_id),
-        Health(100),
-        UnitType::Baddie { meanness: 10.0 },
-    ));
+    commands
+        .spawn(basic_sprite(Color::RED, Vec3::new(150.0, 150.5, 0.0)))
+        .insert((
+            DdlogId(next_id),
+            Health(100),
+            UnitType::Baddie { meanness: 10.0 },
+        ));
     next_id += 1;
     let _ = next_id;
 
