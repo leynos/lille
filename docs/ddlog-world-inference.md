@@ -67,7 +67,7 @@ input relation Position(entity: EntityID, x: Coord, y: Coord)
 input relation Health(entity: EntityID, hp: Health)
 input relation Unit(entity: EntityID, type: UnitType)
 input relation Target(actor: EntityID, tx: Coord, ty: Coord) // Actor’s target destination
-input relation Fraidiness(actor: EntityID, factor: float)    // Corresponds to Actor.fraidiness_factor
+input relation Fraidiness(actor: EntityID, factor: float)    // Corresponds to Actor.fraidiness
 input relation Meanness(baddie: EntityID, factor: float)   // Corresponds to BadGuy.meanness
 
 // --- Input Stream (Per-tick Commands) ---

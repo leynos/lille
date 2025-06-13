@@ -2,8 +2,8 @@ use bevy::log::LogPlugin;
 use bevy::prelude::*;
 use clap::Parser;
 use lille::{
-    apply_ddlog_deltas_system, init_ddlog_system, init_logging, init_world_system,
-    push_state_to_ddlog_system, spawn_world_system,
+    apply_ddlog_deltas_system, init_ddlog_system, init_logging, push_state_to_ddlog_system,
+    spawn_world_system,
 };
 
 /// A realtime strategy game
@@ -15,6 +15,9 @@ struct Args {
     verbose: bool,
 }
 
+/// Entry point for the realtime strategy game application.
+///
+/// Parses command-line arguments, configures logging, and launches the Bevy app with custom system scheduling for DDlog integration and world setup.
 fn main() {
     let args = Args::parse();
     init_logging(args.verbose);
@@ -22,8 +25,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins.build().disable::<LogPlugin>())
         .add_systems(Startup, init_ddlog_system)
-        .add_systems(Startup, init_world_system.after(init_ddlog_system))
-        .add_systems(Startup, spawn_world_system.after(init_world_system))
+        .add_systems(Startup, spawn_world_system.after(init_ddlog_system))
         .add_systems(
             Startup,
             push_state_to_ddlog_system.after(spawn_world_system),
