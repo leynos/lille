@@ -1,6 +1,8 @@
 use glam::Vec2;
 use lille::{ddlog_handle::DdlogEntity, DdlogHandle, UnitType};
 
+const DL_SRC: &str = include_str!("../src/lille.dl");
+
 #[test]
 fn ddlog_moves_towards_target() {
     let mut handle = DdlogHandle::default();
@@ -65,12 +67,28 @@ fn ddlog_flees_from_baddie() {
 
 #[test]
 fn ddlog_program_has_floor_height_rules() {
-    let dl = std::fs::read_to_string("src/lille.dl").expect("read lille.dl");
-    assert!(dl.contains("FloorHeightAt"), "FloorHeightAt rule missing");
-    assert!(dl.contains("IsUnsupported"), "IsUnsupported rule missing");
-    assert!(dl.contains("IsStanding"), "IsStanding rule missing");
     assert!(
-        dl.contains("GRACE_DISTANCE"),
-        "GRACE_DISTANCE constant missing"
+        DL_SRC
+            .split(|c: char| !c.is_alphanumeric() && c != '_')
+            .any(|tok| tok == "FloorHeightAt"),
+        "FloorHeightAt rule missing",
+    );
+    assert!(
+        DL_SRC
+            .split(|c: char| !c.is_alphanumeric() && c != '_')
+            .any(|tok| tok == "IsUnsupported"),
+        "IsUnsupported rule missing",
+    );
+    assert!(
+        DL_SRC
+            .split(|c: char| !c.is_alphanumeric() && c != '_')
+            .any(|tok| tok == "IsStanding"),
+        "IsStanding rule missing",
+    );
+    assert!(
+        DL_SRC
+            .split(|c: char| !c.is_alphanumeric() && c != '_')
+            .any(|tok| tok == "GRACE_DISTANCE"),
+        "GRACE_DISTANCE constant missing",
     );
 }
