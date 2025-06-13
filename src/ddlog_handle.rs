@@ -55,92 +55,89 @@ impl DdlogHandle {
             .max_by_key(|b| b.z)
     }
 
-    /// Calculates the floor height at `(x, y)` given a block base and slope.
-    pub fn floor_height_at(
-        block_x: f32,
-        block_y: f32,
-        block_z: f32,
-        grad_x: f32,
-        grad_y: f32,
-        x: f32,
-        y: f32,
-    ) -> f32 {
-        block_z + 1.0 + (x - block_x) * grad_x + (y - block_y) * grad_y
+    /// Calculates the floor height at `(x, y)` relative to a block.
+    pub fn floor_height_at(block: &Block, slope: Option<&BlockSlope>, x: f32, y: f32) -> f32 {
+        let base = block.z as f32 + 1.0;
+        if let Some(s) = slope {
+            base + (x - block.x as f32) * s.grad_x + (y - block.y as f32) * s.grad_y
+        } else {
+            base
+        }
     }
 
     fn floor_height_at_point(&self, x: f32, y: f32) -> f32 {
         let x_grid = x.floor() as i32;
         let y_grid = y.floor() as i32;
         if let Some(block) = self.highest_block_at(x_grid, y_grid) {
-            if let Some(slope) = self.slopes.get(&block.id) {
-                DdlogHandle::floor_height_at(
-                    block.x as f32,
-                    block.y as f32,
-                    block.z as f32,
-                    slope.grad_x,
-                    slope.grad_y,
-                    x,
-                    y,
-                )
-            } else {
-                (block.z as f32) + 1.0
-            }
+            let slope = self.slopes.get(&block.id);
+            DdlogHandle::floor_height_at(block, slope, x, y)
         } else {
             0.0
         }
+    }
+
+    fn apply_gravity(&self, pos: &mut Vec3, floor: f32) {
+        if pos.z > floor + GRACE_DISTANCE {
+            pos.z += GRAVITY_PULL;
+        } else {
+            pos.z = floor;
+        }
+    }
+
+    fn civvy_move(&self, id: i64, ent: &DdlogEntity, pos: Vec3) -> Vec2 {
+        let fraidiness = match ent.unit {
+            UnitType::Civvy { fraidiness } => fraidiness,
+            _ => return Vec2::ZERO,
+        };
+
+        let mut min_d2 = f32::INFINITY;
+        let mut closest = None;
+        let mut total_fear = 0.0;
+
+        for (&bid, b_ent) in self.entities.iter() {
+            if let UnitType::Baddie { meanness } = b_ent.unit {
+                if bid == id {
+                    continue;
+                }
+                let to_actor = pos.truncate() - b_ent.position.truncate();
+                let d2 = to_actor.length_squared();
+                let fear_radius = fraidiness * meanness * 2.0;
+                if d2 < fear_radius * fear_radius {
+                    total_fear += 1.0 / (d2 + 0.001);
+                }
+                if d2 < min_d2 {
+                    min_d2 = d2;
+                    closest = Some(b_ent.position);
+                }
+            }
+        }
+
+        if total_fear > 0.2 {
+            if let Some(b_pos) = closest {
+                return Vec2::new((pos.x - b_pos.x).signum(), (pos.y - b_pos.y).signum());
+            }
+        } else if let Some(target) = ent.target {
+            return Vec2::new((target.x - pos.x).signum(), (target.y - pos.y).signum());
+        }
+
+        Vec2::ZERO
+    }
+
+    fn compute_entity_update(&self, id: i64, ent: &DdlogEntity) -> Vec3 {
+        let floor = self.floor_height_at_point(ent.position.x, ent.position.y);
+        let mut pos = ent.position;
+        self.apply_gravity(&mut pos, floor);
+        let delta = self.civvy_move(id, ent, pos);
+        pos.x += delta.x;
+        pos.y += delta.y;
+        pos
     }
 
     pub fn step(&mut self) {
         let updates: Vec<(i64, Vec3)> = self
             .entities
             .iter()
-            .map(|(&id, ent)| {
-                let floor = self.floor_height_at_point(ent.position.x, ent.position.y);
-                let mut pos = ent.position;
-                if pos.z > floor + GRACE_DISTANCE {
-                    pos.z += GRAVITY_PULL;
-                } else {
-                    pos.z = floor;
-                }
-                if let UnitType::Civvy { fraidiness } = ent.unit {
-                    let mut min_d2 = f32::INFINITY;
-                    let mut closest = None;
-                    let mut total_fear = 0.0;
-                    for (&bid, b_ent) in self.entities.iter() {
-                        if let UnitType::Baddie { meanness } = b_ent.unit {
-                            if bid == id {
-                                continue;
-                            }
-                            let to_actor = pos.truncate() - b_ent.position.truncate();
-                            let d2 = to_actor.length_squared();
-                            let fear_radius = fraidiness * meanness * 2.0;
-                            if d2 < fear_radius * fear_radius {
-                                total_fear += 1.0 / (d2 + 0.001);
-                            }
-                            if d2 < min_d2 {
-                                min_d2 = d2;
-                                closest = Some(b_ent.position);
-                            }
-                        }
-                    }
-
-                    let mut dx = 0.0;
-                    let mut dy = 0.0;
-                    if total_fear > 0.2 {
-                        if let Some(b_pos) = closest {
-                            dx = (pos.x - b_pos.x).signum();
-                            dy = (pos.y - b_pos.y).signum();
-                        }
-                    } else if let Some(target) = ent.target {
-                        dx = (target.x - pos.x).signum();
-                        dy = (target.y - pos.y).signum();
-                    }
-
-                    pos.x += dx;
-                    pos.y += dy;
-                }
-                (id, pos)
-            })
+            .map(|(&id, ent)| (id, self.compute_entity_update(id, ent)))
             .collect();
 
         self.deltas.clear();

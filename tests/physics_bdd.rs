@@ -113,25 +113,9 @@ fn entity_on_sloped_surface() {
     // WHEN: We calculate the expected floor height at the entity's (x, y)
     let block = app.world.entity(block_entity).get::<Block>().unwrap();
     let slope = app.world.entity(block_entity).get::<BlockSlope>().unwrap();
-    let expected_floor = DdlogHandle::floor_height_at(
-        block.x as f32,
-        block.y as f32,
-        block.z as f32,
-        slope.grad_x,
-        slope.grad_y,
-        entity_x,
-        entity_y,
-    );
+    let expected_floor = DdlogHandle::floor_height_at(block, Some(slope), entity_x, entity_y);
 
     // THEN: The helper should compute the same floor height
-    let actual = DdlogHandle::floor_height_at(
-        block.x as f32,
-        block.y as f32,
-        block.z as f32,
-        slope.grad_x,
-        slope.grad_y,
-        entity_x,
-        entity_y,
-    );
+    let actual = DdlogHandle::floor_height_at(block, Some(slope), entity_x, entity_y);
     assert!((actual - expected_floor).abs() < 1e-6);
 }
