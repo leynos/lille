@@ -4,13 +4,49 @@ typedef BlockID = signed<64>
 // Continuous coordinate used for sub-block precision
 typedef GCoord = float
 
+// --- Physics Constants ---
+const GRACE_DISTANCE: GCoord = 0.1
+
 // --- World Geometry Relations ---
 input relation Block(id: BlockID, x: signed32, y: signed32, z: signed32)
 input relation BlockSlope(block: BlockID, grad_x: GCoord, grad_y: GCoord)
 
+// Finds the highest block at a given (x,y) grid location.
+relation HighestBlockAt(x_grid: signed32, y_grid: signed32, block: BlockID, z_grid: signed32) :-
+    Block(block, x_grid, y_grid, z_grid),
+    not Block(_, x_grid, y_grid, z_grid + 1).
+
+// Calculates the floor Z coordinate at a given continuous (x,y) position when the block has a slope.
+relation FloorHeightAt(x: GCoord, y: GCoord, z_floor: GCoord) :-
+    var x_grid = floor(x),
+    var y_grid = floor(y),
+    HighestBlockAt(x_grid, y_grid, block, z_grid),
+    BlockSlope(block, grad_x, grad_y),
+    var x_in_block = x - x_grid,
+    var y_in_block = y - y_grid,
+    z_floor = (z_grid as GCoord) + 1.0 + (x_in_block * grad_x) + (y_in_block * grad_y).
+
+// Calculates the floor Z coordinate for a flat block.
+relation FloorHeightAt(x: GCoord, y: GCoord, z_floor: GCoord) :-
+    var x_grid = floor(x),
+    var y_grid = floor(y),
+    HighestBlockAt(x_grid, y_grid, block, z_grid),
+    not BlockSlope(block, _, _),
+    z_floor = (z_grid as GCoord) + 1.0.
+
 // --- Entity Position Relations ---
 input relation Position(entity: EntityID, x: GCoord, y: GCoord, z: GCoord)
 output relation NewPosition(entity: EntityID, x: GCoord, y: GCoord, z: GCoord)
+
+// --- Entity State Relations ---
+relation IsUnsupported(entity: EntityID) :-
+    Position(entity, x, y, z),
+    FloorHeightAt(x, y, z_floor),
+    z > z_floor + GRACE_DISTANCE.
+
+relation IsStanding(entity: EntityID) :-
+    Position(entity, _, _, _),
+    not IsUnsupported(entity).
 
 // Placeholder rule mirroring input to output
 NewPosition(e, x, y, z) :- Position(e, x, y, z).
