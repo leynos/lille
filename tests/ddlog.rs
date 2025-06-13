@@ -24,6 +24,15 @@ fn ddlog_moves_towards_target() {
 }
 
 #[test]
+/// Tests that a civilian entity flees away from a nearby baddie after movement inference.
+///
+/// This test sets up a civilian at the origin with a target position and a baddie nearby. After calling `infer_movement()`, it asserts that the civilian's x-position is negative, confirming it moved away from the threat.
+///
+/// # Examples
+///
+/// ```
+/// ddlog_flees_from_baddie();
+/// ```
 fn ddlog_flees_from_baddie() {
     let mut handle = DdlogHandle::default();
     handle.entities.insert(
