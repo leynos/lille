@@ -1,6 +1,8 @@
 use glam::Vec2;
 use lille::{ddlog_handle::DdlogEntity, DdlogHandle, UnitType};
 
+const DL_SRC: &str = include_str!("../src/lille.dl");
+
 #[test]
 fn ddlog_moves_towards_target() {
     let mut handle = DdlogHandle::default();
@@ -60,5 +62,33 @@ fn ddlog_flees_from_baddie() {
         ent.position.x < -0.1,
         "Civvy did not flee from nearby baddie: x={}",
         ent.position.x
+    );
+}
+
+#[test]
+fn ddlog_program_has_floor_height_rules() {
+    assert!(
+        DL_SRC
+            .split(|c: char| !c.is_alphanumeric() && c != '_')
+            .any(|tok| tok == "FloorHeightAt"),
+        "FloorHeightAt rule missing",
+    );
+    assert!(
+        DL_SRC
+            .split(|c: char| !c.is_alphanumeric() && c != '_')
+            .any(|tok| tok == "IsUnsupported"),
+        "IsUnsupported rule missing",
+    );
+    assert!(
+        DL_SRC
+            .split(|c: char| !c.is_alphanumeric() && c != '_')
+            .any(|tok| tok == "IsStanding"),
+        "IsStanding rule missing",
+    );
+    assert!(
+        DL_SRC
+            .split(|c: char| !c.is_alphanumeric() && c != '_')
+            .any(|tok| tok == "GRACE_DISTANCE"),
+        "GRACE_DISTANCE constant missing",
     );
 }
