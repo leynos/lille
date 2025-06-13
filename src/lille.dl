@@ -1,7 +1,16 @@
 typedef EntityID = signed<64>
-typedef Coord = signed<32>
+typedef BlockID = signed<64>
 
-input relation Position(entity: EntityID, x: Coord, y: Coord)
-output relation NewPosition(entity: EntityID, x: Coord, y: Coord)
+// Continuous coordinate used for sub-block precision
+typedef GCoord = float
 
-NewPosition(e, x, y) :- Position(e, x, y).
+// --- World Geometry Relations ---
+input relation Block(id: BlockID, x: signed32, y: signed32, z: signed32)
+input relation BlockSlope(block: BlockID, grad_x: GCoord, grad_y: GCoord)
+
+// --- Entity Position Relations ---
+input relation Position(entity: EntityID, x: GCoord, y: GCoord, z: GCoord)
+output relation NewPosition(entity: EntityID, x: GCoord, y: GCoord, z: GCoord)
+
+// Placeholder rule mirroring input to output
+NewPosition(e, x, y, z) :- Position(e, x, y, z).
