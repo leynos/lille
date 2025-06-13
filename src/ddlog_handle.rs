@@ -55,14 +55,33 @@ impl DdlogHandle {
             .max_by_key(|b| b.z)
     }
 
-    fn floor_height_at(&self, x: f32, y: f32) -> f32 {
+    /// Calculates the floor height at `(x, y)` given a block base and slope.
+    pub fn floor_height_at(
+        block_x: f32,
+        block_y: f32,
+        block_z: f32,
+        grad_x: f32,
+        grad_y: f32,
+        x: f32,
+        y: f32,
+    ) -> f32 {
+        block_z + 1.0 + (x - block_x) * grad_x + (y - block_y) * grad_y
+    }
+
+    fn floor_height_at_point(&self, x: f32, y: f32) -> f32 {
         let x_grid = x.floor() as i32;
         let y_grid = y.floor() as i32;
         if let Some(block) = self.highest_block_at(x_grid, y_grid) {
             if let Some(slope) = self.slopes.get(&block.id) {
-                let x_in_block = x - x_grid as f32;
-                let y_in_block = y - y_grid as f32;
-                (block.z as f32) + 1.0 + x_in_block * slope.grad_x + y_in_block * slope.grad_y
+                DdlogHandle::floor_height_at(
+                    block.x as f32,
+                    block.y as f32,
+                    block.z as f32,
+                    slope.grad_x,
+                    slope.grad_y,
+                    x,
+                    y,
+                )
             } else {
                 (block.z as f32) + 1.0
             }
@@ -76,7 +95,7 @@ impl DdlogHandle {
             .entities
             .iter()
             .map(|(&id, ent)| {
-                let floor = self.floor_height_at(ent.position.x, ent.position.y);
+                let floor = self.floor_height_at_point(ent.position.x, ent.position.y);
                 let mut pos = ent.position;
                 if pos.z > floor + GRACE_DISTANCE {
                     pos.z += GRAVITY_PULL;
@@ -127,18 +146,16 @@ impl DdlogHandle {
         self.deltas.clear();
         for (id, pos) in updates {
             if let Some(ent) = self.entities.get_mut(&id) {
-                ent.position = pos;
+                if pos != ent.position {
+                    ent.position = pos;
+                    self.deltas.push(NewPosition {
+                        entity: id,
+                        x: pos.x,
+                        y: pos.y,
+                        z: pos.z,
+                    });
+                }
             }
-            self.deltas.push(NewPosition {
-                entity: id,
-                x: pos.x,
-                y: pos.y,
-                z: pos.z,
-            });
         }
-    }
-
-    pub fn infer_movement(&mut self) {
-        self.step();
     }
 }

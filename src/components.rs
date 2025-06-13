@@ -26,7 +26,7 @@ pub struct Block {
 
 #[derive(Component, Debug, Clone, Serialize)]
 pub struct BlockSlope {
-    pub block: i64,
+    pub block_id: i64,
     pub grad_x: f32,
     pub grad_y: f32,
 }

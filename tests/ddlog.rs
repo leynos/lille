@@ -16,7 +16,7 @@ fn ddlog_moves_towards_target() {
         },
     );
 
-    handle.infer_movement();
+    handle.step();
     let ent = handle.entities.get(&1).unwrap();
     assert!(
         ent.position.x > 0.1,
@@ -28,7 +28,7 @@ fn ddlog_moves_towards_target() {
 #[test]
 /// Tests that a civilian entity flees away from a nearby baddie after movement inference.
 ///
-/// This test sets up a civilian at the origin with a target position and a baddie nearby. After calling `infer_movement()`, it asserts that the civilian's x-position is negative, confirming it moved away from the threat.
+/// This test sets up a civilian at the origin with a target position and a baddie nearby. After calling `step()`, it asserts that the civilian's x-position is negative, confirming it moved away from the threat.
 ///
 /// # Examples
 ///
@@ -56,7 +56,7 @@ fn ddlog_flees_from_baddie() {
         },
     );
 
-    handle.infer_movement();
+    handle.step();
     let ent = handle.entities.get(&1).unwrap();
     assert!(
         ent.position.x < -0.1,
