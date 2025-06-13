@@ -9,6 +9,7 @@ use lille::{spawn_world_system, DdlogId, Health, Target, UnitType};
 /// - Exactly one Baddie entity is spawned with `meanness` 10.0, no `Target` component, and position near (150.0, 150.5, 0.0).
 /// - Exactly one static entity is spawned at position near (50.0, 50.0, 0.0).
 /// - Exactly one camera entity is present.
+///
 /// The test also asserts that all entities with a `Health` component have positive health.
 ///
 /// # Examples

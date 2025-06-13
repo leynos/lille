@@ -15,7 +15,9 @@ use crate::components::{DdlogId, Health, Target, UnitType};
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore
+/// use bevy::prelude::*;
+/// use lille::spawn_world::basic_sprite;
 /// let sprite = basic_sprite(Color::RED, Vec3::new(10.0, 20.0, 0.0));
 /// assert_eq!(sprite.sprite.color, Color::RED);
 /// assert_eq!(sprite.transform.translation, Vec3::new(10.0, 20.0, 0.0));
@@ -34,7 +36,9 @@ fn basic_sprite(color: Color, translation: Vec3) -> SpriteBundle {
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore
+/// use bevy::prelude::*;
+/// use lille::spawn_world::spawn_world_system;
 /// App::new()
 ///     .add_startup_system(spawn_world_system)
 ///     .run();
