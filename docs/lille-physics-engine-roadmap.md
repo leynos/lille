@@ -9,7 +9,7 @@ This roadmap outlines the steps required to implement the physics engine describ
   - [x] Define DDlog types and relations for positions, blocks and slopes as detailed in the design document.
   - [ ] **Implement the `FloorHeightAt`, `IsUnsupported`, and `IsStanding` rules in DDlog.**
     These relations are part of the logic layer and should be expressed as declarative DDlog rules,
-    not re‑implemented imperatively in Rust.
+    not re-implemented imperatively in Rust.
   - [ ] Write Rust integration code to feed world data into DDlog and apply `NewPosition` outputs.
   - [ ] **Behavioural Tests:** Use the BDD approach to verify that entities correctly transition between standing and falling when terrain heights change. Snapshot the resulting DDlog deltas for regression tests.
 
