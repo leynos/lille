@@ -2,7 +2,7 @@
 
 A simple real-time strategy prototype demonstrating a DDlog-driven game loop
 with Bevy rendering. The project currently implements "Phase 1" of the migration
-roadmap, synchronising the legacy `GameWorld` state into Bevy and rendering
+roadmap, synchronizing the legacy `GameWorld` state into Bevy and rendering
 static entities.
 
 ## Game Setting
@@ -51,6 +51,6 @@ so that `cargo build` can locate the `ddlog` compiler and standard library
 without additional setup.
 
 The script downloads DDlog v1.2.3 into `~/.local/ddlog` and writes environment
-variable assignments to `.env`. If that file already exists it will be backed up
+variable assignments to `.env`. If that file already exists, it will be backed up
 with a `.bak` suffix before being replaced. Any existing directory at
-`~/.local/ddlog` will be removed prior to extraction.
+`~/.local/ddlog` will be removed before extraction.
