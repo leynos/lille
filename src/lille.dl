@@ -7,8 +7,17 @@ typedef GCoord = float
 import fp
 import souffle_lib
 
+extern function vec_mag(x: GCoord, y: GCoord, z: GCoord): GCoord
+extern function vec_normalize(x: GCoord, y: GCoord, z: GCoord): (GCoord, GCoord, GCoord)
+
 // --- Physics Constants ---
 const GRACE_DISTANCE: GCoord = 0.1
+
+// Phase 2 constants
+const GROUND_FRICTION: GCoord = 0.1
+const AIR_FRICTION: GCoord = 0.02
+const TERMINAL_VELOCITY: GCoord = 2.0
+const GRAVITY_PULL: GCoord = -1.0
 
 
 // --- World Geometry Relations ---
@@ -55,7 +64,10 @@ FloorHeightAt(x, y, z_out) :-
 
 // --- Entity Position Relations ---
 input relation Position(entity: EntityID, x: GCoord, y: GCoord, z: GCoord)
+input relation Velocity(entity: EntityID, vx: GCoord, vy: GCoord, vz: GCoord)
+input stream Force(entity: EntityID, fx: GCoord, fy: GCoord, fz: GCoord)
 output relation NewPosition(entity: EntityID, x: GCoord, y: GCoord, z: GCoord)
+output relation NewVelocity(entity: EntityID, nvx: GCoord, nvy: GCoord, nvz: GCoord)
 
 // --- Entity State Relations ---
 relation MaxFloor(x: GCoord, y: GCoord, z_max: GCoord)
@@ -73,6 +85,56 @@ relation IsStanding(entity: EntityID)
 IsStanding(entity) :-
     Position(entity, _, _, _),
     not IsUnsupported(entity).
+
+// --- Dynamics ---
+relation AppliedAcceleration(e: EntityID, ax: GCoord, ay: GCoord, az: GCoord)
+AppliedAcceleration(e, fx, fy, fz) :- Force(e, fx, fy, fz).
+
+relation GravitationalAcceleration(e: EntityID, ax: GCoord, ay: GCoord, az: GCoord)
+GravitationalAcceleration(e, 0.0, 0.0, -GRAVITY_PULL) :- IsUnsupported(e).
+
+relation FrictionalDeceleration(e: EntityID, ax: GCoord, ay: GCoord, az: GCoord)
+FrictionalDeceleration(e, fdx, fdy, 0.0) :-
+    IsStanding(e),
+    Velocity(e, vx, vy, _),
+    var h_mag = vec_mag(vx, vy, 0.0), h_mag > 0.0,
+    var (nx, ny, _) = vec_normalize(vx, vy, 0.0),
+    var decel_mag = min(h_mag, GROUND_FRICTION),
+    fdx = -nx * decel_mag, fdy = -ny * decel_mag.
+
+FrictionalDeceleration(e, fdx, fdy, 0.0) :-
+    IsUnsupported(e),
+    Velocity(e, vx, vy, _),
+    var h_mag = vec_mag(vx, vy, 0.0), h_mag > 0.0,
+    var (nx, ny, _) = vec_normalize(vx, vy, 0.0),
+    var decel_mag = min(h_mag, AIR_FRICTION),
+    fdx = -nx * decel_mag, fdy = -ny * decel_mag.
+
+relation NetAcceleration(e: EntityID, ax: GCoord, ay: GCoord, az: GCoord)
+NetAcceleration(e, ax, ay, az) :-
+    agg(e) sum (
+        ax = aax + gax + fax,
+        ay = aay + gay + fay,
+        az = aaz + gaz + faz
+    ) from (
+        (AppliedAcceleration(e, aax, aay, aaz) or (aax=0.0, aay=0.0, aaz=0.0)) and
+        (GravitationalAcceleration(e, gax, gay, gaz) or (gax=0.0, gay=0.0, gaz=0.0)) and
+        (FrictionalDeceleration(e, fax, fay, faz) or (fax=0.0, fay=0.0, faz=0.0))
+    ).
+
+relation UnclampedNewVelocity(e: EntityID, vx: GCoord, vy: GCoord, vz: GCoord)
+UnclampedNewVelocity(e, vx + ax, vy + ay, vz + az) :-
+    Velocity(e, vx, vy, vz),
+    NetAcceleration(e, ax, ay, az).
+
+NewVelocity(e, nvx, nvy, final_nvz) :-
+    IsUnsupported(e),
+    UnclampedNewVelocity(e, nvx, nvy, raw_nvz),
+    var final_nvz = max(raw_nvz, -TERMINAL_VELOCITY).
+
+NewVelocity(e, nvx, nvy, 0.0) :-
+    IsStanding(e),
+    UnclampedNewVelocity(e, nvx, nvy, _).
 
 // Placeholder rule mirroring input to output
 NewPosition(e, x, y, z) :- Position(e, x, y, z).

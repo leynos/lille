@@ -91,4 +91,13 @@ fn ddlog_program_has_floor_height_rules() {
             .any(|tok| tok == "GRACE_DISTANCE"),
         "GRACE_DISTANCE constant missing",
     );
+    for token in ["Velocity", "Force", "NewVelocity", "FrictionalDeceleration"] {
+        assert!(
+            DL_SRC
+                .split(|c: char| !c.is_alphanumeric() && c != '_')
+                .any(|tok| tok == token),
+            "{} rule or relation missing",
+            token
+        );
+    }
 }
