@@ -10,7 +10,9 @@ This document describes the JSON/MessagePack structure used to represent maps in
   "block_types": {},
   "entity_defs": {},
   "map": [ layer0, layer1, ... ],
-  "entities": []
+  "entities": [],
+  "block_palette": [],
+  "entity_palette": []
 }
 ```
 
@@ -32,24 +34,20 @@ erDiagram
         int[] dimensions
         object block_types "Map<String, BlockType>"
         object entity_defs "Map<String, EntityDefinition>"
-        array map "3D grid of Block References or null"
+        array map "3D grid of BlockType IDs or indices or null"
         array entities "List of EntityInstance"
         string[] block_palette "Optional: stores block type IDs"
         string[] entity_palette "Optional: stores entity definition IDs"
     }
     BlockType {
         string id "Implicit key in MapDocument.block_types"
-        json passability
+        object passability
         int[] slope_dir
     }
     EntityDefinition {
         string id "Implicit key in MapDocument.entity_defs"
         string extends "Optional, refers to another EntityDefinition.id"
         json properties
-    }
-    MapCellReference {
-        string block_or_index_reference "BlockType.id OR integer index into MapDocument.block_palette"
-        boolean is_null
     }
     EntityInstance {
         string type_or_index_reference "EntityDefinition.id OR integer index into MapDocument.entity_palette"
@@ -59,7 +57,6 @@ erDiagram
 
     MapDocument ||--o{ BlockType : "defines_block_types"
     MapDocument ||--o{ EntityDefinition : "defines_entity_definitions"
-    MapDocument ||--o{ MapCellReference : "map_composed_of"
     MapDocument ||--o{ EntityInstance : "contains_entity_instances"
 
     EntityDefinition }o--o| EntityDefinition : "extends"
@@ -148,8 +145,10 @@ archetype defaults. Position is a mandatory `[x,y,z]` triple.
   integer tokens. Add a `block_palette` array listing block IDs and an
   `entity_palette` array listing entity template IDs. In the `map` and
   `entities` array, references are stored as integer indices into these
-  palettes. Tools may choose to emit either the palettized form or the
-  original strings.
+  palettes. Tools may emit either the palettized form or the original strings,
+  but a single document should use one approach consistently. If either palette
+  array is present, the engine should read IDs by index; if both palettes are
+  absent, references are plain strings.
 
 ## 7. Minimal example
 
