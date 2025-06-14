@@ -1,21 +1,33 @@
 use glam::{Vec2, Vec3};
 use lille::{ddlog_handle::DdlogEntity, DdlogHandle, UnitType};
+use once_cell::sync::Lazy;
 use regex::Regex;
 use std::collections::HashSet;
 
 const DL_SRC: &str = include_str!("../src/lille.dl");
 
-fn parsed_relations() -> HashSet<String> {
-    let re = Regex::new(
+static REL_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
         r"(?m)^\s*(?:input\s+(?:relation|stream)|output\s+relation|relation)\s+([A-Za-z_][A-Za-z0-9_]*)",
     )
-    .unwrap();
-    re.captures_iter(DL_SRC).map(|c| c[1].to_string()).collect()
+    .unwrap()
+});
+
+fn parsed_relations() -> HashSet<String> {
+    REL_RE
+        .captures_iter(DL_SRC)
+        .map(|c| c[1].to_string())
+        .collect()
 }
 
+static CONST_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?m)^\s*const\s+([A-Za-z_][A-Za-z0-9_]*)").unwrap());
+
 fn parsed_constants() -> HashSet<String> {
-    let re = Regex::new(r"(?m)^\s*const\s+([A-Za-z_][A-Za-z0-9_]*)").unwrap();
-    re.captures_iter(DL_SRC).map(|c| c[1].to_string()).collect()
+    CONST_RE
+        .captures_iter(DL_SRC)
+        .map(|c| c[1].to_string())
+        .collect()
 }
 
 #[test]
