@@ -54,6 +54,41 @@ fn add(a: i32, b: i32) -> i32 {
 }
 ```
 
+## API doc comments
+
+Use doc comments to document public APIs. Keep them consistent with the
+contents of the manual.
+
+- Begin each block with `///`.
+- Keep the summary line short, followed by further detail.
+- Explicitly document all parameters with `# Parameters`, describing each argument.
+- Document the return value with `# Returns`.
+- Document any panics or errors with `# Panics` or `# Errors` as appropriate.
+- Place examples under `# Examples` and mark the code block with `no_run` so
+  they do not execute during documentation tests.
+- Put function attributes after the doc comment.
+
+```rust
+/// Returns the sum of `a` and `b`.
+///
+/// # Parameters
+/// - `a`: The first integer to add.
+/// - `b`: The second integer to add.
+///
+/// # Returns
+/// The sum of `a` and `b`.
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// assert_eq!(add(2, 3), 5);
+/// ```
+#[inline]
+pub fn add(a: i32, b: i32) -> i32 {
+    a + b
+}
+```
+
 ## Diagrams and images
 
 Where it adds clarity, include [Mermaid](https://mermaid.js.org/) diagrams. When
