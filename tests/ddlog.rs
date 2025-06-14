@@ -66,6 +66,19 @@ fn ddlog_flees_from_baddie() {
 }
 
 #[test]
+/// Verifies that the Datalog source includes required rules and relations for floor height and movement.
+///
+/// Asserts that the source string contains the tokens "FloorHeightAt", "IsUnsupported", "IsStanding", "GRACE_DISTANCE", "Velocity", "Force", "NewVelocity", and "FrictionalDeceleration".
+///
+/// # Panics
+///
+/// Panics if any of the required rules or relations are missing from the source.
+///
+/// # Examples
+///
+/// ```
+/// ddlog_program_has_floor_height_rules(); // Should not panic if all rules are present
+/// ```
 fn ddlog_program_has_floor_height_rules() {
     assert!(
         DL_SRC
