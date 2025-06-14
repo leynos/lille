@@ -31,6 +31,7 @@ these rules to keep the documentation clear and consistent for developers.
 - Always use fenced code blocks with a language identifier;
   use `plaintext` for non-code text.
 - Use `-` as the first level bullet and renumber lists when items change.
+- Prefer inline links using `[text](url)` or angle brackets around the URL.
 
 ## Expanding acronyms
 
@@ -53,9 +54,12 @@ fn add(a: i32, b: i32) -> i32 {
 }
 ```
 
-## Diagrams
+## Diagrams and images
 
-Where it adds clarity, include [Mermaid](https://mermaid.js.org/) diagrams.
+Where it adds clarity, include [Mermaid](https://mermaid.js.org/) diagrams. When
+embedding figures, use `![alt text](path/to/image)` and provide concise alt text
+describing the content. Add a short description before each Mermaid diagram so
+screen readers can understand it.
 
 ```mermaid
 flowchart TD
