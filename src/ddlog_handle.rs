@@ -83,7 +83,6 @@ impl DdlogHandle {
             pos.z = floor;
         }
     }
-
     fn civvy_move(&self, id: i64, ent: &DdlogEntity, pos: Vec3) -> Vec2 {
         let fraidiness = match ent.unit {
             UnitType::Civvy { fraidiness } => fraidiness,

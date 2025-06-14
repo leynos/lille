@@ -4,55 +4,73 @@ typedef BlockID = signed<64>
 // Continuous coordinate used for sub-block precision
 typedef GCoord = float
 
+import fp
+import souffle_lib
+
 // --- Physics Constants ---
 const GRACE_DISTANCE: GCoord = 0.1
 
+
 // --- World Geometry Relations ---
-input relation Block(id: BlockID, x: signed32, y: signed32, z: signed32)
+input relation Block(id: BlockID, x: signed<32>, y: signed<32>, z: signed<32>)
 input relation BlockSlope(block: BlockID, grad_x: GCoord, grad_y: GCoord)
 
 // 1. Aggregate highest Z per (x,y)
-relation HighestZAt(x_grid: signed32, y_grid: signed32, z_top: signed32) :-
-    z_top = max(z) (Block(_, x_grid, y_grid, z)).
+relation HighestZAt(x_grid: signed<32>, y_grid: signed<32>, z_top: signed<32>)
+HighestZAt(x_grid, y_grid, z_top) :-
+    Block(_, x_grid, y_grid, z),
+    var z_top = z.group_by((x_grid, y_grid)).max().
 
 // 2. Produce the matching block id
-relation HighestBlockAt(x_grid: signed32, y_grid: signed32, block: BlockID, z_grid: signed32) :-
+relation HighestBlockAt(x_grid: signed<32>, y_grid: signed<32>, block: BlockID, z_grid: signed<32>)
+HighestBlockAt(x_grid, y_grid, block, z_grid) :-
     Block(block, x_grid, y_grid, z_grid),
     HighestZAt(x_grid, y_grid, z_grid).
 
 // Calculates the floor Z coordinate at a given continuous (x,y) position when the block has a slope.
-relation FloorHeightAt(x: GCoord, y: GCoord, z_floor: GCoord) :-
-    var x_grid = floor(x),
-    var y_grid = floor(y),
+relation FloorHeightAt(x: GCoord, y: GCoord, z_floor: GCoord)
+FloorHeightAt(x, y, z_out) :-
+    Position(_, x, y, _),
+    var x_grid_f = floor_f(x),
+    var y_grid_f = floor_f(y),
+    var x_grid = ftoi(x_grid_f as double),
+    var y_grid = ftoi(y_grid_f as double),
     HighestBlockAt(x_grid, y_grid, block, z_grid),
     BlockSlope(block, grad_x, grad_y),
-    var x_in_block = x - x_grid,
-    var y_in_block = y - y_grid,
+    var x_in_block = x - x_grid_f,
+    var y_in_block = y - y_grid_f,
     var z_base: GCoord = z_grid as GCoord + 1.0,
-    z_floor = z_base + (x_in_block * grad_x) + (y_in_block * grad_y).
+    var z_out = z_base + (x_in_block * grad_x) + (y_in_block * grad_y).
 
 // Calculates the floor Z coordinate for a flat block.
-relation FloorHeightAt(x: GCoord, y: GCoord, z_floor: GCoord) :-
-    var x_grid = floor(x),
-    var y_grid = floor(y),
+FloorHeightAt(x, y, z_out) :-
+    Position(_, x, y, _),
+    var x_grid_f = floor_f(x),
+    var y_grid_f = floor_f(y),
+    var x_grid = ftoi(x_grid_f as double),
+    var y_grid = ftoi(y_grid_f as double),
     HighestBlockAt(x_grid, y_grid, block, z_grid),
     not BlockSlope(block, _, _),
-    z_floor = (z_grid as GCoord) + 1.0.
+    var z_out = (z_grid as GCoord) + 1.0.
 
 // --- Entity Position Relations ---
 input relation Position(entity: EntityID, x: GCoord, y: GCoord, z: GCoord)
 output relation NewPosition(entity: EntityID, x: GCoord, y: GCoord, z: GCoord)
 
 // --- Entity State Relations ---
-relation MaxFloor(x: GCoord, y: GCoord, z_max: GCoord) :-
-    z_max = max(z) (FloorHeightAt(x, y, z)).
+relation MaxFloor(x: GCoord, y: GCoord, z_max: GCoord)
+MaxFloor(x, y, z_max) :-
+    FloorHeightAt(x, y, z),
+    var z_max = z.group_by((x, y)).max().
 
-relation IsUnsupported(entity: EntityID) :-
+relation IsUnsupported(entity: EntityID)
+IsUnsupported(entity) :-
     Position(entity, x, y, z),
     MaxFloor(x, y, z_floor),
     z > z_floor + GRACE_DISTANCE.
 
-relation IsStanding(entity: EntityID) :-
+relation IsStanding(entity: EntityID)
+IsStanding(entity) :-
     Position(entity, _, _, _),
     not IsUnsupported(entity).
 
