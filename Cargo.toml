@@ -21,3 +21,4 @@ reqwest = { version = "0.11", features = ["blocking"] }  # For downloading font 
 [dev-dependencies]
 insta = { version = "1.38.0", features = ["ron"] }
 rstest = "0.18.0"
+regex = "1"
