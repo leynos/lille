@@ -1,16 +1,16 @@
 # Map Data Format
 
-This document describes the JSON/MessagePack structure used to represent maps in Lille. The layout is identical whether serialized as human‑readable JSON or as a binary MessagePack payload.
+This document describes the JSON/MessagePack structure used to represent maps in the Lille engine. The layout is identical whether serialized as human‑readable JSON or as a binary MessagePack payload.
 
 ## 1. Top-level object
 
-```jsonc
+```json
 {
   "dimensions": [width, height, depth],
-  "block_types": { /* ... */ },
-  "entity_defs": { /* ... */ },
+  "block_types": {},
+  "entity_defs": {},
   "map": [ layer0, layer1, ... ],
-  "entities": [ /* ... */ ]
+  "entities": []
 }
 ```
 
@@ -18,9 +18,11 @@ This document describes the JSON/MessagePack structure used to represent maps in
 | ----- | ---- | ----------- |
 | **dimensions** | `int[3]` | `[W, H, Z]` giving the size in blocks along X (east), Y (north) and Z (up). |
 | **block_types** | `object` | Dictionary of block-type definitions, keyed by ID string. |
-| **map** | `array` of `Z` layers | A Z-deep array; each layer is an H×W 2D grid of either a block-type ID or `null` for empty space. |
+| **map** | `array` of `Z` layers | A Z-deep array; each layer is an H×W 2D grid of either a block-type ID or `null` for empty. |
 | **entity_defs** | `object` | Dictionary of entity templates keyed by ID. Each entry may specify an `extends` field and arbitrary property overrides. |
 | **entities** | `array<object>` | List of entity spawn objects with `type`, `position`, and optional per-entity properties. |
+| **block_palette** | `string[]` | *Optional.* Ordered list of block type IDs used as integer tokens. |
+| **entity_palette** | `string[]` | *Optional.* Ordered list of entity template IDs used as integer tokens. |
 
 ## Diagram
 
@@ -67,7 +69,7 @@ erDiagram
 
 Each entry in `"block_types"` describes the physical and navigational properties of one kind of block.
 
-```jsonc
+```json
 "block_types": {
   "<block_id>": {
     "passability": {
@@ -109,14 +111,15 @@ through to the engine.
   // layer 0 (z = 0)
   [
     [ null, "wall_brick", "wall_brick" ],
-    [ "floor_cobble", null ]
+    [ "floor_cobble", null, null ]
   ],
 
   // layer 1 (z = 1)
   [
-    [ null, null, "floor_cobble" ]
+    [ null, null, "floor_cobble" ],
+    [ null, null, null ]
   ]
-  ]
+]
 ```
 
 * **Size**: `map.length === depth` (`Z`). Each `map[z]` is a 2D array with `map[z].length === height` (`H`), and each row `map[z][y].length === width` (`W`).
@@ -138,7 +141,7 @@ archetype defaults. Position is a mandatory `[x,y,z]` triple.
 ## 6. Serialization
 
 * **JSON** provides a human‑readable representation.
-* **MessagePack** stores the exact same structure in a compact binary form.
+* **MessagePack** stores the same structure in a compact binary form.
 * **Apache Arrow** optionally encodes the map in Arrow's columnar format, using
   dictionary (token) encoding for block IDs and sparse tensors for the 3D grid.
 * **Palettized JSON/MessagePack** (optional) replaces repeated strings with
@@ -195,7 +198,7 @@ archetype defaults. Position is a mandatory `[x,y,z]` triple.
 
 The same data can be encoded with integer tokens:
 
-```jsonc
+```json
 {
   "block_palette": ["solid"],
   "entity_palette": ["civvy_scared", "tough_baddie"],
@@ -235,7 +238,7 @@ streaming. The recommended layout is:
 1. **Dictionary encoding** for `block_types` so that each block ID becomes a
    small integer token. The dictionary holds the block definitions.
 2. **Sparse tensor** for `map`, storing only cells that contain a block token
-   and leaving empty space implicit.
+   and leaving empty cells implicit.
 
 When serialized via the Arrow IPC or Feather format, this representation remains
 interoperable with the JSON/MessagePack structure while leveraging Arrow's
