@@ -18,6 +18,7 @@ const GROUND_FRICTION: GCoord = 0.1
 const AIR_FRICTION: GCoord = 0.02
 const TERMINAL_VELOCITY: GCoord = 2.0
 const GRAVITY_PULL: GCoord = -1.0
+const DELTA_TIME: GCoord = 1.0
 
 
 // --- World Geometry Relations ---
@@ -91,7 +92,7 @@ relation AppliedAcceleration(e: EntityID, ax: GCoord, ay: GCoord, az: GCoord)
 AppliedAcceleration(e, fx, fy, fz) :- Force(e, fx, fy, fz).
 
 relation GravitationalAcceleration(e: EntityID, ax: GCoord, ay: GCoord, az: GCoord)
-GravitationalAcceleration(e, 0.0, 0.0, -GRAVITY_PULL) :- IsUnsupported(e).
+GravitationalAcceleration(e, 0.0, 0.0, GRAVITY_PULL) :- IsUnsupported(e).
 
 relation FrictionalDeceleration(e: EntityID, ax: GCoord, ay: GCoord, az: GCoord)
 FrictionalDeceleration(e, fdx, fdy, 0.0) :-
@@ -123,7 +124,7 @@ NetAcceleration(e, ax, ay, az) :-
     ).
 
 relation UnclampedNewVelocity(e: EntityID, vx: GCoord, vy: GCoord, vz: GCoord)
-UnclampedNewVelocity(e, vx + ax, vy + ay, vz + az) :-
+UnclampedNewVelocity(e, vx + ax * DELTA_TIME, vy + ay * DELTA_TIME, vz + az * DELTA_TIME) :-
     Velocity(e, vx, vy, vz),
     NetAcceleration(e, ax, ay, az).
 
