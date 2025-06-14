@@ -11,7 +11,7 @@ static entities.
 
 A city with too many masters and too little future. Once the jewel of a vanished
 federation, its streets are now ruled by whoever can seize them — corporate
-militias, rogue syndicates, data cults and the last vestiges of an irrelevant
+militias, rogue syndicates, data cults, and the last vestiges of an irrelevant
 state.
 
 The skyline tells the story: rusted iron arcades tower over flooded canals and
@@ -24,8 +24,8 @@ Beneath this decaying grandeur, commerce thrives in the margins. Street-level
 markets sprawl through abandoned plazas; encrypted auction houses operate out of
 gutted tram stations. Every corner offers a new opportunity — or an ambush.
 
-Here, real power belongs to those who can move fastest, strike hardest and
-control the flow of information. Squads operate in the open, armed and
+Here, real power belongs to those who can move fastest, strike hardest, and
+control the flow of information. Squads operate in the open, armed, and
 augmented. Every mission risks crossing the unseen lines between factions — and
 starting a war you cannot finish.
 
