@@ -13,21 +13,28 @@ static REL_RE: Lazy<Regex> = Lazy::new(|| {
     .unwrap()
 });
 
-fn parsed_relations() -> HashSet<String> {
-    REL_RE
-        .captures_iter(DL_SRC)
-        .map(|c| c[1].to_string())
+fn capture_set(re: &Regex) -> HashSet<String> {
+    re.captures_iter(DL_SRC)
+        .filter_map(|c| {
+            let text = c.get(0).unwrap().as_str();
+            if text.trim_start().starts_with("//") {
+                None
+            } else {
+                Some(c[1].to_string())
+            }
+        })
         .collect()
+}
+
+fn parsed_relations() -> HashSet<String> {
+    capture_set(&REL_RE)
 }
 
 static CONST_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?m)^\s*const\s+([A-Za-z_][A-Za-z0-9_]*)").unwrap());
 
 fn parsed_constants() -> HashSet<String> {
-    CONST_RE
-        .captures_iter(DL_SRC)
-        .map(|c| c[1].to_string())
-        .collect()
+    capture_set(&CONST_RE)
 }
 
 #[test]
