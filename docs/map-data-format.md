@@ -18,33 +18,33 @@ This document describes the JSON/MessagePack structure used to represent maps in
 | ----- | ---- | ----------- |
 | **dimensions** | `int[3]` | `[W, H, Z]` giving the size in blocks along X (east), Y (north) and Z (up). |
 | **block_types** | `object` | Dictionary of block-type definitions, keyed by ID string. |
-| **map** | `array` of `Z` layers | A Z-deep array; each layer is an H×W 2D grid of either a block-type ID or `null` for empty. |
 | **entity_defs** | `object` | Dictionary of entity templates keyed by ID. Each entry may specify an `extends` field and arbitrary property overrides. |
+| **map** | `array` of `Z` layers | A Z-deep array; each layer is an H×W 2D grid of either a block-type ID or `null` for empty. |
 | **entities** | `array<object>` | List of entity spawn objects with `type`, `position`, and optional per-entity properties. |
 | **block_palette** | `string[]` | *Optional.* Ordered list of block type IDs used as integer tokens. |
 | **entity_palette** | `string[]` | *Optional.* Ordered list of entity template IDs used as integer tokens. |
 
-## Diagram
+### Diagram
 
 ```mermaid
 erDiagram
     MapDocument {
-        int_array dimensions
+        int[] dimensions
         object block_types "Map<String, BlockType>"
         object entity_defs "Map<String, EntityDefinition>"
-        array map_data "3D grid of Block References or null"
-        array entity_instances "List of EntityInstance"
-        string_array block_palette "Optional: stores block type IDs"
-        string_array entity_palette "Optional: stores entity definition IDs"
+        array map "3D grid of Block References or null"
+        array entities "List of EntityInstance"
+        string[] block_palette "Optional: stores block type IDs"
+        string[] entity_palette "Optional: stores entity definition IDs"
     }
     BlockType {
         string id "Implicit key in MapDocument.block_types"
-        json passability_rules
-        int_array slope_direction
+        json passability
+        int[] slope_dir
     }
     EntityDefinition {
         string id "Implicit key in MapDocument.entity_defs"
-        string extends_id "Optional, refers to another EntityDefinition.id"
+        string extends "Optional, refers to another EntityDefinition.id"
         json properties
     }
     MapCellReference {
@@ -53,7 +53,7 @@ erDiagram
     }
     EntityInstance {
         string type_or_index_reference "EntityDefinition.id OR integer index into MapDocument.entity_palette"
-        float_array position
+        float[] position
         json properties
     }
 
@@ -196,7 +196,9 @@ archetype defaults. Position is a mandatory `[x,y,z]` triple.
 
 ### Palettized variant
 
-The same data can be encoded with integer tokens:
+The same data can be encoded with integer tokens. A full palettized document
+must still include required fields like `dimensions`, `block_types`, and
+`entity_defs`; they are omitted here for brevity:
 
 ```json
 {
