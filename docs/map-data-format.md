@@ -22,6 +22,47 @@ This document describes the JSON/MessagePack structure used to represent maps in
 | **entity_defs** | `object` | Dictionary of entity templates keyed by ID. Each entry may specify an `extends` field and arbitrary property overrides. |
 | **entities** | `array<object>` | List of entity spawn objects with `type`, `position`, and optional per-entity properties. |
 
+## Diagram
+
+```mermaid
+erDiagram
+    MapDocument {
+        int_array dimensions
+        object block_types "Map<String, BlockType>"
+        object entity_defs "Map<String, EntityDefinition>"
+        array map_data "3D grid of Block References or null"
+        array entity_instances "List of EntityInstance"
+        string_array block_palette "Optional: stores block type IDs"
+        string_array entity_palette "Optional: stores entity definition IDs"
+    }
+    BlockType {
+        string id "Implicit key in MapDocument.block_types"
+        json passability_rules
+        int_array slope_direction
+    }
+    EntityDefinition {
+        string id "Implicit key in MapDocument.entity_defs"
+        string extends_id "Optional, refers to another EntityDefinition.id"
+        json properties
+    }
+    MapCellReference {
+        string block_or_index_reference "BlockType.id OR integer index into MapDocument.block_palette"
+        boolean is_null
+    }
+    EntityInstance {
+        string type_or_index_reference "EntityDefinition.id OR integer index into MapDocument.entity_palette"
+        float_array position
+        json properties
+    }
+
+    MapDocument ||--o{ BlockType : "defines_block_types"
+    MapDocument ||--o{ EntityDefinition : "defines_entity_definitions"
+    MapDocument ||--o{ MapCellReference : "map_composed_of"
+    MapDocument ||--o{ EntityInstance : "contains_entity_instances"
+
+    EntityDefinition }o--o| EntityDefinition : "extends"
+```
+
 ## 2. `block_types` entries
 
 Each entry in `"block_types"` describes the physical and navigational properties of one kind of block.
