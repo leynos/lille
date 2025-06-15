@@ -58,29 +58,36 @@ where
 }
 
 fn generate_rs_constants(parsed: &Value) -> String {
-    let mut code = String::from("// @generated - do not edit\n");
-    for_each_constant(parsed, |k, v| {
+    generate_code_from_constants(parsed, |k, v| {
         let name = k.to_uppercase();
         match v {
-            Value::Integer(i) => code += &format!("pub const {}: i64 = {};\n", name, i),
-            Value::Float(f) => code += &format!("pub const {}: f32 = {}f32;\n", name, f),
-            Value::String(s) => code += &format!("pub const {}: &str = \"{}\";\n", name, s),
-            _ => {}
+            Value::Integer(i) => format!("pub const {}: i64 = {};\n", name, i),
+            Value::Float(f) => format!("pub const {}: f32 = {}f32;\n", name, f),
+            Value::String(s) => format!("pub const {}: &str = \"{}\";\n", name, s),
+            _ => String::new(),
         }
-    });
-    code
+    })
 }
 
 fn generate_dl_constants(parsed: &Value) -> String {
-    let mut code = String::from("// @generated - do not edit\n");
-    for_each_constant(parsed, |k, v| {
+    generate_code_from_constants(parsed, |k, v| {
         let name = k.to_uppercase();
         match v {
-            Value::Integer(i) => code += &format!("const {}: signed<64> = {}\n", name, i),
-            Value::Float(f) => code += &format!("const {}: GCoord = {}\n", name, f),
-            Value::String(s) => code += &format!("const {}: string = \"{}\"\n", name, s),
-            _ => {}
+            Value::Integer(i) => format!("const {}: signed<64> = {}\n", name, i),
+            Value::Float(f) => format!("const {}: GCoord = {}\n", name, f),
+            Value::String(s) => format!("const {}: string = \"{}\"\n", name, s),
+            _ => String::new(),
         }
+    })
+}
+
+fn generate_code_from_constants<F>(parsed: &Value, mut emit: F) -> String
+where
+    F: FnMut(&str, &Value) -> String,
+{
+    let mut code = String::from("// @generated - do not edit\n");
+    for_each_constant(parsed, |k, v| {
+        code += &emit(k, v);
     });
     code
 }
@@ -103,7 +110,7 @@ fn download_font(manifest_dir: &str) -> Result<PathBuf, Box<dyn Error>> {
             Ok(font_path)
         }
         Err(e) => {
-            println!("cargo:warning={}", e);
+            println!("cargo:warning=Font download failed: {}", e);
             Ok(PathBuf::from(FALLBACK_FONT_PATH))
         }
     }
