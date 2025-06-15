@@ -150,6 +150,10 @@ const TERMINAL_VELOCITY: GCoord = 2.0;
 // Tracks velocity at the start of a tick, fed back from the previous tick's output.
 input relation Velocity(entity: EntityID, vx: GCoord, vy: GCoord, vz: GCoord)
 
+// --- New Mass Relation ---
+// Provides each entity's mass so forces can be converted into acceleration.
+input relation Mass(entity: EntityID, kg: GCoord)
+
 // --- New Ephemeral Input Stream ---
 // Represents instantaneous forces (one-tick accelerations).
 input stream Force(entity: EntityID, fx: GCoord, fy: GCoord, fz: GCoord)
@@ -177,7 +181,12 @@ extern function vec_normalize(x: GCoord, y: GCoord, z: GCoord): (GCoord, GCoord,
 We collect all acceleration vectors acting on an entity for the current tick.
 
 ```
-relation AppliedAcceleration(e, fx, fy, fz) :- Force(e, fx, fy, fz).
+relation AppliedAcceleration(e, ax, ay, az) :-
+    Force(e, fx, fy, fz),
+    Mass(e, mass),
+    ax = fx / mass,
+    ay = fy / mass,
+    az = fz / mass.
 relation GravitationalAcceleration(e, 0.0, 0.0, -GRAVITY_PULL) :- IsUnsupported(e).
 
 ```

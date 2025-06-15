@@ -126,7 +126,13 @@ fn ddlog_program_has_floor_height_rules() {
         "GRACE_DISTANCE constant missing"
     );
 
-    for token in ["Velocity", "Force", "NewVelocity", "FrictionalDeceleration"] {
+    for token in [
+        "Velocity",
+        "Mass",
+        "Force",
+        "NewVelocity",
+        "FrictionalDeceleration",
+    ] {
         assert!(
             relations.contains(token),
             "{} rule or relation missing",
