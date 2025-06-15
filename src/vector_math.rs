@@ -5,12 +5,30 @@ pub fn vec_mag(x: f32, y: f32, z: f32) -> f32 {
     Vec3::new(x, y, z).length()
 }
 
-/// Normalizes the vector `(x, y, z)`. If the vector is zero, returns `(0, 0, 0)`.
+/// Returns the unit vector in the direction of `(x, y, z)`, or `(0.0, 0.0, 0.0)` if the input is not a valid non-zero vector.
+///
+/// The function checks that all components are finite and the vector is non-zero before normalising. If the input is invalid or the zero vector, it returns the zero vector.
+///
+/// # Examples
+///
+/// ```
+/// let (nx, ny, nz) = vec_normalize(3.0, 0.0, 4.0);
+/// assert!((nx - 0.6).abs() < 1e-6);
+/// assert!((ny - 0.0).abs() < 1e-6);
+/// assert!((nz - 0.8).abs() < 1e-6);
+///
+/// let zero = vec_normalize(0.0, 0.0, 0.0);
+/// assert_eq!(zero, (0.0, 0.0, 0.0));
+/// ```
 pub fn vec_normalize(x: f32, y: f32, z: f32) -> (f32, f32, f32) {
     let v = Vec3::new(x, y, z);
-    if let Some(n) = v.try_normalize() {
-        (n.x, n.y, n.z)
-    } else {
-        (0.0, 0.0, 0.0)
+    if v.is_finite() {
+        let len_sq = v.length_squared();
+        if len_sq > f32::EPSILON {
+            let len = len_sq.sqrt();
+            let n = v / len;
+            return (n.x, n.y, n.z);
+        }
     }
+    (0.0, 0.0, 0.0)
 }
