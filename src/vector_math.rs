@@ -8,7 +8,8 @@ pub fn vec_mag(x: f32, y: f32, z: f32) -> f32 {
 /// Normalizes the vector `(x, y, z)`. If the vector is zero, returns `(0, 0, 0)`.
 pub fn vec_normalize(x: f32, y: f32, z: f32) -> (f32, f32, f32) {
     let v = Vec3::new(x, y, z);
-    if let Some(n) = v.try_normalize() {
+    if v.is_finite() && v.length_squared() > 0.0 {
+        let n = v.normalize();
         (n.x, n.y, n.z)
     } else {
         (0.0, 0.0, 0.0)
