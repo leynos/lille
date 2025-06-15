@@ -24,6 +24,8 @@ const TERMINAL_VELOCITY: GCoord = 2.0
 const GRAVITY_PULL: GCoord = -1.0
 // Length of one simulation tick (seconds)
 const DELTA_TIME: GCoord = 1.0
+// Default mass used when an entity lacks a Mass entry
+const DEFAULT_MASS: GCoord = 70.0
 
 
 // --- World Geometry Relations ---
@@ -71,6 +73,8 @@ FloorHeightAt(x, y, z_out) :-
 // --- Entity Position Relations ---
 input relation Position(entity: EntityID, x: GCoord, y: GCoord, z: GCoord)
 input relation Velocity(entity: EntityID, vx: GCoord, vy: GCoord, vz: GCoord)
+// Mass of an entity in kilograms; must be positive to avoid divide by zero
+input relation Mass(entity: EntityID, kg: GCoord)
 input stream Force(entity: EntityID, fx: GCoord, fy: GCoord, fz: GCoord)
 output relation NewPosition(entity: EntityID, x: GCoord, y: GCoord, z: GCoord)
 output relation NewVelocity(entity: EntityID, nvx: GCoord, nvy: GCoord, nvz: GCoord)
@@ -94,7 +98,10 @@ IsStanding(entity) :-
 
 // --- Dynamics ---
 relation AppliedAcceleration(e: EntityID, ax: GCoord, ay: GCoord, az: GCoord)
-AppliedAcceleration(e, fx, fy, fz) :- Force(e, fx, fy, fz).
+AppliedAcceleration(e, fx / mass, fy / mass, fz / mass) :-
+    Force(e, fx, fy, fz),
+    (Mass(e, mass) or mass = DEFAULT_MASS),
+    mass > 0.0.
 
 relation GravitationalAcceleration(e: EntityID, ax: GCoord, ay: GCoord, az: GCoord)
 GravitationalAcceleration(e, 0.0, 0.0, GRAVITY_PULL) :- IsUnsupported(e).
