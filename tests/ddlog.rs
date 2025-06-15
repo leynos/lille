@@ -1,7 +1,41 @@
 use glam::{Vec2, Vec3};
 use lille::{ddlog_handle::DdlogEntity, DdlogHandle, UnitType};
+use once_cell::sync::Lazy;
+use regex::Regex;
+use std::collections::HashSet;
 
 const DL_SRC: &str = include_str!("../src/lille.dl");
+
+static REL_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r"(?m)^\s*(?:input\s+(?:relation|stream)|output\s+relation|relation)\s+([A-Za-z_][A-Za-z0-9_]*)",
+    )
+    .unwrap()
+});
+
+fn capture_set(re: &Regex) -> HashSet<String> {
+    re.captures_iter(DL_SRC)
+        .filter_map(|c| {
+            let text = c.get(0).unwrap().as_str();
+            if text.trim_start().starts_with("//") {
+                None
+            } else {
+                Some(c[1].to_string())
+            }
+        })
+        .collect()
+}
+
+fn parsed_relations() -> HashSet<String> {
+    capture_set(&REL_RE)
+}
+
+static CONST_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?m)^\s*const\s+([A-Za-z_][A-Za-z0-9_]*)").unwrap());
+
+fn parsed_constants() -> HashSet<String> {
+    capture_set(&CONST_RE)
+}
 
 #[test]
 fn ddlog_moves_towards_target() {
@@ -66,29 +100,37 @@ fn ddlog_flees_from_baddie() {
 }
 
 #[test]
+/// Verifies that the Datalog source includes required rules and relations for floor height and movement.
+///
+/// Asserts that the source string contains the tokens "FloorHeightAt", "IsUnsupported", "IsStanding", "GRACE_DISTANCE", "Velocity", "Force", "NewVelocity", and "FrictionalDeceleration".
+///
+/// # Panics
+///
+/// Panics if any of the required rules or relations are missing from the source.
+///
+/// # Examples
+///
+/// ```
+/// ddlog_program_has_floor_height_rules(); // Should not panic if all rules are present
+/// ```
 fn ddlog_program_has_floor_height_rules() {
+    let relations = parsed_relations();
+    let constants = parsed_constants();
+
+    for name in ["FloorHeightAt", "IsUnsupported", "IsStanding"] {
+        assert!(relations.contains(name), "{} rule missing", name);
+    }
+
     assert!(
-        DL_SRC
-            .split(|c: char| !c.is_alphanumeric() && c != '_')
-            .any(|tok| tok == "FloorHeightAt"),
-        "FloorHeightAt rule missing",
+        constants.contains("GRACE_DISTANCE"),
+        "GRACE_DISTANCE constant missing"
     );
-    assert!(
-        DL_SRC
-            .split(|c: char| !c.is_alphanumeric() && c != '_')
-            .any(|tok| tok == "IsUnsupported"),
-        "IsUnsupported rule missing",
-    );
-    assert!(
-        DL_SRC
-            .split(|c: char| !c.is_alphanumeric() && c != '_')
-            .any(|tok| tok == "IsStanding"),
-        "IsStanding rule missing",
-    );
-    assert!(
-        DL_SRC
-            .split(|c: char| !c.is_alphanumeric() && c != '_')
-            .any(|tok| tok == "GRACE_DISTANCE"),
-        "GRACE_DISTANCE constant missing",
-    );
+
+    for token in ["Velocity", "Force", "NewVelocity", "FrictionalDeceleration"] {
+        assert!(
+            relations.contains(token),
+            "{} rule or relation missing",
+            token
+        );
+    }
 }
