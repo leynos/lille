@@ -145,17 +145,10 @@ We introduce relations to track velocity and represent transient forces.
 const GROUND_FRICTION: GCoord = 0.1;
 const AIR_FRICTION: GCoord = 0.02;
 const TERMINAL_VELOCITY: GCoord = 2.0;
-// Default mass applied when an entity lacks a `Mass` entry.
-const DEFAULT_MASS: GCoord = 70.0;
 
 // --- New Persistent Input Relation ---
 // Tracks velocity at the start of a tick, fed back from the previous tick's output.
 input relation Velocity(entity: EntityID, vx: GCoord, vy: GCoord, vz: GCoord)
-
-// --- New Mass Relation ---
-// Provides each entity's mass so forces can be converted into acceleration.
-// Mass values should be positive; non-positive entries are ignored.
-input relation Mass(entity: EntityID, kg: GCoord)
 
 // --- New Ephemeral Input Stream ---
 // Represents instantaneous forces applied to entities for a single tick.
