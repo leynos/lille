@@ -94,7 +94,7 @@ fn ddlog_available() -> Result<bool, Box<dyn Error>> {
             );
             println!(
                 "cargo:warning=stderr: {}",
-                String::from_utf8_lossy(&output.stderr)
+                String::from_utf8_lossy(&output.stderr).trim()
             );
             Ok(false)
         }
