@@ -5,6 +5,7 @@ pub mod ddlog_sync;
 pub mod entity;
 pub mod logging;
 pub mod spawn_world;
+pub mod vector_math;
 
 // Re-export commonly used items
 pub use actor::Actor;
@@ -14,3 +15,4 @@ pub use ddlog_sync::{apply_ddlog_deltas_system, push_state_to_ddlog_system};
 pub use entity::{BadGuy, Entity};
 pub use logging::init as init_logging;
 pub use spawn_world::spawn_world_system;
+pub use vector_math::{vec_mag, vec_normalize};
