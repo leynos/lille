@@ -37,6 +37,7 @@ TMP_DIR="$(mktemp -d)"
 echo "Downloading DDlog archive..."
 curl --fail -L "$ARCHIVE_URL" -o "$TMP_DIR/ddlog.tgz"
 
+mkdir -p "${INSTALL_DIR%/*}"
 rm -rf "$INSTALL_DIR"
 
 echo "Extracting..."
