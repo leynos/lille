@@ -57,36 +57,59 @@ fn download_font(manifest_dir: &str) -> Result<PathBuf, Box<dyn Error>> {
 
 fn compile_ddlog(manifest_dir: &str, out_dir: &Path) -> Result<(), Box<dyn Error>> {
     dotenvy::dotenv().ok();
-    if Command::new("ddlog")
+    let ddlog_version_result = Command::new("ddlog")
         .arg("--version")
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false)
-    {
-        let ddlog_file = Path::new(manifest_dir).join("src/lille.dl");
-        if ddlog_file.exists() {
-            let target_dir = out_dir.join("ddlog_lille");
-            let mut cmd = Command::new("ddlog");
-            if let Ok(home) = env::var("DDLOG_HOME") {
-                cmd.arg("-L").arg(format!("{}/lib", home));
-            }
-            let status = cmd
-                .arg("-i")
-                .arg(ddlog_file.to_string_lossy().to_string())
-                .arg("-o")
-                .arg(&target_dir)
-                .status()?;
-            if !status.success() {
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output();
+
+    match ddlog_version_result {
+        Ok(output) => {
+            if output.status.success() {
                 println!(
-                    "cargo:warning=ddlog compiler exited with status: {}",
-                    status
+                    "Found ddlog: {}",
+                    String::from_utf8_lossy(&output.stdout).trim()
                 );
+            } else {
+                eprintln!(
+                    "cargo:warning=ddlog --version failed with status {}",
+                    output.status
+                );
+                eprintln!(
+                    "cargo:warning=stderr: {}",
+                    String::from_utf8_lossy(&output.stderr)
+                );
+                return Ok(()); // Early return if ddlog not usable
             }
-        } else {
-            println!("cargo:warning=src/lille.dl missing; skipping ddlog compilation");
+        }
+        Err(e) => {
+            eprintln!("cargo:warning=failed to run ddlog --version: {}", e);
+            return Ok(()); // Early return if ddlog not found
+        }
+    }
+
+    let ddlog_file = Path::new(manifest_dir).join("src/lille.dl");
+    if ddlog_file.exists() {
+        let target_dir = out_dir.join("ddlog_lille");
+        let mut cmd = Command::new("ddlog");
+        if let Ok(home) = env::var("DDLOG_HOME") {
+            cmd.arg("-L").arg(format!("{}/lib", home));
+        }
+        let status = cmd
+            .arg("-i")
+            .arg(ddlog_file.to_string_lossy().to_string())
+            .arg("-o")
+            .arg(&target_dir)
+            .status()?;
+        if !status.success() {
+            println!(
+                "cargo:warning=ddlog compiler exited with status: {}",
+                status
+            );
         }
     } else {
-        println!("cargo:warning=ddlog compiler not found; skipping ddlog generation");
+        println!("cargo:warning=src/lille.dl missing; skipping ddlog compilation");
     }
+
     Ok(())
 }
