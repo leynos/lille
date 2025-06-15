@@ -86,19 +86,21 @@ fn ddlog_available() -> Result<bool, Box<dyn Error>> {
             );
             Ok(true)
         }
+        // Use stdout so Cargo captures these warnings correctly
         Ok(output) => {
-            eprintln!(
+            println!(
                 "cargo:warning=ddlog --version failed with status {}",
                 output.status
             );
-            eprintln!(
+            println!(
                 "cargo:warning=stderr: {}",
                 String::from_utf8_lossy(&output.stderr)
             );
             Ok(false)
         }
         Err(e) => {
-            eprintln!("cargo:warning=failed to run ddlog --version: {}", e);
+            // Also print to stdout for Cargo's warning detection
+            println!("cargo:warning=failed to run ddlog --version: {}", e);
             Ok(false)
         }
     }
