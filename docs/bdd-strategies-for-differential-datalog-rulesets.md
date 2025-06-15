@@ -152,10 +152,13 @@ input relation Velocity(entity: EntityID, vx: GCoord, vy: GCoord, vz: GCoord)
 
 // --- New Mass Relation ---
 // Provides each entity's mass so forces can be converted into acceleration.
+// Mass values should be positive; non-positive entries are ignored.
 input relation Mass(entity: EntityID, kg: GCoord)
 
 // --- New Ephemeral Input Stream ---
-// Represents instantaneous forces (one-tick accelerations).
+// Represents instantaneous forces applied to entities for a single tick.
+// These are force inputs (not direct accelerations); acceleration is computed as
+// force divided by mass.
 input stream Force(entity: EntityID, fx: GCoord, fy: GCoord, fz: GCoord)
 
 // --- New Output Relation ---
@@ -184,6 +187,7 @@ We collect all acceleration vectors acting on an entity for the current tick.
 relation AppliedAcceleration(e, ax, ay, az) :-
     Force(e, fx, fy, fz),
     Mass(e, mass),
+    mass > 0.0,
     ax = fx / mass,
     ay = fy / mass,
     az = fz / mass.

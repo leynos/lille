@@ -71,7 +71,7 @@ FloorHeightAt(x, y, z_out) :-
 // --- Entity Position Relations ---
 input relation Position(entity: EntityID, x: GCoord, y: GCoord, z: GCoord)
 input relation Velocity(entity: EntityID, vx: GCoord, vy: GCoord, vz: GCoord)
-// Mass of an entity in kilograms
+// Mass of an entity in kilograms; must be positive to avoid divide by zero
 input relation Mass(entity: EntityID, kg: GCoord)
 input stream Force(entity: EntityID, fx: GCoord, fy: GCoord, fz: GCoord)
 output relation NewPosition(entity: EntityID, x: GCoord, y: GCoord, z: GCoord)
@@ -99,6 +99,7 @@ relation AppliedAcceleration(e: EntityID, ax: GCoord, ay: GCoord, az: GCoord)
 AppliedAcceleration(e, ax, ay, az) :-
     Force(e, fx, fy, fz),
     Mass(e, mass),
+    mass > 0.0,
     ax = fx / mass,
     ay = fy / mass,
     az = fz / mass.

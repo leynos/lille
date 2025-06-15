@@ -139,4 +139,6 @@ fn ddlog_program_has_floor_height_rules() {
             token
         );
     }
+
+    assert!(DL_SRC.contains("mass > 0"), "mass positivity check missing");
 }
