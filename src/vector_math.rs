@@ -12,6 +12,7 @@ pub fn vec_mag(x: f32, y: f32, z: f32) -> f32 {
 /// # Examples
 ///
 /// ```
+/// use lille::vec_normalize;
 /// let (nx, ny, nz) = vec_normalize(3.0, 0.0, 4.0);
 /// assert!((nx - 0.6).abs() < 1e-6);
 /// assert!((ny - 0.0).abs() < 1e-6);
@@ -22,13 +23,10 @@ pub fn vec_mag(x: f32, y: f32, z: f32) -> f32 {
 /// ```
 pub fn vec_normalize(x: f32, y: f32, z: f32) -> (f32, f32, f32) {
     let v = Vec3::new(x, y, z);
-    if v.is_finite() {
-        let len_sq = v.length_squared();
-        if len_sq > f32::EPSILON {
-            let len = len_sq.sqrt();
-            let n = v / len;
-            return (n.x, n.y, n.z);
-        }
+    if !v.is_finite() {
+        return (0.0, 0.0, 0.0);
     }
-    (0.0, 0.0, 0.0)
+
+    let n = v.try_normalize().unwrap_or(Vec3::ZERO);
+    (n.x, n.y, n.z)
 }
