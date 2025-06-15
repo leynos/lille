@@ -98,16 +98,10 @@ IsStanding(entity) :-
 
 // --- Dynamics ---
 relation AppliedAcceleration(e: EntityID, ax: GCoord, ay: GCoord, az: GCoord)
-AppliedAcceleration(e, ax, ay, az) :-
+AppliedAcceleration(e, fx / mass, fy / mass, fz / mass) :-
     Force(e, fx, fy, fz),
-    Mass(e, mass),
-    mass > 0.0,
-    ax = fx / mass,
-    ay = fy / mass,
-    az = fz / mass.
-AppliedAcceleration(e, fx / DEFAULT_MASS, fy / DEFAULT_MASS, fz / DEFAULT_MASS) :-
-    Force(e, fx, fy, fz),
-    not Mass(e, _).
+    (Mass(e, mass) or mass = DEFAULT_MASS),
+    mass > 0.0.
 
 relation GravitationalAcceleration(e: EntityID, ax: GCoord, ay: GCoord, az: GCoord)
 GravitationalAcceleration(e, 0.0, 0.0, GRAVITY_PULL) :- IsUnsupported(e).

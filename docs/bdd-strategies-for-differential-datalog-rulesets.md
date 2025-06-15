@@ -186,16 +186,10 @@ extern function vec_normalize(x: GCoord, y: GCoord, z: GCoord): (GCoord, GCoord,
 We collect all acceleration vectors acting on an entity for the current tick.
 
 ```
-relation AppliedAcceleration(e, ax, ay, az) :-
+relation AppliedAcceleration(e, fx / mass, fy / mass, fz / mass) :-
     Force(e, fx, fy, fz),
-    Mass(e, mass),
-    mass > 0.0,
-    ax = fx / mass,
-    ay = fy / mass,
-    az = fz / mass.
-relation AppliedAcceleration(e, fx / DEFAULT_MASS, fy / DEFAULT_MASS, fz / DEFAULT_MASS) :-
-    Force(e, fx, fy, fz),
-    not Mass(e, _).
+    (Mass(e, mass) or mass = DEFAULT_MASS),
+    mass > 0.0.
 relation GravitationalAcceleration(e, 0.0, 0.0, -GRAVITY_PULL) :- IsUnsupported(e).
 
 ```
