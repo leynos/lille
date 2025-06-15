@@ -25,7 +25,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
       - name: Install DDlog
-        run: ./scripts/install_ddlog.sh
+        run: |
+          ./scripts/install_ddlog.sh
+          ls -l /home/runner/.local/ddlog
+          echo dotenv:
+          cat .env
       - name: Format
         run: cargo fmt --all -- --check
       - name: Lint
