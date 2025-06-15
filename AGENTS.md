@@ -3,7 +3,7 @@
 This repository is written in Rust and uses Cargo for building and dependency management. Contributors should follow these best practices when working on the project:
 
 1. **Run `cargo fmt` and `cargo clippy`** before committing to ensure consistent code style and catch common mistakes.
-2. **Write unit tests** for new functionality. Run `cargo test` in both the root crate and the `validator` crate.
+2. **Write unit tests** for new functionality. Run `cargo test` in the root crate to ensure all tests pass.
 3. **Document public APIs** using Rustdoc comments (`///`) so documentation can be generated with `cargo doc`.
 4. **Prefer immutable data** and avoid unnecessary `mut` bindings.
 5. **Handle errors with the `Result` type** instead of panicking where feasible.
