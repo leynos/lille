@@ -24,6 +24,8 @@ const TERMINAL_VELOCITY: GCoord = 2.0
 const GRAVITY_PULL: GCoord = -1.0
 // Length of one simulation tick (seconds)
 const DELTA_TIME: GCoord = 1.0
+// Default mass used when an entity lacks a Mass entry
+const DEFAULT_MASS: GCoord = 70.0
 
 
 // --- World Geometry Relations ---
@@ -103,6 +105,9 @@ AppliedAcceleration(e, ax, ay, az) :-
     ax = fx / mass,
     ay = fy / mass,
     az = fz / mass.
+AppliedAcceleration(e, fx / DEFAULT_MASS, fy / DEFAULT_MASS, fz / DEFAULT_MASS) :-
+    Force(e, fx, fy, fz),
+    not Mass(e, _).
 
 relation GravitationalAcceleration(e: EntityID, ax: GCoord, ay: GCoord, az: GCoord)
 GravitationalAcceleration(e, 0.0, 0.0, GRAVITY_PULL) :- IsUnsupported(e).

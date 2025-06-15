@@ -145,6 +145,8 @@ We introduce relations to track velocity and represent transient forces.
 const GROUND_FRICTION: GCoord = 0.1;
 const AIR_FRICTION: GCoord = 0.02;
 const TERMINAL_VELOCITY: GCoord = 2.0;
+// Default mass applied when an entity lacks a `Mass` entry.
+const DEFAULT_MASS: GCoord = 70.0;
 
 // --- New Persistent Input Relation ---
 // Tracks velocity at the start of a tick, fed back from the previous tick's output.
@@ -191,6 +193,9 @@ relation AppliedAcceleration(e, ax, ay, az) :-
     ax = fx / mass,
     ay = fy / mass,
     az = fz / mass.
+relation AppliedAcceleration(e, fx / DEFAULT_MASS, fy / DEFAULT_MASS, fz / DEFAULT_MASS) :-
+    Force(e, fx, fy, fz),
+    not Mass(e, _).
 relation GravitationalAcceleration(e, 0.0, 0.0, -GRAVITY_PULL) :- IsUnsupported(e).
 
 ```

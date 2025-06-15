@@ -126,6 +126,11 @@ fn ddlog_program_has_floor_height_rules() {
         "GRACE_DISTANCE constant missing"
     );
 
+    assert!(
+        constants.contains("DEFAULT_MASS"),
+        "DEFAULT_MASS constant missing"
+    );
+
     for token in [
         "Velocity",
         "Mass",
@@ -141,4 +146,8 @@ fn ddlog_program_has_floor_height_rules() {
     }
 
     assert!(DL_SRC.contains("mass > 0"), "mass positivity check missing");
+    assert!(
+        DL_SRC.contains("DEFAULT_MASS") && DL_SRC.contains("not Mass"),
+        "default mass rule missing"
+    );
 }
