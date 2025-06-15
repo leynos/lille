@@ -3,9 +3,7 @@ use hashbrown::HashMap;
 use serde::Serialize;
 
 use crate::components::{Block, BlockSlope, UnitType};
-
-const GRACE_DISTANCE: f32 = 0.1;
-const GRAVITY_PULL: f32 = -1.0;
+use crate::{GRACE_DISTANCE, GRAVITY_PULL};
 
 #[derive(Clone, Serialize)]
 pub struct DdlogEntity {

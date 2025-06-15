@@ -5,6 +5,7 @@ use regex::Regex;
 use std::collections::HashSet;
 
 const DL_SRC: &str = include_str!("../src/lille.dl");
+const CONSTANTS_SRC: &str = include_str!("../src/constants.dl");
 
 static REL_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
@@ -14,14 +15,17 @@ static REL_RE: Lazy<Regex> = Lazy::new(|| {
 });
 
 fn capture_set(re: &Regex) -> HashSet<String> {
-    re.captures_iter(DL_SRC)
-        .filter_map(|c| {
-            let text = c.get(0).unwrap().as_str();
-            if text.trim_start().starts_with("//") {
-                None
-            } else {
-                Some(c[1].to_string())
-            }
+    [DL_SRC, CONSTANTS_SRC]
+        .iter()
+        .flat_map(|src| {
+            re.captures_iter(src).filter_map(|c| {
+                let text = c.get(0).unwrap().as_str();
+                if text.trim_start().starts_with("//") {
+                    None
+                } else {
+                    Some(c[1].to_string())
+                }
+            })
         })
         .collect()
 }

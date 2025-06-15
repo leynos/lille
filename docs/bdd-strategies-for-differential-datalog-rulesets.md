@@ -48,8 +48,7 @@ input relation BlockSlope(
 This is the new core of the physics model. We create relations that derive the correct floor height for any given `(x, y)` coordinate.
 
 ```
-// --- Physics Constants ---
-const GRACE_DISTANCE: GCoord = 0.1; // Small tolerance for floating point comparisons.
+// --- Physics Constants --- (see `constants.toml`)
 
 // Finds the highest block at a given (x,y) grid location.
 relation HighestBlockAt(x_grid: signed32, y_grid: signed32, block: BlockID, z_grid: signed32) :-
@@ -98,7 +97,7 @@ relation IsStanding(entity: EntityID) :-
 Movement is now a two-stage process: calculate the 2D AI move, then "snap" the result to the floor.
 
 ```
-const GRAVITY_PULL: GCoord = -1.0;
+// GRAVITY_PULL defined in `constants.toml`
 
 // --- Falling Logic ---
 relation GravityEffectVector(entity, 0.0, 0.0, GRAVITY_PULL) :-
@@ -141,10 +140,7 @@ This phase builds upon the kinematic model by introducing dynamics. We add the c
 We introduce relations to track velocity and represent transient forces.
 
 ```
-// --- New Physics Constants ---
-const GROUND_FRICTION: GCoord = 0.1;
-const AIR_FRICTION: GCoord = 0.02;
-const TERMINAL_VELOCITY: GCoord = 2.0;
+// --- New Physics Constants --- (see `constants.toml`)
 
 // --- New Persistent Input Relation ---
 // Tracks velocity at the start of a tick, fed back from the previous tick's output.
