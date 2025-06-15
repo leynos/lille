@@ -6,6 +6,7 @@ pub mod entity;
 pub mod logging;
 pub mod spawn_world;
 pub mod vector_math;
+include!(concat!(env!("OUT_DIR"), "/constants.rs"));
 
 // Re-export commonly used items
 pub use actor::Actor;

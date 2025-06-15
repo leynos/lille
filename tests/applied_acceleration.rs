@@ -1,6 +1,5 @@
 use approx::assert_relative_eq;
-
-const DEFAULT_MASS: f32 = 70.0;
+use lille::DEFAULT_MASS;
 
 fn applied_acceleration(force: (f32, f32, f32), mass: Option<f32>) -> Option<(f32, f32, f32)> {
     match mass {

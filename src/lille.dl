@@ -6,27 +6,12 @@ typedef GCoord = float
 
 import fp
 import souffle_lib
+import constants
 
 extern function vec_mag(x: GCoord, y: GCoord, z: GCoord): GCoord
 extern function vec_normalize(x: GCoord, y: GCoord, z: GCoord): (GCoord, GCoord, GCoord)
 
-// --- Physics Constants ---
-// Small tolerance when comparing vertical offsets (GCoord units)
-const GRACE_DISTANCE: GCoord = 0.1
-
-// Phase 2 constants
-// Friction coefficients applied per tick (dimensionless)
-const GROUND_FRICTION: GCoord = 0.1
-const AIR_FRICTION: GCoord = 0.02
-// Maximum absolute vertical speed allowed (GCoord per tick)
-const TERMINAL_VELOCITY: GCoord = 2.0
-// Downward acceleration due to gravity (GCoord per tick^2)
-const GRAVITY_PULL: GCoord = -1.0
-// Length of one simulation tick (seconds)
-const DELTA_TIME: GCoord = 1.0
-// Default mass used when an entity lacks a Mass entry
-const DEFAULT_MASS: GCoord = 70.0
-
+// Physics constants imported from generated file
 
 // --- World Geometry Relations ---
 input relation Block(id: BlockID, x: signed<32>, y: signed<32>, z: signed<32>)
