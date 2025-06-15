@@ -6,6 +6,24 @@ use std::process::{Command, Stdio};
 
 use toml::Value;
 
+struct Formats {
+    int_fmt: &'static str,
+    float_fmt: &'static str,
+    str_fmt: &'static str,
+}
+
+const RUST_FMTS: Formats = Formats {
+    int_fmt: "pub const {}: i64 = {};\n",
+    float_fmt: "pub const {}: f32 = {}f32;\n",
+    str_fmt: "pub const {}: &str = \"{}\";\n",
+};
+
+const DL_FMTS: Formats = Formats {
+    int_fmt: "const {}: signed<64> = {}\n",
+    float_fmt: "const {}: GCoord = {}\n",
+    str_fmt: "const {}: string = \"{}\"\n",
+};
+
 const FALLBACK_FONT_PATH: &str = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -28,10 +46,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 fn generate_constants(manifest_dir: &str, out_dir: &Path) -> Result<(), Box<dyn Error>> {
     let parsed = parse_constants(manifest_dir)?;
-    fs::write(out_dir.join("constants.rs"), generate_rs_constants(&parsed))?;
+    fs::write(
+        out_dir.join("constants.rs"),
+        generate_code_from_constants(&parsed, &RUST_FMTS),
+    )?;
     fs::write(
         Path::new(manifest_dir).join("src/constants.dl"),
-        generate_dl_constants(&parsed),
+        generate_code_from_constants(&parsed, &DL_FMTS),
     )?;
     Ok(())
 }
@@ -57,37 +78,27 @@ where
     }
 }
 
-fn generate_rs_constants(parsed: &Value) -> String {
-    generate_code_from_constants(parsed, |k, v| {
-        let name = k.to_uppercase();
-        match v {
-            Value::Integer(i) => format!("pub const {}: i64 = {};\n", name, i),
-            Value::Float(f) => format!("pub const {}: f32 = {}f32;\n", name, f),
-            Value::String(s) => format!("pub const {}: &str = \"{}\";\n", name, s),
-            _ => String::new(),
-        }
-    })
+fn fill2(fmt: &str, a: impl std::fmt::Display, b: impl std::fmt::Display) -> String {
+    let mut parts = fmt.splitn(3, "{}");
+    let mut s = String::new();
+    s.push_str(parts.next().unwrap_or(""));
+    s.push_str(&a.to_string());
+    s.push_str(parts.next().unwrap_or(""));
+    s.push_str(&b.to_string());
+    s.push_str(parts.next().unwrap_or(""));
+    s
 }
 
-fn generate_dl_constants(parsed: &Value) -> String {
-    generate_code_from_constants(parsed, |k, v| {
-        let name = k.to_uppercase();
-        match v {
-            Value::Integer(i) => format!("const {}: signed<64> = {}\n", name, i),
-            Value::Float(f) => format!("const {}: GCoord = {}\n", name, f),
-            Value::String(s) => format!("const {}: string = \"{}\"\n", name, s),
-            _ => String::new(),
-        }
-    })
-}
-
-fn generate_code_from_constants<F>(parsed: &Value, mut emit: F) -> String
-where
-    F: FnMut(&str, &Value) -> String,
-{
+fn generate_code_from_constants(parsed: &Value, fmts: &Formats) -> String {
     let mut code = String::from("// @generated - do not edit\n");
     for_each_constant(parsed, |k, v| {
-        code += &emit(k, v);
+        let name = k.to_uppercase();
+        match v {
+            Value::Integer(i) => code.push_str(&fill2(fmts.int_fmt, name, i)),
+            Value::Float(f) => code.push_str(&fill2(fmts.float_fmt, name, f)),
+            Value::String(s) => code.push_str(&fill2(fmts.str_fmt, name, s)),
+            _ => (),
+        }
     });
     code
 }
