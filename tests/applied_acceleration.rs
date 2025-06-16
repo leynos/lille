@@ -6,9 +6,9 @@ fn applied_acceleration(force: (f32, f32, f32), mass: Option<f32>) -> Option<(f3
         Some(m) if m > 0.0 => Some((force.0 / m, force.1 / m, force.2 / m)),
         Some(_) => None,
         None => Some((
-            force.0 / DEFAULT_MASS,
-            force.1 / DEFAULT_MASS,
-            force.2 / DEFAULT_MASS,
+            force.0 / DEFAULT_MASS as f32,
+            force.1 / DEFAULT_MASS as f32,
+            force.2 / DEFAULT_MASS as f32,
         )),
     }
 }
