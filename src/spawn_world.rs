@@ -1,3 +1,4 @@
+//! Systems for spawning entities into the Bevy world.
 use bevy::prelude::*;
 
 use crate::components::{DdlogId, Health, Target, UnitType};

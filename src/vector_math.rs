@@ -1,3 +1,4 @@
+//! Basic vector math helper functions.
 use glam::Vec3;
 
 /// Returns the magnitude of the vector `(x, y, z)`.

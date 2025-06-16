@@ -1,3 +1,4 @@
+//! Actor data structures and related logic.
 use crate::entity::Entity;
 use glam::Vec3;
 

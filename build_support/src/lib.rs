@@ -1,3 +1,4 @@
+//! Build support utilities used by the project's build script.
 pub mod constants;
 pub mod ddlog;
 pub mod font;

@@ -1,3 +1,4 @@
+//! Logging utilities.
 use env_logger::{Builder, Env};
 use log::LevelFilter;
 

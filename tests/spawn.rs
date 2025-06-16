@@ -1,3 +1,4 @@
+//! Unit tests for the world-spawning system.
 use bevy::prelude::*;
 use lille::{spawn_world_system, DdlogId, Health, Target, UnitType};
 

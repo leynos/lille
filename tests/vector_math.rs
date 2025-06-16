@@ -1,3 +1,4 @@
+//! Tests for the vector math utility functions.
 use approx::assert_relative_eq;
 use lille::vec_normalize;
 

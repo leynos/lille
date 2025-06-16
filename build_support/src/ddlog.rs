@@ -1,3 +1,4 @@
+//! Build helper for compiling Differential Datalog code.
 use once_cell::sync::OnceCell;
 use std::env;
 use std::error::Error;

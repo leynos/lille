@@ -1,3 +1,4 @@
+//! Utilities for generating Rust constants from the shared `constants.toml` file.
 use std::error::Error;
 use std::fs;
 use std::path::Path;

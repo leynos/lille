@@ -1,3 +1,4 @@
+//! Utility helpers for tests.
 /// Test helper utilities.
 
 /// Assert that all strings in `keys` are present in `code`.

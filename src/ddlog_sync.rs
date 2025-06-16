@@ -1,3 +1,4 @@
+//! Systems for synchronizing ECS state with Differential Datalog.
 use bevy::prelude::*;
 use hashbrown::HashMap;
 

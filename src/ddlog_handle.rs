@@ -1,3 +1,4 @@
+//! Helper types and logic for interfacing with Differential Datalog.
 use bevy::prelude::*;
 use hashbrown::HashMap;
 use serde::Serialize;

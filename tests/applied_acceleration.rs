@@ -1,3 +1,4 @@
+//! Unit tests for physics calculations.
 use approx::assert_relative_eq;
 use lille::DEFAULT_MASS;
 

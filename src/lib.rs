@@ -1,3 +1,4 @@
+//! Library crate providing core Lille game logic.
 pub mod actor;
 pub mod components;
 pub mod ddlog_handle;

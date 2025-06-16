@@ -1,3 +1,4 @@
+//! Tests for the `build_support` constants generator.
 use build_support::constants::{generate_code_from_constants, RUST_FMTS};
 use test_utils::{assert_all_absent, assert_all_present, assert_valid_rust_syntax};
 

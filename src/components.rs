@@ -1,3 +1,4 @@
+//! ECS component types used by the game.
 use bevy::prelude::*;
 use serde::Serialize;
 

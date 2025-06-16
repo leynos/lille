@@ -1,3 +1,4 @@
+//! Downloads and verifies font files for inclusion in the project.
 use reqwest::blocking::Client;
 use sha2::{Digest, Sha256};
 use std::error::Error;

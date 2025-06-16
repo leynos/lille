@@ -1,3 +1,4 @@
+//! Integration tests for the DDlog interface.
 use glam::{Vec2, Vec3};
 use lille::{ddlog_handle::DdlogEntity, DdlogHandle, UnitType};
 use once_cell::sync::Lazy;

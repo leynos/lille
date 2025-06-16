@@ -1,3 +1,4 @@
+//! Basic entity representations used within the game.
 use glam::Vec3;
 
 #[derive(Clone, Debug)]
