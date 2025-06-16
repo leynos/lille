@@ -32,8 +32,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-${{ env.BUILD_PROFILE }}-
       - name: Install DDlog
+        uses: ./.github/actions/install-ddlog
+      - name: Show DDlog install info
         run: |
-          ./scripts/install_ddlog.sh
           ls -l /home/runner/.local/ddlog
           echo dotenv:
           cat .env
