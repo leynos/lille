@@ -6,7 +6,27 @@ pub mod font;
 
 use std::{error::Error, path::PathBuf};
 
-/// Runs the build script logic used by `build.rs`.
+/// Execute all build steps required by `build.rs`.
+///
+/// This function generates constants, downloads the Fira Sans font and
+/// compiles any Differential Datalog sources if the `ddlog` executable is
+/// available. Environment variables such as `CARGO_MANIFEST_DIR` and `OUT_DIR`
+/// must be set by Cargo before this function is called.
+///
+/// # Examples
+/// ```rust,no_run
+/// fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     build_support::build()
+/// }
+/// ```
+///
+/// # Returns
+/// `Ok(())` if all build steps succeed, otherwise an error is returned from the
+/// failing step.
+///
+/// # Errors
+/// Returns an error if required environment variables are missing, if any file
+/// operation fails, or when Differential Datalog compilation does not succeed.
 pub fn build() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=assets");
