@@ -122,7 +122,7 @@ fn ddlog_program_has_floor_height_rules() {
     let constants = parsed_constants();
 
     for name in ["FloorHeightAt", "IsUnsupported", "IsStanding"] {
-        assert!(relations.contains(name), "{} rule missing", name);
+        assert!(relations.contains(name), "{name} rule missing");
     }
 
     assert!(
@@ -144,8 +144,7 @@ fn ddlog_program_has_floor_height_rules() {
     ] {
         assert!(
             relations.contains(token),
-            "{} rule or relation missing",
-            token
+            "{token} rule or relation missing"
         );
     }
 

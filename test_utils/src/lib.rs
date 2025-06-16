@@ -25,6 +25,9 @@ pub fn assert_valid_rust_syntax(code: &str) {
     use syn::parse_file; // syn = syntax only, no type-checking
 
     if let Err(err) = parse_file(code) {
-        panic!("generated code is not valid Rust:\n{}\nError: {}", code, err);
+        panic!(
+            "generated code is not valid Rust:\n{}\nError: {}",
+            code, err
+        );
     }
 }
