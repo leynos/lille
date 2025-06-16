@@ -112,12 +112,12 @@ rstest = "0.18" # Or the latest version available on crates.io
 # rstest_macros = "0.18" # Check crates.io for the latest version
 ```
 
-It is advisable to check `crates.io` for the latest stable version of `rstest`
-(and `rstest_macros` if required separately by the version of `rstest` being
-used).1 Using `dev-dependencies` is a standard practice in Rust for testing
-libraries. This convention prevents testing utilities from being included in
-production binaries, which helps keep them small and reduces compile times for
-non-test builds.11
+Checking `crates.io` for the latest stable version of `rstest` (and
+`rstest_macros` if required separately by the version of `rstest` being used) is
+recommended.1 Using `dev-dependencies` is a standard practice in Rust for
+testing libraries. This convention prevents testing utilities from being
+included in production binaries, which helps keep them small and reduces compile
+times for non-test builds.11
 
 ### B. Your First Fixture: Defining with `#[fixture]`
 
@@ -128,16 +128,14 @@ attribute.
 
 Consider a simple fixture that provides a numeric value:
 
-Rust
-
-````rust
+```rust
 use rstest::fixture; // Or use rstest::*;
 
 #[fixture]
 pub fn answer_to_life() -> u32 {
     42
 }
-```rust
+```
 
 In this example, `answer_to_life` is a public function marked with `#[fixture]`.
 It takes no arguments and returns a `u32` value of 42.9 The `#[fixture]` macro
@@ -157,8 +155,6 @@ an argument in the test function with the same name as the fixture function.
 
 Here’s how to use the `answer_to_life` fixture in a test:
 
-Rust
-
 ```rust
 use rstest::{fixture, rstest}; // Or use rstest::*;
 
@@ -171,7 +167,7 @@ pub fn answer_to_life() -> u32 {
 fn test_with_fixture(answer_to_life: u32) {
     assert_eq!(answer_to_life, 42);
 }
-```rust
+```
 
 In `test_with_fixture`, the argument `answer_to_life: u32` signals to `rstest`
 that the `answer_to_life` fixture should be injected.1 `rstest` resolves this by
@@ -215,7 +211,7 @@ fn default_username() -> String {
 fn test_username_length(default_username: String) {
     assert!(default_username.len() > 0);
 }
-````
+```
 
 - **Fixture returning a struct:**
 
@@ -274,8 +270,8 @@ fn test_add_to_repository(mut empty_repository: impl Repository) {
 }
 ```
 
-This example, adapted from concepts in 1 and 1, demonstrates a fixture providing
-a mutable `Repository` implementation.
+This example, building on earlier concepts, demonstrates a fixture providing a
+mutable `Repository` implementation.
 
 ### B. Understanding Fixture Scope and Lifetime (Default Behavior)
 
@@ -314,9 +310,7 @@ values must also be annotated with `#[case]`.
 
 A classic example is testing the Fibonacci sequence 1:
 
-Rust
-
-````rust
+```rust
 use rstest::rstest;
 
 fn fibonacci(n: u32) -> u32 {
@@ -337,7 +331,7 @@ fn fibonacci(n: u32) -> u32 {
 fn test_fibonacci(#[case] input: u32, #[case] expected: u32) {
   assert_eq!(fibonacci(input), expected);
 }
-```rust
+```
 
 For each `#[case(input_val, expected_val)]` line, `rstest` generates a separate,
 independent test. If one case fails, the others are still executed and reported
@@ -358,9 +352,7 @@ parameters or ensuring comprehensive coverage across various input states.1
 Consider testing a state machine's transition logic based on current state and
 an incoming event:
 
-Rust
-
-```rust
+````rust
 use rstest::rstest;
 
 #
@@ -418,7 +410,6 @@ can be used together, mixing fixture variables, fixed cases, and value lists.9
 For example, a test might use a fixture to obtain a database connection and then
 use `#[case]` arguments to test operations with different user IDs:
 
-Rust
 
 ```rust
 use rstest::*;
@@ -454,7 +445,6 @@ dependency graph, ensuring that prerequisite fixtures are evaluated first. This
 allows for the construction of complex setup logic from smaller, modular, and
 reusable fixture components.4
 
-Rust
 
 ```rust
 use rstest::*;
@@ -497,7 +487,6 @@ For fixtures that are expensive to create or represent read-only shared data,
 initialized only a single time, and all tests using it will receive a static
 reference to this shared instance.9
 
-Rust
 
 ```rust
 use rstest::*;
@@ -550,7 +539,6 @@ or different name is preferred for the argument in a test or another fixture.
 The `#[from(original_fixture_name)]` attribute on an argument allows renaming.12
 This is particularly useful when destructuring the result of a fixture.
 
-Rust
 
 ```rust
 use rstest::*;
@@ -589,7 +577,6 @@ default values for its own arguments.4
 argument within another fixture) to supply specific values to the parameters
 of the invoked fixture, overriding any defaults.4
 
-Rust
 
 ```rust
 use rstest::*;
@@ -652,7 +639,6 @@ can often automatically convert string literals provided in `#[case]` or
 
 An example is converting string literals to `std::net::SocketAddr`:
 
-Rust
 
 ```rust
 use rstest::*;
@@ -689,7 +675,6 @@ Creating an asynchronous fixture is straightforward: simply define the fixture
 function as an `async fn`.12 `rstest` will recognize it as an async fixture and
 handle its execution accordingly when used in an async test.
 
-Rust
 
 ```rust
 use rstest::*;
@@ -718,7 +703,6 @@ popular async runtimes like Tokio or Actix. This is typically done by adding the
 runtime's specific test attribute (e.g., `#[tokio::test]` or
 `#[actix_rt::test]`) alongside `#[rstest]`.4
 
-Rust
 
 ```rust
 use rstest::*;
@@ -763,7 +747,6 @@ test function (`#[awt]`) or a specific `#[future]` argument
 (`#[future(awt)]`), tells `rstest` to automatically insert `.await` calls for
 those futures.
 
-Rust
 
 ```rust
 use rstest::*;
@@ -817,7 +800,6 @@ indefinitely. `rstest` provides a `#[timeout(...)]` attribute to set a maximum
 execution time for async tests.10 This feature typically relies on the
 `async-timeout` feature of `rstest`, which is enabled by default.1
 
-Rust
 
 ```rust
 use rstest::*;
@@ -865,7 +847,6 @@ provide its path or handle to the test, and ensure cleanup (often via RAII).
 
 Here's an illustrative example using the `tempfile` crate:
 
-Rust
 
 ```rust
 use rstest::*;
@@ -931,7 +912,6 @@ examples with fakes or mocks like `empty_repository` and `string_processor`.1
 
 A conceptual example using a hypothetical mocking library:
 
-Rust
 
 ```rust
 use rstest::*;
@@ -1019,7 +999,6 @@ as `&str` or `&[u8]` by specifying a mode, e.g.,
 `#[base_dir = "..."]` can specify a base directory for the glob, and
 `#[exclude("regex")]` can filter out paths matching a regular expression.10
 
-Rust
 
 ```rust
 use rstest::*;
@@ -1073,7 +1052,6 @@ definition of reusable test templates.9
 - `#[apply(template_name)]`: Used on a test function to apply a previously
 defined template, effectively injecting its attributes.
 
-Rust
 
 ```rust
 // Add to Cargo.toml: rstest_reuse = "0.7" (or latest)
@@ -1346,5 +1324,4 @@ provided by `rstest`:
 By mastering `rstest`, Rust developers can significantly elevate the quality and
 efficiency of their testing practices, leading to more reliable and maintainable
 software.
-```
 ````
