@@ -24,5 +24,7 @@ pub fn assert_all_absent(code: &str, keys: &[&str]) {
 pub fn assert_valid_rust_syntax(code: &str) {
     use syn::parse_file; // syn = syntax only, no type-checking
 
-    parse_file(code).expect("generated code is not valid Rust");
+    if let Err(err) = parse_file(code) {
+        panic!("generated code is not valid Rust:\n{}\nError: {}", code, err);
+    }
 }
