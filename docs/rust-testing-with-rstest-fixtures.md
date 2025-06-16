@@ -72,8 +72,8 @@ quality and developer productivity:
 - **Readability:** By injecting dependencies as function arguments, `rstest`
   makes the requirements of a test explicit and easy to understand.9 The test
   function's signature clearly documents what it needs to run. This allows
-  developers to "focus on the important stuff in your tests" by abstracting away
-  the setup details.1
+  developers to "focus on the important stuff in tests" by abstracting away the
+  setup details.1
 - **Reusability:** Fixtures defined with `rstest` are reusable components. A
   single fixture, such as one setting up a database connection or creating a
   complex data structure, can be used across multiple tests, eliminating
@@ -102,8 +102,8 @@ To begin using `rstest`, it must be added as a development dependency in the
 project's `Cargo.toml` file. This ensures that `rstest` is only compiled and
 linked when running tests, not when building the main application or library.
 
-Add the following lines to your `Cargo.toml` under the `[dev-dependencies]`
-section:
+Add the following lines to the project's `Cargo.toml` under the
+`[dev-dependencies]` section:
 
 ```toml
 [dev-dependencies]
@@ -119,7 +119,7 @@ testing libraries. This convention prevents testing utilities from being
 included in production binaries, which helps keep them small and reduces compile
 times for non-test builds.11
 
-### B. Your First Fixture: Defining with `#[fixture]`
+### B. A First Fixture: Defining with `#[fixture]`
 
 A fixture in `rstest` is essentially a Rust function that provides some data or
 performs some setup action, with its result being injectable into tests. To
@@ -378,7 +378,7 @@ fn test_state_transitions(
   # initial_state: State,
   #[values(Event::Process, Event::Error, Event::Fatal)] event: Event
 ) {
-  // In a real test, you'd have more specific assertions based on expected_next_state
+  // In a real test, more specific assertions would be added based on expected_next_state
   let next_state = initial_state.process(event);
   println!("Testing: {:?} + {:?} -> {:?}", initial_state, event, next_state);
   // For demonstration, a generic assertion:
@@ -1005,7 +1005,7 @@ use rstest::*;
 use std::path::PathBuf;
 use std::fs;
 
-// Assume you have files in `tests/test_data/` like `file1.txt`, `file2.json`
+// Assume there are files in `tests/test_data/` like `file1.txt`, `file2.json`
 
 #[rstest]
 #[files("tests/test_data/*.txt")] // Injects PathBuf for each.txt file
@@ -1055,7 +1055,7 @@ defined template, effectively injecting its attributes.
 
 ```rust
 // Add to Cargo.toml: rstest_reuse = "0.7" (or latest)
-// In your test module or lib.rs/main.rs for crate-wide visibility if needed:
+// In the test module or lib.rs/main.rs for crate-wide visibility if necessary:
 // #[cfg(test)]
 // use rstest_reuse; // Important for template macro expansion [18]
 
