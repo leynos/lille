@@ -75,8 +75,8 @@ impl DdlogHandle {
     }
 
     fn apply_gravity(&self, pos: &mut Vec3, floor: f32) {
-        if pos.z > floor + GRACE_DISTANCE {
-            pos.z += GRAVITY_PULL;
+        if pos.z > floor + GRACE_DISTANCE as f32 {
+            pos.z += GRAVITY_PULL as f32;
         } else {
             pos.z = floor;
         }

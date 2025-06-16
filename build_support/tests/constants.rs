@@ -179,7 +179,11 @@ fn generates_valid_rust_syntax() {
     assert!(!code.contains("pub const ;"));
 
     let lines: Vec<&str> = code.lines().collect();
-    let const_lines: Vec<&str> = lines.iter().filter(|line| line.contains("pub const")).cloned().collect();
+    let const_lines: Vec<&str> = lines
+        .iter()
+        .filter(|line| line.contains("pub const"))
+        .cloned()
+        .collect();
     assert!(!const_lines.is_empty());
 }
 
@@ -249,7 +253,9 @@ fn preserves_special_string_content() {
         url_template = 'https://api.example.com/v1/{resource}/{id}?format=json'
         shell_command = 'grep -r "pattern" /path/to/search --include="*.rs"'
     "#;
-    let parsed: toml::Value = toml_str.parse().unwrap_or_else(|_| toml::Value::Table(Default::default()));
+    let parsed: toml::Value = toml_str
+        .parse()
+        .unwrap_or_else(|_| toml::Value::Table(Default::default()));
     let code = generate_code_from_constants(&parsed, &RUST_FMTS);
 
     assert!(code.starts_with("// @generated"));

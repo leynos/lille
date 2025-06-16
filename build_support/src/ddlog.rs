@@ -3,13 +3,18 @@ use std::error::Error;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-pub fn compile_ddlog(manifest_dir: &str, out_dir: &Path) -> Result<(), Box<dyn Error>> {
+pub fn compile_ddlog(
+    manifest_dir: impl AsRef<Path>,
+    out_dir: impl AsRef<Path>,
+) -> Result<(), Box<dyn Error>> {
     dotenvy::dotenv().ok();
+    let manifest_dir = manifest_dir.as_ref();
+    let out_dir = out_dir.as_ref();
     if !ddlog_available() {
         return Ok(());
     }
 
-    let ddlog_file = Path::new(manifest_dir).join("src/lille.dl");
+    let ddlog_file = manifest_dir.join("src/lille.dl");
     if !ddlog_file.exists() {
         println!("cargo:warning=src/lille.dl missing; skipping ddlog compilation");
         return Ok(());
@@ -26,7 +31,10 @@ fn ddlog_available() -> bool {
     {
         Ok(status) if status.success() => true,
         Ok(status) => {
-            println!("cargo:warning=ddlog --version failed with status {}", status);
+            println!(
+                "cargo:warning=ddlog --version failed with status {}",
+                status
+            );
             false
         }
         Err(e) => {
@@ -48,17 +56,18 @@ fn run_ddlog(ddlog_file: &Path, out_dir: &Path) -> Result<(), Box<dyn Error>> {
         .arg("-o")
         .arg(&target_dir)
         .status()?;
-    if !status.success() {
-        println!("cargo:warning=ddlog compiler exited with status: {}", status);
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("ddlog compiler exited with status: {}", status).into())
     }
-    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::fs;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use tempfile::TempDir;
 
     fn create_test_dirs() -> (TempDir, PathBuf, PathBuf) {
@@ -81,14 +90,14 @@ mod tests {
     #[test]
     fn test_compile_ddlog_no_ddlog_available() {
         let (_temp_dir, manifest_dir, out_dir) = create_test_dirs();
-        let result = compile_ddlog(manifest_dir.to_str().unwrap(), &out_dir);
+        let result = compile_ddlog(&manifest_dir, &out_dir);
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_compile_ddlog_missing_ddlog_file() {
         let (_temp_dir, manifest_dir, out_dir) = create_test_dirs();
-        let result = compile_ddlog(manifest_dir.to_str().unwrap(), &out_dir);
+        let result = compile_ddlog(&manifest_dir, &out_dir);
         assert!(result.is_ok());
     }
 
@@ -96,14 +105,14 @@ mod tests {
     fn test_compile_ddlog_with_existing_file() {
         let (_temp_dir, manifest_dir, out_dir) = create_test_dirs();
         create_ddlog_file(&manifest_dir);
-        let result = compile_ddlog(manifest_dir.to_str().unwrap(), &out_dir);
+        let result = compile_ddlog(&manifest_dir, &out_dir);
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_compile_ddlog_invalid_manifest_dir() {
         let (_temp_dir, _manifest_dir, out_dir) = create_test_dirs();
-        let result = compile_ddlog("/non/existent/path", &out_dir);
+        let result = compile_ddlog(Path::new("/non/existent/path"), &out_dir);
         assert!(result.is_ok());
     }
 
@@ -156,8 +165,10 @@ mod tests {
     fn test_compile_ddlog_relative_paths() {
         let (_temp_dir, manifest_dir, out_dir) = create_test_dirs();
         create_ddlog_file(&manifest_dir);
-        let relative_manifest = format!("./{}", manifest_dir.file_name().unwrap().to_str().unwrap());
-        let result = compile_ddlog(&relative_manifest, &out_dir);
+        let relative_manifest = manifest_dir
+            .strip_prefix(manifest_dir.parent().unwrap())
+            .unwrap();
+        let result = compile_ddlog(relative_manifest, &out_dir);
         assert!(result.is_ok());
     }
 
@@ -166,10 +177,16 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let out_dir = temp_dir.path().join("out");
         fs::create_dir_all(&out_dir).unwrap();
-        let edge_cases = vec![".", "..", "/", "./", "../"];
+        let edge_cases = vec![
+            Path::new("."),
+            Path::new(".."),
+            Path::new("/"),
+            Path::new("./"),
+            Path::new("../"),
+        ];
         for case in edge_cases {
             let result = compile_ddlog(case, &out_dir);
-            assert!(result.is_ok(), "Failed for path: {}", case);
+            assert!(result.is_ok(), "Failed for path: {}", case.display());
         }
     }
 
@@ -190,7 +207,7 @@ mod tests {
         create_ddlog_file(&manifest_dir);
         let env_file = manifest_dir.parent().unwrap().join(".env");
         fs::write(&env_file, "TEST_VAR=test_value").unwrap();
-        let result = compile_ddlog(manifest_dir.to_str().unwrap(), &out_dir);
+        let result = compile_ddlog(&manifest_dir, &out_dir);
         assert!(result.is_ok());
         let _ = fs::remove_file(env_file);
     }
@@ -215,7 +232,7 @@ mod tests {
         fs::create_dir_all(&src_dir).unwrap();
         let ddlog_file = src_dir.join("lille.dl");
         fs::write(&ddlog_file, "// unicode test").unwrap();
-        let result = compile_ddlog(unicode_dir.to_str().unwrap(), &out_dir);
+        let result = compile_ddlog(&unicode_dir, &out_dir);
         assert!(result.is_ok());
     }
 }

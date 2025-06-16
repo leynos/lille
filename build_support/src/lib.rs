@@ -1,22 +1,24 @@
 pub mod constants;
-pub mod font;
 pub mod ddlog;
+pub mod font;
 
 use std::{error::Error, path::PathBuf};
 
 /// Runs the build script logic used by `build.rs`.
 pub fn build() -> Result<(), Box<dyn Error>> {
-    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")?;
+    println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=assets");
+    println!("cargo:rerun-if-changed=src/lille.dl");
+    println!("cargo:rerun-if-changed=constants.toml");
+    println!("cargo:rerun-if-env-changed=DDLOG_HOME");
+
+    let manifest_dir = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR")?);
     let out_dir = PathBuf::from(std::env::var("OUT_DIR")?);
 
     constants::generate_constants(&manifest_dir, &out_dir)?;
     let font_path = font::download_font(&manifest_dir)?;
     ddlog::compile_ddlog(&manifest_dir, &out_dir)?;
 
-    println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed=assets");
-    println!("cargo:rerun-if-changed=src/lille.dl");
-    println!("cargo:rerun-if-changed=constants.toml");
     println!("cargo:rustc-env=FONT_PATH={}", font_path.display());
 
     Ok(())
@@ -105,12 +107,19 @@ mod tests {
         let (manifest_temp, _) = setup_test_env();
         fs::create_dir_all(manifest_temp.path().join("assets")).ok();
         fs::create_dir_all(manifest_temp.path().join("src")).ok();
-        fs::write(manifest_temp.path().join("constants.toml"), "# test constants").ok();
+        fs::write(
+            manifest_temp.path().join("constants.toml"),
+            "# test constants",
+        )
+        .ok();
         fs::write(manifest_temp.path().join("src/lille.dl"), "# test ddlog").ok();
         let result = build();
         match result {
             Ok(_) => assert!(true),
-            Err(e) => { println!("Expected error in test environment: {}", e); assert!(true); }
+            Err(e) => {
+                println!("Expected error in test environment: {}", e);
+                assert!(true);
+            }
         }
         cleanup_test_env();
     }
