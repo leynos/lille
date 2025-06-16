@@ -1,4 +1,4 @@
-# Migration roadmap: `lille` to DDlog/Bevy architecture
+# Migration Roadmap: `lille` to DDlog/Bevy architecture
 
 This roadmap outlines the key phases to transition the `leynos/lille` project
 from its current imperative structure to the declarative, DDlog-driven

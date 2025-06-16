@@ -25,7 +25,7 @@ determine an entity's state relative to it.
 To handle continuous height, we adjust our core types to use floating-point
 numbers.
 
-```
+````prolog
 // --- Core Type Modifications ---
 typedef GCoord = float
 
@@ -35,14 +35,14 @@ input relation Block(id: BlockID, x: signed32, y: signed32, z: signed32)
 input relation Target(actor: EntityID, tx: GCoord, ty: GCoord)
 output relation NewPosition(entity: EntityID, x: GCoord, y: GCoord, z: GCoord)
 
-```
+```prolog
 
 #### 2.2 Redesigned World Geometry Relations
 
 The `BlockSlope` relation is redefined to describe a plane equation, enabling
 precise height calculations.
 
-```
+```prolog
 // Defines the top plane of a block with the equation:
 // z = base_z + (x_in_block * grad_x) + (y_in_block * grad_y)
 input relation BlockSlope(
@@ -51,7 +51,7 @@ input relation BlockSlope(
     grad_y: GCoord  // The gradient (steepness) in the y direction.
 )
 
-```
+```prolog
 
 ### 3. Declarative Physics Rules (Refined)
 
@@ -60,7 +60,7 @@ input relation BlockSlope(
 This is the new core of the physics model. We create relations that derive the
 correct floor height for any given `(x, y)` coordinate.
 
-```
+```prolog
 // --- Physics Constants --- (see `constants.toml`)
 
 // Finds the highest block at a given (x,y) grid location.
@@ -87,14 +87,14 @@ relation FloorHeightAt(x: GCoord, y: GCoord, z_floor: GCoord) :-
     not BlockSlope(block, _, _),
     z_floor = (z_grid as GCoord) + 1.0.
 
-```
+```prolog
 
 #### Step 2: Redefine Entity State (Unsupported vs. Standing)
 
 The logic is now simpler. An entity is unsupported if it is "floating" above the
 calculated floor.
 
-```
+```prolog
 relation IsUnsupported(entity: EntityID) :-
     Position(entity, x, y, z),
     FloorHeightAt(x, y, z_floor),
@@ -104,14 +104,14 @@ relation IsStanding(entity: EntityID) :-
     Position(entity, _, _, _),
     not IsUnsupported(entity).
 
-```
+```prolog
 
 #### Step 3: Final Movement Calculation
 
 Movement is now a two-stage process: calculate the 2D AI move, then "snap" the
 result to the floor.
 
-```
+```prolog
 // GRAVITY_PULL defined in `constants.toml`
 
 // --- Falling Logic ---
@@ -140,7 +140,7 @@ output relation NewPosition(e, x + dx, y + dy, new_z_floor) :-
     AiMoveVector(e, dx, dy),
     FloorHeightAt(x + dx, y + dy, new_z_floor).
 
-```
+```prolog
 
 ## Phase 2: Force, Inertia, and Friction
 
@@ -158,7 +158,7 @@ walking) and its **inertial motion** (velocity from external forces).
 
 We introduce relations to track velocity and represent transient forces.
 
-```
+```prolog
 // --- New Physics Constants --- (see `constants.toml`)
 
 // --- New Persistent Input Relation ---
@@ -180,17 +180,17 @@ input stream Force(entity: EntityID, fx: GCoord, fy: GCoord, fz: GCoord)
 // The calculated velocity at the end of a tick.
 output relation NewVelocity(entity: EntityID, nvx: GCoord, nvy: GCoord, nvz: GCoord)
 
-```
+```prolog
 
 #### 2.2 New External Helper Functions
 
 Complex vector maths is offloaded to Rust functions exposed to DDlog.
 
-```
+```prolog
 extern function vec_mag(x: GCoord, y: GCoord, z: GCoord): GCoord
 extern function vec_normalize(x: GCoord, y: GCoord, z: GCoord): (GCoord, GCoord, GCoord)
 
-```
+```prolog
 
 ### 3. Declarative Dynamics Rules
 
@@ -198,21 +198,21 @@ extern function vec_normalize(x: GCoord, y: GCoord, z: GCoord): (GCoord, GCoord,
 
 We collect all acceleration vectors acting on an entity for the current tick.
 
-```
+```prolog
 relation AppliedAcceleration(e, fx / mass, fy / mass, fz / mass) :-
     Force(e, fx, fy, fz),
     (Mass(e, mass) or mass = DEFAULT_MASS),
     mass > 0.0.
 relation GravitationalAcceleration(e, 0.0, 0.0, -GRAVITY_PULL) :- IsUnsupported(e).
 
-```
+```prolog
 
 #### Step 2: Calculate Frictional Deceleration
 
 Friction is an opposing acceleration dependent on the entity's state and
 velocity.
 
-```
+```prolog
 relation FrictionalDeceleration(e, fdx, fdy, 0.0) :-
     IsStanding(e),
     Velocity(e, vx, vy, _),
@@ -229,14 +229,14 @@ relation FrictionalDeceleration(e, fdx, fdy, 0.0) :-
     var decel_mag = min(h_mag, AIR_FRICTION),
     fdx = -nx * decel_mag, fdy = -ny * decel_mag.
 
-```
+```prolog
 
 #### Step 3: Calculate Net Acceleration and New Velocity
 
 We sum all accelerations to get a net acceleration, then use it to update the
 entity's velocity.
 
-```
+```prolog
 relation NetAcceleration(e, ax, ay, az) :-
     agg(e) sum (
         ax = aax + gax + fax,
@@ -262,14 +262,14 @@ output relation NewVelocity(e, nvx, nvy, 0.0) :-
     IsStanding(e),
     UnclampedNewVelocity(e, nvx, nvy, _).
 
-```
+```prolog
 
 #### Step 4: Final Position Calculation
 
 An entity's final displacement is the sum of its new inertial velocity and its
 separate, AI-driven walking vector.
 
-```
+```prolog
 // The AI-driven walking vector, which only applies to standing entities.
 relation AiWalkVector(actor, dx, dy, 0.0) :-
     IsStanding(actor),
@@ -292,4 +292,5 @@ output relation NewPosition(e, new_x, new_y, new_z_floor) :-
     var new_y = py + nvy + walk_dy,
     FloorHeightAt(new_x, new_y, new_z_floor).
 
-```
+```prolog
+````

@@ -56,7 +56,7 @@ The movement calculation considers:
   `src/lille.dl` with the `ddlog` compiler. The generated crate is written to
   Cargo's `OUT_DIR` to keep the project root clean.
 - A placeholder `DdlogHandle` resource is inserted during startup.
-- `DefaultPlugins` are loaded with `LogPlugin` disabled so the custom logger
+- `DefaultPlugins` are loaded with `LogPlugin` disabled, so the custom logger
   from `logging.rs` controls output.
 - The grid-based visualization system from the original code remains, but will
   be ported to Bevy in later phases.

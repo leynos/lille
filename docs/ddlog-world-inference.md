@@ -18,9 +18,9 @@ we will use **Bevy ECS** as the reference.
 This approach offers several distinct advantages:
 
 - **Determinism:** The entire game logic is captured in a pure, declarative
-  dataflow. Given the same sequence of inputs, the game state will always evolve
-  identically, which is a prerequisite for robust replay functionality and
-  lock-step networking models.
+  dataflow. Given the same sequence of inputs, the game state will consistently
+  evolve identically, which is a prerequisite for robust replay functionality
+  and lock-step networking models.
 
 - **Separation of Concerns:** The complex, stateful game logic is completely
   decoupled from the rendering and host application code. The host becomes a

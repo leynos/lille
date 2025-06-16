@@ -1,11 +1,11 @@
-### **Physics Engine Implementation Roadmap**
+# Physics Engine Implementation Roadmap
 
 This roadmap outlines the steps required to implement the physics engine
 described in `docs/lille-physics-engine-design.md`. Each phase includes
 behavioural testing tasks guided by
 `docs/bdd-strategies-for-differential-datalog-rulesets.md`.
 
-#### **Phase 1: Kinematic Foundations**
+## Phase 1: Kinematic Foundations
 
 - **Goal:** Realise the gravity and floor-height model.
 - **Key Tasks:**
@@ -21,7 +21,7 @@ behavioural testing tasks guided by
     correctly transition between standing and falling when terrain heights
     change. Snapshot the resulting DDlog deltas for regression tests.
 
-#### **Phase 2: Dynamics (Forces and Friction)**
+## Phase 2: Dynamics (Forces and Friction)
 
 - **Goal:** Extend the engine with velocity, forces and friction.
   - **Key Tasks:**
@@ -35,7 +35,7 @@ behavioural testing tasks guided by
       covering force application and friction behaviour. Snapshot the expected
       velocity and position changes.
 
-#### **Phase 3: Integration and Polish**
+## Phase 3: Integration and Polish
 
 - **Goal:** Hook the physics systems into the game loop and ensure determinism.
   - **Key Tasks:**
