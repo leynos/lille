@@ -21,6 +21,10 @@ use std::{error::Error, path::PathBuf};
 /// # Returns
 /// `Ok(())` if all build steps succeed, otherwise an error is returned from the
 /// failing step.
+///
+/// # Errors
+/// Returns an error if required environment variables are missing, if any file
+/// operation fails, or when Differential Datalog compilation does not succeed.
 pub fn build() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=assets");

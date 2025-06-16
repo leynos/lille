@@ -13,6 +13,9 @@ static DDLOG_AVAILABLE: OnceCell<bool> = OnceCell::new();
 /// - `manifest_dir`: The crate's manifest directory containing `src/lille.dl`.
 /// - `out_dir`: The output directory for generated Rust code.
 ///
+/// # Returns
+/// `Ok(())` if the sources compile successfully or compilation is skipped.
+///
 /// # Errors
 /// Returns an error if the `ddlog` compiler fails to run successfully.
 ///
@@ -68,6 +71,18 @@ fn ddlog_available() -> bool {
 }
 
 /// Invoke the `ddlog` compiler with the provided source file.
+///
+/// # Parameters
+/// - `ddlog_file`: Path to the Differential Datalog source file.
+/// - `out_dir`: Directory where generated Rust code will be written.
+///
+/// # Returns
+/// `Ok(())` if the compiler succeeds, otherwise an error describing the
+/// failure.
+///
+/// # Errors
+/// Returns an error for I/O failures or if the compiler exits with a non-zero
+/// status.
 fn run_ddlog(ddlog_file: &Path, out_dir: &Path) -> Result<(), Box<dyn Error>> {
     let target_dir = out_dir.join("ddlog_lille");
     let mut cmd = Command::new("ddlog");
