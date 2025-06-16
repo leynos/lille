@@ -59,10 +59,10 @@ fn handles_nested_sections() {
 
     assert!(code.contains("HOST"));
     assert!(code.contains("PORT"));
-    assert!(!code.contains("USERNAME"));
-    assert!(!code.contains("PASSWORD"));
-    assert!(!code.contains("ENDPOINT"));
-    assert!(!code.contains("TIMEOUT"));
+    assert!(code.contains("USERNAME"));
+    assert!(code.contains("PASSWORD"));
+    assert!(code.contains("ENDPOINT"));
+    assert!(code.contains("TIMEOUT"));
 }
 
 #[test]

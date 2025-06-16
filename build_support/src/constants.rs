@@ -33,8 +33,10 @@ pub fn generate_constants(
         out_dir.join("constants.rs"),
         generate_code_from_constants(&parsed, &RUST_FMTS),
     )?;
+    let src_dir = manifest_dir.join("src");
+    fs::create_dir_all(&src_dir)?;
     fs::write(
-        manifest_dir.join("src/constants.dl"),
+        src_dir.join("constants.dl"),
         generate_code_from_constants(&parsed, &DL_FMTS),
     )?;
     Ok(())
@@ -46,7 +48,7 @@ pub fn parse_constants(manifest_dir: impl AsRef<Path>) -> Result<Value, Box<dyn 
     Ok(toml_str.parse()?)
 }
 
-fn for_each_constant<F>(parsed: &Value, mut f: F)
+fn for_each_constant<F>(parsed: &Value, f: &mut F)
 where
     F: FnMut(&str, &Value),
 {
@@ -54,12 +56,8 @@ where
         let mut entries: Vec<_> = map.iter().collect();
         entries.sort_by_key(|(k, _)| *k);
         for (k, v) in entries {
-            if let Some(tab) = v.as_table() {
-                let mut subentries: Vec<_> = tab.iter().collect();
-                subentries.sort_by_key(|(k, _)| *k);
-                for (subk, subv) in subentries {
-                    f(subk, subv);
-                }
+            if v.is_table() {
+                for_each_constant(v, f);
             } else {
                 f(k, v);
             }
@@ -68,23 +66,23 @@ where
 }
 
 fn fill2(fmt: &str, a: impl std::fmt::Display, b: impl std::fmt::Display) -> String {
-    let mut parts = fmt.splitn(3, "{}");
-    let mut s = String::new();
-    s.push_str(parts.next().unwrap_or(""));
-    s.push_str(&a.to_string());
-    s.push_str(parts.next().unwrap_or(""));
-    s.push_str(&b.to_string());
-    s.push_str(parts.next().unwrap_or(""));
-    s
+    fmt.replacen("{}", &a.to_string(), 1)
+        .replacen("{}", &b.to_string(), 1)
 }
 
 pub fn generate_code_from_constants(parsed: &Value, fmts: &Formats) -> String {
     let mut code = String::from("// @generated - do not edit\n");
-    for_each_constant(parsed, |k, v| {
+    let mut append = |k: &str, v: &Value| {
         let name = k.to_uppercase();
         match v {
             Value::Integer(i) => code.push_str(&fill2(fmts.int_fmt, name, i)),
-            Value::Float(f) => code.push_str(&fill2(fmts.float_fmt, name, format!("{f:?}"))),
+            Value::Float(f) => {
+                let mut val = f.to_string();
+                if !val.contains('.') && !val.contains('e') && !val.contains('E') {
+                    val.push_str(".0");
+                }
+                code.push_str(&fill2(fmts.float_fmt, name, val));
+            }
             Value::String(s) => code.push_str(&fill2(fmts.str_fmt, name, s)),
             other => {
                 println!(
@@ -93,6 +91,7 @@ pub fn generate_code_from_constants(parsed: &Value, fmts: &Formats) -> String {
                 );
             }
         }
-    });
+    };
+    for_each_constant(parsed, &mut append);
     code
 }
