@@ -1,21 +1,5 @@
 use build_support::constants::{generate_code_from_constants, RUST_FMTS};
-
-fn assert_all_present(code: &str, keys: &[&str]) {
-    for key in keys {
-        assert!(code.contains(key), "{key} not found in output");
-    }
-}
-
-fn assert_all_absent(code: &str, keys: &[&str]) {
-    for key in keys {
-        assert!(!code.contains(key), "{key} should not be present");
-    }
-}
-
-fn assert_valid_rust_syntax(code: &str) {
-    assert_all_present(code, &["pub const", ";"]);
-    assert_all_absent(code, &["@@", "##", "pub const ;"]);
-}
+use test_utils::{assert_all_absent, assert_all_present, assert_valid_rust_syntax};
 
 #[test]
 fn generates_rust_constants() {
@@ -97,7 +81,16 @@ fn handles_different_numeric_types() {
     assert_all_present(
         &code,
         &[
-            "INTEGER", "42", "NEGATIVE", "-100", "ZERO", "0", "FLOAT", "3.14159",
+            "INTEGER",
+            "42",
+            "NEGATIVE",
+            "-100",
+            "ZERO",
+            "0",
+            "FLOAT",
+            "3.14159",
+            "SCIENTIFIC",
+            "1e6",
         ],
     );
 }

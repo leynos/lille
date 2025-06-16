@@ -104,7 +104,7 @@ pub fn generate_code_from_constants(parsed: &Value, fmts: &Formats) -> String {
             Value::Integer(i) => code.push_str(&fill2(fmts.int_fmt, name, i)),
             Value::Float(f) => {
                 let mut val = f.to_string();
-                if is_plain_integer_literal(&val) {
+                if f.is_finite() && is_plain_integer_literal(&val) {
                     val.push_str(".0");
                 }
                 code.push_str(&fill2(fmts.float_fmt, name, val));
@@ -140,5 +140,7 @@ mod tests {
         assert!(!is_plain_integer_literal("1.0"));
         assert!(!is_plain_integer_literal("2e10"));
         assert!(!is_plain_integer_literal("3E5"));
+        assert!(!is_plain_integer_literal("inf"));
+        assert!(!is_plain_integer_literal("NaN"));
     }
 }
