@@ -17,6 +17,10 @@ use std::{error::Error, path::PathBuf};
 ///     build_support::build()
 /// }
 /// ```
+///
+/// # Returns
+/// `Ok(())` if all build steps succeed, otherwise an error is returned from the
+/// failing step.
 pub fn build() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=assets");

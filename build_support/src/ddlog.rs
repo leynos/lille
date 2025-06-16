@@ -20,7 +20,8 @@ static DDLOG_AVAILABLE: OnceCell<bool> = OnceCell::new();
 /// ```rust,no_run
 /// # use std::path::Path;
 /// use build_support::ddlog::compile_ddlog;
-/// compile_ddlog(Path::new("."), Path::new("./target")).ok();
+/// compile_ddlog(Path::new("."), Path::new("./target"))?;
+/// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub fn compile_ddlog(
     manifest_dir: impl AsRef<Path>,

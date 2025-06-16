@@ -68,7 +68,9 @@ fn fallback_font_path() -> PathBuf {
 ///
 /// # Examples
 /// ```rust,no_run
-/// build_support::font::download_font(std::env::current_dir().unwrap()).ok();
+/// # use std::env;
+/// build_support::font::download_font(env::current_dir()?)?;
+/// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub fn download_font(manifest_dir: impl AsRef<Path>) -> Result<PathBuf, Box<dyn Error>> {
     download_font_with(&HttpFontFetcher, manifest_dir)
@@ -80,8 +82,12 @@ pub fn download_font(manifest_dir: impl AsRef<Path>) -> Result<PathBuf, Box<dyn 
 /// - `fetcher`: Implementation used to retrieve the font bytes.
 /// - `manifest_dir`: Directory containing an `assets` folder.
 ///
+/// # Returns
+/// The path to the downloaded font, or a fallback path if fetching or writing
+/// the font fails.
+///
 /// # Errors
-/// Returns a path to a fallback font if downloading fails.
+/// Propagates I/O errors related to creating directories or writing files.
 ///
 /// # Examples
 /// ```rust,no_run
