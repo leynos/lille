@@ -4,8 +4,24 @@ use std::error::Error;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
+/// Caches whether the `ddlog` executable is available on the system.
 static DDLOG_AVAILABLE: OnceCell<bool> = OnceCell::new();
 
+/// Compile the project's Differential Datalog sources if possible.
+///
+/// # Parameters
+/// - `manifest_dir`: The crate's manifest directory containing `src/lille.dl`.
+/// - `out_dir`: The output directory for generated Rust code.
+///
+/// # Errors
+/// Returns an error if the `ddlog` compiler fails to run successfully.
+///
+/// # Examples
+/// ```rust,no_run
+/// # use std::path::Path;
+/// use build_support::ddlog::compile_ddlog;
+/// compile_ddlog(Path::new("."), Path::new("./target")).ok();
+/// ```
 pub fn compile_ddlog(
     manifest_dir: impl AsRef<Path>,
     out_dir: impl AsRef<Path>,
@@ -26,6 +42,7 @@ pub fn compile_ddlog(
     run_ddlog(&ddlog_file, out_dir)
 }
 
+/// Check whether the `ddlog` executable can be invoked.
 fn ddlog_available() -> bool {
     *DDLOG_AVAILABLE.get_or_init(|| {
         match Command::new("ddlog")
@@ -49,6 +66,7 @@ fn ddlog_available() -> bool {
     })
 }
 
+/// Invoke the `ddlog` compiler with the provided source file.
 fn run_ddlog(ddlog_file: &Path, out_dir: &Path) -> Result<(), Box<dyn Error>> {
     let target_dir = out_dir.join("ddlog_lille");
     let mut cmd = Command::new("ddlog");

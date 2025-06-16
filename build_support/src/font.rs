@@ -7,11 +7,30 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tempfile::NamedTempFile;
 
+/// Fetches the binary contents of the Fira Sans font.
+///
+/// Implementors are used by [`download_font_with`] to obtain the font data.
+///
+/// # Errors
+/// Implementations should return an error if the font cannot be retrieved.
+///
+/// # Examples
+/// ```rust,no_run
+/// use build_support::font::{FontFetcher, download_font_with};
+/// struct Dummy;
+/// impl FontFetcher for Dummy {
+///     fn fetch(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+///         Ok(Vec::new())
+///     }
+/// }
+/// let _ = download_font_with(&Dummy, std::env::current_dir().unwrap());
+/// ```
 #[cfg_attr(test, mockall::automock)]
 pub trait FontFetcher {
     fn fetch(&self) -> Result<Vec<u8>, Box<dyn Error>>;
 }
 
+/// Default HTTP implementation of [`FontFetcher`].
 struct HttpFontFetcher;
 
 impl FontFetcher for HttpFontFetcher {
@@ -20,8 +39,10 @@ impl FontFetcher for HttpFontFetcher {
     }
 }
 
+/// Path used when the font download fails.
 pub const DEFAULT_FALLBACK_FONT_PATH: &str = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
 
+/// Determine a fallback font path for the current platform.
 fn fallback_font_path() -> PathBuf {
     if let Ok(p) = std::env::var("FALLBACK_FONT_PATH") {
         return PathBuf::from(p);
@@ -37,10 +58,43 @@ fn fallback_font_path() -> PathBuf {
     PathBuf::from(DEFAULT_FALLBACK_FONT_PATH)
 }
 
+/// Ensure the Fira Sans font exists in the `assets` directory.
+///
+/// # Parameters
+/// - `manifest_dir`: Path to the crate's manifest directory.
+///
+/// # Errors
+/// Propagates any download or I/O errors.
+///
+/// # Examples
+/// ```rust,no_run
+/// build_support::font::download_font(std::env::current_dir().unwrap()).ok();
+/// ```
 pub fn download_font(manifest_dir: impl AsRef<Path>) -> Result<PathBuf, Box<dyn Error>> {
     download_font_with(&HttpFontFetcher, manifest_dir)
 }
 
+/// Download the font using the supplied [`FontFetcher`].
+///
+/// # Parameters
+/// - `fetcher`: Implementation used to retrieve the font bytes.
+/// - `manifest_dir`: Directory containing an `assets` folder.
+///
+/// # Errors
+/// Returns a path to a fallback font if downloading fails.
+///
+/// # Examples
+/// ```rust,no_run
+/// # use build_support::font::{download_font_with, FontFetcher};
+/// # struct Dummy;
+/// # impl FontFetcher for Dummy {
+/// #     fn fetch(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+/// #         Ok(vec![])
+/// #     }
+/// # }
+/// let path = download_font_with(&Dummy, std::env::current_dir().unwrap()).unwrap();
+/// println!("{}", path.display());
+/// ```
 pub fn download_font_with(
     fetcher: &dyn FontFetcher,
     manifest_dir: impl AsRef<Path>,
@@ -74,6 +128,7 @@ pub fn download_font_with(
     }
 }
 
+/// Download the font bytes over HTTP and verify the checksum.
 fn fetch_font_data() -> Result<Vec<u8>, Box<dyn Error>> {
     const FONT_URL: &str = "https://raw.githubusercontent.com/mozilla/Fira/fd8c8c0a3d353cd99e8ca1662942d165e6961407/ttf/FiraSans-Regular.ttf";
     const FONT_SHA256: &str = "a389cef71891df1232370fcebd7cfde5f74e741967070399adc91fd069b2094b";
