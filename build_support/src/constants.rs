@@ -87,7 +87,7 @@ fn fill2(fmt: &str, a: impl std::fmt::Display, b: impl std::fmt::Display) -> Str
 /// `true` if `s` lacks a `.` and does not include `e` or `E`.
 ///
 /// # Examples
-/// ```rust,ignore
+/// ```rust,no_run
 /// assert!(is_plain_integer_literal("42"));
 /// assert!(!is_plain_integer_literal("3.14"));
 /// assert!(!is_plain_integer_literal("1e5"));

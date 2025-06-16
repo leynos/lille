@@ -13,11 +13,8 @@ fn assert_all_absent(code: &str, keys: &[&str]) {
 }
 
 fn assert_valid_rust_syntax(code: &str) {
-    assert!(code.contains("pub const"));
-    assert!(code.contains(";"));
-    assert!(!code.contains("@@"));
-    assert!(!code.contains("##"));
-    assert!(!code.contains("pub const ;"));
+    assert_all_present(code, &["pub const", ";"]);
+    assert_all_absent(code, &["@@", "##", "pub const ;"]);
 }
 
 #[test]
@@ -334,9 +331,8 @@ fn output_compiles_as_valid_rust() {
     let code = generate_code_from_constants(&parsed, &RUST_FMTS);
 
     assert_valid_rust_syntax(&code);
-    assert!(code.contains(":"));
-    assert!(!code.contains(": ;"));
-    assert!(!code.contains("= ;"));
+    assert_all_present(&code, &[":"]);
+    assert_all_absent(&code, &[": ;", "= ;"]);
 
     let const_lines: Vec<&str> = code
         .lines()
