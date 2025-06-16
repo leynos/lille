@@ -378,7 +378,7 @@ fn test_state_transitions(
   # initial_state: State,
   #[values(Event::Process, Event::Error, Event::Fatal)] event: Event
 ) {
-  // In a real test, more specific assertions would be added based on expected_next_state
+  // In a real test, add assertions verifying the expected next state
   let next_state = initial_state.process(event);
   println!("Testing: {:?} + {:?} -> {:?}", initial_state, event, next_state);
   // For demonstration, a generic assertion:
