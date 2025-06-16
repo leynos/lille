@@ -76,6 +76,22 @@ fn fill2(fmt: &str, a: impl std::fmt::Display, b: impl std::fmt::Display) -> Str
     s
 }
 
+/// Determine if a numeric string is a plain integer literal.
+///
+/// A plain integer literal contains neither a decimal point nor an exponent.
+///
+/// # Parameters
+/// - `s`: The numeric literal to inspect.
+///
+/// # Returns
+/// `true` if `s` lacks a `.` and does not include `e` or `E`.
+///
+/// # Examples
+/// ```rust,ignore
+/// assert!(is_plain_integer_literal("42"));
+/// assert!(!is_plain_integer_literal("3.14"));
+/// assert!(!is_plain_integer_literal("1e5"));
+/// ```
 fn is_plain_integer_literal(s: &str) -> bool {
     !s.contains('.') && !s.contains('e') && !s.contains('E')
 }
@@ -107,4 +123,22 @@ pub fn generate_code_from_constants(parsed: &Value, fmts: &Formats) -> String {
     };
     for_each_constant(parsed, &mut append);
     code
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_plain_integer_literal;
+
+    #[test]
+    fn identifies_plain_integers() {
+        assert!(is_plain_integer_literal("0"));
+        assert!(is_plain_integer_literal("42"));
+    }
+
+    #[test]
+    fn rejects_non_plain_integers() {
+        assert!(!is_plain_integer_literal("1.0"));
+        assert!(!is_plain_integer_literal("2e10"));
+        assert!(!is_plain_integer_literal("3E5"));
+    }
 }
