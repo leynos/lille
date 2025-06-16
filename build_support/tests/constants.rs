@@ -1,5 +1,25 @@
 use build_support::constants::{generate_code_from_constants, RUST_FMTS};
 
+fn assert_all_present(code: &str, keys: &[&str]) {
+    for key in keys {
+        assert!(code.contains(key), "{key} not found in output");
+    }
+}
+
+fn assert_all_absent(code: &str, keys: &[&str]) {
+    for key in keys {
+        assert!(!code.contains(key), "{key} should not be present");
+    }
+}
+
+fn assert_valid_rust_syntax(code: &str) {
+    assert!(code.contains("pub const"));
+    assert!(code.contains(";"));
+    assert!(!code.contains("@@"));
+    assert!(!code.contains("##"));
+    assert!(!code.contains("pub const ;"));
+}
+
 #[test]
 fn generates_rust_constants() {
     let toml_str = r#"
@@ -33,10 +53,8 @@ fn handles_root_level_values() {
     let parsed: toml::Value = toml_str.parse().unwrap();
     let code = generate_code_from_constants(&parsed, &RUST_FMTS);
 
-    assert!(code.contains("NAME"));
-    assert!(code.contains("VERSION"));
-    assert!(code.contains("PORT"));
-    assert!(!code.contains("DEBUG"));
+    assert_all_present(&code, &["NAME", "VERSION", "PORT"]);
+    assert_all_absent(&code, &["DEBUG"]);
 }
 
 #[test]
@@ -57,12 +75,12 @@ fn handles_nested_sections() {
     let parsed: toml::Value = toml_str.parse().unwrap();
     let code = generate_code_from_constants(&parsed, &RUST_FMTS);
 
-    assert!(code.contains("HOST"));
-    assert!(code.contains("PORT"));
-    assert!(code.contains("USERNAME"));
-    assert!(code.contains("PASSWORD"));
-    assert!(code.contains("ENDPOINT"));
-    assert!(code.contains("TIMEOUT"));
+    assert_all_present(
+        &code,
+        &[
+            "HOST", "PORT", "USERNAME", "PASSWORD", "ENDPOINT", "TIMEOUT",
+        ],
+    );
 }
 
 #[test]
@@ -79,14 +97,12 @@ fn handles_different_numeric_types() {
     let parsed: toml::Value = toml_str.parse().unwrap();
     let code = generate_code_from_constants(&parsed, &RUST_FMTS);
 
-    assert!(code.contains("INTEGER"));
-    assert!(code.contains("42"));
-    assert!(code.contains("NEGATIVE"));
-    assert!(code.contains("-100"));
-    assert!(code.contains("ZERO"));
-    assert!(code.contains("0"));
-    assert!(code.contains("FLOAT"));
-    assert!(code.contains("3.14159"));
+    assert_all_present(
+        &code,
+        &[
+            "INTEGER", "42", "NEGATIVE", "-100", "ZERO", "0", "FLOAT", "3.14159",
+        ],
+    );
 }
 
 #[test]
@@ -101,10 +117,7 @@ fn handles_boolean_values() {
     let parsed: toml::Value = toml_str.parse().unwrap();
     let code = generate_code_from_constants(&parsed, &RUST_FMTS);
 
-    assert!(!code.contains("DEBUG"));
-    assert!(!code.contains("PRODUCTION"));
-    assert!(!code.contains("VERBOSE"));
-    assert!(!code.contains("QUIET"));
+    assert_all_absent(&code, &["DEBUG", "PRODUCTION", "VERBOSE", "QUIET"]);
 }
 
 #[test]
@@ -126,13 +139,18 @@ fn handles_string_edge_cases() {
     let parsed: toml::Value = toml_str.parse().unwrap();
     let code = generate_code_from_constants(&parsed, &RUST_FMTS);
 
-    assert!(code.contains("EMPTY"));
-    assert!(code.contains("WITH_QUOTES"));
-    assert!(code.contains("WITH_NEWLINES"));
-    assert!(code.contains("WITH_UNICODE"));
-    assert!(code.contains("WITH_BACKSLASHES"));
-    assert!(code.contains("SINGLE_QUOTE"));
-    assert!(code.contains("MULTILINE"));
+    assert_all_present(
+        &code,
+        &[
+            "EMPTY",
+            "WITH_QUOTES",
+            "WITH_NEWLINES",
+            "WITH_UNICODE",
+            "WITH_BACKSLASHES",
+            "SINGLE_QUOTE",
+            "MULTILINE",
+        ],
+    );
 }
 
 #[test]
@@ -183,17 +201,11 @@ fn generates_valid_rust_syntax() {
     let parsed: toml::Value = toml_str.parse().unwrap();
     let code = generate_code_from_constants(&parsed, &RUST_FMTS);
 
-    assert!(code.contains("pub const"));
-    assert!(code.contains(";"));
-    assert!(!code.contains("@@"));
-    assert!(!code.contains("##"));
-    assert!(!code.contains("pub const ;"));
+    assert_valid_rust_syntax(&code);
 
-    let lines: Vec<&str> = code.lines().collect();
-    let const_lines: Vec<&str> = lines
-        .iter()
+    let const_lines: Vec<&str> = code
+        .lines()
         .filter(|line| line.contains("pub const"))
-        .cloned()
         .collect();
     assert!(!const_lines.is_empty());
 }
@@ -321,10 +333,8 @@ fn output_compiles_as_valid_rust() {
     let parsed: toml::Value = toml_str.parse().unwrap();
     let code = generate_code_from_constants(&parsed, &RUST_FMTS);
 
-    assert!(code.contains("pub const"));
+    assert_valid_rust_syntax(&code);
     assert!(code.contains(":"));
-    assert!(code.contains(";"));
-    assert!(!code.contains("pub const ;"));
     assert!(!code.contains(": ;"));
     assert!(!code.contains("= ;"));
 

@@ -76,6 +76,10 @@ fn fill2(fmt: &str, a: impl std::fmt::Display, b: impl std::fmt::Display) -> Str
     s
 }
 
+fn is_plain_integer_literal(s: &str) -> bool {
+    !s.contains('.') && !s.contains('e') && !s.contains('E')
+}
+
 pub fn generate_code_from_constants(parsed: &Value, fmts: &Formats) -> String {
     let mut code = String::from("// @generated - do not edit\n");
     let mut append = |k: &str, v: &Value| {
@@ -84,7 +88,7 @@ pub fn generate_code_from_constants(parsed: &Value, fmts: &Formats) -> String {
             Value::Integer(i) => code.push_str(&fill2(fmts.int_fmt, name, i)),
             Value::Float(f) => {
                 let mut val = f.to_string();
-                if !val.contains('.') && !val.contains('e') && !val.contains('E') {
+                if is_plain_integer_literal(&val) {
                     val.push_str(".0");
                 }
                 code.push_str(&fill2(fmts.float_fmt, name, val));
