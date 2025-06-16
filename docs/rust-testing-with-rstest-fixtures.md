@@ -1180,8 +1180,8 @@ The following table summarizes key differences:
 
 **Table 1:** `rstest` **vs. Standard Rust** `#[test]` **for Fixture Management
 and Parameterization**
-
 <!-- markdownlint-disable MD013 -->
+
 | Feature                                  | Standard #[test] Approach                                     | rstest Approach                                                                  |
 | ---------------------------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | Fixture Injection                        | Manual calls to setup functions within each test.             | Fixture name as argument in #[rstest] function; fixture defined with #[fixture]. |
@@ -1325,8 +1325,8 @@ The following table provides a quick reference to some of the key attributes
 provided by `rstest`:
 
 **Table 2: Key** `rstest` **Attributes Quick Reference**
-
 <!-- markdownlint-disable MD013 -->
+
 | Attribute                    | Core Purpose                                                                                 |
 | ---------------------------- | -------------------------------------------------------------------------------------------- |
 | #[rstest]                    | Marks a function as an rstest test; enables fixture injection and parameterization.          |
@@ -1341,9 +1341,10 @@ provided by `rstest`:
 | #[default(...)]              | Provides default values for arguments within a fixture function.                             |
 | #[timeout(...)]              | Sets a timeout for an asynchronous test.                                                     |
 | #[files("glob_pattern",...)] | Injects file paths (or contents, with mode=) matching a glob pattern as test arguments.      |
-
 <!-- markdownlint-enable MD013 -->
+
 By mastering `rstest`, Rust developers can significantly elevate the quality and
 efficiency of their testing practices, leading to more reliable and maintainable
 software.
+```
 ````

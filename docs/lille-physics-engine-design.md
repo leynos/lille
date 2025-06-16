@@ -25,7 +25,7 @@ determine an entity's state relative to it.
 To handle continuous height, we adjust our core types to use floating-point
 numbers.
 
-````prolog
+```prolog
 // --- Core Type Modifications ---
 typedef GCoord = float
 
@@ -35,14 +35,14 @@ input relation Block(id: BlockID, x: signed32, y: signed32, z: signed32)
 input relation Target(actor: EntityID, tx: GCoord, ty: GCoord)
 output relation NewPosition(entity: EntityID, x: GCoord, y: GCoord, z: GCoord)
 
-```prolog
+```
 
 #### 2.2 Redesigned World Geometry Relations
 
 The `BlockSlope` relation is redefined to describe a plane equation, enabling
 precise height calculations.
 
-```prolog
+````prolog
 // Defines the top plane of a block with the equation:
 // z = base_z + (x_in_block * grad_x) + (y_in_block * grad_y)
 input relation BlockSlope(
@@ -293,4 +293,4 @@ output relation NewPosition(e, new_x, new_y, new_z_floor) :-
     FloorHeightAt(new_x, new_y, new_z_floor).
 
 ```prolog
-````
+```

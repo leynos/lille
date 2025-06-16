@@ -177,7 +177,7 @@ commands and their conceptual Rust API equivalents, which form the basis for
 test interactions:
 
 | DDlog CLI Command | Inferred Rust API Call (Conceptual) | Purpose in Testing |
-| ---------------------- | -------------------------------------------------- |
+| -------------------- | --------------------------------------------------- |
 ------------------------------------------------------------- | | start; |
 `program.transaction_start()` | Begins a new transaction to batch input changes.
 | | insert MyRel(f1=v1); | `program.apply_updates(vec![insert MyRel(f1=v1)])` |
@@ -191,11 +191,10 @@ retrieves deltas. | | dump MyOutputRel; |
 output relation. | | rollback; | `program.transaction_rollback()` | Discards
 pending changes in the current transaction. | | clear MyRel; |
 `program.clear_relation(MyRel::relid())` | Removes all records from a relation
-within a transaction. |
-
-*Note: Actual API names and structures will vary based on the DDlog compiler
-version and the specific DDlog program.* `DDValue`*,* `DeltaMap`*,* `relid()`
-*are placeholders for types and methods the generated API might use.*
+within a transaction. | *Note: Actual API names and structures will vary based
+on the DDlog compiler version and the specific DDlog program.* `DDValue`*,*
+`DeltaMap`*,* `relid()` *are placeholders for types and methods the generated
+API might use.*
 
 This inferred API structure highlights that testing DDlog rulesets in Rust
 involves programmatically managing the DDlog engine's state. Each test will
@@ -553,25 +552,20 @@ Several Rust crates are particularly well-suited for testing DDlog rulesets:
     need to derive `serde::Serialize` (for snapshotting) and
     `serde::Deserialize` (for loading test data).
   - **Usage**: Standard `serde` deserialization functions are used to load test
-    data. `insta` macros like `assert_yaml_snapshot!` implicitly use
-    `serde::Serialize`.10
-
-The following table summarizes these recommended crates:
-
-| Crate Name | Latest Version (Approx.) | Primary Purpose for DDlog Testing                                                     | Conceptual Usage Snippet for DDlog                                                                                       |
-| ---------- | ------------------------ | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| insta      | 1.34.x                   | Snapshot testing of output relations (full state or deltas).                          | insta::assert_ron_snapshot!("relation_snapshot", &retrieved_relation_data);                                              |
-| proptest   | 1.4.x                    | Verifying invariants of DDlog rules with automatically generated input facts.         | \`proptest!(                                                                                                             |
-| rstest     | 0.18.x                   | Creating DDlog test fixtures and parameterized tests for varied input scenarios.      | #[fixture] fn ddlog_prog() -> Program { MyDdlogProgram::new() } #[rstest] fn my_test(ddlog_prog: Program) { /\*... \*/ } |
-| serde      | 1.0.x                    | Serializing/deserializing DDlog facts for external test data or structured snapshots. | # struct MyDdlogFact { field1: String, field2: u32 }                                                                     |
-| assert_fs  | 1.0.x                    | Managing temporary files for test data if inputs/outputs are file-based.              | let temp = assert_fs::TempDir::new()?; let file = temp.child("input.dat");                                               |
-
-This curated toolset provides a strong foundation. The relational output of
-DDlog makes snapshot testing with `insta` particularly effective. `proptest`
-enhances robustness by exploring a larger input space than manually crafted
-examples. `rstest` improves test organization, and `serde` is key if
-DDlog-generated types need to be serialized for structured snapshots or
-deserialized from external test data files.
+    \-------------------------------------------------------------------------------------------------------
+    | Crate | Version | Purpose | Example | | ----- | ------- | ------- |
+    ------- | | insta | 1.34.x | Snapshot testing of output relations. |
+    `assert_ron_snapshot!(...)` | | proptest | 1.4.x | Property-based testing
+    with generated facts. | `proptest!(...)` | | rstest | 0.18.x | Fixtures and
+    parameterized tests. | `#[fixture] fn ddlog_prog()` | | serde | 1.0.x |
+    Serialize/deserialize facts. | `derive(Serialize, Deserialize)` | |
+    assert_fs | 1.0.x | Temporary file fixtures. | `assert_fs::TempDir::new()` |
+    The relational output of DDlog makes snapshot testing with `insta`
+    particularly effective. `proptest` enhances robustness by exploring a larger
+    input space than manually crafted examples. `rstest` improves test
+    organization, and `serde` is key if DDlog-generated types need to be
+    serialized for structured snapshots or deserialized from external test data
+    files.
 
 ### 4.3. Helper Utilities and Test Organization
 
@@ -821,15 +815,15 @@ A typical flow:
 
    Rust
 
-````rust
+```rust
    // prog.transaction_start()?;
    // let incremental_update = Update::Insert { /*... */ };
    // prog.apply_updates(&mut vec![incremental_update].into_iter())?;
    // let deltas = prog.transaction_commit_dump_changes()?;
 
-```rust
+```
 
-3. **Assert on Deltas:** Verify that the `deltas` object contains the expected
+1. **Assert on Deltas:** Verify that the `deltas` object contains the expected
    insertions and deletions for the affected output relations.
 
    Rust
@@ -840,7 +834,7 @@ A typical flow:
    // path_changes would typically contain a list of (value, weight) where weight +1 is insert, -1 is delete.
    // insta::assert_ron_snapshot!("path_deltas_after_insert", path_changes);
 
-````
+```
 
 1. **Repeat:** Apply further incremental changes (e.g., a deletion) and assert
    on the new deltas.
