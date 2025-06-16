@@ -5,3 +5,4 @@ edition = "2021"
 publish = false
 
 [dependencies]
+syn = "2.0.103"
