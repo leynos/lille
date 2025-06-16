@@ -1,18 +1,29 @@
 # Lille Physics Engine: A Declarative Design
 
-This document outlines a multi-phase proposal for implementing a deterministic, 3D physics engine for the `lille` RTS, driven by Differential Datalog (DDlog). The architecture models physical laws as a series of declarative rules, separating the complex logic of motion from the Bevy-based host application.
+This document outlines a multi-phase proposal for implementing a deterministic,
+3D physics engine for the `lille` RTS, driven by Differential Datalog (DDlog).
+The architecture models physical laws as a series of declarative rules,
+separating the complex logic of motion from the Bevy-based host application.
 
 ## Phase 1: Gravity and Floor-Height-Based Physics
 
 ### 1. Introduction
 
-This initial phase establishes a kinematic system concerned with position and gravity. The core principle is to model the world as a grid of isometric blocks and to define an entity's physical state as either **Unsupported (Falling)** or **Supported (Standing)**. Slopes on blocks are used to define a continuous floor height, not to induce sliding, allowing for the creation of smooth ramps and varied terrain. The DDlog engine's primary role in this phase is to calculate the precise floor height (`z_floor`) at any given `(x, y)` coordinate and determine an entity's state relative to it.
+This initial phase establishes a kinematic system concerned with position and
+gravity. The core principle is to model the world as a grid of isometric blocks
+and to define an entity's physical state as either **Unsupported (Falling)** or
+**Supported (Standing)**. Slopes on blocks are used to define a continuous floor
+height, not to induce sliding, allowing for the creation of smooth ramps and
+varied terrain. The DDlog engine's primary role in this phase is to calculate
+the precise floor height (`z_floor`) at any given `(x, y)` coordinate and
+determine an entity's state relative to it.
 
 ### 2. DDlog Model Changes
 
 #### 2.1 Core Type and Relation Modifications
 
-To handle continuous height, we adjust our core types to use floating-point numbers.
+To handle continuous height, we adjust our core types to use floating-point
+numbers.
 
 ```
 // --- Core Type Modifications ---
@@ -28,7 +39,8 @@ output relation NewPosition(entity: EntityID, x: GCoord, y: GCoord, z: GCoord)
 
 #### 2.2 Redesigned World Geometry Relations
 
-The `BlockSlope` relation is redefined to describe a plane equation, enabling precise height calculations.
+The `BlockSlope` relation is redefined to describe a plane equation, enabling
+precise height calculations.
 
 ```
 // Defines the top plane of a block with the equation:
@@ -45,7 +57,8 @@ input relation BlockSlope(
 
 #### Step 1: Calculate Floor Height at Any Position
 
-This is the new core of the physics model. We create relations that derive the correct floor height for any given `(x, y)` coordinate.
+This is the new core of the physics model. We create relations that derive the
+correct floor height for any given `(x, y)` coordinate.
 
 ```
 // --- Physics Constants --- (see `constants.toml`)
@@ -78,7 +91,8 @@ relation FloorHeightAt(x: GCoord, y: GCoord, z_floor: GCoord) :-
 
 #### Step 2: Redefine Entity State (Unsupported vs. Standing)
 
-The logic is now simpler. An entity is unsupported if it is "floating" above the calculated floor.
+The logic is now simpler. An entity is unsupported if it is "floating" above the
+calculated floor.
 
 ```
 relation IsUnsupported(entity: EntityID) :-
@@ -94,7 +108,8 @@ relation IsStanding(entity: EntityID) :-
 
 #### Step 3: Final Movement Calculation
 
-Movement is now a two-stage process: calculate the 2D AI move, then "snap" the result to the floor.
+Movement is now a two-stage process: calculate the 2D AI move, then "snap" the
+result to the floor.
 
 ```
 // GRAVITY_PULL defined in `constants.toml`
@@ -131,7 +146,11 @@ output relation NewPosition(e, x + dx, y + dy, new_z_floor) :-
 
 ### 1. Introduction
 
-This phase builds upon the kinematic model by introducing dynamics. We add the concepts of **force**, **velocity**, **inertia**, and **friction** to simulate how entities react to kinetic impulses and environmental drag. An entity's final movement becomes the sum of its self-powered **propulsive motion** (AI-driven walking) and its **inertial motion** (velocity from external forces).
+This phase builds upon the kinematic model by introducing dynamics. We add the
+concepts of **force**, **velocity**, **inertia**, and **friction** to simulate
+how entities react to kinetic impulses and environmental drag. An entity's final
+movement becomes the sum of its self-powered **propulsive motion** (AI-driven
+walking) and its **inertial motion** (velocity from external forces).
 
 ### 2. DDlog Model Expansion
 
@@ -190,7 +209,8 @@ relation GravitationalAcceleration(e, 0.0, 0.0, -GRAVITY_PULL) :- IsUnsupported(
 
 #### Step 2: Calculate Frictional Deceleration
 
-Friction is an opposing acceleration dependent on the entity's state and velocity.
+Friction is an opposing acceleration dependent on the entity's state and
+velocity.
 
 ```
 relation FrictionalDeceleration(e, fdx, fdy, 0.0) :-
@@ -213,7 +233,8 @@ relation FrictionalDeceleration(e, fdx, fdy, 0.0) :-
 
 #### Step 3: Calculate Net Acceleration and New Velocity
 
-We sum all accelerations to get a net acceleration, then use it to update the entity's velocity.
+We sum all accelerations to get a net acceleration, then use it to update the
+entity's velocity.
 
 ```
 relation NetAcceleration(e, ax, ay, az) :-
@@ -245,7 +266,8 @@ output relation NewVelocity(e, nvx, nvy, 0.0) :-
 
 #### Step 4: Final Position Calculation
 
-An entity's final displacement is the sum of its new inertial velocity and its separate, AI-driven walking vector.
+An entity's final displacement is the sum of its new inertial velocity and its
+separate, AI-driven walking vector.
 
 ```
 // The AI-driven walking vector, which only applies to standing entities.

@@ -1,20 +1,31 @@
 # Lille Physics Engine: A Declarative Design
 
-This document outlines a multi-phase proposal for implementing a deterministic, 3D physics engine for the `lille` RTS, driven by Differential Datalog (DDlog). The architecture models physical laws as a series of declarative rules, separating the complex logic of motion from the Bevy-based host application.
+This document outlines a multi-phase proposal for implementing a deterministic,
+3D physics engine for the `lille` RTS, driven by Differential Datalog (DDlog).
+The architecture models physical laws as a series of declarative rules,
+separating the complex logic of motion from the Bevy-based host application.
 
 ## Phase 1: Gravity and Floor-Height-Based Physics
 
 ### 1. Introduction
 
-This initial phase establishes a kinematic system concerned with position and gravity. The core principle is to model the world as a grid of isometric blocks and to define an entity's physical state as either **Unsupported (Falling)** or **Supported (Standing)**. Slopes on blocks are used to define a continuous floor height, not to induce sliding, allowing for the creation of smooth ramps and varied terrain. The DDlog engine's primary role in this phase is to calculate the precise floor height (`z_floor`) at any given `(x, y)` coordinate and determine an entity's state relative to it.
+This initial phase establishes a kinematic system concerned with position and
+gravity. The core principle is to model the world as a grid of isometric blocks
+and to define an entity's physical state as either **Unsupported (Falling)** or
+**Supported (Standing)**. Slopes on blocks are used to define a continuous floor
+height, not to induce sliding, allowing for the creation of smooth ramps and
+varied terrain. The DDlog engine's primary role in this phase is to calculate
+the precise floor height (`z_floor`) at any given `(x, y)` coordinate and
+determine an entity's state relative to it.
 
 ### 2. DDlog Model Changes
 
 #### 2.1 Core Type and Relation Modifications
 
-To handle continuous height, we adjust our core types to use floating-point numbers.
+To handle continuous height, we adjust our core types to use floating-point
+numbers.
 
-```
+```prolog
 // --- Core Type Modifications ---
 typedef GCoord = float
 
@@ -28,9 +39,10 @@ output relation NewPosition(entity: EntityID, x: GCoord, y: GCoord, z: GCoord)
 
 #### 2.2 Redesigned World Geometry Relations
 
-The `BlockSlope` relation is redefined to describe a plane equation, enabling precise height calculations.
+The `BlockSlope` relation is redefined to describe a plane equation, enabling
+precise height calculations.
 
-```
+```prolog
 // Defines the top plane of a block with the equation:
 // z = base_z + (x_in_block * grad_x) + (y_in_block * grad_y)
 input relation BlockSlope(
@@ -45,9 +57,10 @@ input relation BlockSlope(
 
 #### Step 1: Calculate Floor Height at Any Position
 
-This is the new core of the physics model. We create relations that derive the correct floor height for any given `(x, y)` coordinate.
+This is the new core of the physics model. We create relations that derive the
+correct floor height for any given `(x, y)` coordinate.
 
-```
+```prolog
 // --- Physics Constants --- (see `constants.toml`)
 
 // Finds the highest block at a given (x,y) grid location.
@@ -78,9 +91,10 @@ relation FloorHeightAt(x: GCoord, y: GCoord, z_floor: GCoord) :-
 
 #### Step 2: Redefine Entity State (Unsupported vs. Standing)
 
-The logic is now simpler. An entity is unsupported if it is "floating" above the calculated floor.
+The logic is now simpler. An entity is unsupported if it is "floating" above the
+calculated floor.
 
-```
+```prolog
 relation IsUnsupported(entity: EntityID) :-
     Position(entity, x, y, z),
     FloorHeightAt(x, y, z_floor),
@@ -94,9 +108,10 @@ relation IsStanding(entity: EntityID) :-
 
 #### Step 3: Final Movement Calculation
 
-Movement is now a two-stage process: calculate the 2D AI move, then "snap" the result to the floor.
+Movement is now a two-stage process: calculate the 2D AI move, then "snap" the
+result to the floor.
 
-```
+```prolog
 // GRAVITY_PULL defined in `constants.toml`
 
 // --- Falling Logic ---
@@ -129,9 +144,13 @@ output relation NewPosition(e, x + dx, y + dy, new_z_floor) :-
 
 ## Phase 2: Force, Inertia, and Friction
 
-### 1. Introduction
+### 1. Overview
 
-This phase builds upon the kinematic model by introducing dynamics. We add the concepts of **force**, **velocity**, **inertia**, and **friction** to simulate how entities react to kinetic impulses and environmental drag. An entity's final movement becomes the sum of its self-powered **propulsive motion** (AI-driven walking) and its **inertial motion** (velocity from external forces).
+This phase builds upon the kinematic model by introducing dynamics. We add the
+concepts of **force**, **velocity**, **inertia**, and **friction** to simulate
+how entities react to kinetic impulses and environmental drag. An entity's final
+movement becomes the sum of its self-powered **propulsive motion** (AI-driven
+walking) and its **inertial motion** (velocity from external forces).
 
 ### 2. DDlog Model Expansion
 
@@ -139,7 +158,7 @@ This phase builds upon the kinematic model by introducing dynamics. We add the c
 
 We introduce relations to track velocity and represent transient forces.
 
-```
+```prolog
 // --- New Physics Constants --- (see `constants.toml`)
 
 // --- New Persistent Input Relation ---
@@ -162,7 +181,7 @@ output relation NewVelocity(entity: EntityID, nvx: GCoord, nvy: GCoord, nvz: GCo
 
 Complex vector maths is offloaded to Rust functions exposed to DDlog.
 
-```
+```prolog
 extern function vec_mag(x: GCoord, y: GCoord, z: GCoord): GCoord
 extern function vec_normalize(x: GCoord, y: GCoord, z: GCoord): (GCoord, GCoord, GCoord)
 
@@ -174,7 +193,7 @@ extern function vec_normalize(x: GCoord, y: GCoord, z: GCoord): (GCoord, GCoord,
 
 We collect all acceleration vectors acting on an entity for the current tick.
 
-```
+```prolog
 relation AppliedAcceleration(e, fx / mass, fy / mass, fz / mass) :-
     Force(e, fx, fy, fz),
     (Mass(e, mass) or mass = DEFAULT_MASS),
@@ -185,9 +204,10 @@ relation GravitationalAcceleration(e, 0.0, 0.0, -GRAVITY_PULL) :- IsUnsupported(
 
 #### Step 2: Calculate Frictional Deceleration
 
-Friction is an opposing acceleration dependent on the entity's state and velocity.
+Friction is an opposing acceleration dependent on the entity's state and
+velocity.
 
-```
+```prolog
 relation FrictionalDeceleration(e, fdx, fdy, 0.0) :-
     IsStanding(e),
     Velocity(e, vx, vy, _),
@@ -208,9 +228,10 @@ relation FrictionalDeceleration(e, fdx, fdy, 0.0) :-
 
 #### Step 3: Calculate Net Acceleration and New Velocity
 
-We sum all accelerations to get a net acceleration, then use it to update the entity's velocity.
+We sum all accelerations to get a net acceleration, then use it to update the
+entity's velocity.
 
-```
+```prolog
 relation NetAcceleration(e, ax, ay, az) :-
     agg(e) sum (
         ax = aax + gax + fax,
@@ -240,9 +261,10 @@ output relation NewVelocity(e, nvx, nvy, 0.0) :-
 
 #### Step 4: Final Position Calculation
 
-An entity's final displacement is the sum of its new inertial velocity and its separate, AI-driven walking vector.
+An entity's final displacement is the sum of its new inertial velocity and its
+separate, AI-driven walking vector.
 
-```
+```prolog
 // The AI-driven walking vector, which only applies to standing entities.
 relation AiWalkVector(actor, dx, dy, 0.0) :-
     IsStanding(actor),

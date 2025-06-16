@@ -2,17 +2,34 @@
 
 ## 1. Introduction
 
-This document outlines a re-architecture of the `leynos/lille` real-time strategy game. The current implementation uses a traditional, imperative game loop within the `GameWorld` struct. We propose replacing this with a declarative, data-driven core powered by **Differential Datalog (DDlog)**.
+This document outlines a re-architecture of the `leynos/lille` real-time
+strategy game. The current implementation uses a traditional, imperative game
+loop within the `GameWorld` struct. We propose replacing this with a
+declarative, data-driven core powered by **Differential Datalog (DDlog)**.
 
-The new architecture will model all significant game state and behaviour—unit movement, AI decisions, and combat resolution—as a set of DDlog rules. The game's host application, written in Rust, will interface with the DDlog runtime. Each game tick, it will stream world-state changes and player commands into DDlog and receive incrementally computed updates back. These updates will then be applied to a lightweight Entity-Component-System (ECS) framework, for which we will use **Bevy ECS** as the reference.
+The new architecture will model all significant game state and behaviour—unit
+movement, AI decisions, and combat resolution—as a set of DDlog rules. The
+game's host application, written in Rust, will interface with the DDlog runtime.
+Each game tick, it will stream world-state changes and player commands into
+DDlog and receive incrementally computed updates back. These updates will then
+be applied to a lightweight Entity-Component-System (ECS) framework, for which
+we will use **Bevy ECS** as the reference.
 
 This approach offers several distinct advantages:
 
-- **Determinism:** The entire game logic is captured in a pure, declarative dataflow. Given the same sequence of inputs, the game state will always evolve identically, which is a prerequisite for robust replay functionality and lock-step networking models.
+- **Determinism:** The entire game logic is captured in a pure, declarative
+  dataflow. Given the same sequence of inputs, the game state will always evolve
+  identically, which is a prerequisite for robust replay functionality and
+  lock-step networking models.
 
-- **Separation of Concerns:** The complex, stateful game logic is completely decoupled from the rendering and host application code. The host becomes a simple coordinator, translating between the ECS and DDlog's relational model.
+- **Separation of Concerns:** The complex, stateful game logic is completely
+  decoupled from the rendering and host application code. The host becomes a
+  simple coordinator, translating between the ECS and DDlog's relational model.
 
-- **Extensibility:** New game features, such as economic models, technology trees, or more sophisticated unit behaviours, can be added by introducing new DDlog relations and rules, often without modifying the existing Rust host code.
+- **Extensibility:** New game features, such as economic models, technology
+  trees, or more sophisticated unit behaviours, can be added by introducing new
+  DDlog relations and rules, often without modifying the existing Rust host
+  code.
 
 The flow of data each frame will be as follows:
 
@@ -26,11 +43,15 @@ The flow of data each frame will be as follows:
 
 ```
 
-This document will detail the modelling of game state in DDlog, the integration strategy with the Bevy ECS, and the practicalities of implementation, including debugging and performance considerations.
+This document will detail the modelling of game state in DDlog, the integration
+strategy with the Bevy ECS, and the practicalities of implementation, including
+debugging and performance considerations.
 
 ## 2. Modelling Game State and Rules in DDlog
 
-The foundation of the new architecture is the translation of `lille`'s current object-oriented concepts (`Actor`, `BadGuy`, `GameWorld`) into a relational model within DDlog.
+The foundation of the new architecture is the translation of `lille`'s current
+object-oriented concepts (`Actor`, `BadGuy`, `GameWorld`) into a relational
+model within DDlog.
 
 ### 2.1. Core Types and Relations
 
@@ -53,13 +74,16 @@ const ATTACK_RANGE: float = 10.0; // Based on lille’s fear mechanics
 
 ```
 
-With these types, we define the relations that constitute the game's state. We distinguish between three kinds of relations:
+With these types, we define the relations that constitute the game's state. We
+distinguish between three kinds of relations:
 
 - `input relation`: Persistent state that the host application manages.
 
-- `input stream`: Ephemeral data, like commands, that exist only for a single transaction (tick).
+- `input stream`: Ephemeral data, like commands, that exist only for a single
+  transaction (tick).
 
-- `output relation`: Results computed by DDlog that the host application will read and apply.
+- `output relation`: Results computed by DDlog that the host application will
+  read and apply.
 
 ```prolog
 // --- Input Relations (Persistent State from ECS) ---
@@ -82,11 +106,13 @@ output relation Despawn(entity: EntityID)
 
 ### 2.2. Declarative Game Logic Rules
 
-The imperative logic currently in `actor.rs` and `world.rs` will be rewritten as declarative DDlog rules.
+The imperative logic currently in `actor.rs` and `world.rs` will be rewritten as
+declarative DDlog rules.
 
 #### Fear and Threat Modelling
 
-The complex fear calculation in `Actor::calculate_fear_vector` can be expressed as a series of relational joins and aggregations.
+The complex fear calculation in `Actor::calculate_fear_vector` can be expressed
+as a series of relational joins and aggregations.
 
 ```prolog
 // extern function provided by the Rust host for vector math if needed
@@ -131,7 +157,8 @@ relation FleeVector(actor: EntityID, dx: Coord, dy: Coord) :-
 
 #### Movement Logic
 
-The decision-making process for movement combines seeking a target with avoiding threats. This maps cleanly to conditional rules.
+The decision-making process for movement combines seeking a target with avoiding
+threats. This maps cleanly to conditional rules.
 
 ```prolog
 // Vector towards the actor’s primary target
@@ -165,7 +192,8 @@ output relation NewPosition(e, nx, ny) :-
 
 #### Combat and Health
 
-Combat is simplified to a rule that generates `Damage` facts when an `Attack` command is issued and the target is in range.
+Combat is simplified to a rule that generates `Damage` facts when an `Attack`
+command is issued and the target is in range.
 
 ```prolog
 relation Hit(attacker: EntityID, target: EntityID, damage: Health) :-
@@ -189,11 +217,15 @@ output relation Despawn(e) :-
 
 ## 3. ECS Integration Strategy
 
-We will replace the `piston_window` backend with `bevy`. DDlog will act as a "logic system" within Bevy's schedule. The `GameWorld` struct will be dismantled, its responsibilities distributed among ECS components and DDlog relations.
+We will replace the `piston_window` backend with `bevy`. DDlog will act as a
+"logic system" within Bevy's schedule. The `GameWorld` struct will be
+dismantled, its responsibilities distributed among ECS components and DDlog
+relations.
 
 ### 3.1. Bevy ECS Components
 
-The ECS components will be minimal, primarily holding data that needs to be synchronised with DDlog or is required for rendering.
+The ECS components will be minimal, primarily holding data that needs to be
+synchronised with DDlog or is required for rendering.
 
 ```rust
 // In src/main.rs or a new components.rs
@@ -220,16 +252,21 @@ enum UnitType {
 
 Two Bevy systems will manage the interaction with DDlog.
 
-1. `push_state_to_ddlog`: This system runs first. It queries the ECS for all relevant components and constructs a `DeltaMap` of changes to send to DDlog.
+1. `push_state_to_ddlog`: This system runs first. It queries the ECS for all
+   relevant components and constructs a `DeltaMap` of changes to send to DDlog.
 
-2. `apply_ddlog_deltas`: This system runs after `push_state_to_ddlog`. It commits the transaction, retrieves the resulting changes from DDlog's output relations, and applies them back to the ECS components (e.g., updating `Transform`, `Health`).
+2. `apply_ddlog_deltas`: This system runs after `push_state_to_ddlog`. It
+   commits the transaction, retrieves the resulting changes from DDlog's output
+   relations, and applies them back to the ECS components (e.g., updating
+   `Transform`, `Health`).
 
 ```rust
 // In a new ddlog_integration.rs module
 
 use bevy::prelude::*;
 use std::sync::{Arc, Mutex};
-use ddlog_lille::{api::HDDlog, run, DDlogRecord}; // Assuming ‘ddlog_lille’ is the generated crate name
+use ddlog_lille::{api::HDDlog, run, DDlogRecord};
+// Assuming `ddlog_lille` is the generated crate name
 
 // A Bevy resource to hold the DDlog instance
 #[derive(Resource)]
@@ -237,7 +274,9 @@ struct DdlogHandle(Arc<Mutex<HDDlog>>);
 
 // Startup system to initialize DDlog
 fn init_ddlog_system(mut commands: Commands) {
-    let (hddlog, _err_handler) = run(2, false).expect("Failed to start DDlog"); // 2 worker threads
+    let (hddlog, _err_handler) = run(2, false)
+        .expect("Failed to start DDlog");
+    // 2 worker threads
     commands.insert_resource(DdlogHandle(Arc::new(Mutex::new(hddlog))));
 }
 
@@ -266,9 +305,16 @@ fn push_state_to_ddlog_system(
         match unit_type {
             UnitType::Civvy { fraidiness } => {
                 changes.push(DDlogRecord::insert("Unit", (id, "Civvy".to_string())));
-                changes.push(DDlogRecord::insert("Fraidiness", (id, *fraidiness as f64)));
+                changes.push(
+                    DDlogRecord::insert("Fraidiness", (id, *fraidiness as f64)),
+                );
                 if let Some(t) = target {
-                    changes.push(DDlogRecord::insert("Target", (id, t.0.x as i32, t.0.y as i32)));
+                    changes.push(
+                        DDlogRecord::insert(
+                            "Target",
+                            (id, t.0.x as i32, t.0.y as i32),
+                        ),
+                    );
                 }
             }
             UnitType::Baddie { meanness } => {
@@ -332,7 +378,8 @@ fn apply_ddlog_deltas_system(
 
 ### 3.3. Bevy App Configuration
 
-The main application setup will chain these systems together in the correct order.
+The main application setup will chain these systems together in the correct
+order.
 
 ```rust
 fn main() {
@@ -357,27 +404,49 @@ fn main() {
 
 A key advantage of DDlog is its debuggability.
 
-- **Command Logging:** We can enable command recording to produce a human-readable log of every transaction.
+- **Command Logging:** We can enable command recording to produce a
+  human-readable log of every transaction.
 
   ```rust
   // In init_ddlog_system
   ddlog.record_commands(Some(Path::new("game_replay.dat"))).unwrap();
-  
-  
+
+
   ```
 
-  This `game_replay.dat` file can be replayed through the DDlog command-line tool to inspect state at any tick, without the Bevy host.
+  This `game_replay.dat` file can be replayed through the DDlog command-line
+  tool to inspect state at any tick, without the Bevy host.
 
-- **Dumping Relations:** By temporarily marking intermediate relations like `TotalFear` or `FleeVector` as `output`, we can `dump` their contents during a replay to see exactly what the logic engine is thinking. This is invaluable for debugging complex AI behaviours.
+- **Dumping Relations:** By temporarily marking intermediate relations like
+  `TotalFear` or `FleeVector` as `output`, we can `dump` their contents during a
+  replay to see exactly what the logic engine is thinking. This is invaluable
+  for debugging complex AI behaviours.
 
 ## 5. Performance and Limitations
 
-- **Scalability:** DDlog's incremental nature means that performance depends on the size of the *delta* (changes per tick), not the total state size. For an RTS with hundreds of units, per-tick updates should be well within a millisecond budget on modern hardware, especially with multiple worker threads.
+- **Scalability:** DDlog's incremental nature means that performance depends on
+  the size of the *delta* (changes per tick), not the total state size. For an
+  RTS with hundreds of units, per-tick updates should be well within a
+  millisecond budget on modern hardware, especially with multiple worker
+  threads.
 
-- **Complex Algorithms:** Algorithms that are inherently global or require complex graph traversal, like A\* pathfinding, are not a natural fit for DDlog's relational model. The best practice is to offload these to the Rust host. The host can run A\*, for example, and feed the resulting path waypoints into the `Target` relation for the DDlog movement logic to follow.
+- **Complex Algorithms:** Algorithms that are inherently global or require
+  complex graph traversal, like A\* pathfinding, are not a natural fit for
+  DDlog's relational model. The best practice is to offload these to the Rust
+  host. The host can run A\*, for example, and feed the resulting path waypoints
+  into the `Target` relation for the DDlog movement logic to follow.
 
-- **Memory Usage:** DDlog holds all persistent relations in memory. While efficient, for games with extremely large maps or unit counts, memory usage should be monitored. Using `stream` relations for ephemeral data is critical to prevent unbounded memory growth.
+- **Memory Usage:** DDlog holds all persistent relations in memory. While
+  efficient, for games with extremely large maps or unit counts, memory usage
+  should be monitored. Using `stream` relations for ephemeral data is critical
+  to prevent unbounded memory growth.
 
 ## 6. Conclusion
 
-Migrating `lille` to a DDlog-driven architecture represents a significant shift from an imperative to a declarative model. This change promises to deliver a more robust, deterministic, and extensible foundation for future development. The core logic of the game becomes a verifiable set of rules, clearly separated from the concerns of rendering and real-time host execution. By leveraging Bevy for the ECS and rendering backend, we can focus development effort on the game's unique logic within DDlog, confident that the underlying engine is sound.
+Migrating `lille` to a DDlog-driven architecture represents a significant shift
+from an imperative to a declarative model. This change promises to deliver a
+more robust, deterministic, and extensible foundation for future development.
+The core logic of the game becomes a verifiable set of rules, clearly separated
+from the concerns of rendering and real-time host execution. By leveraging Bevy
+for the ECS and rendering backend, we can focus development effort on the game's
+unique logic within DDlog, confident that the underlying engine is sound.
