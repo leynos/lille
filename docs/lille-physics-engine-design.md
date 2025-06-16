@@ -25,7 +25,7 @@ determine an entity's state relative to it.
 To handle continuous height, we adjust our core types to use floating-point
 numbers.
 
-````prolog
+```prolog
 // --- Core Type Modifications ---
 typedef GCoord = float
 
@@ -35,7 +35,7 @@ input relation Block(id: BlockID, x: signed32, y: signed32, z: signed32)
 input relation Target(actor: EntityID, tx: GCoord, ty: GCoord)
 output relation NewPosition(entity: EntityID, x: GCoord, y: GCoord, z: GCoord)
 
-```prolog
+```
 
 #### 2.2 Redesigned World Geometry Relations
 
@@ -51,7 +51,7 @@ input relation BlockSlope(
     grad_y: GCoord  // The gradient (steepness) in the y direction.
 )
 
-```prolog
+```
 
 ### 3. Declarative Physics Rules (Refined)
 
@@ -87,7 +87,7 @@ relation FloorHeightAt(x: GCoord, y: GCoord, z_floor: GCoord) :-
     not BlockSlope(block, _, _),
     z_floor = (z_grid as GCoord) + 1.0.
 
-```prolog
+```
 
 #### Step 2: Redefine Entity State (Unsupported vs. Standing)
 
@@ -104,7 +104,7 @@ relation IsStanding(entity: EntityID) :-
     Position(entity, _, _, _),
     not IsUnsupported(entity).
 
-```prolog
+```
 
 #### Step 3: Final Movement Calculation
 
@@ -140,11 +140,11 @@ output relation NewPosition(e, x + dx, y + dy, new_z_floor) :-
     AiMoveVector(e, dx, dy),
     FloorHeightAt(x + dx, y + dy, new_z_floor).
 
-```prolog
+```
 
 ## Phase 2: Force, Inertia, and Friction
 
-### 1. Introduction
+### 1. Introduction to Dynamics
 
 This phase builds upon the kinematic model by introducing dynamics. We add the
 concepts of **force**, **velocity**, **inertia**, and **friction** to simulate
@@ -180,7 +180,7 @@ input stream Force(entity: EntityID, fx: GCoord, fy: GCoord, fz: GCoord)
 // The calculated velocity at the end of a tick.
 output relation NewVelocity(entity: EntityID, nvx: GCoord, nvy: GCoord, nvz: GCoord)
 
-```prolog
+```
 
 #### 2.2 New External Helper Functions
 
@@ -190,7 +190,7 @@ Complex vector maths is offloaded to Rust functions exposed to DDlog.
 extern function vec_mag(x: GCoord, y: GCoord, z: GCoord): GCoord
 extern function vec_normalize(x: GCoord, y: GCoord, z: GCoord): (GCoord, GCoord, GCoord)
 
-```prolog
+```
 
 ### 3. Declarative Dynamics Rules
 
@@ -205,7 +205,7 @@ relation AppliedAcceleration(e, fx / mass, fy / mass, fz / mass) :-
     mass > 0.0.
 relation GravitationalAcceleration(e, 0.0, 0.0, -GRAVITY_PULL) :- IsUnsupported(e).
 
-```prolog
+```
 
 #### Step 2: Calculate Frictional Deceleration
 
@@ -229,7 +229,7 @@ relation FrictionalDeceleration(e, fdx, fdy, 0.0) :-
     var decel_mag = min(h_mag, AIR_FRICTION),
     fdx = -nx * decel_mag, fdy = -ny * decel_mag.
 
-```prolog
+```
 
 #### Step 3: Calculate Net Acceleration and New Velocity
 
@@ -262,7 +262,7 @@ output relation NewVelocity(e, nvx, nvy, 0.0) :-
     IsStanding(e),
     UnclampedNewVelocity(e, nvx, nvy, _).
 
-```prolog
+```
 
 #### Step 4: Final Position Calculation
 
@@ -292,5 +292,4 @@ output relation NewPosition(e, new_x, new_y, new_z_floor) :-
     var new_y = py + nvy + walk_dy,
     FloorHeightAt(new_x, new_y, new_z_floor).
 
-```prolog
-````
+```

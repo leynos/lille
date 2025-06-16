@@ -177,29 +177,24 @@ commands and their conceptual Rust API equivalents, which form the basis for
 test interactions:
 
 | DDlog CLI Command | Inferred Rust API Call (Conceptual) | Purpose in Testing |
-
-| -------------------- |
--------------------------------------------------------------------------- |
-\----------------------------------------------------------------------------------------
-| | start; | program.transaction_start() | Begins a new transaction to batch
-input changes. | | insert MyRel(f1=v1); | program.apply_updates(vec!) | Adds new
-facts to an input relation. | | delete MyRel(f1=v1); |
-program.apply_updates(vec!) | Removes facts from an input relation. | | commit;
-| program.transaction_commit() | Applies batched changes without immediately
-returning deltas. | | commit dump_changes; | let changes: DeltaMap<DDValue> =
-program.transaction_commit_dump_changes() | Applies batched changes and
-retrieves deltas in output relations for incremental checks. | | dump
-MyOutputRel; | let contents: Vec<MyOutputRel> =
-program.dump_table(MyOutputRel::relid()) | Retrieves the full current content of
-an output relation for state verification. | | rollback; |
-program.transaction_rollback() | Discards pending changes in the current
-transaction. | | clear MyRel; | program.clear_relation(MyRel::relid()) | Removes
-all records from a relation, typically an input relation, within a transaction.
-|
-
-*Note: Actual API names and structures will vary based on the DDlog compiler
-version and the specific DDlog program.* `DDValue`*,* `DeltaMap`*,* `relid()`
-*are placeholders for types and methods the generated API might use.*
+| -------------------- | --------------------------------------------------- |
+------------------------------------------------------------- | | start; |
+`program.transaction_start()` | Begins a new transaction to batch input changes.
+| | insert MyRel(f1=v1); | `program.apply_updates(vec![insert MyRel(f1=v1)])` |
+Adds new facts to an input relation. | | delete MyRel(f1=v1); |
+`program.apply_updates(vec![delete MyRel(f1=v1)])` | Removes facts from an input
+relation. | | commit; | `program.transaction_commit()` | Applies batched changes
+without immediately returning deltas. | | commit dump_changes; |
+`program.transaction_commit_dump_changes()` | Applies batched changes and
+retrieves deltas. | | dump MyOutputRel; |
+`program.dump_table(MyOutputRel::relid())` | Retrieves the full contents of an
+output relation. | | rollback; | `program.transaction_rollback()` | Discards
+pending changes in the current transaction. | | clear MyRel; |
+`program.clear_relation(MyRel::relid())` | Removes all records from a relation
+within a transaction. | *Note: Actual API names and structures will vary based
+on the DDlog compiler version and the specific DDlog program.* `DDValue`*,*
+`DeltaMap`*,* `relid()` *are placeholders for types and methods the generated
+API might use.*
 
 This inferred API structure highlights that testing DDlog rulesets in Rust
 involves programmatically managing the DDlog engine's state. Each test will
@@ -270,7 +265,7 @@ For example, consider a simple DDlog program:
 
 Code snippet
 
-```
+```ddlog
 input relation Parent(person1: string, person2: string)
 output relation Grandparent(gp: string, gc: string)
 
@@ -468,18 +463,18 @@ The `Cargo.toml` for the crate containing the tests (e.g.,
 
   Ini, TOML
 
-  ```
+```toml
   [dependencies]
   # Path will depend on how the DDlog build process organizes its output
   my_ddlog_rules = { path = "../my_ddlog_rules_ddlog_generated_crate" }
 
-  ```
+```
 
 - **Development Dependencies for Testing:**
 
   Ini, TOML
 
-  ```
+```toml
   [dev-dependencies]
   insta = "1.34" # For snapshot testing
   serde = { version = "1.0", features = ["derive"] } # If serializing/deserializing test data
@@ -490,9 +485,9 @@ The `Cargo.toml` for the crate containing the tests (e.g.,
   assert_fs = "1.0" # For filesystem fixtures if loading data from temp files
   # Other utility crates as needed
 
-  ```
+```
 
-  It is advisable to use specific versions for reproducibility.
+It is advisable to use specific versions for reproducibility.
 
 The `insta` crate, in particular, benefits from being compiled in release mode
 even as a dev-dependency, as this can improve its performance (e.g., faster
@@ -500,7 +495,7 @@ diffing).10 This can be configured in the workspace or project `Cargo.toml`:
 
 Ini, TOML
 
-```
+```toml
 [profile.dev.package.insta]
 opt-level = 3
 [profile.dev.package.similar] # insta's diffing backend
@@ -557,25 +552,20 @@ Several Rust crates are particularly well-suited for testing DDlog rulesets:
     need to derive `serde::Serialize` (for snapshotting) and
     `serde::Deserialize` (for loading test data).
   - **Usage**: Standard `serde` deserialization functions are used to load test
-    data. `insta` macros like `assert_yaml_snapshot!` implicitly use
-    `serde::Serialize`.10
-
-The following table summarizes these recommended crates:
-
-| Crate Name | Latest Version (Approx.) | Primary Purpose for DDlog Testing                                                     | Conceptual Usage Snippet for DDlog                                                                                       |
-| ---------- | ------------------------ | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| insta      | 1.34.x                   | Snapshot testing of output relations (full state or deltas).                          | insta::assert_ron_snapshot!("relation_snapshot", &retrieved_relation_data);                                              |
-| proptest   | 1.4.x                    | Verifying invariants of DDlog rules with automatically generated input facts.         | \`proptest!(                                                                                                             |
-| rstest     | 0.18.x                   | Creating DDlog test fixtures and parameterized tests for varied input scenarios.      | #[fixture] fn ddlog_prog() -> Program { MyDdlogProgram::new() } #[rstest] fn my_test(ddlog_prog: Program) { /\*... \*/ } |
-| serde      | 1.0.x                    | Serializing/deserializing DDlog facts for external test data or structured snapshots. | # struct MyDdlogFact { field1: String, field2: u32 }                                                                     |
-| assert_fs  | 1.0.x                    | Managing temporary files for test data if inputs/outputs are file-based.              | let temp = assert_fs::TempDir::new()?; let file = temp.child("input.dat");                                               |
-
-This curated toolset provides a strong foundation. The relational output of
-DDlog makes snapshot testing with `insta` particularly effective. `proptest`
-enhances robustness by exploring a larger input space than manually crafted
-examples. `rstest` improves test organization, and `serde` is key if
-DDlog-generated types need to be serialized for structured snapshots or
-deserialized from external test data files.
+    \-------------------------------------------------------------------------------------------------------
+    | Crate | Version | Purpose | Example | | ----- | ------- | ------- |
+    ------- | | insta | 1.34.x | Snapshot testing of output relations. |
+    `assert_ron_snapshot!(...)` | | proptest | 1.4.x | Property-based testing
+    with generated facts. | `proptest!(...)` | | rstest | 0.18.x | Fixtures and
+    parameterized tests. | `#[fixture] fn ddlog_prog()` | | serde | 1.0.x |
+    Serialize/deserialize facts. | `derive(Serialize, Deserialize)` | |
+    assert_fs | 1.0.x | Temporary file fixtures. | `assert_fs::TempDir::new()` |
+    The relational output of DDlog makes snapshot testing with `insta`
+    particularly effective. `proptest` enhances robustness by exploring a larger
+    input space than manually crafted examples. `rstest` improves test
+    organization, and `serde` is key if DDlog-generated types need to be
+    serialized for structured snapshots or deserialized from external test data
+    files.
 
 ### 4.3. Helper Utilities and Test Organization
 
@@ -611,7 +601,7 @@ A standard DDlog test function in Rust will have the following structure:
 
 Rust
 
-```
+```rust
 #[test]
 fn test_specific_ddlog_scenario() {
     // 1. ARRANGE: Set up the test conditions.
@@ -672,7 +662,7 @@ code defines:
 
 Code snippet
 
-```
+```ddlog
 typedef MyRec = MyRec { f1: string, f2: u64 }
 input relation MyInput(rec: MyRec)
 ```
@@ -683,7 +673,7 @@ Test code would then construct instances of `MyRec` to create input facts:
 
 Rust
 
-```
+```rust
 // In test code:
 let fact1 = MyRec { f1: "example".to_string(), f2: 42 };
 let fact2 = MyRec { f1: "another".to_string(), f2: 100 };
@@ -697,7 +687,7 @@ test modules can be very effective. For instance:
 
 Rust
 
-```
+```rust
 fn new_my_rec(f1: &str, f2: u64) -> MyRec {
     MyRec { f1: f1.to_string(), f2 }
 }
@@ -719,15 +709,15 @@ transactions and apply updates. A typical sequence in a test would be:
 
    Rust
 
-   ```
+```rust
    // Example conceptual updates
    // let updates = vec!;
 
-   ```
+```
 
-4. Apply these updates: `prog.apply_updates(&mut updates.into_iter())?;`.
+1. Apply these updates: `prog.apply_updates(&mut updates.into_iter())?;`.
 
-5. Commit the transaction. To get changes for incremental testing:
+2. Commit the transaction. To get changes for incremental testing:
    `let changes = prog.transaction_commit_dump_changes()?;`. For a simple
    commit: `prog.transaction_commit()?;`.
 
@@ -754,7 +744,7 @@ tests if comparing Vecs directly. To ensure stable tests:
 
 Rust
 
-```
+```rust
 // Assuming 'paths' is a Vec<PathRecord> retrieved from DDlog
 // and PathRecord implements Eq, Hash, and potentially Ord.
 
@@ -779,7 +769,7 @@ expected to change during development, insta is highly recommended.1
 
 Rust
 
-```
+```rust
 // let paths: Vec<PathRecord> = get_paths_from_ddlog_program(&mut prog)?;
 // To ensure stable snapshots even if order varies, sort before snapshotting if possible:
 // let mut sorted_paths = paths;
@@ -813,52 +803,52 @@ A typical flow:
 
    Rust
 
-   ```
+```rust
    // setup_initial_state(&mut prog);
    // let initial_output = get_full_output(&mut prog)?;
    // insta::assert_ron_snapshot!("initial_output", initial_output);
 
-   ```
+```
 
-2. **Apply an Incremental Input Change:** Introduce a new input fact or delete
+1. **Apply an Incremental Input Change:** Introduce a new input fact or delete
    an existing one.
 
    Rust
 
-   ```
+```rust
    // prog.transaction_start()?;
    // let incremental_update = Update::Insert { /*... */ };
    // prog.apply_updates(&mut vec![incremental_update].into_iter())?;
    // let deltas = prog.transaction_commit_dump_changes()?;
 
-   ```
+```
 
-3. **Assert on Deltas:** Verify that the `deltas` object contains the expected
+1. **Assert on Deltas:** Verify that the `deltas` object contains the expected
    insertions and deletions for the affected output relations.
 
    Rust
 
-   ```
+```rust
    // Assuming 'deltas' is a structure mapping relation IDs to their changes.
    // let path_changes = deltas.get_changes_for_relation(Relations::Path as RelId);
    // path_changes would typically contain a list of (value, weight) where weight +1 is insert, -1 is delete.
    // insta::assert_ron_snapshot!("path_deltas_after_insert", path_changes);
 
-   ```
+```
 
-4. **Repeat:** Apply further incremental changes (e.g., a deletion) and assert
+1. **Repeat:** Apply further incremental changes (e.g., a deletion) and assert
    on the new deltas.
 
    Rust
 
-   ```
+```rust
    // prog.transaction_start()?;
    // let delete_update = Update::DeleteValue { /*... */ };
    // prog.apply_updates(&mut vec![delete_update].into_iter())?;
    // let deltas_after_delete = prog.transaction_commit_dump_changes()?;
    // insta::assert_ron_snapshot!("path_deltas_after_delete", deltas_after_delete);
 
-   ```
+```
 
 This focus on deltas is crucial because it directly tests the core value
 proposition of DDlog: correct and efficient incremental computation.1 The CLI
@@ -979,7 +969,7 @@ becomes crucial.
 
   Rust
 
-  ```
+```rust
   // use rstest::*;
   // #[fixture]
   // fn initialized_ddlog_program() -> MyDdlogProgram {
@@ -994,7 +984,7 @@ becomes crucial.
   //     //... specific test logic...
   // }
 
-  ```
+```
 
 - **Data Generation:** For property-based tests, `proptest` strategies are used
   to generate data. For example-based tests that need varied but not fully
@@ -1073,14 +1063,14 @@ CI 10:
 
   YAML
 
-  ```
+```yaml
   # Example GitHub Actions step
   # - name: Run tests
   #   env:
   #     INSTA_UPDATE: "no"
   #   run: cargo test
 
-  ```
+```
 
 - **Workflow:**
 
