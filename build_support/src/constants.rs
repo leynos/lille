@@ -13,7 +13,7 @@ pub struct Formats {
 pub const RUST_FMTS: Formats = Formats {
     int_fmt: "pub const {}: i64 = {};\n",
     float_fmt: "pub const {}: f64 = {};\n",
-    str_fmt: "pub const {}: &str = \"{}\";\n",
+    str_fmt: "pub const {}: &str = {};\n",
 };
 
 pub const DL_FMTS: Formats = Formats {
@@ -66,8 +66,14 @@ where
 }
 
 fn fill2(fmt: &str, a: impl std::fmt::Display, b: impl std::fmt::Display) -> String {
-    fmt.replacen("{}", &a.to_string(), 1)
-        .replacen("{}", &b.to_string(), 1)
+    let mut parts = fmt.splitn(3, "{}");
+    let mut s = String::new();
+    s.push_str(parts.next().unwrap_or(""));
+    s.push_str(&a.to_string());
+    s.push_str(parts.next().unwrap_or(""));
+    s.push_str(&b.to_string());
+    s.push_str(parts.next().unwrap_or(""));
+    s
 }
 
 pub fn generate_code_from_constants(parsed: &Value, fmts: &Formats) -> String {
@@ -83,7 +89,10 @@ pub fn generate_code_from_constants(parsed: &Value, fmts: &Formats) -> String {
                 }
                 code.push_str(&fill2(fmts.float_fmt, name, val));
             }
-            Value::String(s) => code.push_str(&fill2(fmts.str_fmt, name, s)),
+            Value::String(s) => {
+                let lit = format!("{:?}", s);
+                code.push_str(&fill2(fmts.str_fmt, name, lit));
+            }
             other => {
                 println!(
                     "cargo:warning=Unsupported constant `{}` of type {:?}",
