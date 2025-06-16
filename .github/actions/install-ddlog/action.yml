@@ -3,6 +3,7 @@ description: Download and install the DDlog toolchain.
 runs:
   using: composite
   steps:
-    - shell: bash
+    - name: Run install script
+      shell: bash
       run: |
         ./scripts/install_ddlog.sh
