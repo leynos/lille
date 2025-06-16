@@ -20,8 +20,14 @@ pub fn assert_all_absent(code: &str, keys: &[&str]) {
     }
 }
 
-/// Basic sanity checks that generated code looks like valid Rust.
+/// Basic sanity checks that generated code is syntactically valid Rust.
 pub fn assert_valid_rust_syntax(code: &str) {
-    assert_all_present(code, &["pub const", ";"]);
-    assert_all_absent(code, &["@@", "##", "pub const ;"]);
+    use syn::parse_file; // syn = syntax only, no type-checking
+
+    if let Err(err) = parse_file(code) {
+        panic!(
+            "generated code is not valid Rust:\n{}\nError: {}",
+            code, err
+        );
+    }
 }

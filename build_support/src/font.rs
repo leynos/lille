@@ -58,17 +58,17 @@ pub fn download_font_with(
         Ok(data) => {
             let mut tmp = NamedTempFile::new_in(&assets_dir)?;
             if let Err(e) = tmp.write_all(&data) {
-                println!("cargo:warning=Failed to write font: {}", e);
+                println!("cargo:warning=Failed to write font: {e}");
                 return Ok(fallback_font_path());
             }
             if let Err(e) = tmp.persist(&font_path) {
-                println!("cargo:warning=Failed to rename font file: {}", e);
+                println!("cargo:warning=Failed to rename font file: {e}");
                 return Ok(fallback_font_path());
             }
             Ok(font_path)
         }
         Err(e) => {
-            println!("cargo:warning=Font download failed: {}", e);
+            println!("cargo:warning=Font download failed: {e}");
             Ok(fallback_font_path())
         }
     }
@@ -84,7 +84,7 @@ fn fetch_font_data() -> Result<Vec<u8>, Box<dyn Error>> {
     let resp = client.get(FONT_URL).send()?.error_for_status()?;
     let bytes = resp.bytes()?;
     let digest = Sha256::digest(&bytes);
-    let actual = format!("{:x}", digest);
+    let actual = format!("{digest:x}");
     if actual != FONT_SHA256 {
         return Err("font checksum mismatch".into());
     }

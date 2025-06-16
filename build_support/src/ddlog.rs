@@ -35,14 +35,11 @@ fn ddlog_available() -> bool {
         {
             Ok(status) if status.success() => true,
             Ok(status) => {
-                println!(
-                    "cargo:warning=ddlog --version failed with status {}",
-                    status
-                );
+                println!("cargo:warning=ddlog --version failed with status {status}");
                 false
             }
             Err(e) => {
-                println!("cargo:warning=failed to run ddlog --version: {}", e);
+                println!("cargo:warning=failed to run ddlog --version: {e}");
                 false
             }
         }
@@ -53,7 +50,7 @@ fn run_ddlog(ddlog_file: &Path, out_dir: &Path) -> Result<(), Box<dyn Error>> {
     let target_dir = out_dir.join("ddlog_lille");
     let mut cmd = Command::new("ddlog");
     if let Ok(home) = env::var("DDLOG_HOME") {
-        cmd.arg("-L").arg(format!("{}/lib", home));
+        cmd.arg("-L").arg(format!("{home}/lib"));
     }
     let status = cmd
         .arg("-i")
@@ -64,7 +61,7 @@ fn run_ddlog(ddlog_file: &Path, out_dir: &Path) -> Result<(), Box<dyn Error>> {
     if status.success() {
         Ok(())
     } else {
-        Err(format!("ddlog compiler exited with status: {}", status).into())
+        Err(format!("ddlog compiler exited with status: {status}").into())
     }
 }
 

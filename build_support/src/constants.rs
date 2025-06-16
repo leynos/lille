@@ -110,14 +110,11 @@ pub fn generate_code_from_constants(parsed: &Value, fmts: &Formats) -> String {
                 code.push_str(&fill2(fmts.float_fmt, name, val));
             }
             Value::String(s) => {
-                let lit = format!("{:?}", s);
+                let lit = format!("{s:?}");
                 code.push_str(&fill2(fmts.str_fmt, name, lit));
             }
             other => {
-                println!(
-                    "cargo:warning=Unsupported constant `{}` of type {:?}",
-                    name, other
-                );
+                println!("cargo:warning=Unsupported constant `{name}` of type {other:?}");
             }
         }
     };
