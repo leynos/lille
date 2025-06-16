@@ -1,4 +1,5 @@
 //! Integration tests for the DDlog interface.
+//! Ensures that relations defined in the Datalog schema match expectations.
 use glam::{Vec2, Vec3};
 use lille::{ddlog_handle::DdlogEntity, DdlogHandle, UnitType};
 use once_cell::sync::Lazy;

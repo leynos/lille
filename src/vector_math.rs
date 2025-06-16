@@ -1,4 +1,5 @@
 //! Basic vector math helper functions.
+//! Small helpers for calculating magnitudes and normalised vectors.
 use glam::Vec3;
 
 /// Returns the magnitude of the vector `(x, y, z)`.

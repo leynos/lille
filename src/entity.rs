@@ -1,4 +1,5 @@
 //! Basic entity representations used within the game.
+//! Contains lightweight structs for generic entities and adversaries.
 use glam::Vec3;
 
 #[derive(Clone, Debug)]

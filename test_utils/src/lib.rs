@@ -1,5 +1,5 @@
 //! Utility helpers for tests.
-/// Test helper utilities.
+//! Provides assertions for verifying generated code.
 
 /// Assert that all strings in `keys` are present in `code`.
 ///

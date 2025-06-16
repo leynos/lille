@@ -1,4 +1,5 @@
 //! Tests for the vector math utility functions.
+//! Focuses on normalisation and NaN handling.
 use approx::assert_relative_eq;
 use lille::vec_normalize;
 

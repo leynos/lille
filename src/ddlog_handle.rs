@@ -1,4 +1,5 @@
-//! Helper types and logic for interfacing with Differential Datalog.
+//! Helper types and logic for interfacing with `DDlog`.
+//! Provides the `DdlogHandle` resource and entity representations used by syncing systems.
 use bevy::prelude::*;
 use hashbrown::HashMap;
 use serde::Serialize;

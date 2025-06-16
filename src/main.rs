@@ -1,4 +1,5 @@
 //! Example game application using the Lille library.
+//! Launches a Bevy app and wires up logging, DDlog, and basic systems.
 use bevy::log::LogPlugin;
 use bevy::prelude::*;
 use clap::Parser;

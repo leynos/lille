@@ -1,4 +1,5 @@
 //! ECS component types used by the game.
+//! Includes identifiers, health, target positions, and unit descriptors shared between systems.
 use bevy::prelude::*;
 use serde::Serialize;
 

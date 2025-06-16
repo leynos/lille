@@ -1,4 +1,5 @@
 //! Unit tests for physics calculations.
+//! Covers acceleration helper functions for edge cases and typical inputs.
 use approx::assert_relative_eq;
 use lille::DEFAULT_MASS;
 

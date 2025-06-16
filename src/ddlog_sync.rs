@@ -1,4 +1,5 @@
-//! Systems for synchronizing ECS state with Differential Datalog.
+//! Systems for synchronizing ECS state with `DDlog`.
+//! Pushes component data to the database and applies deltas back to the world.
 use bevy::prelude::*;
 use hashbrown::HashMap;
 
