@@ -54,3 +54,9 @@ The script downloads DDlog v1.2.3 into `~/.local/ddlog` and writes environment
 variable assignments to `.env`. If that file already exists, it will be backed up
 with a `.bak` suffix before being replaced. Any existing directory at
 `~/.local/ddlog` will be removed before extraction.
+
+## Build script
+
+The `build.rs` entry point delegates to the `build_support` crate. This helper
+crate generates constants from `constants.toml`, downloads the project font, and
+compiles the DDlog ruleset when the compiler is available.
