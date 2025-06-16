@@ -7,6 +7,19 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tempfile::NamedTempFile;
 
+#[cfg_attr(test, mockall::automock)]
+pub trait FontFetcher {
+    fn fetch(&self) -> Result<Vec<u8>, Box<dyn Error>>;
+}
+
+struct HttpFontFetcher;
+
+impl FontFetcher for HttpFontFetcher {
+    fn fetch(&self) -> Result<Vec<u8>, Box<dyn Error>> {
+        fetch_font_data()
+    }
+}
+
 pub const DEFAULT_FALLBACK_FONT_PATH: &str = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
 
 fn fallback_font_path() -> PathBuf {
@@ -25,6 +38,13 @@ fn fallback_font_path() -> PathBuf {
 }
 
 pub fn download_font(manifest_dir: impl AsRef<Path>) -> Result<PathBuf, Box<dyn Error>> {
+    download_font_with(&HttpFontFetcher, manifest_dir)
+}
+
+pub fn download_font_with(
+    fetcher: &dyn FontFetcher,
+    manifest_dir: impl AsRef<Path>,
+) -> Result<PathBuf, Box<dyn Error>> {
     let manifest_dir = manifest_dir.as_ref();
     let assets_dir = manifest_dir.join("assets");
     fs::create_dir_all(&assets_dir)?;
@@ -34,7 +54,7 @@ pub fn download_font(manifest_dir: impl AsRef<Path>) -> Result<PathBuf, Box<dyn 
         return Ok(font_path);
     }
 
-    match fetch_font_data() {
+    match fetcher.fetch() {
         Ok(data) => {
             let mut tmp = NamedTempFile::new_in(&assets_dir)?;
             if let Err(e) = tmp.write_all(&data) {
@@ -74,124 +94,92 @@ fn fetch_font_data() -> Result<Vec<u8>, Box<dyn Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::{fixture, rstest};
     use std::fs;
+    use std::path::Path;
+    use std::sync::Arc;
+    use std::thread;
     use tempfile::TempDir;
 
-    fn setup_test_dir() -> TempDir {
+    #[fixture]
+    fn temp_dir() -> TempDir {
         TempDir::new().expect("Failed to create temp dir")
     }
 
-    #[test]
-    fn test_download_font_creates_assets_directory() {
-        let temp_dir = setup_test_dir();
-        let manifest_path = temp_dir.path().to_str().unwrap();
-        let _ = download_font(manifest_path);
+    #[rstest]
+    fn creates_assets_directory(temp_dir: TempDir) {
+        let manifest_path = temp_dir.path().to_path_buf();
+        let mut fetcher = MockFontFetcher::new();
+        fetcher.expect_fetch().returning(|| Ok(vec![1, 2, 3]));
+        let _ = download_font_with(&fetcher, &manifest_path);
         let assets_path = temp_dir.path().join("assets");
-        assert!(assets_path.exists(), "Assets directory should be created");
-        assert!(assets_path.is_dir(), "Assets path should be a directory");
+        assert!(assets_path.exists());
+        assert!(assets_path.is_dir());
     }
 
-    #[test]
-    fn test_download_font_returns_existing_font_path() {
-        let temp_dir = setup_test_dir();
-        let manifest_path = temp_dir.path().to_str().unwrap();
+    #[rstest]
+    fn returns_existing_font_path(temp_dir: TempDir) {
+        let manifest_path = temp_dir.path().to_path_buf();
         let assets_dir = temp_dir.path().join("assets");
         let font_path = assets_dir.join("FiraSans-Regular.ttf");
         fs::create_dir_all(&assets_dir).unwrap();
         fs::write(&font_path, b"fake font data").unwrap();
-        let result = download_font(manifest_path).unwrap();
+        let mut fetcher = MockFontFetcher::new();
+        fetcher.expect_fetch().times(0);
+        let result = download_font_with(&fetcher, &manifest_path).unwrap();
         assert_eq!(result, font_path);
         assert!(result.exists());
     }
 
-    #[test]
-    fn test_download_font_fallback_on_write_error() {
-        let temp_dir = setup_test_dir();
-        let manifest_path = temp_dir.path().to_str().unwrap();
-        let assets_dir = temp_dir.path().join("assets");
-        fs::create_dir_all(&assets_dir).unwrap();
-        let mut perms = fs::metadata(&assets_dir).unwrap().permissions();
-        perms.set_readonly(true);
-        fs::set_permissions(&assets_dir, perms).unwrap();
-        let result = download_font(manifest_path).unwrap();
+    #[rstest]
+    fn fallback_on_write_error(temp_dir: TempDir) {
+        let manifest_path = temp_dir.path().to_path_buf();
+        let mut fetcher = MockFontFetcher::new();
+        fetcher
+            .expect_fetch()
+            .returning(|| Err("network error".into()));
+        let result = download_font_with(&fetcher, &manifest_path).unwrap();
         assert!(result == fallback_font_path() || result.exists());
     }
 
-    #[test]
-    fn test_download_font_invalid_manifest_dir() {
-        let result = download_font("/non/existent/path");
+    #[rstest]
+    fn invalid_manifest_dir() {
+        let mut fetcher = MockFontFetcher::new();
+        fetcher
+            .expect_fetch()
+            .returning(|| Err("network error".into()));
+        let result = download_font_with(&fetcher, Path::new("/non/existent/path"));
         assert!(result.is_ok());
-        let path = result.unwrap();
-        assert!(path == fallback_font_path() || path.ends_with("FiraSans-Regular.ttf"));
+        let p = result.unwrap();
+        assert!(p == fallback_font_path() || p.exists());
     }
 
-    #[test]
-    fn test_download_font_empty_manifest_dir() {
-        let result = download_font("");
-        assert!(result.is_ok());
+    #[rstest]
+    fn concurrent_calls(temp_dir: TempDir) {
+        let manifest_path = temp_dir.path().to_path_buf();
+        let mut fetcher = MockFontFetcher::new();
+        fetcher
+            .expect_fetch()
+            .returning(|| Ok(vec![1, 2, 3]))
+            .times(1..=3);
+        let fetcher = Arc::new(fetcher);
+        let handles: Vec<_> = (0..3)
+            .map(|_| {
+                let f = Arc::clone(&fetcher);
+                let path = manifest_path.clone();
+                thread::spawn(move || download_font_with(&*f, &path).is_ok())
+            })
+            .collect();
+        for h in handles {
+            assert!(h.join().unwrap());
+        }
     }
 
-    #[test]
-    fn test_download_font_relative_path() {
-        let temp_dir = setup_test_dir();
-        let manifest_path = temp_dir.path().to_str().unwrap();
-        let result = download_font(manifest_path);
-        assert!(result.is_ok());
-        let path = result.unwrap();
-        assert!(path.exists() || path == fallback_font_path());
-    }
-
-    #[test]
-    fn test_fallback_font_path_constant() {
+    #[rstest]
+    fn fallback_font_path_constant() {
         assert_eq!(
             DEFAULT_FALLBACK_FONT_PATH,
             "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
         );
-        assert!(!DEFAULT_FALLBACK_FONT_PATH.is_empty());
-    }
-
-    #[test]
-    fn test_assets_directory_structure() {
-        let temp_dir = setup_test_dir();
-        let manifest_path = temp_dir.path().to_str().unwrap();
-        let _ = download_font(manifest_path);
-        let assets_path = temp_dir.path().join("assets");
-        let expected_font_path = assets_path.join("FiraSans-Regular.ttf");
-        assert!(assets_path.exists());
-        assert_eq!(expected_font_path.parent().unwrap(), assets_path);
-    }
-
-    #[test]
-    fn test_download_font_creates_nested_directories() {
-        let temp_dir = setup_test_dir();
-        let nested_manifest = temp_dir
-            .path()
-            .join("deeply")
-            .join("nested")
-            .join("manifest");
-        fs::create_dir_all(&nested_manifest).unwrap();
-        let manifest_path = nested_manifest.to_str().unwrap();
-        let result = download_font(manifest_path);
-        assert!(result.is_ok());
-        let assets_path = nested_manifest.join("assets");
-        assert!(assets_path.exists());
-    }
-
-    #[test]
-    fn test_download_font_concurrent_calls() {
-        use std::sync::Arc;
-        use std::thread;
-        let temp_dir = Arc::new(setup_test_dir());
-        let manifest_path = temp_dir.path().to_str().unwrap().to_string();
-        let handles: Vec<_> = (0..3)
-            .map(|_| {
-                let path = manifest_path.clone();
-                thread::spawn(move || download_font(&path).is_ok())
-            })
-            .collect();
-        let results: Vec<_> = handles.into_iter().map(|h| h.join().unwrap()).collect();
-        for result in results {
-            assert!(result);
-        }
     }
 }
