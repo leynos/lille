@@ -7,23 +7,30 @@ on:
 jobs:
   build-test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     env:
       CARGO_TERM_COLOR: always
       CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN }}
       CODESCENE_CLI_SHA256: ${{ vars.CODESCENE_CLI_SHA256 }}
+      BUILD_PROFILE: debug
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Install rust
+        uses: actions-rust-lang/setup-rust-toolchain@9d7e65c320fdb52dcd45ffaa68deb6c02c8754d9
+        with:
+          override: true
+          components: rustfmt, clippy
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+            target/${{ env.BUILD_PROFILE }}
+          key: ${{ runner.os }}-cargo-${{ env.BUILD_PROFILE }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-
+            ${{ runner.os }}-cargo-${{ env.BUILD_PROFILE }}-
       - name: Install DDlog
         run: |
           ./scripts/install_ddlog.sh
@@ -53,3 +60,8 @@ jobs:
       - name: Upload coverage data to CodeScene
         if: env.CS_ACCESS_TOKEN
         run: cs-coverage upload --format "lcov" --metric "line-coverage" "lcov.info"
+
+
+
+
+
