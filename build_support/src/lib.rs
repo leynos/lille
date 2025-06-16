@@ -1,3 +1,5 @@
+//! Build support utilities used by the project's build script.
+//! Coordinates constants generation, font downloads, and optional `DDlog` compilation.
 pub mod constants;
 pub mod ddlog;
 pub mod font;

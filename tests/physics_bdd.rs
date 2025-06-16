@@ -1,3 +1,5 @@
+//! Behaviour-driven tests for physics-related systems.
+//! Uses `rstest` to script scenarios covering entity transitions.
 use bevy::prelude::*;
 use insta::assert_ron_snapshot;
 use lille::{

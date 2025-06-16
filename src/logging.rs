@@ -1,3 +1,5 @@
+//! Logging utilities.
+//! Exposes `init` which configures `env_logger` with optional verbosity.
 use env_logger::{Builder, Env};
 use log::LevelFilter;
 

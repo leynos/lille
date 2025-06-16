@@ -1,3 +1,5 @@
+//! Build helper for compiling `DDlog` code.
+//! Detects the compiler and invokes it during the build process.
 use once_cell::sync::OnceCell;
 use std::env;
 use std::error::Error;

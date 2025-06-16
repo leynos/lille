@@ -1,3 +1,5 @@
+//! Utilities for generating Rust constants from the shared `constants.toml` file.
+//! Provides functions to read `constants.toml` and produce Rust and `DDlog` code.
 use std::error::Error;
 use std::fs;
 use std::path::Path;

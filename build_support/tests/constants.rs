@@ -1,3 +1,5 @@
+//! Tests for the `build_support` constants generator.
+//! Ensures generated code is syntactically valid and handles edge cases.
 use build_support::constants::{generate_code_from_constants, RUST_FMTS};
 use test_utils::{assert_all_absent, assert_all_present, assert_valid_rust_syntax};
 
