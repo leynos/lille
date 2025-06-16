@@ -85,6 +85,7 @@ mod tests {
     #[test]
     fn test_build_pathbuf_creation() {
         let (_manifest_temp, out_temp) = setup_test_env();
+        env::set_var("OUT_DIR", out_temp.path());
         let out_dir_str = env::var("OUT_DIR").unwrap();
         let out_dir = PathBuf::from(&out_dir_str);
         assert_eq!(out_dir, out_temp.path());

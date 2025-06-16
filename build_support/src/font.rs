@@ -1,7 +1,11 @@
+use reqwest::blocking::Client;
 use sha2::{Digest, Sha256};
 use std::error::Error;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
+use tempfile::NamedTempFile;
 
 pub const DEFAULT_FALLBACK_FONT_PATH: &str = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
 
@@ -32,12 +36,12 @@ pub fn download_font(manifest_dir: impl AsRef<Path>) -> Result<PathBuf, Box<dyn 
 
     match fetch_font_data() {
         Ok(data) => {
-            let tmp_path = font_path.with_extension("tmp");
-            if let Err(e) = fs::write(&tmp_path, data) {
+            let mut tmp = NamedTempFile::new_in(&assets_dir)?;
+            if let Err(e) = tmp.write_all(&data) {
                 println!("cargo:warning=Failed to write font: {}", e);
                 return Ok(fallback_font_path());
             }
-            if let Err(e) = fs::rename(&tmp_path, &font_path) {
+            if let Err(e) = tmp.persist(&font_path) {
                 println!("cargo:warning=Failed to rename font file: {}", e);
                 return Ok(fallback_font_path());
             }
@@ -53,7 +57,11 @@ pub fn download_font(manifest_dir: impl AsRef<Path>) -> Result<PathBuf, Box<dyn 
 fn fetch_font_data() -> Result<Vec<u8>, Box<dyn Error>> {
     const FONT_URL: &str = "https://raw.githubusercontent.com/mozilla/Fira/fd8c8c0a3d353cd99e8ca1662942d165e6961407/ttf/FiraSans-Regular.ttf";
     const FONT_SHA256: &str = "a389cef71891df1232370fcebd7cfde5f74e741967070399adc91fd069b2094b";
-    let resp = reqwest::blocking::get(FONT_URL)?.error_for_status()?;
+    let client = Client::builder()
+        .timeout(Duration::from_secs(10))
+        .user_agent("lille-build/1.0")
+        .build()?;
+    let resp = client.get(FONT_URL).send()?.error_for_status()?;
     let bytes = resp.bytes()?;
     let digest = Sha256::digest(&bytes);
     let actual = format!("{:x}", digest);

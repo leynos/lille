@@ -5,6 +5,9 @@ use serde::Serialize;
 use crate::components::{Block, BlockSlope, UnitType};
 use crate::{GRACE_DISTANCE, GRAVITY_PULL};
 
+const GRACE_DISTANCE_F32: f32 = GRACE_DISTANCE as f32;
+const GRAVITY_PULL_F32: f32 = GRAVITY_PULL as f32;
+
 #[derive(Clone, Serialize)]
 pub struct DdlogEntity {
     pub position: Vec3,
@@ -75,8 +78,8 @@ impl DdlogHandle {
     }
 
     fn apply_gravity(&self, pos: &mut Vec3, floor: f32) {
-        if pos.z > floor + GRACE_DISTANCE as f32 {
-            pos.z += GRAVITY_PULL as f32;
+        if pos.z > floor + GRACE_DISTANCE_F32 {
+            pos.z += GRAVITY_PULL_F32;
         } else {
             pos.z = floor;
         }

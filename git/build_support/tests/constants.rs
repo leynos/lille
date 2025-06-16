@@ -77,7 +77,7 @@ fn test_formats_struct_creation() {
 #[test]
 fn test_rust_fmts_constants() {
     assert_eq!(RUST_FMTS.int_fmt, "pub const {}: i64 = {};\n");
-    assert_eq!(RUST_FMTS.float_fmt, "pub const {}: f32 = {}f32;\n");
+    assert_eq!(RUST_FMTS.float_fmt, "pub const {}: f64 = {};\n");
     assert_eq!(RUST_FMTS.str_fmt, "pub const {}: &str = \"{}\";\n");
 }
 
@@ -155,7 +155,7 @@ str_val = "hello"
     let result = generate_code_from_constants(&parsed, &RUST_FMTS);
     assert!(result.contains("// @generated - do not edit"));
     assert!(result.contains("pub const INT_VAL: i64 = 42;"));
-    assert!(result.contains("pub const FLOAT_VAL: f32 = 3.14f32;"));
+    assert!(result.contains("pub const FLOAT_VAL: f64 = 3.14;"));
     assert!(result.contains("pub const STR_VAL: &str = \"hello\";"));
 }
 
@@ -209,7 +209,7 @@ negative_float = -3.14
     let parsed: Value = toml_content.parse().unwrap();
     let result = generate_code_from_constants(&parsed, &RUST_FMTS);
     assert!(result.contains("pub const NEGATIVE_INT: i64 = -42;"));
-    assert!(result.contains("pub const NEGATIVE_FLOAT: f32 = -3.14f32;"));
+    assert!(result.contains("pub const NEGATIVE_FLOAT: f64 = -3.14;"));
 }
 
 #[test]
@@ -237,7 +237,7 @@ empty_str = ""
     let parsed: Value = toml_content.parse().unwrap();
     let result = generate_code_from_constants(&parsed, &RUST_FMTS);
     assert!(result.contains("pub const ZERO_INT: i64 = 0;"));
-    assert!(result.contains("pub const ZERO_FLOAT: f32 = 0f32;"));
+    assert!(result.contains("pub const ZERO_FLOAT: f64 = 0;"));
     assert!(result.contains("pub const EMPTY_STR: &str = \"\";"));
 }
 

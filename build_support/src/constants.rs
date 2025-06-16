@@ -51,9 +51,13 @@ where
     F: FnMut(&str, &Value),
 {
     if let Some(map) = parsed.as_table() {
-        for (k, v) in map {
+        let mut entries: Vec<_> = map.iter().collect();
+        entries.sort_by_key(|(k, _)| *k);
+        for (k, v) in entries {
             if let Some(tab) = v.as_table() {
-                for (subk, subv) in tab {
+                let mut subentries: Vec<_> = tab.iter().collect();
+                subentries.sort_by_key(|(k, _)| *k);
+                for (subk, subv) in subentries {
                     f(subk, subv);
                 }
             } else {
@@ -64,8 +68,14 @@ where
 }
 
 fn fill2(fmt: &str, a: impl std::fmt::Display, b: impl std::fmt::Display) -> String {
-    fmt.replacen("{}", &a.to_string(), 1)
-        .replacen("{}", &b.to_string(), 1)
+    let mut parts = fmt.splitn(3, "{}");
+    let mut s = String::new();
+    s.push_str(parts.next().unwrap_or(""));
+    s.push_str(&a.to_string());
+    s.push_str(parts.next().unwrap_or(""));
+    s.push_str(&b.to_string());
+    s.push_str(parts.next().unwrap_or(""));
+    s
 }
 
 pub fn generate_code_from_constants(parsed: &Value, fmts: &Formats) -> String {

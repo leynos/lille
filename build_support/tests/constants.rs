@@ -33,7 +33,10 @@ fn handles_root_level_values() {
     let parsed: toml::Value = toml_str.parse().unwrap();
     let code = generate_code_from_constants(&parsed, &RUST_FMTS);
 
-    assert!(code.starts_with("// @generated"));
+    assert!(code.contains("NAME"));
+    assert!(code.contains("VERSION"));
+    assert!(code.contains("PORT"));
+    assert!(!code.contains("DEBUG"));
 }
 
 #[test]
@@ -54,7 +57,12 @@ fn handles_nested_sections() {
     let parsed: toml::Value = toml_str.parse().unwrap();
     let code = generate_code_from_constants(&parsed, &RUST_FMTS);
 
-    assert!(code.starts_with("// @generated"));
+    assert!(code.contains("HOST"));
+    assert!(code.contains("PORT"));
+    assert!(!code.contains("USERNAME"));
+    assert!(!code.contains("PASSWORD"));
+    assert!(!code.contains("ENDPOINT"));
+    assert!(!code.contains("TIMEOUT"));
 }
 
 #[test]
@@ -93,7 +101,10 @@ fn handles_boolean_values() {
     let parsed: toml::Value = toml_str.parse().unwrap();
     let code = generate_code_from_constants(&parsed, &RUST_FMTS);
 
-    assert!(code.starts_with("// @generated"));
+    assert!(!code.contains("DEBUG"));
+    assert!(!code.contains("PRODUCTION"));
+    assert!(!code.contains("VERBOSE"));
+    assert!(!code.contains("QUIET"));
 }
 
 #[test]

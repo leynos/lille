@@ -1,7 +1,10 @@
+use once_cell::sync::OnceCell;
 use std::env;
 use std::error::Error;
 use std::path::Path;
 use std::process::{Command, Stdio};
+
+static DDLOG_AVAILABLE: OnceCell<bool> = OnceCell::new();
 
 pub fn compile_ddlog(
     manifest_dir: impl AsRef<Path>,
@@ -24,24 +27,26 @@ pub fn compile_ddlog(
 }
 
 fn ddlog_available() -> bool {
-    match Command::new("ddlog")
-        .arg("--version")
-        .stdout(Stdio::null())
-        .status()
-    {
-        Ok(status) if status.success() => true,
-        Ok(status) => {
-            println!(
-                "cargo:warning=ddlog --version failed with status {}",
-                status
-            );
-            false
+    *DDLOG_AVAILABLE.get_or_init(|| {
+        match Command::new("ddlog")
+            .arg("--version")
+            .stdout(Stdio::null())
+            .status()
+        {
+            Ok(status) if status.success() => true,
+            Ok(status) => {
+                println!(
+                    "cargo:warning=ddlog --version failed with status {}",
+                    status
+                );
+                false
+            }
+            Err(e) => {
+                println!("cargo:warning=failed to run ddlog --version: {}", e);
+                false
+            }
         }
-        Err(e) => {
-            println!("cargo:warning=failed to run ddlog --version: {}", e);
-            false
-        }
-    }
+    })
 }
 
 fn run_ddlog(ddlog_file: &Path, out_dir: &Path) -> Result<(), Box<dyn Error>> {
