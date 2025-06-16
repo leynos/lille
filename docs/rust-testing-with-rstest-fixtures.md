@@ -105,14 +105,12 @@ linked when running tests, not when building the main application or library.
 Add the following lines to your `Cargo.toml` under the `[dev-dependencies]`
 section:
 
-Ini, TOML
-
-````rust
+```toml
 [dev-dependencies]
 rstest = "0.18" # Or the latest version available on crates.io
 # rstest_macros may also be needed explicitly depending on usage or version
 # rstest_macros = "0.18" # Check crates.io for the latest version
-```rust
+```
 
 It is advisable to check `crates.io` for the latest stable version of `rstest`
 (and `rstest_macros` if required separately by the version of `rstest` being
@@ -132,7 +130,7 @@ Consider a simple fixture that provides a numeric value:
 
 Rust
 
-```rust
+````rust
 use rstest::fixture; // Or use rstest::*;
 
 #[fixture]
@@ -205,25 +203,23 @@ Here are a few examples illustrating different kinds of fixtures:
 
 - **Fixture returning a primitive data type:**
 
-  Rust
+```rust
+use rstest::*;
 
+#[fixture]
+fn default_username() -> String {
+    "test_user".to_string()
+}
+
+#[rstest]
+fn test_username_length(default_username: String) {
+    assert!(default_username.len() > 0);
+}
 ````
-
-use rstest::\*;
-
-#[fixture] fn default_username() -> String { "test_user".to_string() }
-
-#[rstest] fn test_username_length(default_username: String) {
-assert!(default_username.len() > 0); }
-
-```
 
 - **Fixture returning a struct:**
 
-Rust
-
-```
-
+```rust
 use rstest::\*;
 
 struct User { id: u32, name: String, }
@@ -237,46 +233,49 @@ struct User { id: u32, name: String, }
 ```
 
 - **Fixture performing setup and returning a resource (e.g., a mock
-repository):**
+  repository):**
 
-Rust
+```rust
+use rstest::*;
+use std::collections::HashMap;
 
-```
-
-use rstest::\*; use std::collections::HashMap;
-
-// A simple trait for a repository trait Repository { fn add_item(&mut self, id:
-&str, name: &str); fn get_item_name(&self, id: &str) -> Option<String>; }
-
-// A mock implementation
-
-# 
-
-struct MockRepository { data: HashMap\<String, String>, }
-
-impl Repository for MockRepository { fn add_item(&mut self, id: &str, name:
-&str) { self.data.insert(id.to_string(), name.to_string()); }
-
-```
-  fn get_item_name(&self, id: &str) -> Option<String> {
-      self.data.get(id).cloned()
-  }
-```
-
+trait Repository {
+    fn add_item(&mut self, id: &str, name: &str);
+    fn get_item_name(&self, id: &str) -> Option<String>;
 }
 
-#[fixture] fn empty_repository() -> impl Repository { MockRepository::default()
+#[derive(Default)]
+struct MockRepository {
+    data: HashMap<String, String>,
 }
 
-#[rstest] fn test_add_to_repository(mut empty_repository: impl Repository) {
-empty_repository.add_item("item1", "Test Item");
-assert_eq!(empty_repository.get_item_name("item1"), Some("Test
-Item".to_string())); }
+impl Repository for MockRepository {
+    fn add_item(&mut self, id: &str, name: &str) {
+        self.data.insert(id.to_string(), name.to_string());
+    }
 
-````
+    fn get_item_name(&self, id: &str) -> Option<String> {
+        self.data.get(id).cloned()
+    }
+}
 
-This example, adapted from concepts in 1 and 1, demonstrates a fixture
-providing a mutable `Repository` implementation.
+#[fixture]
+fn empty_repository() -> impl Repository {
+    MockRepository::default()
+}
+
+#[rstest]
+fn test_add_to_repository(mut empty_repository: impl Repository) {
+    empty_repository.add_item("item1", "Test Item");
+    assert_eq!(
+        empty_repository.get_item_name("item1"),
+        Some("Test Item".to_string())
+    );
+}
+```
+
+This example, adapted from concepts in 1 and 1, demonstrates a fixture providing
+a mutable `Repository` implementation.
 
 ### B. Understanding Fixture Scope and Lifetime (Default Behavior)
 
@@ -317,7 +316,7 @@ A classic example is testing the Fibonacci sequence 1:
 
 Rust
 
-```rust
+````rust
 use rstest::rstest;
 
 fn fibonacci(n: u32) -> u32 {
@@ -1182,6 +1181,7 @@ The following table summarizes key differences:
 **Table 1:** `rstest` **vs. Standard Rust** `#[test]` **for Fixture Management
 and Parameterization**
 
+<!-- markdownlint-disable MD013 -->
 | Feature                                  | Standard #[test] Approach                                     | rstest Approach                                                                  |
 | ---------------------------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | Fixture Injection                        | Manual calls to setup functions within each test.             | Fixture name as argument in #[rstest] function; fixture defined with #[fixture]. |
@@ -1189,6 +1189,7 @@ and Parameterization**
 | Parameterized Tests (Value Combinations) | Nested loops inside one test, or complex manual generation.   | #[values(...)] attributes on arguments of #[rstest] function.                    |
 | Async Fixture Setup                      | Manual async block and .await calls inside test.              | async fn fixtures, with #[future] and #[awt] for ergonomic .awaiting.            |
 | Reusing Parameter Sets                   | Manual duplication of cases or custom helper macros.          | rstest_reuse crate with #[template] and #[apply] attributes.                     |
+<!-- markdownlint-enable MD013 -->
 
 This comparison highlights how `rstest`'s attribute-based, declarative approach
 streamlines common testing patterns, reducing manual effort and improving the
@@ -1325,6 +1326,7 @@ provided by `rstest`:
 
 **Table 2: Key** `rstest` **Attributes Quick Reference**
 
+<!-- markdownlint-disable MD013 -->
 | Attribute                    | Core Purpose                                                                                 |
 | ---------------------------- | -------------------------------------------------------------------------------------------- |
 | #[rstest]                    | Marks a function as an rstest test; enables fixture injection and parameterization.          |
@@ -1340,6 +1342,7 @@ provided by `rstest`:
 | #[timeout(...)]              | Sets a timeout for an asynchronous test.                                                     |
 | #[files("glob_pattern",...)] | Injects file paths (or contents, with mode=) matching a glob pattern as test arguments.      |
 
+<!-- markdownlint-enable MD013 -->
 By mastering `rstest`, Rust developers can significantly elevate the quality and
 efficiency of their testing practices, leading to more reliable and maintainable
 software.
