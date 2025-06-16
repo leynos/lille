@@ -1,6 +1,8 @@
 # Map Data Format
 
-This document describes the JSON/MessagePack structure used to represent maps in the Lille engine. The layout is identical whether serialized as human‑readable JSON or as a binary MessagePack payload.
+This document describes the JSON/MessagePack structure used to represent maps in
+the Lille engine. The layout is identical whether serialized as human‑readable
+JSON or as a binary MessagePack payload.
 
 ## 1. Top-level object
 
@@ -16,15 +18,15 @@ This document describes the JSON/MessagePack structure used to represent maps in
 }
 ```
 
-| Field | Type | Description |
-| ----- | ---- | ----------- |
-| **dimensions** | `int[3]` | `[W, H, Z]` giving the size in blocks along X (east), Y (north) and Z (up). |
-| **block_types** | `object` | Dictionary of block-type definitions, keyed by ID string. |
-| **entity_defs** | `object` | Dictionary of entity templates keyed by ID. Each entry may specify an `extends` field and arbitrary property overrides. |
-| **map** | `array` of `Z` layers | A Z-deep array; each layer is an H×W 2D grid of either a block-type ID or `null` for empty. |
-| **entities** | `array<object>` | List of entity spawn objects with `type`, `position`, and optional per-entity properties. |
-| **block_palette** | `string[]` | *Optional.* Ordered list of block type IDs used as integer tokens. |
-| **entity_palette** | `string[]` | *Optional.* Ordered list of entity template IDs used as integer tokens. |
+| Field              | Type                  | Description                                                                                                             |
+| ------------------ | --------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| **dimensions**     | `int[3]`              | `[W, H, Z]` giving the size in blocks along X (east), Y (north) and Z (up).                                             |
+| **block_types**    | `object`              | Dictionary of block-type definitions, keyed by ID string.                                                               |
+| **entity_defs**    | `object`              | Dictionary of entity templates keyed by ID. Each entry may specify an `extends` field and arbitrary property overrides. |
+| **map**            | `array` of `Z` layers | A Z-deep array; each layer is an H×W 2D grid of either a block-type ID or `null` for empty.                             |
+| **entities**       | `array<object>`       | List of entity spawn objects with `type`, `position`, and optional per-entity properties.                               |
+| **block_palette**  | `string[]`            | *Optional.* Ordered list of block type IDs used as integer tokens.                                                      |
+| **entity_palette** | `string[]`            | *Optional.* Ordered list of entity template IDs used as integer tokens.                                                 |
 
 ### Diagram
 
@@ -64,7 +66,8 @@ erDiagram
 
 ## 2. `block_types` entries
 
-Each entry in `"block_types"` describes the physical and navigational properties of one kind of block.
+Each entry in `"block_types"` describes the physical and navigational properties
+of one kind of block.
 
 ```json
 "block_types": {
@@ -77,17 +80,17 @@ Each entry in `"block_types"` describes the physical and navigational properties
 }
 ```
 
-| Property | Type | Meaning |
-| -------- | ---- | ------- |
+| Property        | Type                 | Meaning                                                                                                                                                               |
+| --------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **passability** | `object<string,int>` | Map from face-normal vector to 0/1. Keys are the six unit vectors: `"1,0,0"`, `"-1,0,0"`, `"0,1,0"`, `"0,-1,0"`, `"0,0,1"`, `"0,0,-1"`. 0 = impassable, 1 = passable. |
-| **slope_dir** | `int[2]` | Horizontal direction of rise: `[+1,0]` up to +X, `[-1,0]` down in +X direction, etc. `[0,0]` represents a flat block. |
+| **slope_dir**   | `int[2]`             | Horizontal direction of rise: `[+1,0]` up to +X, `[-1,0]` down in +X direction, etc. `[0,0]` represents a flat block.                                                 |
 
 ## 3. `entity_defs` entries
 
 Each entry in `"entity_defs"` defines a reusable template for spawning entities.
 Templates may inherit from another template using an optional `"extends"` field
-and can override or add arbitrary properties. If a property is absent, the engine
-falls back to the defaults for that entity archetype.
+and can override or add arbitrary properties. If a property is absent, the
+engine falls back to the defaults for that entity archetype.
 
 ```jsonc
 "entity_defs": {
@@ -119,8 +122,12 @@ through to the engine.
 ]
 ```
 
-* **Size**: `map.length === depth` (`Z`). Each `map[z]` is a 2D array with `map[z].length === height` (`H`), and each row `map[z][y].length === width` (`W`).
-* **Cell value** at `(x, y, z)` is either a string matching one of the `"block_types"` keys or `null` meaning empty/air. The engine should treat `z < 0` as the implied ground.
+- **Size**: `map.length === depth` (`Z`). Each `map[z]` is a 2D array with
+  `map[z].length === height` (`H`), and each row `map[z][y].length === width`
+  (`W`).
+- **Cell value** at `(x, y, z)` is either a string matching one of the
+  `"block_types"` keys or `null` meaning empty/air. The engine should treat
+  `z < 0` as the implied ground.
 
 ## 5. The `entities` array
 
@@ -131,17 +138,17 @@ through to the engine.
 ]
 ```
 
-Each entry spawns one entity. `type` refers to a template ID from
-`entity_defs`. Properties listed here override both the template and the
-archetype defaults. Position is a mandatory `[x,y,z]` triple.
+Each entry spawns one entity. `type` refers to a template ID from `entity_defs`.
+Properties listed here override both the template and the archetype defaults.
+Position is a mandatory `[x,y,z]` triple.
 
 ## 6. Serialization
 
-* **JSON** provides a human‑readable representation.
-* **MessagePack** stores the same structure in a compact binary form.
-* **Apache Arrow** optionally encodes the map in Arrow's columnar format, using
+- **JSON** provides a human‑readable representation.
+- **MessagePack** stores the same structure in a compact binary form.
+- **Apache Arrow** optionally encodes the map in Arrow's columnar format, using
   dictionary (token) encoding for block IDs and sparse tensors for the 3D grid.
-* **Palettized JSON/MessagePack** (optional) replaces repeated strings with
+- **Palettized JSON/MessagePack** (optional) replaces repeated strings with
   integer tokens. Add a `block_palette` array listing block IDs and an
   `entity_palette` array listing entity template IDs. In the `map` and
   `entities` array, references are stored as integer indices into these
@@ -190,7 +197,8 @@ archetype defaults. Position is a mandatory `[x,y,z]` triple.
 
 1. **dimensions** = 4×4×2.
 2. Every face of `solid` is impassable (`0`), and the block is flat.
-3. **layer 0** is a hollow room walled in; **layer 1** has two floating solid blocks.
+3. **layer 0** is a hollow room walled in; **layer 1** has two floating solid
+   blocks.
 4. Two entities are spawned: a scared civilian and a tough baddie.
 
 ### Palettized variant
@@ -226,10 +234,12 @@ must still include required fields like `dimensions`, `block_types`, and
 
 ## 8. Tips for engine integration
 
-* Perform bounds‑checking on all `(x, y, z)` queries; positions outside the valid range should be treated as empty or solid depending on your collision rules.
-* Treat `z = -1` as the implicit ground plane.
-* Use the `passability` map on the face between adjacent voxels for pathfinding.
-* When supporting traversal up or down slopes, consult `slope_dir`.
+- Perform bounds‑checking on all `(x, y, z)` queries; positions outside the
+  valid range should be treated as empty or solid depending on your collision
+  rules.
+- Treat `z = -1` as the implicit ground plane.
+- Use the `passability` map on the face between adjacent voxels for pathfinding.
+- When supporting traversal up or down slopes, consult `slope_dir`.
 
 ## 9. Optional Apache Arrow Representation
 
@@ -244,4 +254,3 @@ streaming. The recommended layout is:
 When serialized via the Arrow IPC or Feather format, this representation remains
 interoperable with the JSON/MessagePack structure while leveraging Arrow's
 columnar compression and sparse data handling.
-

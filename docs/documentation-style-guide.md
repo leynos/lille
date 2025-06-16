@@ -14,8 +14,8 @@ these rules to keep the documentation clear and consistent for developers.
 ## Punctuation and grammar
 
 - Use the Oxford comma: "ships, planes, and hovercraft".
-- Company names are treated as collective nouns:
-  "Lille Industries are expanding".
+- Company names are treated as collective nouns: "Lille Industries are
+  expanding".
 
 ## Headings
 
@@ -28,8 +28,8 @@ these rules to keep the documentation clear and consistent for developers.
 - Follow [markdownlint](https://github.com/DavidAnson/markdownlint)
   recommendations[^markdownlint].
 - Provide code blocks and lists using standard Markdown syntax.
-- Always use fenced code blocks with a language identifier;
-  use `plaintext` for non-code text.
+- Always use fenced code blocks with a language identifier; use `plaintext` for
+  non-code text.
 - Use `-` as the first level bullet and renumber lists when items change.
 - Prefer inline links using `[text](url)` or angle brackets around the URL.
 
@@ -56,19 +56,20 @@ fn add(a: i32, b: i32) -> i32 {
 
 ## API doc comments
 
-Use doc comments to document public APIs. Keep them consistent with the
-contents of the manual.
+Use doc comments to document public APIs. Keep them consistent with the contents
+of the manual.
 
 - Begin each block with `///`.
 - Keep the summary line short, followed by further detail.
-- Explicitly document all parameters with `# Parameters`, describing each argument.
+- Explicitly document all parameters with `# Parameters`, describing each
+  argument.
 - Document the return value with `# Returns`.
 - Document any panics or errors with `# Panics` or `# Errors` as appropriate.
 - Place examples under `# Examples` and mark the code block with `no_run` so
   they do not execute during documentation tests.
 - Put function attributes after the doc comment.
 
-```rust
+````rust
 /// Returns the sum of `a` and `b`.
 ///
 /// # Parameters
@@ -87,7 +88,7 @@ contents of the manual.
 pub fn add(a: i32, b: i32) -> i32 {
     a + b
 }
-```
+````
 
 ## Diagrams and images
 
@@ -103,4 +104,4 @@ flowchart TD
     C --> D[Merge]
 ```
 
-[^markdownlint]: A linter that enforces consistent Markdown formatting.
+\[^markdownlint\]: A linter that enforces consistent Markdown formatting.
