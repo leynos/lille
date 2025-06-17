@@ -1,3 +1,5 @@
+//! Library crate providing core Lille game logic.
+//! Re-exports common components and systems for the main application and tests.
 pub mod actor;
 pub mod components;
 pub mod ddlog_handle;

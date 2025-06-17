@@ -1,0 +1,61 @@
+name: Setup DDlog
+description: Install and cache DDlog compiler
+inputs:
+  install-script:
+    description: "Path to the DDlog install script"
+    required: false
+    default: scripts/install_ddlog.sh
+  cache-path:
+    description: "Directory to cache the DDlog installation"
+    required: false
+    default: ${{ runner.os == 'Windows' && env.USERPROFILE || env.HOME }}/.local/ddlog
+  debug:
+    description: "Enable verbose debug output"
+    required: false
+    default: "false"
+runs:
+  using: composite
+  steps:
+    - name: Extract DDlog version
+      id: version
+      shell: bash
+      run: |
+        set -euo pipefail
+        install_script="${{ inputs.install-script }}"
+        version=$(grep -Eo '^ARCHIVE_URL=.*ddlog-(v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?)' "$install_script" | \
+          head -n1 | \
+          sed -E 's/^ARCHIVE_URL=.*ddlog-(v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?).*/\1/')
+        if [ -z "$version" ]; then
+          echo "setup-ddlog: failed to detect DDlog version in $install_script" >&2
+          exit 1
+        fi
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+    - name: Restore DDlog cache
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ inputs.cache-path }}
+        key: ${{ runner.os }}-ddlog-${{ steps.version.outputs.version }}
+        restore-keys: |
+          ${{ runner.os }}-ddlog-
+    - name: Install DDlog
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        bash "${{ inputs.install-script }}"
+        # To enable debug output for this step, set the `debug` input to 'true'
+        if [ "${{ inputs.debug }}" = "true" ]; then
+          ls -l "${{ inputs.cache-path }}"
+          echo dotenv:
+          cat .env
+        fi
+    - name: Save DDlog cache
+      if: steps.cache.outputs.cache-hit != 'true'
+      uses: actions/cache@v4
+      with:
+        path: ${{ inputs.cache-path }}
+        key: ${{ runner.os }}-ddlog-${{ steps.version.outputs.version }}
+outputs:
+  version:
+    value: ${{ steps.version.outputs.version }}
+    description: "DDlog version detected"

@@ -1,3 +1,5 @@
+//! Systems for spawning entities into the Bevy world.
+//! Provides helper functions to create sprites and initialise game objects.
 use bevy::prelude::*;
 
 use crate::components::{DdlogId, Health, Target, UnitType};

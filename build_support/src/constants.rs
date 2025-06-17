@@ -1,27 +1,56 @@
+//! Utilities for generating Rust constants from the shared `constants.toml` file.
+//! Provides functions to read `constants.toml` and produce Rust and `DDlog` code.
 use std::error::Error;
 use std::fs;
 use std::path::Path;
 
 use toml::Value;
 
+/// Format strings used when generating code.
+///
+/// Each field contains a template with two `{}` placeholders that will be
+/// substituted with the constant name and its value.
 pub struct Formats {
+    /// Format used for integer constants.
     pub int_fmt: &'static str,
+    /// Format used for floating point constants.
     pub float_fmt: &'static str,
+    /// Format used for string constants.
     pub str_fmt: &'static str,
 }
 
+/// Default format templates for generating Rust code.
 pub const RUST_FMTS: Formats = Formats {
     int_fmt: "pub const {}: i64 = {};\n",
     float_fmt: "pub const {}: f64 = {};\n",
     str_fmt: "pub const {}: &str = {};\n",
 };
 
+/// Default format templates for generating DDlog code.
 pub const DL_FMTS: Formats = Formats {
     int_fmt: "const {}: signed<64> = {}\n",
     float_fmt: "const {}: GCoord = {}\n",
     str_fmt: "const {}: string = \"{}\"\n",
 };
 
+/// Generate Rust and DDlog constant files from `constants.toml`.
+///
+/// # Parameters
+/// - `manifest_dir`: Directory containing `constants.toml`.
+/// - `out_dir`: Directory where the generated Rust file will be written.
+///
+/// # Errors
+/// Propagates I/O or TOML parsing errors encountered while reading or writing
+/// files.
+///
+/// # Examples
+/// ```rust,no_run
+/// use build_support::constants::generate_constants;
+/// # use std::path::Path;
+/// let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
+/// let out = Path::new(env!("OUT_DIR"));
+/// generate_constants(manifest, out).unwrap();
+/// ```
 pub fn generate_constants(
     manifest_dir: impl AsRef<Path>,
     out_dir: impl AsRef<Path>,
@@ -42,12 +71,30 @@ pub fn generate_constants(
     Ok(())
 }
 
+/// Parse the `constants.toml` file into a [`toml::Value`].
+///
+/// # Parameters
+/// - `manifest_dir`: Path where `constants.toml` resides.
+///
+/// # Errors
+/// Returns any error produced when reading or parsing the TOML file.
+///
+/// # Examples
+/// ```rust,no_run
+/// use build_support::constants::parse_constants;
+/// # use std::path::Path;
+/// let value = parse_constants(Path::new(env!("CARGO_MANIFEST_DIR"))).unwrap();
+/// assert!(value.is_table());
+/// ```
 pub fn parse_constants(manifest_dir: impl AsRef<Path>) -> Result<Value, Box<dyn Error>> {
     let const_path = manifest_dir.as_ref().join("constants.toml");
     let toml_str = fs::read_to_string(const_path)?;
     Ok(toml_str.parse()?)
 }
 
+/// Traverse all scalar constants in the parsed TOML value.
+///
+/// The provided closure is called with each key/value pair in sorted order.
 fn for_each_constant<F>(parsed: &Value, f: &mut F)
 where
     F: FnMut(&str, &Value),
@@ -65,6 +112,7 @@ where
     }
 }
 
+/// Replace two `{}` markers in `fmt` with `a` and `b`.
 fn fill2(fmt: &str, a: impl std::fmt::Display, b: impl std::fmt::Display) -> String {
     let mut parts = fmt.splitn(3, "{}");
     let mut s = String::new();
@@ -96,6 +144,23 @@ fn is_plain_integer_literal(s: &str) -> bool {
     !s.contains('.') && !s.contains('e') && !s.contains('E')
 }
 
+/// Convert parsed constants into source code using the given formats.
+///
+/// # Parameters
+/// - `parsed`: The TOML data returned by [`parse_constants`].
+/// - `fmts`: Formatting strings describing how to emit each value type.
+///
+/// # Returns
+/// A string containing the generated source code.
+///
+/// # Examples
+/// ```rust,no_run
+/// # use toml::Value;
+/// # use build_support::constants::{generate_code_from_constants, RUST_FMTS};
+/// let data: Value = "answer = 42".parse().unwrap();
+/// let src = generate_code_from_constants(&data, &RUST_FMTS);
+/// assert!(src.contains("ANSWER"));
+/// ```
 pub fn generate_code_from_constants(parsed: &Value, fmts: &Formats) -> String {
     let mut code = String::from("// @generated - do not edit\n");
     let mut append = |k: &str, v: &Value| {

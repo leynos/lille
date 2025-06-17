@@ -1,3 +1,5 @@
+//! Unit tests for the world-spawning system.
+//! Verifies entity counts and component assignments after system execution.
 use bevy::prelude::*;
 use lille::{spawn_world_system, DdlogId, Health, Target, UnitType};
 

@@ -1,3 +1,5 @@
+//! Actor data structures and related logic.
+//! Defines the `Actor` component and behaviour utilities for movement systems.
 use crate::entity::Entity;
 use glam::Vec3;
 
