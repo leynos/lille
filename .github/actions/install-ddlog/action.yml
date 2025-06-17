@@ -21,6 +21,7 @@ runs:
       name: Run install script
       shell: bash
       run: |
+        set -euo pipefail
         DDLOG_ARCHIVE_URL="${{ inputs.archive_url }}" \
         DDLOG_INSTALL_DIR="${{ inputs.install_dir }}" \
         ./scripts/install_ddlog.sh

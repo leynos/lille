@@ -55,7 +55,7 @@ variable assignments to `.env`. If that file already exists, it will be backed u
 with a `.bak` suffix before being replaced. Any existing directory at
 `~/.local/ddlog` will be removed before extraction.
 
-For CI builds the same script is wrapped in a reusable GitHub Action located at
+For CI builds, the same script is wrapped in a reusable GitHub Action located at
 `.github/actions/install-ddlog`.
 
 ## Build script
