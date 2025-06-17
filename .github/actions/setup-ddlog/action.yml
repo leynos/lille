@@ -8,7 +8,9 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        version=$(grep -Eo 'v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?' scripts/install_ddlog.sh | head -n1)
+        version=$(grep -oE '^ARCHIVE_URL=.*ddlog-v[0-9]+\.[0-9]+\.[0-9]+' scripts/install_ddlog.sh | \
+          head -n1 | \
+          sed -E 's/^ARCHIVE_URL=.*ddlog-(v[0-9]+\.[0-9]+\.[0-9]+).*/\1/')
         if [ -z "$version" ]; then
           echo "Failed to detect DDlog version" >&2
           exit 1
@@ -20,14 +22,14 @@ runs:
       with:
         path: ${{ runner.os == 'Windows' && env.USERPROFILE || env.HOME }}/.local/ddlog
         key: ${{ runner.os }}-ddlog-${{ steps.version.outputs.version }}
-        restore-keys: |
-          ${{ runner.os }}-ddlog-
     - name: Install DDlog
       if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
       run: |
         ./scripts/install_ddlog.sh
-        if [ "${DEBUG:-}" = "true" ]; then
+        # To enable debug output for this step, set the ACTIONS_STEP_DEBUG secret to 'true'
+        # See: https://docs.github.com/en/actions/monitoring-and-troubleshooting-workflows/enabling-debug-logging
+        if [ "${RUNNER_DEBUG:-}" = "1" ]; then
           ls -l "${{ runner.os == 'Windows' && env.USERPROFILE || env.HOME }}/.local/ddlog"
           echo dotenv:
           cat .env
