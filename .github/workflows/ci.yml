@@ -32,7 +32,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-${{ env.BUILD_PROFILE }}-
       - name: Setup DDlog
-        id: setup-ddlog
         uses: ./.github/actions/setup-ddlog
       - name: Format
         run: cargo fmt --all -- --check

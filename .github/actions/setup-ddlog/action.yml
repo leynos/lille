@@ -8,7 +8,7 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        version=$(grep -E -o 'v[0-9]+\.[0-9]+\.[0-9]+' scripts/install_ddlog.sh | head -n1)
+        version=$(grep -Eo 'v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?' scripts/install_ddlog.sh | head -n1)
         if [ -z "$version" ]; then
           echo "Failed to detect DDlog version" >&2
           exit 1
@@ -18,7 +18,7 @@ runs:
       id: cache
       uses: actions/cache@v4
       with:
-        path: ${{ env.HOME }}/.local/ddlog
+        path: ${{ runner.os == 'Windows' && env.USERPROFILE || env.HOME }}/.local/ddlog
         key: ${{ runner.os }}-ddlog-${{ steps.version.outputs.version }}
         restore-keys: |
           ${{ runner.os }}-ddlog-
@@ -27,14 +27,16 @@ runs:
       shell: bash
       run: |
         ./scripts/install_ddlog.sh
-        ls -l "$HOME/.local/ddlog"
-        echo dotenv:
-        cat .env
+        if [ "${DEBUG:-}" = "true" ]; then
+          ls -l "${{ runner.os == 'Windows' && env.USERPROFILE || env.HOME }}/.local/ddlog"
+          echo dotenv:
+          cat .env
+        fi
     - name: Save DDlog cache
       if: steps.cache.outputs.cache-hit != 'true'
       uses: actions/cache@v4
       with:
-        path: ${{ env.HOME }}/.local/ddlog
+        path: ${{ runner.os == 'Windows' && env.USERPROFILE || env.HOME }}/.local/ddlog
         key: ${{ runner.os }}-ddlog-${{ steps.version.outputs.version }}
 outputs:
   version:
