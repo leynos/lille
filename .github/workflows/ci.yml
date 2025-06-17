@@ -31,12 +31,8 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ env.BUILD_PROFILE }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-${{ env.BUILD_PROFILE }}-
-      - name: Install DDlog
-        run: |
-          ./scripts/install_ddlog.sh
-          ls -l /home/runner/.local/ddlog
-          echo dotenv:
-          cat .env
+      - name: Setup DDlog
+        uses: ./.github/actions/setup-ddlog
       - name: Format
         run: cargo fmt --all -- --check
       - name: Lint
