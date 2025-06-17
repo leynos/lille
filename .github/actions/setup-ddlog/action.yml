@@ -1,5 +1,18 @@
 name: Setup DDlog
 description: Install and cache DDlog compiler
+inputs:
+  install-script:
+    description: "Path to the DDlog install script"
+    required: false
+    default: scripts/install_ddlog.sh
+  cache-path:
+    description: "Directory to cache the DDlog installation"
+    required: false
+    default: ${{ runner.os == 'Windows' && env.USERPROFILE || env.HOME }}/.local/ddlog
+  debug:
+    description: "Enable verbose debug output"
+    required: false
+    default: "false"
 runs:
   using: composite
   steps:
@@ -8,11 +21,12 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        version=$(grep -Eo '^ARCHIVE_URL=.*ddlog-(v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?)' scripts/install_ddlog.sh | \
+        install_script="${{ inputs.install-script }}"
+        version=$(grep -Eo '^ARCHIVE_URL=.*ddlog-(v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?)' "$install_script" | \
           head -n1 | \
           sed -E 's/^ARCHIVE_URL=.*ddlog-(v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?).*/\1/')
         if [ -z "$version" ]; then
-          echo "Failed to detect DDlog version" >&2
+          echo "setup-ddlog: failed to detect DDlog version in $install_script" >&2
           exit 1
         fi
         echo "version=$version" >> "$GITHUB_OUTPUT"
@@ -20,7 +34,7 @@ runs:
       id: cache
       uses: actions/cache@v4
       with:
-        path: ${{ runner.os == 'Windows' && env.USERPROFILE || env.HOME }}/.local/ddlog
+        path: ${{ inputs.cache-path }}
         key: ${{ runner.os }}-ddlog-${{ steps.version.outputs.version }}
         restore-keys: |
           ${{ runner.os }}-ddlog-
@@ -28,11 +42,10 @@ runs:
       if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
       run: |
-        ./scripts/install_ddlog.sh
-        # To enable debug output for this step, set the ACTIONS_STEP_DEBUG secret to 'true'
-        # See: https://docs.github.com/en/actions/monitoring-and-troubleshooting-workflows/enabling-debug-logging
-        if [ "${ACTIONS_STEP_DEBUG:-}" = "true" ]; then
-          ls -l "${{ runner.os == 'Windows' && env.USERPROFILE || env.HOME }}/.local/ddlog"
+        bash "${{ inputs.install-script }}"
+        # To enable debug output for this step, set the `debug` input to 'true'
+        if [ "${{ inputs.debug }}" = "true" ]; then
+          ls -l "${{ inputs.cache-path }}"
           echo dotenv:
           cat .env
         fi
@@ -40,7 +53,7 @@ runs:
       if: steps.cache.outputs.cache-hit != 'true'
       uses: actions/cache@v4
       with:
-        path: ${{ runner.os == 'Windows' && env.USERPROFILE || env.HOME }}/.local/ddlog
+        path: ${{ inputs.cache-path }}
         key: ${{ runner.os }}-ddlog-${{ steps.version.outputs.version }}
 outputs:
   version:
