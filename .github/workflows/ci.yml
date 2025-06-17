@@ -16,16 +16,6 @@ jobs:
       BUILD_PROFILE: debug
     steps:
       - uses: actions/checkout@v4
-      - name: Extract DDlog version
-        id: ddlog-version
-        run: |
-          set -euo pipefail
-          version=$(grep -E -o 'v[0-9]+\.[0-9]+\.[0-9]+' scripts/install_ddlog.sh | head -n1)
-          if [ -z "$version" ]; then
-            echo "Failed to detect DDlog version" >&2
-            exit 1
-          fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Install rust
         uses: actions-rust-lang/setup-rust-toolchain@9d7e65c320fdb52dcd45ffaa68deb6c02c8754d9
         with:
@@ -41,26 +31,9 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ env.BUILD_PROFILE }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-${{ env.BUILD_PROFILE }}-
-      - name: Restore DDlog cache
-        id: ddlog-cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.HOME }}/.local/ddlog
-          key: ${{ runner.os }}-ddlog-${{ steps.ddlog-version.outputs.version }}
-          restore-keys: |
-            ${{ runner.os }}-ddlog-
-      - name: Install DDlog
-        run: |
-          ./scripts/install_ddlog.sh
-          ls -l /home/runner/.local/ddlog
-          echo dotenv:
-          cat .env
-      - name: Save DDlog cache
-        if: steps.ddlog-cache.outputs.cache-hit != 'true'
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.HOME }}/.local/ddlog
-          key: ${{ runner.os }}-ddlog-${{ steps.ddlog-version.outputs.version }}
+      - name: Setup DDlog
+        id: setup-ddlog
+        uses: ./.github/actions/setup-ddlog
       - name: Format
         run: cargo fmt --all -- --check
       - name: Lint

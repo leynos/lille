@@ -1,0 +1,42 @@
+name: Setup DDlog
+description: Install and cache DDlog compiler
+runs:
+  using: composite
+  steps:
+    - name: Extract DDlog version
+      id: version
+      shell: bash
+      run: |
+        set -euo pipefail
+        version=$(grep -E -o 'v[0-9]+\.[0-9]+\.[0-9]+' scripts/install_ddlog.sh | head -n1)
+        if [ -z "$version" ]; then
+          echo "Failed to detect DDlog version" >&2
+          exit 1
+        fi
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+    - name: Restore DDlog cache
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ env.HOME }}/.local/ddlog
+        key: ${{ runner.os }}-ddlog-${{ steps.version.outputs.version }}
+        restore-keys: |
+          ${{ runner.os }}-ddlog-
+    - name: Install DDlog
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        ./scripts/install_ddlog.sh
+        ls -l "$HOME/.local/ddlog"
+        echo dotenv:
+        cat .env
+    - name: Save DDlog cache
+      if: steps.cache.outputs.cache-hit != 'true'
+      uses: actions/cache@v4
+      with:
+        path: ${{ env.HOME }}/.local/ddlog
+        key: ${{ runner.os }}-ddlog-${{ steps.version.outputs.version }}
+outputs:
+  version:
+    value: ${{ steps.version.outputs.version }}
+    description: "DDlog version detected"
