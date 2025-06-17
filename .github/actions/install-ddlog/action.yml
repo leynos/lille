@@ -1,9 +1,27 @@
 name: Install DDlog
 description: Download and install the DDlog toolchain.
+
+inputs:
+  archive_url:
+    description: URL of the DDlog release archive
+    required: false
+  install_dir:
+    description: Destination directory for the DDlog installation
+    required: false
+
+outputs:
+  ddlog_home:
+    description: Path where DDlog was installed
+    value: ${{ steps.install.outputs.ddlog_home }}
+
 runs:
   using: composite
   steps:
-    - name: Run install script
+    - id: install
+      name: Run install script
       shell: bash
       run: |
+        DDLOG_ARCHIVE_URL="${{ inputs.archive_url }}" \
+        DDLOG_INSTALL_DIR="${{ inputs.install_dir }}" \
         ./scripts/install_ddlog.sh
+        echo "ddlog_home=${DDLOG_INSTALL_DIR:-$HOME/.local/ddlog}" >> "$GITHUB_OUTPUT"

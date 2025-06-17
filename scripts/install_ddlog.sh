@@ -9,8 +9,8 @@ trap 'if [ -n "${TMP_DIR:-}" ]; then rm -rf "$TMP_DIR"; fi' EXIT
 # are written to a `.env` file in this repository so that the
 # build script can load them with `dotenvy`.
 
-ARCHIVE_URL="https://github.com/vmware-archive/differential-datalog/releases/download/v1.2.3/ddlog-v1.2.3-20211213235218-Linux.tar.gz"
-INSTALL_DIR="$HOME/.local/ddlog"
+ARCHIVE_URL="${DDLOG_ARCHIVE_URL:-https://github.com/vmware-archive/differential-datalog/releases/download/v1.2.3/ddlog-v1.2.3-20211213235218-Linux.tar.gz}"
+INSTALL_DIR="${DDLOG_INSTALL_DIR:-$HOME/.local/ddlog}"
 #ENV_FILE="$HOME/.ddlog_env"
 ENV_FILE=".env"
 

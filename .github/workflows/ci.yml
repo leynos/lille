@@ -35,7 +35,7 @@ jobs:
         uses: ./.github/actions/install-ddlog
       - name: Show DDlog install info
         run: |
-          ls -l /home/runner/.local/ddlog
+          ls -l "$HOME/.local/ddlog"
           echo dotenv:
           cat .env
       - name: Format
