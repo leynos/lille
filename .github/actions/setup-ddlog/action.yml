@@ -8,7 +8,7 @@ inputs:
   cache-path:
     description: "Directory to cache the DDlog installation"
     required: false
-    default: ${{ runner.os == 'Windows' && env.USERPROFILE || env.HOME }}/.local/ddlog
+    default: ""
   debug:
     description: "Enable verbose debug output"
     required: false
@@ -16,6 +16,17 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Compute DDlog cache path
+      id: ddlog_path
+      shell: bash
+      run: |
+        if [[ -n "${{ inputs.cache-path }}" ]]; then
+          echo "path=${{ inputs.cache-path }}" >> "$GITHUB_OUTPUT"
+        elif [[ "${{ runner.os }}" == "Windows" ]]; then
+          echo "path=$USERPROFILE\\.local\\ddlog" >> "$GITHUB_OUTPUT"
+        else
+          echo "path=$HOME/.local/ddlog" >> "$GITHUB_OUTPUT"
+        fi
     - name: Extract DDlog version
       id: version
       shell: bash
@@ -25,7 +36,7 @@ runs:
         version=$(grep -Eo '^ARCHIVE_URL=.*ddlog-(v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?)' "$install_script" | \
           head -n1 | \
           sed -E 's/^ARCHIVE_URL=.*ddlog-(v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?).*/\1/')
-        if [ -z "$version" ]; then
+        if [[ -z "$version" ]]; then
           echo "setup-ddlog: failed to detect DDlog version in $install_script" >&2
           exit 1
         fi
@@ -34,7 +45,7 @@ runs:
       id: cache
       uses: actions/cache@v4
       with:
-        path: ${{ inputs.cache-path }}
+        path: "${{ steps.ddlog_path.outputs.path }}"
         key: ${{ runner.os }}-ddlog-${{ steps.version.outputs.version }}
         restore-keys: |
           ${{ runner.os }}-ddlog-
@@ -44,8 +55,8 @@ runs:
       run: |
         bash "${{ inputs.install-script }}"
         # To enable debug output for this step, set the `debug` input to 'true'
-        if [ "${{ inputs.debug }}" = "true" ]; then
-          ls -l "${{ inputs.cache-path }}"
+        if [[ "${{ inputs.debug }}" == "true" ]]; then
+          ls -l "${{ steps.ddlog_path.outputs.path }}"
           echo dotenv:
           cat .env
         fi
@@ -53,7 +64,7 @@ runs:
       if: steps.cache.outputs.cache-hit != 'true'
       uses: actions/cache@v4
       with:
-        path: ${{ inputs.cache-path }}
+        path: "${{ steps.ddlog_path.outputs.path }}"
         key: ${{ runner.os }}-ddlog-${{ steps.version.outputs.version }}
 outputs:
   version:
