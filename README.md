@@ -60,3 +60,13 @@ with a `.bak` suffix before being replaced. Any existing directory at
 The `build.rs` entry point delegates to the `build_support` crate. This helper
 crate generates constants from `constants.toml`, downloads the project font, and
 compiles the DDlog ruleset when the compiler is available.
+
+## Isolated build support
+
+Run the build support logic without compiling the whole game using the new binary:
+
+```bash
+cargo run -p build_support --bin build_support_runner
+```
+
+This performs the same steps as `build.rs`, generating constants, downloading the font, and compiling the DDlog ruleset when available.

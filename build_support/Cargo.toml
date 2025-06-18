@@ -18,3 +18,8 @@ rstest = "0.18.0"
 mockall = "0.13.1"
 test_utils = { path = "../test_utils" }
 
+
+[[bin]]
+name = "build_support_runner"
+path = "src/bin/build_support_runner.rs"
+
