@@ -51,7 +51,7 @@ pub fn spawn_world_system(mut commands: Commands) {
     // Static landmark entity
     commands
         .spawn(basic_sprite(Color::GRAY, Vec3::new(50.0, 50.0, 0.0)))
-        .insert((DdlogId(next_id), Velocity::default()));
+        .insert(DdlogId(next_id));
     next_id += 1;
 
     // Civilian unit with a movement target

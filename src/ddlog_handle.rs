@@ -79,8 +79,14 @@ impl DdlogHandle {
     }
 
     /// Apply a force to an entity for the next tick.
+    ///
+    /// If multiple forces are applied to the same entity within a single tick
+    /// they will accumulate until [`step`] is called.
     pub fn apply_force(&mut self, id: i64, force: Vec3) {
-        self.forces.insert(id, force);
+        self.forces
+            .entry(id)
+            .and_modify(|f| *f += force)
+            .or_insert(force);
     }
 
     /// Calculates the floor height at `(x, y)` relative to a block.
@@ -191,6 +197,11 @@ impl DdlogHandle {
         (pos, new_vel)
     }
 
+    /// Advance the simulation by one tick.
+    ///
+    /// This should be called exactly once per game update after any forces are
+    /// queued via [`apply_force`]. It computes new positions and velocities and
+    /// clears applied forces when finished.
     pub fn step(&mut self) {
         let updates: Vec<(i64, Vec3, Vec3)> = self
             .entities
@@ -213,8 +224,6 @@ impl DdlogHandle {
                         y: pos.y,
                         z: pos.z,
                     });
-                } else {
-                    ent.position = pos;
                 }
                 if vel != ent.velocity {
                     ent.velocity = vel;
@@ -224,8 +233,6 @@ impl DdlogHandle {
                         vy: vel.y,
                         vz: vel.z,
                     });
-                } else {
-                    ent.velocity = vel;
                 }
             }
         }

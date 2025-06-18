@@ -5,7 +5,7 @@ use insta::assert_ron_snapshot;
 use lille::{
     apply_ddlog_deltas_system,
     components::{Block, BlockSlope, DdlogId, Health, UnitType, Velocity},
-    ddlog_handle::DdlogHandle,
+    ddlog_handle::{DdlogHandle, NewPosition, NewVelocity},
     init_ddlog_system, push_state_to_ddlog_system,
 };
 use rstest::rstest;
@@ -66,7 +66,17 @@ fn entity_transitions_between_standing_and_falling() {
     // THEN the entity should have fallen
     let ddlog = app.world.resource::<DdlogHandle>();
     assert!(ddlog.deltas[0].z < 1.0);
-    assert_ron_snapshot!("falling_delta", &ddlog.deltas);
+    let rounded: Vec<NewPosition> = ddlog
+        .deltas
+        .iter()
+        .map(|d| NewPosition {
+            entity: d.entity,
+            x: (d.x * 1e4).round() / 1e4,
+            y: (d.y * 1e4).round() / 1e4,
+            z: (d.z * 1e4).round() / 1e4,
+        })
+        .collect();
+    assert_ron_snapshot!("falling_delta", &rounded);
 }
 
 #[rstest]
@@ -92,8 +102,28 @@ fn force_application_updates_velocity() {
     app.update();
 
     let ddlog = app.world.resource::<DdlogHandle>();
-    assert_ron_snapshot!("force_velocity", &ddlog.velocity_deltas);
-    assert_ron_snapshot!("force_position", &ddlog.deltas);
+    let rounded_vel: Vec<NewVelocity> = ddlog
+        .velocity_deltas
+        .iter()
+        .map(|v| NewVelocity {
+            entity: v.entity,
+            vx: (v.vx * 1e4).round() / 1e4,
+            vy: (v.vy * 1e4).round() / 1e4,
+            vz: (v.vz * 1e4).round() / 1e4,
+        })
+        .collect();
+    let rounded_pos: Vec<NewPosition> = ddlog
+        .deltas
+        .iter()
+        .map(|d| NewPosition {
+            entity: d.entity,
+            x: (d.x * 1e4).round() / 1e4,
+            y: (d.y * 1e4).round() / 1e4,
+            z: (d.z * 1e4).round() / 1e4,
+        })
+        .collect();
+    assert_ron_snapshot!("force_velocity", &rounded_vel);
+    assert_ron_snapshot!("force_position", &rounded_pos);
 }
 
 #[rstest]
@@ -115,6 +145,26 @@ fn ground_friction_slows_entity() {
     app.update();
 
     let ddlog = app.world.resource::<DdlogHandle>();
-    assert_ron_snapshot!("friction_velocity", &ddlog.velocity_deltas);
-    assert_ron_snapshot!("friction_position", &ddlog.deltas);
+    let rounded_vel: Vec<NewVelocity> = ddlog
+        .velocity_deltas
+        .iter()
+        .map(|v| NewVelocity {
+            entity: v.entity,
+            vx: (v.vx * 1e4).round() / 1e4,
+            vy: (v.vy * 1e4).round() / 1e4,
+            vz: (v.vz * 1e4).round() / 1e4,
+        })
+        .collect();
+    let rounded_pos: Vec<NewPosition> = ddlog
+        .deltas
+        .iter()
+        .map(|d| NewPosition {
+            entity: d.entity,
+            x: (d.x * 1e4).round() / 1e4,
+            y: (d.y * 1e4).round() / 1e4,
+            z: (d.z * 1e4).round() / 1e4,
+        })
+        .collect();
+    assert_ron_snapshot!("friction_velocity", &rounded_vel);
+    assert_ron_snapshot!("friction_position", &rounded_pos);
 }

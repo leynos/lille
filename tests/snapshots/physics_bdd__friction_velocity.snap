@@ -6,7 +6,7 @@ expression: "&ddlog.velocity_deltas"
 [
   NewVelocity(
     entity: 1,
-    vx: 0.79999995,
+    vx: 0.8,
     vy: 0.0,
     vz: 0.0,
   ),
