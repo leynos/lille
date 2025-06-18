@@ -4,7 +4,7 @@ use bevy::prelude::*;
 use insta::assert_ron_snapshot;
 use lille::{
     apply_ddlog_deltas_system,
-    components::{Block, BlockSlope, DdlogId, Health, UnitType},
+    components::{Block, BlockSlope, DdlogId, Health, UnitType, Velocity},
     ddlog_handle::DdlogHandle,
     init_ddlog_system, push_state_to_ddlog_system,
 };
@@ -45,6 +45,7 @@ fn entity_transitions_between_standing_and_falling() {
         Health(100),
         UnitType::Civvy { fraidiness: 0.0 },
         Transform::from_xyz(0.5, 0.5, 1.0),
+        Velocity::default(),
     ));
 
     app.update(); // initial sync
@@ -66,4 +67,54 @@ fn entity_transitions_between_standing_and_falling() {
     let ddlog = app.world.resource::<DdlogHandle>();
     assert!(ddlog.deltas[0].z < 1.0);
     assert_ron_snapshot!("falling_delta", &ddlog.deltas);
+}
+
+#[rstest]
+fn force_application_updates_velocity() {
+    let mut app = setup_app();
+    app.add_systems(
+        Update,
+        (push_state_to_ddlog_system, apply_ddlog_deltas_system).chain(),
+    );
+    app.world.spawn((
+        DdlogId(1),
+        Health(100),
+        UnitType::Civvy { fraidiness: 0.0 },
+        Transform::from_xyz(0.0, 0.0, 0.0),
+        Velocity::default(),
+    ));
+
+    app.update();
+    {
+        let mut ddlog = app.world.resource_mut::<DdlogHandle>();
+        ddlog.apply_force(1, Vec3::new(7.0, 0.0, 0.0));
+    }
+    app.update();
+
+    let ddlog = app.world.resource::<DdlogHandle>();
+    assert_ron_snapshot!("force_velocity", &ddlog.velocity_deltas);
+    assert_ron_snapshot!("force_position", &ddlog.deltas);
+}
+
+#[rstest]
+fn ground_friction_slows_entity() {
+    let mut app = setup_app();
+    app.add_systems(
+        Update,
+        (push_state_to_ddlog_system, apply_ddlog_deltas_system).chain(),
+    );
+    app.world.spawn((
+        DdlogId(1),
+        Health(100),
+        UnitType::Civvy { fraidiness: 0.0 },
+        Transform::from_xyz(0.0, 0.0, 0.0),
+        Velocity(Vec3::new(1.0, 0.0, 0.0)),
+    ));
+
+    app.update();
+    app.update();
+
+    let ddlog = app.world.resource::<DdlogHandle>();
+    assert_ron_snapshot!("friction_velocity", &ddlog.velocity_deltas);
+    assert_ron_snapshot!("friction_position", &ddlog.deltas);
 }

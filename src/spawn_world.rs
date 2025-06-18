@@ -2,7 +2,7 @@
 //! Provides helper functions to create sprites and initialise game objects.
 use bevy::prelude::*;
 
-use crate::components::{DdlogId, Health, Target, UnitType};
+use crate::components::{DdlogId, Health, Target, UnitType, Velocity};
 
 /// Creates a `SpriteBundle` with the specified colour and position.
 ///
@@ -51,7 +51,7 @@ pub fn spawn_world_system(mut commands: Commands) {
     // Static landmark entity
     commands
         .spawn(basic_sprite(Color::GRAY, Vec3::new(50.0, 50.0, 0.0)))
-        .insert(DdlogId(next_id));
+        .insert((DdlogId(next_id), Velocity::default()));
     next_id += 1;
 
     // Civilian unit with a movement target
@@ -62,6 +62,7 @@ pub fn spawn_world_system(mut commands: Commands) {
             Health(100),
             UnitType::Civvy { fraidiness: 1.0 },
             Target(Vec2::new(202.0, 200.0)),
+            Velocity::default(),
         ));
     next_id += 1;
 
@@ -72,6 +73,7 @@ pub fn spawn_world_system(mut commands: Commands) {
             DdlogId(next_id),
             Health(100),
             UnitType::Baddie { meanness: 10.0 },
+            Velocity::default(),
         ));
     next_id += 1;
     let _ = next_id;

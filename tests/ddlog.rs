@@ -50,6 +50,7 @@ fn ddlog_moves_towards_target() {
         1,
         DdlogEntity {
             position: Vec3::ZERO,
+            velocity: Vec3::ZERO,
             unit: UnitType::Civvy { fraidiness: 1.0 },
             health: 100,
             target: Some(Vec2::new(5.0, 0.0)),
@@ -81,6 +82,7 @@ fn ddlog_flees_from_baddie() {
         1,
         DdlogEntity {
             position: Vec3::ZERO,
+            velocity: Vec3::ZERO,
             unit: UnitType::Civvy { fraidiness: 1.0 },
             health: 100,
             target: Some(Vec2::new(10.0, 0.0)),
@@ -90,6 +92,7 @@ fn ddlog_flees_from_baddie() {
         2,
         DdlogEntity {
             position: Vec3::new(1.0, 0.0, 0.0),
+            velocity: Vec3::ZERO,
             unit: UnitType::Baddie { meanness: 1.0 },
             health: 100,
             target: None,

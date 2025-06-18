@@ -5,14 +5,23 @@ use hashbrown::HashMap;
 use serde::Serialize;
 
 use crate::components::{Block, BlockSlope, UnitType};
-use crate::{GRACE_DISTANCE, GRAVITY_PULL};
+use crate::{
+    AIR_FRICTION, DEFAULT_MASS, DELTA_TIME, GRACE_DISTANCE, GRAVITY_PULL, GROUND_FRICTION,
+    TERMINAL_VELOCITY,
+};
 
 const GRACE_DISTANCE_F32: f32 = GRACE_DISTANCE as f32;
 const GRAVITY_PULL_F32: f32 = GRAVITY_PULL as f32;
+const DELTA_TIME_F32: f32 = DELTA_TIME as f32;
+const TERMINAL_VELOCITY_F32: f32 = TERMINAL_VELOCITY as f32;
+const GROUND_FRICTION_F32: f32 = GROUND_FRICTION as f32;
+const AIR_FRICTION_F32: f32 = AIR_FRICTION as f32;
+const DEFAULT_MASS_F32: f32 = DEFAULT_MASS as f32;
 
 #[derive(Clone, Serialize)]
 pub struct DdlogEntity {
     pub position: Vec3,
+    pub velocity: Vec3,
     pub unit: UnitType,
     pub health: i32,
     pub target: Option<Vec2>,
@@ -22,6 +31,7 @@ impl Default for DdlogEntity {
     fn default() -> Self {
         Self {
             position: Vec3::ZERO,
+            velocity: Vec3::ZERO,
             unit: UnitType::Civvy { fraidiness: 0.0 },
             health: 0,
             target: None,
@@ -37,12 +47,22 @@ pub struct NewPosition {
     pub z: f32,
 }
 
+#[derive(Clone, Serialize)]
+pub struct NewVelocity {
+    pub entity: i64,
+    pub vx: f32,
+    pub vy: f32,
+    pub vz: f32,
+}
+
 #[derive(Resource, Default)]
 pub struct DdlogHandle {
     pub blocks: Vec<Block>,
     pub slopes: HashMap<i64, BlockSlope>,
     pub entities: HashMap<i64, DdlogEntity>,
     pub deltas: Vec<NewPosition>,
+    pub velocity_deltas: Vec<NewVelocity>,
+    pub forces: HashMap<i64, Vec3>,
 }
 
 pub fn init_ddlog_system(mut commands: Commands) {
@@ -56,6 +76,11 @@ impl DdlogHandle {
             .iter()
             .filter(|b| b.x == x && b.y == y)
             .max_by_key(|b| b.z)
+    }
+
+    /// Apply a force to an entity for the next tick.
+    pub fn apply_force(&mut self, id: i64, force: Vec3) {
+        self.forces.insert(id, force);
     }
 
     /// Calculates the floor height at `(x, y)` relative to a block.
@@ -79,13 +104,6 @@ impl DdlogHandle {
         }
     }
 
-    fn apply_gravity(&self, pos: &mut Vec3, floor: f32) {
-        if pos.z > floor + GRACE_DISTANCE_F32 {
-            pos.z += GRAVITY_PULL_F32;
-        } else {
-            pos.z = floor;
-        }
-    }
     fn civvy_move(&self, id: i64, ent: &DdlogEntity, pos: Vec3) -> Vec2 {
         let fraidiness = match ent.unit {
             UnitType::Civvy { fraidiness } => fraidiness,
@@ -125,25 +143,67 @@ impl DdlogHandle {
         Vec2::ZERO
     }
 
-    fn compute_entity_update(&self, id: i64, ent: &DdlogEntity) -> Vec3 {
+    fn compute_entity_update(&self, id: i64, ent: &DdlogEntity) -> (Vec3, Vec3) {
         let floor = self.floor_height_at_point(ent.position.x, ent.position.y);
+        let unsupported = ent.position.z > floor + GRACE_DISTANCE_F32;
+
+        let mut acceleration = Vec3::ZERO;
+        if let Some(force) = self.forces.get(&id) {
+            acceleration += *force / DEFAULT_MASS_F32;
+        }
+
+        if unsupported {
+            acceleration.z += GRAVITY_PULL_F32;
+        }
+
+        let vel_xy = ent.velocity.truncate();
+        let h_mag = vel_xy.length();
+        if h_mag > 0.0 {
+            let coeff = if unsupported {
+                AIR_FRICTION_F32
+            } else {
+                GROUND_FRICTION_F32
+            };
+            let decel_mag = h_mag.min(coeff);
+            let dir = vel_xy / h_mag;
+            acceleration.x -= dir.x * decel_mag;
+            acceleration.y -= dir.y * decel_mag;
+        }
+
+        let mut new_vel = ent.velocity + acceleration * DELTA_TIME_F32;
+        if unsupported {
+            new_vel.z = new_vel
+                .z
+                .clamp(-TERMINAL_VELOCITY_F32, TERMINAL_VELOCITY_F32);
+        } else {
+            new_vel.z = 0.0;
+        }
+
+        let walk = self.civvy_move(id, ent, ent.position);
         let mut pos = ent.position;
-        self.apply_gravity(&mut pos, floor);
-        let delta = self.civvy_move(id, ent, pos);
-        pos.x += delta.x;
-        pos.y += delta.y;
-        pos
+        if unsupported {
+            pos += new_vel;
+        } else {
+            pos += Vec3::new(new_vel.x + walk.x, new_vel.y + walk.y, 0.0);
+            pos.z = floor;
+        }
+
+        (pos, new_vel)
     }
 
     pub fn step(&mut self) {
-        let updates: Vec<(i64, Vec3)> = self
+        let updates: Vec<(i64, Vec3, Vec3)> = self
             .entities
             .iter()
-            .map(|(&id, ent)| (id, self.compute_entity_update(id, ent)))
+            .map(|(&id, ent)| {
+                let (pos, vel) = self.compute_entity_update(id, ent);
+                (id, pos, vel)
+            })
             .collect();
 
         self.deltas.clear();
-        for (id, pos) in updates {
+        self.velocity_deltas.clear();
+        for (id, pos, vel) in updates {
             if let Some(ent) = self.entities.get_mut(&id) {
                 if pos != ent.position {
                     ent.position = pos;
@@ -153,8 +213,22 @@ impl DdlogHandle {
                         y: pos.y,
                         z: pos.z,
                     });
+                } else {
+                    ent.position = pos;
+                }
+                if vel != ent.velocity {
+                    ent.velocity = vel;
+                    self.velocity_deltas.push(NewVelocity {
+                        entity: id,
+                        vx: vel.x,
+                        vy: vel.y,
+                        vz: vel.z,
+                    });
+                } else {
+                    ent.velocity = vel;
                 }
             }
         }
+        self.forces.clear();
     }
 }
