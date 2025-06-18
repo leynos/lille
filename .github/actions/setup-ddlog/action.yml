@@ -44,7 +44,7 @@ runs:
       id: cache
       uses: actions/cache@v4
       with:
-        path: ${{ steps.ddlog_path.outputs.path }}
+        path: "${{ steps.ddlog_path.outputs.path }}"
         key: ${{ runner.os }}-ddlog-${{ steps.version.outputs.version }}
         restore-keys: |
           ${{ runner.os }}-ddlog-
@@ -63,7 +63,7 @@ runs:
       if: steps.cache.outputs.cache-hit != 'true'
       uses: actions/cache@v4
       with:
-        path: ${{ steps.ddlog_path.outputs.path }}
+        path: "${{ steps.ddlog_path.outputs.path }}"
         key: ${{ runner.os }}-ddlog-${{ steps.version.outputs.version }}
 outputs:
   version:
