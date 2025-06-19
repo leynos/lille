@@ -54,7 +54,8 @@ The movement calculation considers:
   window and prints a greeting.
 - The `build.rs` script downloads the Fira Sans font if needed and compiles
   `src/lille.dl` with the `ddlog` compiler. The generated crate is written to
-  Cargo's `OUT_DIR` to keep the project root clean.
+  Cargo's `OUT_DIR` to keep the project root clean. The download client uses the
+  system's root certificates to verify TLS connections.
 - A placeholder `DdlogHandle` resource is inserted during startup.
 - `DefaultPlugins` are loaded with `LogPlugin` disabled, so the custom logger
   from `logging.rs` controls output.
