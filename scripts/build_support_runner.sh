@@ -12,6 +12,6 @@ trap 'rm -rf "$OUT_DIR"' EXIT
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MANIFEST_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-exec CARGO_MANIFEST_DIR="$MANIFEST_DIR" OUT_DIR="$OUT_DIR" \
-  cargo run -p build_support --bin build_support_runner -- "$@"
-
+export CARGO_MANIFEST_DIR="$MANIFEST_DIR"
+export OUT_DIR="$OUT_DIR"
+exec cargo run -p build_support --bin build_support_runner -- "$@"
