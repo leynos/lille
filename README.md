@@ -63,10 +63,12 @@ compiles the DDlog ruleset when the compiler is available.
 
 ## Isolated build support
 
-Run the build support logic without compiling the whole game using the new binary:
+Run the build support logic without compiling the whole game using the helper script:
 
 ```bash
-cargo run -p build_support --bin build_support_runner
+./scripts/build_support_runner.sh
 ```
+The script sets `CARGO_MANIFEST_DIR` and `OUT_DIR` so the helper binary behaves
+like a build script.
 
 This performs the same steps as `build.rs`, generating constants, downloading the font, and compiling the DDlog ruleset when available.
