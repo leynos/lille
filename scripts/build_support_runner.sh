@@ -14,4 +14,8 @@ MANIFEST_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 export CARGO_MANIFEST_DIR="$MANIFEST_DIR"
 export OUT_DIR="$OUT_DIR"
-exec cargo run -p build_support --bin build_support_runner -- "$@"
+
+# Compile the helper binary if needed and run it directly so Cargo does not
+# override `CARGO_MANIFEST_DIR`.
+cargo build -p build_support --bin build_support_runner
+exec "$MANIFEST_DIR/target/debug/build_support_runner" "$@"

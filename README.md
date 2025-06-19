@@ -70,8 +70,11 @@ script:
 ./scripts/build_support_runner.sh
 ```
 
-The script sets `CARGO_MANIFEST_DIR` and `OUT_DIR` so the helper binary behaves
-like a build script.
+The script compiles the helper binary and executes it directly so
+`CARGO_MANIFEST_DIR` points to the repository root while running. It sets
+`OUT_DIR` so the helper binary behaves like a build script.
 
 This performs the same steps as `build.rs`, generating constants, downloading
-the font, and compiling the DDlog ruleset when available.
+the font, and compiling the DDlog ruleset when available. The helper does not
+output "No such file or directory" errors when locating `constants.toml`,
+though compilation may still fail if the DDlog compiler is missing.
