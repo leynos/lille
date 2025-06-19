@@ -68,6 +68,7 @@ Run the build support logic without compiling the whole game using the helper sc
 ```bash
 ./scripts/build_support_runner.sh
 ```
+
 The script sets `CARGO_MANIFEST_DIR` and `OUT_DIR` so the helper binary behaves
 like a build script.
 
