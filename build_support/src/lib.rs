@@ -28,6 +28,7 @@ use std::{error::Error, path::PathBuf};
 /// Returns an error if required environment variables are missing, if any file
 /// operation fails, or when Differential Datalog compilation does not succeed.
 pub fn build() -> Result<(), Box<dyn Error>> {
+    dotenvy::dotenv().ok();
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=assets");
     println!("cargo:rerun-if-changed=src/lille.dl");
