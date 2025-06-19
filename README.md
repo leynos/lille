@@ -51,8 +51,8 @@ so that `cargo build` can locate the `ddlog` compiler and standard library
 without additional setup.
 
 The script downloads DDlog v1.2.3 into `~/.local/ddlog` and writes environment
-variable assignments to `.env`. If that file already exists, it will be backed up
-with a `.bak` suffix before being replaced. Any existing directory at
+variable assignments to `.env`. If that file already exists, it will be backed
+up with a `.bak` suffix before being replaced. Any existing directory at
 `~/.local/ddlog` will be removed before extraction.
 
 ## Build script
@@ -63,7 +63,8 @@ compiles the DDlog ruleset when the compiler is available.
 
 ## Isolated build support
 
-Run the build support logic without compiling the whole game using the helper script:
+Run the build support logic without compiling the whole game using the helper
+script:
 
 ```bash
 ./scripts/build_support_runner.sh
@@ -72,4 +73,5 @@ Run the build support logic without compiling the whole game using the helper sc
 The script sets `CARGO_MANIFEST_DIR` and `OUT_DIR` so the helper binary behaves
 like a build script.
 
-This performs the same steps as `build.rs`, generating constants, downloading the font, and compiling the DDlog ruleset when available.
+This performs the same steps as `build.rs`, generating constants, downloading
+the font, and compiling the DDlog ruleset when available.
