@@ -61,6 +61,10 @@ The `build.rs` entry point delegates to the `build_support` crate. This helper
 crate generates constants from `constants.toml`, downloads the project font, and
 compiles the DDlog ruleset when the compiler is available.
 
+The font download uses the operating system's certificate store for TLS
+verification. Ensure your environment has a valid set of root certificates so
+the HTTPS request succeeds.
+
 ## Isolated build support
 
 Run the build support logic without compiling the whole game using the helper
