@@ -3,6 +3,7 @@
 use bevy::log::LogPlugin;
 use bevy::prelude::*;
 use clap::Parser;
+use color_eyre::eyre::Result;
 use lille::{
     apply_ddlog_deltas_system, init_ddlog_system, init_logging, push_state_to_ddlog_system,
     spawn_world_system,
@@ -20,7 +21,8 @@ struct Args {
 /// Entry point for the realtime strategy game application.
 ///
 /// Parses command-line arguments, configures logging, and launches the Bevy app with custom system scheduling for DDlog integration and world setup.
-fn main() {
+fn main() -> Result<()> {
+    color_eyre::install()?;
     let args = Args::parse();
     init_logging(args.verbose);
 
@@ -37,4 +39,5 @@ fn main() {
             (push_state_to_ddlog_system, apply_ddlog_deltas_system).chain(),
         )
         .run();
+    Ok(())
 }

@@ -4,7 +4,8 @@ pub mod constants;
 pub mod ddlog;
 pub mod font;
 
-use std::{error::Error, path::PathBuf};
+use color_eyre::eyre::Result;
+use std::path::PathBuf;
 
 /// Execute all build steps required by `build.rs`.
 ///
@@ -15,7 +16,8 @@ use std::{error::Error, path::PathBuf};
 ///
 /// # Examples
 /// ```rust,no_run
-/// fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// use color_eyre::eyre::Result;
+/// fn main() -> Result<()> {
 ///     build_support::build()
 /// }
 /// ```
@@ -27,7 +29,7 @@ use std::{error::Error, path::PathBuf};
 /// # Errors
 /// Returns an error if required environment variables are missing, if any file
 /// operation fails, or when Differential Datalog compilation does not succeed.
-pub fn build() -> Result<(), Box<dyn Error>> {
+pub fn build() -> Result<()> {
     dotenvy::dotenv().ok();
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=assets");

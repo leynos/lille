@@ -1,8 +1,8 @@
 //! Build helper for compiling `DDlog` code.
 //! Detects the compiler and invokes it during the build process.
+use color_eyre::eyre::{eyre, Result};
 use once_cell::sync::OnceCell;
 use std::env;
-use std::error::Error;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
@@ -26,12 +26,9 @@ static DDLOG_AVAILABLE: OnceCell<bool> = OnceCell::new();
 /// # use std::path::Path;
 /// use build_support::ddlog::compile_ddlog;
 /// compile_ddlog(Path::new("."), Path::new("./target"))?;
-/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// # Ok::<(), color_eyre::Report>(())
 /// ```
-pub fn compile_ddlog(
-    manifest_dir: impl AsRef<Path>,
-    out_dir: impl AsRef<Path>,
-) -> Result<(), Box<dyn Error>> {
+pub fn compile_ddlog(manifest_dir: impl AsRef<Path>, out_dir: impl AsRef<Path>) -> Result<()> {
     dotenvy::dotenv().ok();
     let manifest_dir = manifest_dir.as_ref();
     let out_dir = out_dir.as_ref();
@@ -82,7 +79,7 @@ fn ddlog_available() -> bool {
 /// # Errors
 /// Returns an error for I/O failures or if the compiler exits with a non-zero
 /// status.
-fn run_ddlog(ddlog_file: &Path, out_dir: &Path) -> Result<(), Box<dyn Error>> {
+fn run_ddlog(ddlog_file: &Path, out_dir: &Path) -> Result<()> {
     let target_dir = out_dir.join("ddlog_lille");
     let mut cmd = Command::new("ddlog");
     if let Ok(home) = env::var("DDLOG_HOME") {
@@ -97,7 +94,7 @@ fn run_ddlog(ddlog_file: &Path, out_dir: &Path) -> Result<(), Box<dyn Error>> {
     if status.success() {
         Ok(())
     } else {
-        Err(format!("ddlog compiler exited with status: {status}").into())
+        Err(eyre!("ddlog compiler exited with status: {status}"))
     }
 }
 
