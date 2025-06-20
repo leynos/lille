@@ -1,0 +1,13 @@
+---
+source: tests/physics_bdd.rs
+assertion_line: 119
+expression: "&ddlog.deltas"
+---
+[
+  NewPosition(
+    entity: 1,
+    x: 1.7,
+    y: 0.0,
+    z: 0.0,
+  ),
+]

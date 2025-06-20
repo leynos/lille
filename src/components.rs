@@ -32,3 +32,6 @@ pub struct BlockSlope {
     pub grad_x: f32,
     pub grad_y: f32,
 }
+
+#[derive(Component, Debug, Default, Serialize)]
+pub struct Velocity(pub Vec3);

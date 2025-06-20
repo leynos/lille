@@ -3,14 +3,22 @@
 use bevy::prelude::*;
 use hashbrown::HashMap;
 
-use crate::components::{Block, BlockSlope, DdlogId, Health, Target, UnitType};
+use crate::components::{Block, BlockSlope, DdlogId, Health, Target, UnitType, Velocity};
 use crate::ddlog_handle::{DdlogEntity, DdlogHandle};
 
 /// Pushes the current ECS state into DDlog.
 /// This implementation is a stub that simply logs the state.
+#[allow(clippy::type_complexity)]
 pub fn push_state_to_ddlog_system(
     mut ddlog: ResMut<DdlogHandle>,
-    entity_query: Query<(&DdlogId, &Transform, &Health, &UnitType, Option<&Target>)>,
+    entity_query: Query<(
+        &DdlogId,
+        &Transform,
+        &Health,
+        &UnitType,
+        Option<&Target>,
+        Option<&Velocity>,
+    )>,
     block_query: Query<(&Block, Option<&BlockSlope>)>,
 ) {
     let mut new_entities = HashMap::with_capacity(entity_query.iter().len());
@@ -24,7 +32,7 @@ pub fn push_state_to_ddlog_system(
         }
     }
 
-    for (id, transform, health, unit, target) in &entity_query {
+    for (id, transform, health, unit, target, velocity) in &entity_query {
         log::trace!(
             "Sync Entity {} pos=({:.1},{:.1}) hp={} unit={:?} has_target={}",
             id.0,
@@ -39,6 +47,7 @@ pub fn push_state_to_ddlog_system(
             id.0,
             DdlogEntity {
                 position: transform.translation,
+                velocity: velocity.map_or(Vec3::ZERO, |v| v.0),
                 unit: unit.clone(),
                 health: health.0,
                 target: target.map(|t| **t),
@@ -54,13 +63,20 @@ pub fn push_state_to_ddlog_system(
 /// Applies the inferred movement deltas from the DDlog stub.
 pub fn apply_ddlog_deltas_system(
     mut ddlog: ResMut<DdlogHandle>,
-    mut query: Query<(&DdlogId, &mut Transform)>,
+    mut query: Query<(Entity, &DdlogId, &mut Transform, Option<&mut Velocity>)>,
+    mut commands: Commands,
 ) {
     ddlog.step();
 
-    for (id, mut transform) in &mut query {
+    for (entity, id, mut transform, vel_opt) in &mut query {
         if let Some(ent) = ddlog.entities.get(&id.0) {
             transform.translation = ent.position;
+            match vel_opt {
+                Some(mut v) => v.0 = ent.velocity,
+                None => {
+                    commands.entity(entity).insert(Velocity(ent.velocity));
+                }
+            }
         }
     }
 }

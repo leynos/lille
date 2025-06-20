@@ -1,0 +1,13 @@
+---
+source: tests/physics_bdd.rs
+assertion_line: 118
+expression: "&ddlog.velocity_deltas"
+---
+[
+  NewVelocity(
+    entity: 1,
+    vx: 0.8,
+    vy: 0.0,
+    vz: 0.0,
+  ),
+]
