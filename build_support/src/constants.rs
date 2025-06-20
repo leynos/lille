@@ -1,5 +1,9 @@
-//! Utilities for generating Rust constants from the shared `constants.toml` file.
-//! Provides functions to read `constants.toml` and produce Rust and `DDlog` code.
+//! Generate Rust and DDlog constant definitions from `constants.toml`.
+//!
+//! This module is invoked from the build script to read `constants.toml` and
+//! output Rust and Differential Datalog source files. It keeps the two
+//! languages in sync so both parts of the project share the same numerical and
+//! string constants.
 use color_eyre::eyre::Result;
 use std::fs;
 use std::path::Path;
