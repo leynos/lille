@@ -1,5 +1,9 @@
-//! Downloads and verifies font files for inclusion in the project.
-//! Provides a `FontFetcher` trait and checksum validation used by the build script.
+//! Download and verify the Fira Sans font during the build.
+//!
+//! The build script fetches the font using an implementation of
+//! [`FontFetcher`], checks its SHA-256 digest and writes the verified font to
+//! disk. This ensures deterministic builds without shipping the font in the
+//! repository.
 use color_eyre::eyre::{eyre, Result};
 use reqwest::blocking::Client;
 use sha2::{Digest, Sha256};
