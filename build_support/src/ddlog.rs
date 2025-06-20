@@ -1,7 +1,7 @@
 //! Build helper for compiling Differential Datalog rules.
 //!
 //! This module is responsible for locating the `ddlog` compiler and invoking
-//! it as part of the build. When the compiler is unavailable the build skips
+//! it as part of the build. When the compiler is unavailable, the build skips
 //! DDlog compilation so the rest of the project can still build successfully.
 use color_eyre::eyre::{eyre, Result};
 use once_cell::sync::OnceCell;
