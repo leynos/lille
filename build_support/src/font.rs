@@ -1,8 +1,8 @@
 //! Downloads and verifies font files for inclusion in the project.
 //! Provides a `FontFetcher` trait and checksum validation used by the build script.
+use color_eyre::eyre::{eyre, Result};
 use reqwest::blocking::Client;
 use sha2::{Digest, Sha256};
-use std::error::Error;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -21,7 +21,7 @@ use tempfile::NamedTempFile;
 /// use build_support::font::{FontFetcher, download_font_with};
 /// struct Dummy;
 /// impl FontFetcher for Dummy {
-///     fn fetch(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+///     fn fetch(&self) -> Result<Vec<u8>> {
 ///         Ok(Vec::new())
 ///     }
 /// }
@@ -29,14 +29,14 @@ use tempfile::NamedTempFile;
 /// ```
 #[cfg_attr(test, mockall::automock)]
 pub trait FontFetcher {
-    fn fetch(&self) -> Result<Vec<u8>, Box<dyn Error>>;
+    fn fetch(&self) -> Result<Vec<u8>>;
 }
 
 /// Default HTTP implementation of [`FontFetcher`].
 struct HttpFontFetcher;
 
 impl FontFetcher for HttpFontFetcher {
-    fn fetch(&self) -> Result<Vec<u8>, Box<dyn Error>> {
+    fn fetch(&self) -> Result<Vec<u8>> {
         fetch_font_data()
     }
 }
@@ -72,9 +72,9 @@ fn fallback_font_path() -> PathBuf {
 /// ```rust,no_run
 /// # use std::env;
 /// build_support::font::download_font(env::current_dir()?)?;
-/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// # Ok::<(), color_eyre::Report>(())
 /// ```
-pub fn download_font(manifest_dir: impl AsRef<Path>) -> Result<PathBuf, Box<dyn Error>> {
+pub fn download_font(manifest_dir: impl AsRef<Path>) -> Result<PathBuf> {
     download_font_with(&HttpFontFetcher, manifest_dir)
 }
 
@@ -96,7 +96,7 @@ pub fn download_font(manifest_dir: impl AsRef<Path>) -> Result<PathBuf, Box<dyn 
 /// # use build_support::font::{download_font_with, FontFetcher};
 /// # struct Dummy;
 /// # impl FontFetcher for Dummy {
-/// #     fn fetch(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+/// #     fn fetch(&self) -> Result<Vec<u8>> {
 /// #         Ok(vec![])
 /// #     }
 /// # }
@@ -106,7 +106,7 @@ pub fn download_font(manifest_dir: impl AsRef<Path>) -> Result<PathBuf, Box<dyn 
 pub fn download_font_with(
     fetcher: &dyn FontFetcher,
     manifest_dir: impl AsRef<Path>,
-) -> Result<PathBuf, Box<dyn Error>> {
+) -> Result<PathBuf> {
     let manifest_dir = manifest_dir.as_ref();
     let assets_dir = manifest_dir.join("assets");
     fs::create_dir_all(&assets_dir)?;
@@ -137,7 +137,7 @@ pub fn download_font_with(
 }
 
 /// Download the font bytes over HTTP and verify the checksum.
-fn fetch_font_data() -> Result<Vec<u8>, Box<dyn Error>> {
+fn fetch_font_data() -> Result<Vec<u8>> {
     const FONT_URL: &str = "https://raw.githubusercontent.com/mozilla/Fira/fd8c8c0a3d353cd99e8ca1662942d165e6961407/ttf/FiraSans-Regular.ttf";
     const FONT_SHA256: &str = "a389cef71891df1232370fcebd7cfde5f74e741967070399adc91fd069b2094b";
     let client = Client::builder()
@@ -149,7 +149,7 @@ fn fetch_font_data() -> Result<Vec<u8>, Box<dyn Error>> {
     let digest = Sha256::digest(&bytes);
     let actual = format!("{digest:x}");
     if actual != FONT_SHA256 {
-        return Err("font checksum mismatch".into());
+        return Err(eyre!("font checksum mismatch"));
     }
     Ok(bytes.to_vec())
 }

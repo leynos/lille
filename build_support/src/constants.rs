@@ -1,6 +1,6 @@
 //! Utilities for generating Rust constants from the shared `constants.toml` file.
 //! Provides functions to read `constants.toml` and produce Rust and `DDlog` code.
-use std::error::Error;
+use color_eyre::eyre::Result;
 use std::fs;
 use std::path::Path;
 
@@ -51,10 +51,7 @@ pub const DL_FMTS: Formats = Formats {
 /// let out = Path::new(env!("OUT_DIR"));
 /// generate_constants(manifest, out).unwrap();
 /// ```
-pub fn generate_constants(
-    manifest_dir: impl AsRef<Path>,
-    out_dir: impl AsRef<Path>,
-) -> Result<(), Box<dyn Error>> {
+pub fn generate_constants(manifest_dir: impl AsRef<Path>, out_dir: impl AsRef<Path>) -> Result<()> {
     let manifest_dir = manifest_dir.as_ref();
     let out_dir = out_dir.as_ref();
     let parsed = parse_constants(manifest_dir)?;
@@ -86,7 +83,7 @@ pub fn generate_constants(
 /// let value = parse_constants(Path::new(env!("CARGO_MANIFEST_DIR"))).unwrap();
 /// assert!(value.is_table());
 /// ```
-pub fn parse_constants(manifest_dir: impl AsRef<Path>) -> Result<Value, Box<dyn Error>> {
+pub fn parse_constants(manifest_dir: impl AsRef<Path>) -> Result<Value> {
     let const_path = manifest_dir.as_ref().join("constants.toml");
     let toml_str = fs::read_to_string(const_path)?;
     Ok(toml_str.parse()?)
