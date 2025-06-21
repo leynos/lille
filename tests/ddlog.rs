@@ -42,7 +42,7 @@ fn parsed_relations() -> HashSet<String> {
 }
 
 static CONST_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?m)^\s*const\s+([A-Za-z_][A-Za-z0-9_]*)").unwrap());
+    Lazy::new(|| Regex::new(r"(?m)^\s*function\s+([A-Za-z_][A-Za-z0-9_]*)\(").unwrap());
 
 fn parsed_constants() -> HashSet<String> {
     capture_set(&CONST_RE)
@@ -133,13 +133,13 @@ fn ddlog_program_has_floor_height_rules() {
     }
 
     assert!(
-        constants.contains("GRACE_DISTANCE"),
-        "GRACE_DISTANCE constant missing"
+        constants.contains("grace_distance"),
+        "grace_distance constant missing"
     );
 
     assert!(
-        constants.contains("DEFAULT_MASS"),
-        "DEFAULT_MASS constant missing"
+        constants.contains("default_mass"),
+        "default_mass constant missing"
     );
 
     for token in [
@@ -157,7 +157,7 @@ fn ddlog_program_has_floor_height_rules() {
 
     assert!(DL_SRC.contains("mass > 0"), "mass positivity check missing");
     assert!(
-        DL_SRC.contains("mass = DEFAULT_MASS") && !DL_SRC.contains("not Mass"),
+        DL_SRC.contains("mass = default_mass()") && !DL_SRC.contains("not Mass"),
         "default mass rule missing"
     );
 }

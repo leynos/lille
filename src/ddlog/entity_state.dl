@@ -8,7 +8,7 @@ relation IsUnsupported(entity: EntityID)
 IsUnsupported(entity) :-
     Position(entity, x, y, z),
     MaxFloor(x, y, z_floor),
-    z > z_floor + GRACE_DISTANCE.
+    z > z_floor + grace_distance().
 
 relation IsStanding(entity: EntityID)
 IsStanding(entity) :-

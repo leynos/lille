@@ -1,6 +1,6 @@
 //! Tests for the `build_support` constants generator.
 //! Ensures generated code is syntactically valid and handles edge cases.
-use build_support::constants::{generate_code_from_constants, RUST_FMTS};
+use build_support::constants::{generate_code_from_constants, DL_FMTS, RUST_FMTS};
 use test_utils::{assert_all_absent, assert_all_present, assert_valid_rust_syntax};
 
 #[test]
@@ -339,4 +339,13 @@ fn output_compiles_as_valid_rust() {
         assert!(line.contains("="));
         assert!(line.ends_with(";"));
     }
+}
+
+#[test]
+fn generates_ddlog_functions() {
+    let toml_str = "value = 5";
+    let parsed: toml::Value = toml_str.parse().unwrap();
+    let code = generate_code_from_constants(&parsed, &DL_FMTS);
+    assert!(code.contains("function value()"));
+    assert!(code.contains("{ 5 }"));
 }

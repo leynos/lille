@@ -32,9 +32,9 @@ pub const RUST_FMTS: Formats = Formats {
 
 /// Default format templates for generating DDlog code.
 pub const DL_FMTS: Formats = Formats {
-    int_fmt: "const {}: signed<64> = {};\n",
-    float_fmt: "const {}: GCoord = {};\n",
-    str_fmt: "const {}: string = \"{}\";\n",
+    int_fmt: "function {}(): signed<64> { {} }\n",
+    float_fmt: "function {}(): GCoord { {} }\n",
+    str_fmt: "function {}(): string { {} }\n",
 };
 
 /// Generate Rust and DDlog constant files from `constants.toml`.
@@ -167,7 +167,11 @@ fn is_plain_integer_literal(s: &str) -> bool {
 pub fn generate_code_from_constants(parsed: &Value, fmts: &Formats) -> String {
     let mut code = String::from("// @generated - do not edit\n");
     let mut append = |k: &str, v: &Value| {
-        let name = k.to_uppercase();
+        let name = if std::ptr::eq(fmts, &DL_FMTS) {
+            k.to_lowercase()
+        } else {
+            k.to_uppercase()
+        };
         match v {
             Value::Integer(i) => code.push_str(&fill2(fmts.int_fmt, name, i)),
             Value::Float(f) => {
