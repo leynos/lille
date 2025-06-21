@@ -12,7 +12,7 @@ const DL_SRC: &str = concat!(
     include_str!("../src/ddlog/entity_state.dl"),
     include_str!("../src/ddlog/physics.dl")
 );
-const CONSTANTS_SRC: &str = include_str!("../src/constants.dl");
+const CONSTANTS_SRC: &str = include_str!("../src/ddlog/constants.dl");
 
 static REL_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(

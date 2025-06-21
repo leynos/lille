@@ -32,9 +32,9 @@ pub const RUST_FMTS: Formats = Formats {
 
 /// Default format templates for generating DDlog code.
 pub const DL_FMTS: Formats = Formats {
-    int_fmt: "const {}: signed<64> = {}\n",
-    float_fmt: "const {}: GCoord = {}\n",
-    str_fmt: "const {}: string = \"{}\"\n",
+    int_fmt: "const {}: signed<64> = {};\n",
+    float_fmt: "const {}: GCoord = {};\n",
+    str_fmt: "const {}: string = \"{}\";\n",
 };
 
 /// Generate Rust and DDlog constant files from `constants.toml`.
@@ -63,10 +63,12 @@ pub fn generate_constants(manifest_dir: impl AsRef<Path>, out_dir: impl AsRef<Pa
         out_dir.join("constants.rs"),
         generate_code_from_constants(&parsed, &RUST_FMTS),
     )?;
-    let src_dir = manifest_dir.join("src");
-    fs::create_dir_all(&src_dir)?;
+    // Write the DDlog constants next to the other `.dl` modules so the
+    // compiler's import resolution can locate them without additional flags.
+    let ddlog_dir = manifest_dir.join("src/ddlog");
+    fs::create_dir_all(&ddlog_dir)?;
     fs::write(
-        src_dir.join("constants.dl"),
+        ddlog_dir.join("constants.dl"),
         generate_code_from_constants(&parsed, &DL_FMTS),
     )?;
     Ok(())
