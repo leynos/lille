@@ -80,5 +80,5 @@ The script compiles the helper binary and executes it directly so
 
 This performs the same steps as `build.rs`, generating constants, downloading
 the font, and compiling the DDlog ruleset when available. The helper does not
-output "No such file or directory" errors when locating `constants.toml`,
-though compilation may still fail if the DDlog compiler is missing.
+output "No such file or directory" errors when locating `constants.toml`, though
+compilation may still fail if the DDlog compiler is missing.
