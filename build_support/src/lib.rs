@@ -33,7 +33,10 @@ pub fn build() -> Result<()> {
     dotenvy::dotenv().ok();
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=assets");
-    println!("cargo:rerun-if-changed=src/lille.dl");
+    println!("cargo:rerun-if-changed=src/ddlog/lille.dl");
+    println!("cargo:rerun-if-changed=src/ddlog/geometry.dl");
+    println!("cargo:rerun-if-changed=src/ddlog/entity_state.dl");
+    println!("cargo:rerun-if-changed=src/ddlog/physics.dl");
     println!("cargo:rerun-if-changed=constants.toml");
     println!("cargo:rerun-if-env-changed=DDLOG_HOME");
 

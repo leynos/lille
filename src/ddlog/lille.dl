@@ -1,0 +1,15 @@
+typedef EntityID = signed<64>
+typedef BlockID = signed<64>
+
+// Continuous coordinate used for sub-block precision
+typedef GCoord = float
+
+import fp
+import souffle_lib
+import constants
+import geometry
+import entity_state
+import physics
+
+extern function vec_mag(x: GCoord, y: GCoord, z: GCoord): GCoord
+extern function vec_normalize(x: GCoord, y: GCoord, z: GCoord): (GCoord, GCoord, GCoord)

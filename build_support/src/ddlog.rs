@@ -39,9 +39,9 @@ pub fn compile_ddlog(manifest_dir: impl AsRef<Path>, out_dir: impl AsRef<Path>) 
         return Ok(());
     }
 
-    let ddlog_file = manifest_dir.join("src/lille.dl");
+    let ddlog_file = manifest_dir.join("src/ddlog/lille.dl");
     if !ddlog_file.exists() {
-        println!("cargo:warning=src/lille.dl missing; skipping ddlog compilation");
+        println!("cargo:warning=src/ddlog/lille.dl missing; skipping ddlog compilation");
         return Ok(());
     }
 

@@ -6,7 +6,12 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use std::collections::HashSet;
 
-const DL_SRC: &str = include_str!("../src/lille.dl");
+const DL_SRC: &str = concat!(
+    include_str!("../src/ddlog/lille.dl"),
+    include_str!("../src/ddlog/geometry.dl"),
+    include_str!("../src/ddlog/entity_state.dl"),
+    include_str!("../src/ddlog/physics.dl")
+);
 const CONSTANTS_SRC: &str = include_str!("../src/constants.dl");
 
 static REL_RE: Lazy<Regex> = Lazy::new(|| {
