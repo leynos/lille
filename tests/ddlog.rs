@@ -42,7 +42,7 @@ fn parsed_relations() -> HashSet<String> {
 }
 
 static CONST_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?m)^\s*function\s+([A-Za-z_][A-Za-z0-9_]*)\(").unwrap());
+    Lazy::new(|| Regex::new(r"(?m)^\s*const\s+([A-Za-z_][A-Za-z0-9_]*)").unwrap());
 
 fn parsed_constants() -> HashSet<String> {
     capture_set(&CONST_RE)
