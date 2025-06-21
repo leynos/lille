@@ -53,7 +53,7 @@ pub fn build() -> Result<()> {
 
     constants::generate_constants(&manifest_dir, &out_dir)?;
     let font_path = font::download_font(&manifest_dir)?;
-    ddlog::compile_ddlog(&manifest_dir, &out_dir)?;
+    ddlog::compile_ddlog(manifest_dir.join("src/ddlog"), &out_dir)?;
 
     println!("cargo:rustc-env=FONT_PATH={}", font_path.display());
 

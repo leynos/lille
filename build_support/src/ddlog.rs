@@ -15,8 +15,7 @@ static DDLOG_AVAILABLE: OnceCell<bool> = OnceCell::new();
 /// Compile the project's Differential Datalog sources if possible.
 ///
 /// # Parameters
-/// - `manifest_dir`: The crate's manifest directory containing
-///   `src/ddlog/lille.dl`.
+/// - `ddlog_dir`: Directory containing one or more `.dl` modules.
 /// - `out_dir`: The output directory for generated Rust code.
 ///
 /// # Returns
@@ -29,24 +28,34 @@ static DDLOG_AVAILABLE: OnceCell<bool> = OnceCell::new();
 /// ```rust,no_run
 /// # use std::path::Path;
 /// use build_support::ddlog::compile_ddlog;
-/// compile_ddlog(Path::new("."), Path::new("./target"))?;
+/// compile_ddlog(Path::new("src/ddlog"), Path::new("./target"))?;
 /// # Ok::<(), color_eyre::Report>(())
 /// ```
-pub fn compile_ddlog(manifest_dir: impl AsRef<Path>, out_dir: impl AsRef<Path>) -> Result<()> {
+pub fn compile_ddlog(ddlog_dir: impl AsRef<Path>, out_dir: impl AsRef<Path>) -> Result<()> {
     dotenvy::dotenv().ok();
-    let manifest_dir = manifest_dir.as_ref();
+    let ddlog_dir = ddlog_dir.as_ref();
     let out_dir = out_dir.as_ref();
     if !ddlog_available() {
         return Ok(());
     }
 
-    let ddlog_file = manifest_dir.join("src/ddlog/lille.dl");
-    if !ddlog_file.exists() {
-        println!("cargo:warning=src/ddlog/lille.dl missing; skipping ddlog compilation");
+    if !ddlog_dir.exists() {
+        println!(
+            "cargo:warning={} missing; skipping ddlog compilation",
+            ddlog_dir.display()
+        );
         return Ok(());
     }
 
-    run_ddlog(&ddlog_file, out_dir)
+    for entry in std::fs::read_dir(ddlog_dir)? {
+        let path = entry?.path();
+        if path.extension().and_then(|e| e.to_str()) == Some("dl") {
+            if let Err(e) = run_ddlog(&path, out_dir) {
+                println!("cargo:warning=failed to compile {}: {e}", path.display());
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Check whether the `ddlog` executable can be invoked.
@@ -84,7 +93,11 @@ fn ddlog_available() -> bool {
 /// Returns an error for I/O failures or if the compiler exits with a non-zero
 /// status.
 fn run_ddlog(ddlog_file: &Path, out_dir: &Path) -> Result<()> {
-    let target_dir = out_dir.join("ddlog_lille");
+    let module_name = ddlog_file
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .ok_or_else(|| eyre!("invalid ddlog file name"))?;
+    let target_dir = out_dir.join(format!("ddlog_{module_name}"));
     let mut cmd = Command::new("ddlog");
     if let Ok(home) = env::var("DDLOG_HOME") {
         cmd.arg("-L").arg(format!("{home}/lib"));
@@ -111,15 +124,15 @@ mod tests {
 
     fn create_test_dirs() -> (TempDir, PathBuf, PathBuf) {
         let temp_dir = TempDir::new().unwrap();
-        let manifest_dir = temp_dir.path().join("manifest");
+        let ddlog_dir = temp_dir.path().join("manifest/src/ddlog");
         let out_dir = temp_dir.path().join("out");
-        fs::create_dir_all(&manifest_dir).unwrap();
+        fs::create_dir_all(&ddlog_dir).unwrap();
         fs::create_dir_all(&out_dir).unwrap();
-        (temp_dir, manifest_dir, out_dir)
+        (temp_dir, ddlog_dir, out_dir)
     }
 
-    fn create_ddlog_file(manifest_dir: &Path) -> PathBuf {
-        let src_dir = manifest_dir.join("src/ddlog");
+    fn create_ddlog_file(ddlog_dir: &Path) -> PathBuf {
+        let src_dir = ddlog_dir;
         fs::create_dir_all(&src_dir).unwrap();
         let ddlog_file = src_dir.join("lille.dl");
         fs::write(&ddlog_file, "// test ddlog file").unwrap();
@@ -128,29 +141,29 @@ mod tests {
 
     #[test]
     fn test_compile_ddlog_no_ddlog_available() {
-        let (_temp_dir, manifest_dir, out_dir) = create_test_dirs();
-        let result = compile_ddlog(&manifest_dir, &out_dir);
+        let (_temp_dir, ddlog_dir, out_dir) = create_test_dirs();
+        let result = compile_ddlog(&ddlog_dir, &out_dir);
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_compile_ddlog_missing_ddlog_file() {
-        let (_temp_dir, manifest_dir, out_dir) = create_test_dirs();
-        let result = compile_ddlog(&manifest_dir, &out_dir);
+        let (_temp_dir, ddlog_dir, out_dir) = create_test_dirs();
+        let result = compile_ddlog(&ddlog_dir, &out_dir);
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_compile_ddlog_with_existing_file() {
-        let (_temp_dir, manifest_dir, out_dir) = create_test_dirs();
-        create_ddlog_file(&manifest_dir);
-        let result = compile_ddlog(&manifest_dir, &out_dir);
+        let (_temp_dir, ddlog_dir, out_dir) = create_test_dirs();
+        create_ddlog_file(&ddlog_dir);
+        let result = compile_ddlog(&ddlog_dir, &out_dir);
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_compile_ddlog_invalid_manifest_dir() {
-        let (_temp_dir, _manifest_dir, out_dir) = create_test_dirs();
+        let (_temp_dir, _ddlog_dir, out_dir) = create_test_dirs();
         let result = compile_ddlog(Path::new("/non/existent/path"), &out_dir);
         assert!(result.is_ok());
     }
@@ -163,8 +176,8 @@ mod tests {
 
     #[test]
     fn test_run_ddlog_with_valid_paths() {
-        let (_temp_dir, manifest_dir, out_dir) = create_test_dirs();
-        let ddlog_file = create_ddlog_file(&manifest_dir);
+        let (_temp_dir, ddlog_dir, out_dir) = create_test_dirs();
+        let ddlog_file = create_ddlog_file(&ddlog_dir);
         let result = run_ddlog(&ddlog_file, &out_dir);
         match result {
             Ok(_) | Err(_) => assert!(true),
@@ -173,8 +186,8 @@ mod tests {
 
     #[test]
     fn test_run_ddlog_with_ddlog_home_env() {
-        let (_temp_dir, manifest_dir, out_dir) = create_test_dirs();
-        let ddlog_file = create_ddlog_file(&manifest_dir);
+        let (_temp_dir, ddlog_dir, out_dir) = create_test_dirs();
+        let ddlog_file = create_ddlog_file(&ddlog_dir);
         std::env::set_var("DDLOG_HOME", "/tmp/test_ddlog_home");
         let result = run_ddlog(&ddlog_file, &out_dir);
         std::env::remove_var("DDLOG_HOME");
@@ -185,7 +198,7 @@ mod tests {
 
     #[test]
     fn test_run_ddlog_nonexistent_file() {
-        let (_temp_dir, _manifest_dir, out_dir) = create_test_dirs();
+        let (_temp_dir, _ddlog_dir, out_dir) = create_test_dirs();
         let nonexistent_file = std::path::Path::new("/nonexistent/file.dl");
         let result = run_ddlog(&nonexistent_file, &out_dir);
         match result {
@@ -202,11 +215,9 @@ mod tests {
 
     #[test]
     fn test_compile_ddlog_relative_paths() {
-        let (_temp_dir, manifest_dir, out_dir) = create_test_dirs();
-        create_ddlog_file(&manifest_dir);
-        let relative_manifest = manifest_dir
-            .strip_prefix(manifest_dir.parent().unwrap())
-            .unwrap();
+        let (_temp_dir, ddlog_dir, out_dir) = create_test_dirs();
+        create_ddlog_file(&ddlog_dir);
+        let relative_manifest = ddlog_dir.strip_prefix(ddlog_dir.parent().unwrap()).unwrap();
         let result = compile_ddlog(relative_manifest, &out_dir);
         assert!(result.is_ok());
     }
@@ -231,8 +242,8 @@ mod tests {
 
     #[test]
     fn test_run_ddlog_output_directory_creation() {
-        let (_temp_dir, manifest_dir, out_dir) = create_test_dirs();
-        let ddlog_file = create_ddlog_file(&manifest_dir);
+        let (_temp_dir, ddlog_dir, out_dir) = create_test_dirs();
+        let ddlog_file = create_ddlog_file(&ddlog_dir);
         assert!(out_dir.exists());
         let result = run_ddlog(&ddlog_file, &out_dir);
         match result {
@@ -242,11 +253,11 @@ mod tests {
 
     #[test]
     fn test_compile_ddlog_with_dotenv() {
-        let (_temp_dir, manifest_dir, out_dir) = create_test_dirs();
-        create_ddlog_file(&manifest_dir);
-        let env_file = manifest_dir.parent().unwrap().join(".env");
+        let (_temp_dir, ddlog_dir, out_dir) = create_test_dirs();
+        create_ddlog_file(&ddlog_dir);
+        let env_file = ddlog_dir.parent().unwrap().parent().unwrap().join(".env");
         fs::write(&env_file, "TEST_VAR=test_value").unwrap();
-        let result = compile_ddlog(&manifest_dir, &out_dir);
+        let result = compile_ddlog(&ddlog_dir, &out_dir);
         assert!(result.is_ok());
         let _ = fs::remove_file(env_file);
     }
@@ -271,7 +282,7 @@ mod tests {
         fs::create_dir_all(&src_dir).unwrap();
         let ddlog_file = src_dir.join("lille.dl");
         fs::write(&ddlog_file, "// unicode test").unwrap();
-        let result = compile_ddlog(&unicode_dir, &out_dir);
+        let result = compile_ddlog(&src_dir, &out_dir);
         assert!(result.is_ok());
     }
 }
