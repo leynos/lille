@@ -35,8 +35,5 @@ jobs:
         uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@v1
         with:
           format: lcov
-
-
-
-
-
+          access-token: ${{ secrets.CS_ACCESS_TOKEN }}
+          installer-checksum: ${{ vars.CODESCENE_CLI_SHA256 }}
