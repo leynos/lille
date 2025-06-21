@@ -30,7 +30,7 @@ use std::path::PathBuf;
 /// Returns an error if required environment variables are missing, if any file
 /// operation fails, or when Differential Datalog compilation does not succeed.
 pub fn build() -> Result<()> {
-    dotenvy::dotenv().ok();
+    dotenvy::dotenv_override().ok();
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=assets");
     // Re-run the build script if any DDlog source file changes. Iterate over

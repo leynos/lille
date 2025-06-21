@@ -53,9 +53,9 @@ The movement calculation considers:
 - Phase 0 introduced Bevy as the new runtime. The current binary starts a Bevy
   window and prints a greeting.
 - The `build.rs` script downloads the Fira Sans font if needed and compiles
-  `src/ddlog/lille.dl` with the `ddlog` compiler. The generated crate is written to
-  Cargo's `OUT_DIR` to keep the project root clean. The download client uses the
-  system's root certificates to verify TLS connections.
+  `src/ddlog/lille.dl` with the `ddlog` compiler. The generated crate is written
+  to Cargo's `OUT_DIR` to keep the project root clean. The download client uses
+  the system's root certificates to verify TLS connections.
 - A placeholder `DdlogHandle` resource is inserted during startup.
 - `DefaultPlugins` are loaded with `LogPlugin` disabled, so the custom logger
   from `logging.rs` controls output.
