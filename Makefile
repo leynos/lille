@@ -1,13 +1,20 @@
-.PHONY: build test fmt build-support-run lint markdownlint nixie
+.PHONY: all clean build test fmt build-support-run lint markdownlint nixie
+
+.ONESHELL:
+SHELL := bash
+ENV := . ./.env && export DDLOG_HOME
+
+all: build
+
+clean:
+	cargo clean
 
 build:
-	. ./.env
-	export DDLOG_HOME
+	$(ENV)
 	RUSTFLAGS="-D warnings" cargo build
 
 test:
-	. ./.env
-	export DDLOG_HOME
+	$(ENV)
 	RUSTFLAGS="-D warnings" cargo test
 
 fmt:
@@ -15,17 +22,15 @@ fmt:
 	mdformat-all
 
 build-support-run:
-	. ./.env
-	export DDLOG_HOME
+	$(ENV)
 	./scripts/build_support_runner.sh
 
 lint:
-	. ./.env
-	export DDLOG_HOME
+	$(ENV)
 	cargo clippy --all-targets --all-features -- -D warnings
 
 markdownlint:
-	markdownlint *.md **/*.md
+	find . -name '*.md' -print0 | xargs -0 markdownlint
 
 nixie:
-	nixie *.md **/*.md
+	find . -name '*.md' -print0 | xargs -0 nixie
