@@ -33,7 +33,7 @@ static DDLOG_AVAILABLE: OnceCell<bool> = OnceCell::new();
 /// # Ok::<(), color_eyre::Report>(())
 /// ```
 pub fn compile_ddlog(manifest_dir: impl AsRef<Path>, out_dir: impl AsRef<Path>) -> Result<()> {
-    dotenvy::dotenv().ok();
+    dotenvy::dotenv_override().ok();
     let manifest_dir = manifest_dir.as_ref();
     let out_dir = out_dir.as_ref();
     if !ddlog_available() {
