@@ -119,7 +119,7 @@ mod tests {
     }
 
     fn create_ddlog_file(manifest_dir: &Path) -> PathBuf {
-        let src_dir = manifest_dir.join("src");
+        let src_dir = manifest_dir.join("src/ddlog");
         fs::create_dir_all(&src_dir).unwrap();
         let ddlog_file = src_dir.join("lille.dl");
         fs::write(&ddlog_file, "// test ddlog file").unwrap();
@@ -267,7 +267,7 @@ mod tests {
         let out_dir = temp_dir.path().join("out");
         fs::create_dir_all(&unicode_dir).unwrap();
         fs::create_dir_all(&out_dir).unwrap();
-        let src_dir = unicode_dir.join("src");
+        let src_dir = unicode_dir.join("src/ddlog");
         fs::create_dir_all(&src_dir).unwrap();
         let ddlog_file = src_dir.join("lille.dl");
         fs::write(&ddlog_file, "// unicode test").unwrap();
