@@ -33,7 +33,18 @@ pub fn build() -> Result<()> {
     dotenvy::dotenv().ok();
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=assets");
-    println!("cargo:rerun-if-changed=src/lille.dl");
+    // Re-run the build script if any DDlog source file changes. Iterate over
+    // the directory so each file is tracked individually. This ensures new
+    // modules trigger rebuilds without manually updating the list.
+    let ddlog_dir = PathBuf::from("src/ddlog");
+    if let Ok(entries) = std::fs::read_dir(&ddlog_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) == Some("dl") {
+                println!("cargo:rerun-if-changed={}", path.display());
+            }
+        }
+    }
     println!("cargo:rerun-if-changed=constants.toml");
     println!("cargo:rerun-if-env-changed=DDLOG_HOME");
 
@@ -132,13 +143,17 @@ mod tests {
     fn test_build_with_valid_temp_dirs() {
         let (manifest_temp, _) = setup_test_env();
         fs::create_dir_all(manifest_temp.path().join("assets")).ok();
-        fs::create_dir_all(manifest_temp.path().join("src")).ok();
+        fs::create_dir_all(manifest_temp.path().join("src/ddlog")).ok();
         fs::write(
             manifest_temp.path().join("constants.toml"),
             "# test constants",
         )
         .ok();
-        fs::write(manifest_temp.path().join("src/lille.dl"), "# test ddlog").ok();
+        fs::write(
+            manifest_temp.path().join("src/ddlog/lille.dl"),
+            "# test ddlog",
+        )
+        .ok();
         let result = build();
         match result {
             Ok(_) => assert!(true),
@@ -154,9 +169,9 @@ mod tests {
     fn test_build_environment_variable_setting() {
         let (manifest_temp, _) = setup_test_env();
         fs::create_dir_all(manifest_temp.path().join("assets")).ok();
-        fs::create_dir_all(manifest_temp.path().join("src")).ok();
+        fs::create_dir_all(manifest_temp.path().join("src/ddlog")).ok();
         fs::write(manifest_temp.path().join("constants.toml"), "").ok();
-        fs::write(manifest_temp.path().join("src/lille.dl"), "").ok();
+        fs::write(manifest_temp.path().join("src/ddlog/lille.dl"), "").ok();
         let manifest_dir_result = env::var("CARGO_MANIFEST_DIR");
         if let Ok(val) = manifest_dir_result {
             assert!(!val.is_empty());
@@ -219,9 +234,9 @@ mod tests {
     fn test_build_idempotency() {
         let (manifest_temp, _) = setup_test_env();
         fs::create_dir_all(manifest_temp.path().join("assets")).ok();
-        fs::create_dir_all(manifest_temp.path().join("src")).ok();
+        fs::create_dir_all(manifest_temp.path().join("src/ddlog")).ok();
         fs::write(manifest_temp.path().join("constants.toml"), "").ok();
-        fs::write(manifest_temp.path().join("src/lille.dl"), "").ok();
+        fs::write(manifest_temp.path().join("src/ddlog/lille.dl"), "").ok();
         let result1 = build();
         let result2 = build();
         assert_eq!(result1.is_ok(), result2.is_ok());
@@ -230,9 +245,13 @@ mod tests {
 
     fn create_minimal_project_structure(base_path: &std::path::Path) {
         fs::create_dir_all(base_path.join("assets")).ok();
-        fs::create_dir_all(base_path.join("src")).ok();
+        fs::create_dir_all(base_path.join("src/ddlog")).ok();
         fs::write(base_path.join("constants.toml"), "# Test constants file").ok();
-        fs::write(base_path.join("src").join("lille.dl"), "# Test ddlog file").ok();
+        fs::write(
+            base_path.join("src/ddlog").join("lille.dl"),
+            "# Test ddlog file",
+        )
+        .ok();
         fs::write(base_path.join("build.rs"), "// Test build script").ok();
     }
 

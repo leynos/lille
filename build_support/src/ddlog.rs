@@ -15,7 +15,8 @@ static DDLOG_AVAILABLE: OnceCell<bool> = OnceCell::new();
 /// Compile the project's Differential Datalog sources if possible.
 ///
 /// # Parameters
-/// - `manifest_dir`: The crate's manifest directory containing `src/lille.dl`.
+/// - `manifest_dir`: The crate's manifest directory containing
+///   `src/ddlog/lille.dl`.
 /// - `out_dir`: The output directory for generated Rust code.
 ///
 /// # Returns
@@ -39,9 +40,9 @@ pub fn compile_ddlog(manifest_dir: impl AsRef<Path>, out_dir: impl AsRef<Path>) 
         return Ok(());
     }
 
-    let ddlog_file = manifest_dir.join("src/lille.dl");
+    let ddlog_file = manifest_dir.join("src/ddlog/lille.dl");
     if !ddlog_file.exists() {
-        println!("cargo:warning=src/lille.dl missing; skipping ddlog compilation");
+        println!("cargo:warning=src/ddlog/lille.dl missing; skipping ddlog compilation");
         return Ok(());
     }
 
@@ -118,7 +119,7 @@ mod tests {
     }
 
     fn create_ddlog_file(manifest_dir: &Path) -> PathBuf {
-        let src_dir = manifest_dir.join("src");
+        let src_dir = manifest_dir.join("src/ddlog");
         fs::create_dir_all(&src_dir).unwrap();
         let ddlog_file = src_dir.join("lille.dl");
         fs::write(&ddlog_file, "// test ddlog file").unwrap();
@@ -266,7 +267,7 @@ mod tests {
         let out_dir = temp_dir.path().join("out");
         fs::create_dir_all(&unicode_dir).unwrap();
         fs::create_dir_all(&out_dir).unwrap();
-        let src_dir = unicode_dir.join("src");
+        let src_dir = unicode_dir.join("src/ddlog");
         fs::create_dir_all(&src_dir).unwrap();
         let ddlog_file = src_dir.join("lille.dl");
         fs::write(&ddlog_file, "// unicode test").unwrap();

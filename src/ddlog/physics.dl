@@ -1,0 +1,58 @@
+// --- Entity Position Relations ---
+input relation Position(entity: EntityID, x: GCoord, y: GCoord, z: GCoord)
+input relation Velocity(entity: EntityID, vx: GCoord, vy: GCoord, vz: GCoord)
+// Mass of an entity in kilograms; must be positive to avoid divide by zero
+input relation Mass(entity: EntityID, kg: GCoord)
+input stream Force(entity: EntityID, fx: GCoord, fy: GCoord, fz: GCoord)
+output relation NewPosition(entity: EntityID, x: GCoord, y: GCoord, z: GCoord)
+output relation NewVelocity(entity: EntityID, nvx: GCoord, nvy: GCoord, nvz: GCoord)
+// --- Dynamics ---
+relation AppliedAcceleration(e: EntityID, ax: GCoord, ay: GCoord, az: GCoord)
+AppliedAcceleration(e, fx / mass, fy / mass, fz / mass) :-
+    Force(e, fx, fy, fz),
+    (Mass(e, mass) or mass = DEFAULT_MASS),
+    mass > 0.0.
+
+relation GravitationalAcceleration(e: EntityID, ax: GCoord, ay: GCoord, az: GCoord)
+GravitationalAcceleration(e, 0.0, 0.0, GRAVITY_PULL) :- IsUnsupported(e).
+
+relation FrictionalDeceleration(e: EntityID, ax: GCoord, ay: GCoord, az: GCoord)
+FrictionalDeceleration(e, fdx, fdy, 0.0) :-
+    (IsStanding(e), var coeff = GROUND_FRICTION;
+     IsUnsupported(e), var coeff = AIR_FRICTION),
+    Velocity(e, vx, vy, _),
+    var h_mag = vec_mag(vx, vy, 0.0), h_mag > 0.0,
+    var (nx, ny, _) = vec_normalize(vx, vy, 0.0),
+    var decel_mag = min(h_mag, coeff),
+    fdx = -nx * decel_mag, fdy = -ny * decel_mag.
+
+relation NetAccelRow(e: EntityID, ax: GCoord, ay: GCoord, az: GCoord).
+NetAccelRow(e, ax, ay, az) :- AppliedAcceleration(e, ax, ay, az).
+NetAccelRow(e, ax, ay, az) :- GravitationalAcceleration(e, ax, ay, az).
+NetAccelRow(e, ax, ay, az) :- FrictionalDeceleration(e, ax, ay, az).
+
+relation NetAcceleration(e: EntityID, ax: GCoord, ay: GCoord, az: GCoord).
+NetAcceleration(e, ax, ay, az) :-
+    agg(e) sum(
+        ax = ax_i,
+        ay = ay_i,
+        az = az_i
+    ) from NetAccelRow(e, ax_i, ay_i, az_i).
+
+relation UnclampedNewVelocity(e: EntityID, vx: GCoord, vy: GCoord, vz: GCoord)
+UnclampedNewVelocity(e, vx + ax * DELTA_TIME, vy + ay * DELTA_TIME, vz + az * DELTA_TIME) :-
+    Velocity(e, vx, vy, vz),
+    NetAcceleration(e, ax, ay, az).
+
+NewVelocity(e, nvx, nvy, final_nvz) :-
+    IsUnsupported(e),
+    UnclampedNewVelocity(e, nvx, nvy, raw_nvz),
+    var clamped = max(min(raw_nvz, TERMINAL_VELOCITY), -TERMINAL_VELOCITY),
+    var final_nvz = clamped.
+
+NewVelocity(e, nvx, nvy, 0.0) :-
+    IsStanding(e),
+    UnclampedNewVelocity(e, nvx, nvy, _).
+
+// Placeholder rule mirroring input to output
+NewPosition(e, x, y, z) :- Position(e, x, y, z).

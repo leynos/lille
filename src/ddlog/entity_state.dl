@@ -1,0 +1,16 @@
+// --- Entity State Relations ---
+relation MaxFloor(x: GCoord, y: GCoord, z_max: GCoord)
+MaxFloor(x, y, z_max) :-
+    FloorHeightAt(x, y, z),
+    var z_max = z.group_by((x, y)).max().
+
+relation IsUnsupported(entity: EntityID)
+IsUnsupported(entity) :-
+    Position(entity, x, y, z),
+    MaxFloor(x, y, z_floor),
+    z > z_floor + GRACE_DISTANCE.
+
+relation IsStanding(entity: EntityID)
+IsStanding(entity) :-
+    Position(entity, _, _, _),
+    not IsUnsupported(entity).
