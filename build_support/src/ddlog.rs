@@ -15,7 +15,8 @@ static DDLOG_AVAILABLE: OnceCell<bool> = OnceCell::new();
 /// Compile the project's Differential Datalog sources if possible.
 ///
 /// # Parameters
-/// - `manifest_dir`: The crate's manifest directory containing `src/lille.dl`.
+/// - `manifest_dir`: The crate's manifest directory containing
+///   `src/ddlog/lille.dl`.
 /// - `out_dir`: The output directory for generated Rust code.
 ///
 /// # Returns
