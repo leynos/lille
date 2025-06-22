@@ -13,7 +13,7 @@ output relation NewVelocity(entity: EntityID, nvx: GCoord, nvy: GCoord, nvz: GCo
 relation AppliedAcceleration(e: EntityID, ax: GCoord, ay: GCoord, az: GCoord)
 AppliedAcceleration(e, fx / mass, fy / mass, fz / mass) :-
     Force(e, fx, fy, fz),
-    (Mass(e, mass) or mass = default_mass()),
+    (Mass(e, mass) or var mass = default_mass()),
     mass > 0.0.
 
 relation GravitationalAcceleration(e: EntityID, ax: GCoord, ay: GCoord, az: GCoord)
