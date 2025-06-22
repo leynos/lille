@@ -138,8 +138,7 @@ relation FearContribution(actor: EntityID, baddie: EntityID, fear: float) :-
 
 // Aggregate fear from all nearby baddies for each actor
 relation TotalFear(actor: EntityID, total_fear: float) :-
-    agg(total) = sum(f) from FearContribution(actor, _, f),
-    total_fear = total.
+    total_fear = sum f : { FearContribution(actor, _, f) }.
 
 // Determine the direction to flee from the nearest baddie
 relation FleeVector(actor: EntityID, dx: Coord, dy: Coord) :-
@@ -204,8 +203,7 @@ relation Hit(attacker: EntityID, target: EntityID, damage: Health) :-
 
 // Accumulate all damage for a given target in a single tick
 output relation Damage(target, total_dmg) :-
-    agg(total) = sum(d) from Hit(_, target, d),
-    total_dmg = total.
+    total_dmg = sum d : { Hit(_, target, d) }.
 
 // A unit is despawned if its health goes to or below zero
 output relation Despawn(e) :-
