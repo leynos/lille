@@ -1,5 +1,4 @@
-.PHONY: all clean build test fmt build-support-run generated/ddlog_lille/lib.rs \
-    targets/ddlog/debug/lille test-ddlog lint markdownlint nixie
+.PHONY: all clean build test fmt build-support-run targets/ddlog/debug/lille test-ddlog lint markdownlint nixie
 
 .ONESHELL:
 SHELL := bash
@@ -16,6 +15,10 @@ test:
 	RUSTFLAGS="-D warnings" cargo test
 
 fmt:
+	@if [ ! -f generated/ddlog_lille/lib.rs ]; then \
+	mkdir -p generated/ddlog_lille; \
+	echo "// Placeholder for generated ddlog crate" > generated/ddlog_lille/lib.rs; \
+	fi
 	cargo fmt --all
 	mdformat-all
 

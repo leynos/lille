@@ -1,4 +1,3 @@
-#![allow(unexpected_cfgs, non_snake_case)]
 //! Build support utilities used by the project's build script.
 //! Coordinates constants generation, font downloads, and optional `DDlog` compilation.
 pub mod constants;
@@ -6,22 +5,29 @@ pub mod ddlog;
 pub mod font;
 
 use color_eyre::eyre::Result;
-use ortho_config::OrthoConfig;
-use serde::Deserialize;
 use std::path::PathBuf;
 
-/// Configuration options for the build pipeline.
-#[derive(Clone, Default, OrthoConfig, Debug, Deserialize)]
-#[ortho_config(prefix = "BUILD_SUPPORT")]
-pub struct BuildOptions {
-    /// If `true`, a failure to compile DDlog code causes [`build_with_options`]
-    /// to return an error. When `false`, DDlog errors are logged but ignored.
-    pub fail_on_ddlog_error: bool,
+#[allow(unexpected_cfgs, non_snake_case, dead_code, unused_imports)]
+mod build_options {
+    use ortho_config::OrthoConfig;
+    use serde::Deserialize;
 
-    /// Destination directory for the generated `ddlog_lille` crate.
-    /// If not provided, defaults to `OUT_DIR/ddlog_lille`.
-    pub ddlog_dir: Option<std::path::PathBuf>,
+    /// Configuration options for the build pipeline.
+    #[derive(Clone, Default, OrthoConfig, Debug, Deserialize)]
+    #[ortho_config(prefix = "BUILD_SUPPORT")]
+    #[allow(dead_code, unused)]
+    pub struct BuildOptions {
+        /// If `true`, a failure to compile DDlog code causes [`build_with_options`]
+        /// to return an error. When `false`, DDlog errors are logged but ignored.
+        pub fail_on_ddlog_error: bool,
+
+        /// Destination directory for the generated `ddlog_lille` crate.
+        /// If not provided, defaults to `OUT_DIR/ddlog_lille`.
+        pub ddlog_dir: Option<std::path::PathBuf>,
+    }
 }
+
+pub use build_options::BuildOptions;
 
 /// Execute all build steps required by `build.rs`.
 ///
@@ -116,7 +122,7 @@ fn compile_ddlog_optional(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::build;
     use std::env;
     use std::fs;
     use std::path::PathBuf;
