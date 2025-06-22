@@ -367,3 +367,48 @@ fn generates_ddlog_string_function() {
     assert!(code.contains("function greeting()"));
     assert!(code.contains("{ \"hello \\\"world\\\"\" }"));
 }
+
+#[test]
+fn generates_ddlog_boolean_functions_absent() {
+    let toml_str = r#"
+        flag_true = true
+        flag_false = false
+    "#;
+    let parsed: toml::Value = toml_str.parse().unwrap();
+    let code = generate_code_from_constants(&parsed, &DL_FMTS);
+    assert_all_absent(&code, &["function flag_true()", "function flag_false()"]);
+}
+
+#[test]
+fn generates_ddlog_nested_functions() {
+    let toml_str = r#"
+        [outer]
+        inner_int = 10
+
+        [outer.inner]
+        deeper_str = "deep"
+    "#;
+    let parsed: toml::Value = toml_str.parse().unwrap();
+    let code = generate_code_from_constants(&parsed, &DL_FMTS);
+    assert!(code.contains("function inner_int()"));
+    assert!(code.contains("{ 10 }"));
+    assert!(code.contains("function deeper_str()"));
+    assert!(code.contains("{ \"deep\" }"));
+}
+
+#[test]
+fn generates_ddlog_edge_case_functions() {
+    let toml_str = r#"
+        empty_str = ""
+        large_int = 9223372036854775807
+        special = "line\nwith\tspecial❤"
+    "#;
+    let parsed: toml::Value = toml_str.parse().unwrap();
+    let code = generate_code_from_constants(&parsed, &DL_FMTS);
+    assert!(code.contains("function empty_str()"));
+    assert!(code.contains("{ \"\" }"));
+    assert!(code.contains("function large_int()"));
+    assert!(code.contains("{ 9223372036854775807 }"));
+    assert!(code.contains("function special()"));
+    assert!(code.contains("line\\nwith\\tspecial❤"));
+}
