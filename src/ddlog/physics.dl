@@ -4,14 +4,16 @@ import constants
 import geometry
 
 // --- Entity Position Relations ---
-input stream Force(entity: EntityID, fx: GCoord, fy: GCoord, fz: GCoord)
+// `Force` captures all momentary forces acting on an entity during the
+// current tick. The host application should replace this relation each frame.
+input relation Force(entity: EntityID, fx: GCoord, fy: GCoord, fz: GCoord)
 output relation NewPosition(entity: EntityID, x: GCoord, y: GCoord, z: GCoord)
 output relation NewVelocity(entity: EntityID, nvx: GCoord, nvy: GCoord, nvz: GCoord)
 // --- Dynamics ---
 relation AppliedAcceleration(e: EntityID, ax: GCoord, ay: GCoord, az: GCoord)
 AppliedAcceleration(e, fx / mass, fy / mass, fz / mass) :-
     Force(e, fx, fy, fz),
-    (Mass(e, mass) or mass = default_mass()),
+    (Mass{.entity = e, .kg = mass} or var mass = default_mass()),
     mass > 0.0.
 
 relation GravitationalAcceleration(e: EntityID, ax: GCoord, ay: GCoord, az: GCoord)
