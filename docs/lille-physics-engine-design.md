@@ -201,7 +201,7 @@ We collect all acceleration vectors acting on an entity for the current tick.
 ```prolog
 relation AppliedAcceleration(e, fx / mass, fy / mass, fz / mass) :-
     Force(e, fx, fy, fz),
-    (Mass(e, mass) or mass = DEFAULT_MASS),
+    (Mass{.entity = e, .kg = mass} or var mass = DEFAULT_MASS),
     mass > 0.0.
 relation GravitationalAcceleration(e, 0.0, 0.0, -GRAVITY_PULL) :- IsUnsupported(e).
 
