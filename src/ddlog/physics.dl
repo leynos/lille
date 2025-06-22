@@ -22,7 +22,9 @@ FrictionalDeceleration(e, fdx, fdy, 0.0) :-
     var coeff = ground_friction(),
     Velocity(e, vx, vy, _),
     var h_mag = vec_mag(vx, vy, 0.0), h_mag > 0.0,
-    var (nx, ny, _) = vec_normalize(vx, vy, 0.0),
+    var nvec = vec_normalize(vx, vy, 0.0),
+    var nx = nvec.0,
+    var ny = nvec.1,
     var decel_mag = min(h_mag, coeff),
     fdx = -nx * decel_mag, fdy = -ny * decel_mag.
 FrictionalDeceleration(e, fdx, fdy, 0.0) :-
@@ -30,7 +32,9 @@ FrictionalDeceleration(e, fdx, fdy, 0.0) :-
     var coeff = air_friction(),
     Velocity(e, vx, vy, _),
     var h_mag = vec_mag(vx, vy, 0.0), h_mag > 0.0,
-    var (nx, ny, _) = vec_normalize(vx, vy, 0.0),
+    var nvec2 = vec_normalize(vx, vy, 0.0),
+    var nx = nvec2.0,
+    var ny = nvec2.1,
     var decel_mag = min(h_mag, coeff),
     fdx = -nx * decel_mag, fdy = -ny * decel_mag.
 
