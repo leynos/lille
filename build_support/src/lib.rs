@@ -1,19 +1,27 @@
+#![allow(unexpected_cfgs, non_snake_case)]
 //! Build support utilities used by the project's build script.
 //! Coordinates constants generation, font downloads, and optional `DDlog` compilation.
 pub mod constants;
 pub mod ddlog;
 pub mod font;
 
+use color_eyre::eyre::Result;
+use ortho_config::OrthoConfig;
+use serde::Deserialize;
+use std::path::PathBuf;
+
 /// Configuration options for the build pipeline.
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Default, OrthoConfig, Debug, Deserialize)]
+#[ortho_config(prefix = "BUILD_SUPPORT")]
 pub struct BuildOptions {
     /// If `true`, a failure to compile DDlog code causes [`build_with_options`]
     /// to return an error. When `false`, DDlog errors are logged but ignored.
     pub fail_on_ddlog_error: bool,
-}
 
-use color_eyre::eyre::Result;
-use std::path::PathBuf;
+    /// Destination directory for the generated `ddlog_lille` crate.
+    /// If not provided, defaults to `OUT_DIR/ddlog_lille`.
+    pub ddlog_dir: Option<std::path::PathBuf>,
+}
 
 /// Execute all build steps required by `build.rs`.
 ///
@@ -55,7 +63,11 @@ pub fn build_with_options(options: &BuildOptions) -> Result<()> {
 
     constants::generate_constants(&manifest_dir, &out_dir)?;
     let font_path = font::download_font(&manifest_dir)?;
-    compile_ddlog_optional(&manifest_dir, &out_dir, options)?;
+    let ddlog_dir = options
+        .ddlog_dir
+        .clone()
+        .unwrap_or_else(|| out_dir.join("ddlog_lille"));
+    compile_ddlog_optional(&manifest_dir, &ddlog_dir, options)?;
 
     println!("cargo:rustc-env=FONT_PATH={}", font_path.display());
 
@@ -89,10 +101,10 @@ fn track_ddlog_files(dir: &PathBuf) {
 
 fn compile_ddlog_optional(
     manifest_dir: &PathBuf,
-    out_dir: &PathBuf,
+    ddlog_dir: &PathBuf,
     options: &BuildOptions,
 ) -> Result<()> {
-    match ddlog::compile_ddlog(manifest_dir, out_dir) {
+    match ddlog::compile_ddlog(manifest_dir, ddlog_dir) {
         Ok(_) => Ok(()),
         Err(e) if !options.fail_on_ddlog_error => {
             println!("cargo:warning=DDlog build failed: {e}");
