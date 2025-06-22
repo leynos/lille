@@ -89,16 +89,23 @@ fn run_ddlog(ddlog_file: &Path, out_dir: &Path) -> Result<()> {
     if let Ok(home) = env::var("DDLOG_HOME") {
         cmd.arg("-L").arg(format!("{home}/lib"));
     }
-    let status = cmd
+    let output = cmd
         .arg("-i")
         .arg(ddlog_file)
         .arg("-o")
         .arg(&target_dir)
-        .status()?;
-    if status.success() {
+        .output()?;
+    if output.status.success() {
         Ok(())
     } else {
-        Err(eyre!("ddlog compiler exited with status: {status}"))
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(eyre!(
+            "ddlog compiler exited with status: {}\nstdout:\n{}\nstderr:\n{}",
+            output.status,
+            stdout,
+            stderr
+        ))
     }
 }
 
