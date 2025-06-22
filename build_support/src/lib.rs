@@ -5,11 +5,14 @@ pub mod ddlog;
 pub mod font;
 
 /// Configuration options for the build pipeline.
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Default)]
 pub struct BuildOptions {
     /// If `true`, a failure to compile DDlog code causes [`build_with_options`]
     /// to return an error. When `false`, DDlog errors are logged but ignored.
     pub fail_on_ddlog_error: bool,
+    /// Path to the directory containing `.dl` files. Defaults to `src/ddlog` if
+    /// `None` is provided.
+    pub ddlog_path: Option<PathBuf>,
 }
 
 use color_eyre::eyre::Result;
@@ -49,7 +52,7 @@ pub fn build() -> Result<()> {
 /// `true` causes the error to be propagated to the caller.
 pub fn build_with_options(options: &BuildOptions) -> Result<()> {
     dotenvy::dotenv_override().ok();
-    set_rerun_triggers();
+    set_rerun_triggers(options);
 
     let (manifest_dir, out_dir) = manifest_and_out_dir()?;
 
@@ -68,10 +71,14 @@ fn manifest_and_out_dir() -> Result<(PathBuf, PathBuf)> {
     Ok((manifest, out))
 }
 
-fn set_rerun_triggers() {
+fn set_rerun_triggers(options: &BuildOptions) {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=assets");
-    track_ddlog_files(&PathBuf::from("src/ddlog"));
+    let ddlog_dir = options
+        .ddlog_path
+        .clone()
+        .unwrap_or_else(|| PathBuf::from("src/ddlog"));
+    track_ddlog_files(&ddlog_dir);
     println!("cargo:rerun-if-changed=constants.toml");
     println!("cargo:rerun-if-env-changed=DDLOG_HOME");
 }
