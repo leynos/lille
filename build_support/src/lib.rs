@@ -4,6 +4,14 @@ pub mod constants;
 pub mod ddlog;
 pub mod font;
 
+/// Configuration options for the build pipeline.
+#[derive(Clone, Copy, Default)]
+pub struct BuildOptions {
+    /// If `true`, a failure to compile DDlog code causes [`build_with_options`]
+    /// to return an error. When `false`, DDlog errors are logged but ignored.
+    pub fail_on_ddlog_error: bool,
+}
+
 use color_eyre::eyre::Result;
 use std::path::PathBuf;
 
@@ -30,6 +38,16 @@ use std::path::PathBuf;
 /// Returns an error if required environment variables are missing, if any file
 /// operation fails, or when Differential Datalog compilation does not succeed.
 pub fn build() -> Result<()> {
+    build_with_options(&BuildOptions::default())
+}
+
+/// Execute all build steps with configurable behaviour.
+///
+/// When `options.fail_on_ddlog_error` is `false`, any error returned from
+/// [`ddlog::compile_ddlog`] is printed as a Cargo warning and ignored. This
+/// mirrors the behaviour of the regular `build()` function. Setting the flag to
+/// `true` causes the error to be propagated to the caller.
+pub fn build_with_options(options: &BuildOptions) -> Result<()> {
     dotenvy::dotenv_override().ok();
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=assets");
@@ -53,7 +71,12 @@ pub fn build() -> Result<()> {
 
     constants::generate_constants(&manifest_dir, &out_dir)?;
     let font_path = font::download_font(&manifest_dir)?;
-    ddlog::compile_ddlog(&manifest_dir, &out_dir)?;
+    if let Err(e) = ddlog::compile_ddlog(&manifest_dir, &out_dir) {
+        if options.fail_on_ddlog_error {
+            return Err(e);
+        }
+        println!("cargo:warning=DDlog build failed: {e}");
+    }
 
     println!("cargo:rustc-env=FONT_PATH={}", font_path.display());
 
