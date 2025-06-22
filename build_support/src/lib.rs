@@ -16,7 +16,7 @@ pub struct BuildOptions {
 }
 
 use color_eyre::eyre::Result;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Execute all build steps required by `build.rs`.
 ///
@@ -76,14 +76,14 @@ fn set_rerun_triggers(options: &BuildOptions) {
     println!("cargo:rerun-if-changed=assets");
     let ddlog_dir = options
         .ddlog_path
-        .clone()
-        .unwrap_or_else(|| PathBuf::from("src/ddlog"));
-    track_ddlog_files(&ddlog_dir);
+        .as_deref()
+        .unwrap_or_else(|| Path::new("src/ddlog"));
+    track_ddlog_files(ddlog_dir);
     println!("cargo:rerun-if-changed=constants.toml");
     println!("cargo:rerun-if-env-changed=DDLOG_HOME");
 }
 
-fn track_ddlog_files(dir: &PathBuf) {
+fn track_ddlog_files(dir: &Path) {
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();

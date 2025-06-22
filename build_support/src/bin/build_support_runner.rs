@@ -8,5 +8,6 @@ fn main() -> Result<()> {
     color_eyre::install()?;
     build_support::build_with_options(&BuildOptions {
         fail_on_ddlog_error: true,
+        ddlog_path: None,
     })
 }
