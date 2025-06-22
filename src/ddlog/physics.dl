@@ -2,6 +2,19 @@ import types
 import entity_state
 import constants
 import geometry
+import fp
+import souffle_lib
+
+function sum_group(g: Group<EntityID, GCoord>): GCoord {
+    var acc = 0.0;
+    for ((val, w) in g) {
+        acc = acc + val * (w as GCoord);
+    };
+    acc
+}
+
+extern function vec_mag(x: GCoord, y: GCoord, z: GCoord): GCoord
+extern function vec_normalize(x: GCoord, y: GCoord, z: GCoord): (GCoord, GCoord, GCoord)
 
 // --- Entity Position Relations ---
 // `Force` captures all momentary forces acting on an entity during the
@@ -13,7 +26,12 @@ output relation NewVelocity(entity: EntityID, nvx: GCoord, nvy: GCoord, nvz: GCo
 relation AppliedAcceleration(e: EntityID, ax: GCoord, ay: GCoord, az: GCoord)
 AppliedAcceleration(e, fx / mass, fy / mass, fz / mass) :-
     Force(e, fx, fy, fz),
-    (Mass(e, mass) or mass = default_mass()),
+    Mass(e, mass),
+    mass > 0.0.
+AppliedAcceleration(e, fx / mass, fy / mass, fz / mass) :-
+    Force(e, fx, fy, fz),
+    not Mass(e, _),
+    var mass = default_mass(),
     mass > 0.0.
 
 relation GravitationalAcceleration(e: EntityID, ax: GCoord, ay: GCoord, az: GCoord)
@@ -29,7 +47,7 @@ FrictionalDeceleration(e, fdx, fdy, 0.0) :-
     var nx = nvec.0,
     var ny = nvec.1,
     var decel_mag = min(h_mag, coeff),
-    fdx = -nx * decel_mag, fdy = -ny * decel_mag.
+    var fdx = -nx * decel_mag, var fdy = -ny * decel_mag.
 FrictionalDeceleration(e, fdx, fdy, 0.0) :-
     IsUnsupported(e),
     var coeff = air_friction(),
@@ -39,7 +57,7 @@ FrictionalDeceleration(e, fdx, fdy, 0.0) :-
     var nx = nvec2.0,
     var ny = nvec2.1,
     var decel_mag = min(h_mag, coeff),
-    fdx = -nx * decel_mag, fdy = -ny * decel_mag.
+    var fdx = -nx * decel_mag, var fdy = -ny * decel_mag.
 
 relation NetAccelRow(e: EntityID, ax: GCoord, ay: GCoord, az: GCoord)
 NetAccelRow(e, ax, ay, az) :- AppliedAcceleration(e, ax, ay, az).
@@ -47,13 +65,22 @@ NetAccelRow(e, ax, ay, az) :- GravitationalAcceleration(e, ax, ay, az).
 NetAccelRow(e, ax, ay, az) :- FrictionalDeceleration(e, ax, ay, az).
 
 relation SumAx(e: EntityID, ax: GCoord)
-SumAx(e, sum(ax_i)) :- NetAccelRow(e, ax_i, _, _).
+SumAx(e, ax) :-
+    NetAccelRow(e, ax_i, _, _),
+    var group = ax_i.group_by(e),
+    var ax = sum_group(group).
 
 relation SumAy(e: EntityID, ay: GCoord)
-SumAy(e, sum(ay_i)) :- NetAccelRow(e, _, ay_i, _).
+SumAy(e, ay) :-
+    NetAccelRow(e, _, ay_i, _),
+    var group = ay_i.group_by(e),
+    var ay = sum_group(group).
 
 relation SumAz(e: EntityID, az: GCoord)
-SumAz(e, sum(az_i)) :- NetAccelRow(e, _, _, az_i).
+SumAz(e, az) :-
+    NetAccelRow(e, _, _, az_i),
+    var group = az_i.group_by(e),
+    var az = sum_group(group).
 
 relation NetAcceleration(e: EntityID, ax: GCoord, ay: GCoord, az: GCoord)
 NetAcceleration(e, ax, ay, az) :-

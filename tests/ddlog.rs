@@ -157,7 +157,7 @@ fn ddlog_program_has_floor_height_rules() {
 
     assert!(DL_SRC.contains("mass > 0"), "mass positivity check missing");
     assert!(
-        DL_SRC.contains("mass = default_mass()") && !DL_SRC.contains("not Mass"),
-        "default mass rule missing"
+        DL_SRC.contains("not Mass(e, _)") && DL_SRC.contains("var mass = default_mass()"),
+        "default mass rule missing",
     );
 }
