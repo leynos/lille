@@ -249,8 +249,8 @@ correctly set up:
   `$DDLOG_HOME`) have taken effect.
 - Run the command: `ddlog --version` This should print the installed DDlog
   version.
-- Alternatively, try compiling a very simple DDlog file (see Section III.E for
-  an example) using the `ddlog` command. The tutorial documentation frequently
+- Alternatively, try compiling a simple DDlog file (see Section III.E for an
+  example) using the `ddlog` command. The tutorial documentation frequently
   refers to command-line interactions 3, implying the `ddlog` executable should
   be readily available and functional after a correct installation.
 
