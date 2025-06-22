@@ -14,7 +14,15 @@ use toml::Value;
 ///
 /// Each field contains a template with two `{}` placeholders that will be
 /// substituted with the constant name and its value.
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub enum FormatFlavor {
+    Rust,
+    Ddlog,
+}
+
 pub struct Formats {
+    /// Indicates the target language these format strings generate.
+    pub flavor: FormatFlavor,
     /// Format used for integer constants.
     pub int_fmt: &'static str,
     /// Format used for floating point constants.
@@ -25,6 +33,7 @@ pub struct Formats {
 
 /// Default format templates for generating Rust code.
 pub const RUST_FMTS: Formats = Formats {
+    flavor: FormatFlavor::Rust,
     int_fmt: "pub const {}: i64 = {};\n",
     float_fmt: "pub const {}: f64 = {};\n",
     str_fmt: "pub const {}: &str = {};\n",
@@ -32,6 +41,7 @@ pub const RUST_FMTS: Formats = Formats {
 
 /// Default format templates for generating DDlog code.
 pub const DL_FMTS: Formats = Formats {
+    flavor: FormatFlavor::Ddlog,
     int_fmt: "function {}(): signed<64> { {} }\n",
     float_fmt: "function {}(): GCoord { {} }\n",
     str_fmt: "function {}(): string { {} }\n",
@@ -167,7 +177,7 @@ fn is_plain_integer_literal(s: &str) -> bool {
 pub fn generate_code_from_constants(parsed: &Value, fmts: &Formats) -> String {
     let mut code = String::from("// @generated - do not edit\n");
     let mut append = |k: &str, v: &Value| {
-        let name = if std::ptr::eq(fmts, &DL_FMTS) {
+        let name = if matches!(fmts.flavor, FormatFlavor::Ddlog) {
             k.to_lowercase()
         } else {
             k.to_uppercase()

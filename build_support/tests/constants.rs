@@ -349,3 +349,21 @@ fn generates_ddlog_functions() {
     assert!(code.contains("function value()"));
     assert!(code.contains("{ 5 }"));
 }
+
+#[test]
+fn generates_ddlog_float_function() {
+    let toml_str = "pi = 3.14";
+    let parsed: toml::Value = toml_str.parse().unwrap();
+    let code = generate_code_from_constants(&parsed, &DL_FMTS);
+    assert!(code.contains("function pi()"));
+    assert!(code.contains("{ 3.14 }"));
+}
+
+#[test]
+fn generates_ddlog_string_function() {
+    let toml_str = r#"greeting = "hello \"world\"""#;
+    let parsed: toml::Value = toml_str.parse().unwrap();
+    let code = generate_code_from_constants(&parsed, &DL_FMTS);
+    assert!(code.contains("function greeting()"));
+    assert!(code.contains("{ \"hello \\\"world\\\"\" }"));
+}
