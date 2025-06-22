@@ -718,6 +718,9 @@ express complex relationships:
   functions (see next section). These include sequential execution (using
   semicolons), `if/else` statements, `match` expressions (similar to Rust's
   `match` or C/Java `switch`), `for` loops, `continue`, `break`, and `return`.3
+- **Aggregates:** Use aggregate functions like `sum`, `count`, or `max` to
+  compute values grouped by the variables outside the aggregate expression.
+  Example: `Totals(x, sum y) :- Values(x, y).`
 
 ### C. Using Functions in DDlog
 

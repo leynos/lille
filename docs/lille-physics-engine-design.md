@@ -217,7 +217,9 @@ relation FrictionalDeceleration(e, fdx, fdy, 0.0) :-
     IsStanding(e),
     Velocity(e, vx, vy, _),
     var h_mag = vec_mag(vx, vy, 0.0), h_mag > 0.0,
-    var (nx, ny, _) = vec_normalize(vx, vy, 0.0),
+    var nvec = vec_normalize(vx, vy, 0.0),
+    var nx = nvec.0,
+    var ny = nvec.1,
     var decel_mag = min(h_mag, GROUND_FRICTION),
     fdx = -nx * decel_mag, fdy = -ny * decel_mag.
 
@@ -225,7 +227,9 @@ relation FrictionalDeceleration(e, fdx, fdy, 0.0) :-
     IsUnsupported(e),
     Velocity(e, vx, vy, _),
     var h_mag = vec_mag(vx, vy, 0.0), h_mag > 0.0,
-    var (nx, ny, _) = vec_normalize(vx, vy, 0.0),
+    var nvec2 = vec_normalize(vx, vy, 0.0),
+    var nx = nvec2.0,
+    var ny = nvec2.1,
     var decel_mag = min(h_mag, AIR_FRICTION),
     fdx = -nx * decel_mag, fdy = -ny * decel_mag.
 
@@ -237,16 +241,18 @@ We sum all accelerations to get a net acceleration, then use it to update the
 entity's velocity.
 
 ```prolog
+relation NetAccelRow(e, ax, ay, az) :- AppliedAcceleration(e, ax, ay, az).
+relation NetAccelRow(e, ax, ay, az) :- GravitationalAcceleration(e, ax, ay, az).
+relation NetAccelRow(e, ax, ay, az) :- FrictionalDeceleration(e, ax, ay, az).
+
+relation SumAx(e, ax) :- ax = sum ax_i : { NetAccelRow(e, ax_i, _, _) }.
+relation SumAy(e, ay) :- ay = sum ay_i : { NetAccelRow(e, _, ay_i, _) }.
+relation SumAz(e, az) :- az = sum az_i : { NetAccelRow(e, _, _, az_i) }.
+
 relation NetAcceleration(e, ax, ay, az) :-
-    agg(e) sum (
-        ax = aax + gax + fax,
-        ay = aay + gay + fay,
-        az = aaz + gaz + faz
-    ) from (
-        (AppliedAcceleration(e, aax, aay, aaz) or (aax=0.0, aay=0.0, aaz=0.0)) and
-        (GravitationalAcceleration(e, gax, gay, gaz) or (gax=0.0, gay=0.0, gaz=0.0)) and
-        (FrictionalDeceleration(e, fax, fay, faz) or (fax=0.0, fay=0.0, faz=0.0))
-    ).
+    SumAx(e, ax),
+    SumAy(e, ay),
+    SumAz(e, az).
 
 relation UnclampedNewVelocity(e, vx + ax, vy + ay, vz + az) :-
     Velocity(e, vx, vy, vz),

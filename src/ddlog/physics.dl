@@ -22,7 +22,9 @@ FrictionalDeceleration(e, fdx, fdy, 0.0) :-
     var coeff = ground_friction(),
     Velocity(e, vx, vy, _),
     var h_mag = vec_mag(vx, vy, 0.0), h_mag > 0.0,
-    var (nx, ny, _) = vec_normalize(vx, vy, 0.0),
+    var nvec = vec_normalize(vx, vy, 0.0),
+    var nx = nvec.0,
+    var ny = nvec.1,
     var decel_mag = min(h_mag, coeff),
     fdx = -nx * decel_mag, fdy = -ny * decel_mag.
 FrictionalDeceleration(e, fdx, fdy, 0.0) :-
@@ -30,22 +32,31 @@ FrictionalDeceleration(e, fdx, fdy, 0.0) :-
     var coeff = air_friction(),
     Velocity(e, vx, vy, _),
     var h_mag = vec_mag(vx, vy, 0.0), h_mag > 0.0,
-    var (nx, ny, _) = vec_normalize(vx, vy, 0.0),
+    var nvec2 = vec_normalize(vx, vy, 0.0),
+    var nx = nvec2.0,
+    var ny = nvec2.1,
     var decel_mag = min(h_mag, coeff),
     fdx = -nx * decel_mag, fdy = -ny * decel_mag.
 
-relation NetAccelRow(e: EntityID, ax: GCoord, ay: GCoord, az: GCoord).
+relation NetAccelRow(e: EntityID, ax: GCoord, ay: GCoord, az: GCoord)
 NetAccelRow(e, ax, ay, az) :- AppliedAcceleration(e, ax, ay, az).
 NetAccelRow(e, ax, ay, az) :- GravitationalAcceleration(e, ax, ay, az).
 NetAccelRow(e, ax, ay, az) :- FrictionalDeceleration(e, ax, ay, az).
 
-relation NetAcceleration(e: EntityID, ax: GCoord, ay: GCoord, az: GCoord).
+relation SumAx(e: EntityID, ax: GCoord)
+SumAx(e, sum(ax_i)) :- NetAccelRow(e, ax_i, _, _).
+
+relation SumAy(e: EntityID, ay: GCoord)
+SumAy(e, sum(ay_i)) :- NetAccelRow(e, _, ay_i, _).
+
+relation SumAz(e: EntityID, az: GCoord)
+SumAz(e, sum(az_i)) :- NetAccelRow(e, _, _, az_i).
+
+relation NetAcceleration(e: EntityID, ax: GCoord, ay: GCoord, az: GCoord)
 NetAcceleration(e, ax, ay, az) :-
-    agg(e) sum(
-        ax = ax_i,
-        ay = ay_i,
-        az = az_i
-    ) from NetAccelRow(e, ax_i, ay_i, az_i).
+    SumAx(e, ax),
+    SumAy(e, ay),
+    SumAz(e, az).
 
 relation UnclampedNewVelocity(e: EntityID, vx: GCoord, vy: GCoord, vz: GCoord)
 UnclampedNewVelocity(e, vx + ax * delta_time(), vy + ay * delta_time(), vz + az * delta_time()) :-
