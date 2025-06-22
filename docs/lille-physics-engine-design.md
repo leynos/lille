@@ -241,13 +241,18 @@ We sum all accelerations to get a net acceleration, then use it to update the
 entity's velocity.
 
 ```prolog
+relation NetAccelRow(e, ax, ay, az) :- AppliedAcceleration(e, ax, ay, az).
+relation NetAccelRow(e, ax, ay, az) :- GravitationalAcceleration(e, ax, ay, az).
+relation NetAccelRow(e, ax, ay, az) :- FrictionalDeceleration(e, ax, ay, az).
+
+relation SumAx(e, ax) :- ax = sum ax_i : { NetAccelRow(e, ax_i, _, _) }.
+relation SumAy(e, ay) :- ay = sum ay_i : { NetAccelRow(e, _, ay_i, _) }.
+relation SumAz(e, az) :- az = sum az_i : { NetAccelRow(e, _, _, az_i) }.
+
 relation NetAcceleration(e, ax, ay, az) :-
-    var <ax, ay, az> =
-        sum <aax + gax + fax, aay + gay + fay, aaz + gaz + faz> : {
-            AppliedAcceleration(e, aax, aay, aaz),
-            GravitationalAcceleration(e, gax, gay, gaz),
-            FrictionalDeceleration(e, fax, fay, faz)
-        }.
+    SumAx(e, ax),
+    SumAy(e, ay),
+    SumAz(e, az).
 
 relation UnclampedNewVelocity(e, vx + ax, vy + ay, vz + az) :-
     Velocity(e, vx, vy, vz),

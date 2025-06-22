@@ -43,10 +43,20 @@ NetAccelRow(e, ax, ay, az) :- AppliedAcceleration(e, ax, ay, az).
 NetAccelRow(e, ax, ay, az) :- GravitationalAcceleration(e, ax, ay, az).
 NetAccelRow(e, ax, ay, az) :- FrictionalDeceleration(e, ax, ay, az).
 
+relation SumAx(e: EntityID, ax: GCoord)
+SumAx(e, sum(ax_i)) :- NetAccelRow(e, ax_i, _, _).
+
+relation SumAy(e: EntityID, ay: GCoord)
+SumAy(e, sum(ay_i)) :- NetAccelRow(e, _, ay_i, _).
+
+relation SumAz(e: EntityID, az: GCoord)
+SumAz(e, sum(az_i)) :- NetAccelRow(e, _, _, az_i).
+
 relation NetAcceleration(e: EntityID, ax: GCoord, ay: GCoord, az: GCoord)
 NetAcceleration(e, ax, ay, az) :-
-    var <ax, ay, az> =
-        sum <ax_i, ay_i, az_i> : { NetAccelRow(e, ax_i, ay_i, az_i) }.
+    SumAx(e, ax),
+    SumAy(e, ay),
+    SumAz(e, az).
 
 relation UnclampedNewVelocity(e: EntityID, vx: GCoord, vy: GCoord, vz: GCoord)
 UnclampedNewVelocity(e, vx + ax * delta_time(), vy + ay * delta_time(), vz + az * delta_time()) :-

@@ -720,9 +720,7 @@ express complex relationships:
   `match` or C/Java `switch`), `for` loops, `continue`, `break`, and `return`.3
 - **Aggregates:** Use aggregate functions like `sum`, `count`, or `max` to
   compute values grouped by the variables outside the aggregate expression.
-  Example: `Totals(x, sum y) :- Values(x, y).` To combine multiple values at
-  once, aggregate a tuple and unpack it:
-  `var <sx, sy> = sum <vx, vy> : { Vel(e, vx, vy) }.`
+  Example: `Totals(x, sum y) :- Values(x, y).`
 
 ### C. Using Functions in DDlog
 
