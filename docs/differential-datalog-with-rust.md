@@ -313,7 +313,7 @@ A.dl   ──imports──►  B.dl   ──imports──►  C.dl
 Here, the contents of `C.dl` are visible in both `B.dl` and `A.dl`, while
 definitions in `A.dl` remain hidden from `B.dl` and `C.dl`. To avoid
 `Unknown type` errors, common types should be placed in a module such as
-`types.dl` and imported from all other files.
+`types.dl` and imported from all other modules.
 
 ```datalog
 // types.dl
