@@ -165,11 +165,11 @@ We introduce relations to track velocity and represent transient forces.
 // Tracks velocity at the start of a tick, fed back from the previous tick's output.
 input relation Velocity(entity: EntityID, vx: GCoord, vy: GCoord, vz: GCoord)
 
-// --- New Ephemeral Input Stream ---
+// --- New Per-Tick Input Relation ---
 // Represents instantaneous forces applied to entities for a single tick.
-// These are force inputs (not direct accelerations); acceleration is computed as
-// force divided by mass.
-input stream Force(entity: EntityID, fx: GCoord, fy: GCoord, fz: GCoord)
+// The host engine overwrites this relation every frame. These are force inputs
+// (not direct accelerations); acceleration is computed as force divided by mass.
+input relation Force(entity: EntityID, fx: GCoord, fy: GCoord, fz: GCoord)
 
 // --- New Output Relation ---
 // The calculated velocity at the end of a tick.
