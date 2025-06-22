@@ -1,3 +1,5 @@
+import types
+
 // --- Entity Position Relations ---
 input relation Position(entity: EntityID, x: GCoord, y: GCoord, z: GCoord)
 input relation Velocity(entity: EntityID, vx: GCoord, vy: GCoord, vz: GCoord)

@@ -300,7 +300,31 @@ DDlog supports C++/Java-style comments:
   comments can be nested, which is useful for commenting out large blocks of
   code that may already contain comments.3
 
-### B. Defining Data: Types and Relations
+### B. Module Import Semantics
+
+When a DDlog file imports another, visibility flows only *down* the chain of
+imports. Definitions in a module are visible to anything that imports it, but
+the reverse is not true. Consider three files:
+
+```plaintext
+A.dl   ──imports──►  B.dl   ──imports──►  C.dl
+```
+
+Here, the contents of `C.dl` are visible in both `B.dl` and `A.dl`, while
+definitions in `A.dl` remain hidden from `B.dl` and `C.dl`. To avoid
+`Unknown type` errors, common types should be placed in a module such as
+`types.dl` and imported from all other modules.
+
+```datalog
+// types.dl
+typedef GCoord = float
+typedef EntityID = signed<64>
+
+// some_module.dl
+import types
+```
+
+### C. Defining Data: Types and Relations
 
 Data in DDlog is structured using types and stored in relations.
 
@@ -357,7 +381,7 @@ This separation underpins the reactive nature of DDlog: modifications to input
 relations trigger the incremental computation process, which in turn updates the
 output relations.
 
-### C. Defining Logic: Rules and Facts
+### D. Defining Logic: Rules and Facts
 
 The core logic of a DDlog program is expressed through rules. A rule defines how
 to derive new facts (records in relations) based on existing facts.
@@ -401,7 +425,7 @@ recursion (e.g., defining a path in terms of edges and shorter paths, as in
 complex computations. The programmer declares the conditions for a fact's
 existence, and the DDlog engine determines how to derive all such facts.
 
-### D. A Simple "Hello, World" Style Example
+### E. A Simple "Hello, World" Style Example
 
 The following is a small, complete DDlog program based on the tutorial
 examples.3 This program can be saved as `example.dl`:

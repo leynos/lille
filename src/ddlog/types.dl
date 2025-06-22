@@ -1,0 +1,10 @@
+// Basic shared types
+
+// Continuous coordinate used for sub-block precision
+typedef GCoord = float
+
+// Unique identifier for entities
+typedef EntityID = signed<64>
+
+// Unique identifier for world blocks
+typedef BlockID = signed<64>

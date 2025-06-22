@@ -176,6 +176,9 @@ fn is_plain_integer_literal(s: &str) -> bool {
 /// ```
 pub fn generate_code_from_constants(parsed: &Value, fmts: &Formats) -> String {
     let mut code = String::from("// @generated - do not edit\n");
+    if matches!(fmts.flavor, FormatFlavor::Ddlog) {
+        code.push_str("import types\n\n");
+    }
     let mut append = |k: &str, v: &Value| {
         let name = if matches!(fmts.flavor, FormatFlavor::Ddlog) {
             k.to_lowercase()

@@ -1,8 +1,4 @@
-typedef EntityID = signed<64>
-typedef BlockID = signed<64>
-
-// Continuous coordinate used for sub-block precision
-typedef GCoord = float
+import types
 
 import fp
 import souffle_lib
