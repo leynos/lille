@@ -310,10 +310,19 @@ the reverse is not true. Consider three files:
 A.dl   ──imports──►  B.dl   ──imports──►  C.dl
 ```
 
-Here `C.dl`'s contents are visible to `B.dl` and `A.dl`, while definitions in
-`A.dl` remain hidden from `B.dl` and `C.dl`. Place common types in a module such
-as `types.dl` and import it from every other file to avoid `Unknown type`
-errors.
+Here, the contents of `C.dl` are visible in both `B.dl` and `A.dl`, while
+definitions in `A.dl` remain hidden from `B.dl` and `C.dl`. To avoid
+`Unknown type` errors, common types should be placed in a module such as
+`types.dl` and imported from all other files.
+
+```datalog
+// types.dl
+typedef GCoord = float
+typedef EntityID = signed<64>
+
+// some_module.dl
+import types
+```
 
 ### C. Defining Data: Types and Relations
 
