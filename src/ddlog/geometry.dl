@@ -1,4 +1,8 @@
 import types
+import entity_state
+import constants
+import fp
+import souffle_lib
 
 // --- World Geometry Relations ---
 input relation Block(id: BlockID, x: signed<32>, y: signed<32>, z: signed<32>)
@@ -41,3 +45,20 @@ FloorHeightAt(x, y, z_out) :-
     HighestBlockAt(x_grid, y_grid, block, z_grid),
     not BlockSlope(block, _, _),
     var z_out = (z_grid as GCoord) + 1.0.
+
+// --- Derived convenience relations ---
+relation MaxFloor(x: GCoord, y: GCoord, z_max: GCoord)
+MaxFloor(x, y, z_max) :-
+    FloorHeightAt(x, y, z),
+    var z_max = z.group_by((x, y)).max().
+
+relation IsUnsupported(entity: EntityID)
+IsUnsupported(entity) :-
+    Position(entity, x, y, z),
+    MaxFloor(x, y, z_floor),
+    z > z_floor + grace_distance().
+
+relation IsStanding(entity: EntityID)
+IsStanding(entity) :-
+    Position(entity, _, _, _),
+    not IsUnsupported(entity).

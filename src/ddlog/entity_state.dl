@@ -1,18 +1,9 @@
 import types
 
-// --- Entity State Relations ---
-relation MaxFloor(x: GCoord, y: GCoord, z_max: GCoord)
-MaxFloor(x, y, z_max) :-
-    FloorHeightAt(x, y, z),
-    var z_max = z.group_by((x, y)).max().
-
-relation IsUnsupported(entity: EntityID)
-IsUnsupported(entity) :-
-    Position(entity, x, y, z),
-    MaxFloor(x, y, z_floor),
-    z > z_floor + grace_distance().
-
-relation IsStanding(entity: EntityID)
-IsStanding(entity) :-
-    Position(entity, _, _, _),
-    not IsUnsupported(entity).
+// --- Entity *input* state shared by multiple subsystems ---
+input relation Position(entity: EntityID,
+                        x: GCoord, y: GCoord, z: GCoord)
+input relation Velocity(entity: EntityID,
+                        vx: GCoord, vy: GCoord, vz: GCoord)
+// Mass of an entity in kilograms; must be positive to avoid divide by zero
+input relation Mass(entity: EntityID, kg: GCoord)

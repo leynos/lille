@@ -1,10 +1,9 @@
 import types
+import entity_state
+import constants
+import geometry
 
 // --- Entity Position Relations ---
-input relation Position(entity: EntityID, x: GCoord, y: GCoord, z: GCoord)
-input relation Velocity(entity: EntityID, vx: GCoord, vy: GCoord, vz: GCoord)
-// Mass of an entity in kilograms; must be positive to avoid divide by zero
-input relation Mass(entity: EntityID, kg: GCoord)
 input stream Force(entity: EntityID, fx: GCoord, fy: GCoord, fz: GCoord)
 output relation NewPosition(entity: EntityID, x: GCoord, y: GCoord, z: GCoord)
 output relation NewVelocity(entity: EntityID, nvx: GCoord, nvy: GCoord, nvz: GCoord)

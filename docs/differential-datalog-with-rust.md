@@ -324,6 +324,26 @@ typedef EntityID = signed<64>
 import types
 ```
 
+#### Shared input state modules
+
+Visibility only flows one way, so relations used by multiple subsystems should
+live in a tiny module with no dependencies. Each subsystem then imports that
+module before the first use of those relations. This avoids cycles such as
+`geometry` → `physics` → `geometry` and keeps a single authoritative definition:
+
+```datalog
+// entity_state.dl
+input relation Position(e: EntityID, x: GCoord, y: GCoord, z: GCoord)
+input relation Velocity(e: EntityID, vx: GCoord, vy: GCoord, vz: GCoord)
+input relation Mass(e: EntityID, kg: GCoord)
+```
+
+Modules that need the state import it explicitly:
+
+```datalog
+import entity_state
+```
+
 ### C. Defining Data: Types and Relations
 
 Data in DDlog is structured using types and stored in relations.
