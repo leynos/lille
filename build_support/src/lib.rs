@@ -49,13 +49,35 @@ pub fn build() -> Result<()> {
 /// `true` causes the error to be propagated to the caller.
 pub fn build_with_options(options: &BuildOptions) -> Result<()> {
     dotenvy::dotenv_override().ok();
+    set_rerun_triggers();
+
+    let (manifest_dir, out_dir) = manifest_and_out_dir()?;
+
+    constants::generate_constants(&manifest_dir, &out_dir)?;
+    let font_path = font::download_font(&manifest_dir)?;
+    compile_ddlog_optional(&manifest_dir, &out_dir, options)?;
+
+    println!("cargo:rustc-env=FONT_PATH={}", font_path.display());
+
+    Ok(())
+}
+
+fn manifest_and_out_dir() -> Result<(PathBuf, PathBuf)> {
+    let manifest = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR")?);
+    let out = PathBuf::from(std::env::var("OUT_DIR")?);
+    Ok((manifest, out))
+}
+
+fn set_rerun_triggers() {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=assets");
-    // Re-run the build script if any DDlog source file changes. Iterate over
-    // the directory so each file is tracked individually. This ensures new
-    // modules trigger rebuilds without manually updating the list.
-    let ddlog_dir = PathBuf::from("src/ddlog");
-    if let Ok(entries) = std::fs::read_dir(&ddlog_dir) {
+    track_ddlog_files(&PathBuf::from("src/ddlog"));
+    println!("cargo:rerun-if-changed=constants.toml");
+    println!("cargo:rerun-if-env-changed=DDLOG_HOME");
+}
+
+fn track_ddlog_files(dir: &PathBuf) {
+    if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
             if path.extension().and_then(|e| e.to_str()) == Some("dl") {
@@ -63,24 +85,21 @@ pub fn build_with_options(options: &BuildOptions) -> Result<()> {
             }
         }
     }
-    println!("cargo:rerun-if-changed=constants.toml");
-    println!("cargo:rerun-if-env-changed=DDLOG_HOME");
+}
 
-    let manifest_dir = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR")?);
-    let out_dir = PathBuf::from(std::env::var("OUT_DIR")?);
-
-    constants::generate_constants(&manifest_dir, &out_dir)?;
-    let font_path = font::download_font(&manifest_dir)?;
-    if let Err(e) = ddlog::compile_ddlog(&manifest_dir, &out_dir) {
-        if options.fail_on_ddlog_error {
-            return Err(e);
+fn compile_ddlog_optional(
+    manifest_dir: &PathBuf,
+    out_dir: &PathBuf,
+    options: &BuildOptions,
+) -> Result<()> {
+    match ddlog::compile_ddlog(manifest_dir, out_dir) {
+        Ok(_) => Ok(()),
+        Err(e) if !options.fail_on_ddlog_error => {
+            println!("cargo:warning=DDlog build failed: {e}");
+            Ok(())
         }
-        println!("cargo:warning=DDlog build failed: {e}");
+        Err(e) => Err(e),
     }
-
-    println!("cargo:rustc-env=FONT_PATH={}", font_path.display());
-
-    Ok(())
 }
 
 #[cfg(test)]
