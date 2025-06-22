@@ -390,10 +390,15 @@ fn generates_ddlog_nested_functions() {
     "#;
     let parsed: toml::Value = toml_str.parse().unwrap();
     let code = generate_code_from_constants(&parsed, &DL_FMTS);
-    assert!(code.contains("function inner_int()"));
-    assert!(code.contains("{ 10 }"));
-    assert!(code.contains("function deeper_str()"));
-    assert!(code.contains("{ \"deep\" }"));
+    assert_all_present(
+        &code,
+        &[
+            "function inner_int()",
+            "{ 10 }",
+            "function deeper_str()",
+            "{ \"deep\" }",
+        ],
+    );
 }
 
 #[test]
@@ -405,10 +410,15 @@ fn generates_ddlog_edge_case_functions() {
     "#;
     let parsed: toml::Value = toml_str.parse().unwrap();
     let code = generate_code_from_constants(&parsed, &DL_FMTS);
-    assert!(code.contains("function empty_str()"));
-    assert!(code.contains("{ \"\" }"));
-    assert!(code.contains("function large_int()"));
-    assert!(code.contains("{ 9223372036854775807 }"));
-    assert!(code.contains("function special()"));
-    assert!(code.contains("line\\nwith\\tspecial❤"));
+    assert_all_present(
+        &code,
+        &[
+            "function empty_str()",
+            "{ \"\" }",
+            "function large_int()",
+            "{ 9223372036854775807 }",
+            "function special()",
+            "line\\nwith\\tspecial❤",
+        ],
+    );
 }
