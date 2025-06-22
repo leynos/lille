@@ -1,3 +1,5 @@
+import types
+
 // --- Entity State Relations ---
 relation MaxFloor(x: GCoord, y: GCoord, z_max: GCoord)
 MaxFloor(x, y, z_max) :-

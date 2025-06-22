@@ -1,3 +1,5 @@
+import types
+
 // --- World Geometry Relations ---
 input relation Block(id: BlockID, x: signed<32>, y: signed<32>, z: signed<32>)
 input relation BlockSlope(block: BlockID, grad_x: GCoord, grad_y: GCoord)
