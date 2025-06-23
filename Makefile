@@ -1,4 +1,7 @@
-.PHONY: all clean build test fmt build-support-run targets/ddlog/debug/lille generated/ddlog_lille/lib.rs test-ddlog lint markdownlint nixie
+.PHONY: all clean build fmt test lint \
+        build-support-run \
+        build-ddlog test-ddlog build-inferencer \
+        markdownlint nixie
 
 .ONESHELL:
 SHELL := bash
@@ -39,3 +42,8 @@ markdownlint:
 
 nixie:
 	find . -name '*.md' -print0 | xargs -0 nixie
+
+# Generate, patch, and compile the DDlog inferencer
+build-inferencer: generated/ddlog_lille/lib.rs generated/ddlog_lille/patches/fix_static.patch
+	patch -N -p1 -d generated/ddlog_lille/lille_ddlog < generated/ddlog_lille/patches/fix_static.patch
+	RUSTFLAGS="-D warnings" cargo build --manifest-path generated/ddlog_lille/lille_ddlog/Cargo.toml --target-dir targets/ddlog
