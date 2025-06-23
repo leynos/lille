@@ -27,6 +27,7 @@ mod build_options {
     pub struct BuildOptions {
         /// If `true`, a failure to compile DDlog code causes [`build_with_options`]
         /// to return an error. When `false`, DDlog errors are logged but ignored.
+        #[ortho_config(default = false)]
         pub fail_on_ddlog_error: bool,
 
         /// Destination directory for the generated `ddlog_lille` crate.
