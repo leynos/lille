@@ -4,5 +4,5 @@ version = "0.1.0"
 edition = "2021"
 publish = false
 
-[dev-dependencies]
-syn = "2.0.103"
+[dependencies]
+syn = { version = "2.0.103", features = ["full"] }

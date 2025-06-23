@@ -3,6 +3,7 @@
 //! Allows running the build pipeline without compiling the entire game.
 use build_support::BuildOptions;
 use color_eyre::eyre::Result;
+use ortho_config::OrthoConfig;
 
 fn main() -> Result<()> {
     color_eyre::install()?;
