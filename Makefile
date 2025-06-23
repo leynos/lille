@@ -21,7 +21,7 @@ fmt:
 	mdformat-all
 
 build-support-run:
-	./scripts/build_support_runner.sh -- --ddlog-dir generated/lille_ddlog
+	./scripts/build_support_runner.sh
 
 generated/ddlog_lille/lib.rs: build-support-run
 
