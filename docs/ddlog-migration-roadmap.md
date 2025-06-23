@@ -16,7 +16,7 @@ architecture we have designed.
   2. **Integrate DDlog Compiler:** Modify the build process (likely in
      `build.rs`) to invoke the DDlog compiler on a new `.dl` file (e.g.,
      `src/ddlog/lille.dl`). This should generate the corresponding Rust crate
-     (`ddlog_lille`) and make it available to the main project.
+     (`lille_ddlog`) and make it available to the main project.
   3. **Establish DDlog Handle:** Create the Bevy `Resource` for the DDlog handle
      (`DdlogHandle`) and a startup system (`init_ddlog_system`) to initialise
      the DDlog runtime and insert the resource into the Bevy world.

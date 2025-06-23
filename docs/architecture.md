@@ -74,7 +74,7 @@ The movement calculation considers:
 - `clap` (4.4): Command-line argument parsing
 - `bevy` (0.12): ECS and rendering framework introduced in Phase 0
 - `differential-datalog` (0.53): Runtime library for the DDlog rules (generated
-  as `ddlog_lille`)
+  as `lille_ddlog`)
 
 ### Update Cycle
 

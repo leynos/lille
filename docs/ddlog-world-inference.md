@@ -263,8 +263,8 @@ Two Bevy systems will manage the interaction with DDlog.
 
 use bevy::prelude::*;
 use std::sync::{Arc, Mutex};
-use ddlog_lille::{api::HDDlog, run, DDlogRecord};
-// Assuming `ddlog_lille` is the generated crate name
+use lille_ddlog::{api::HDDlog, run, DDlogRecord};
+// Assuming `lille_ddlog` is the generated crate name
 
 // A Bevy resource to hold the DDlog instance
 #[derive(Resource)]
