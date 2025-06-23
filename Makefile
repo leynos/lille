@@ -44,6 +44,6 @@ nixie:
 	find . -name '*.md' -print0 | xargs -0 nixie
 
 # Generate, patch, and compile the DDlog inferencer
-build-inferencer: generated/lille_ddlog/lib.rs generated/ddlog_lille/patches/fix_static.patch
-	patch -N -p1 -d generated/lille_ddlog < generated/ddlog_lille/patches/fix_static.patch
+build-inferencer: generated/lille_ddlog/lib.rs patches/fix_static.patch
+	patch -N -p1 -d generated/lille_ddlog < patches/fix_static.patch
 	RUSTFLAGS="-D warnings" cargo build --manifest-path generated/ddlog_lille/lille_ddlog/Cargo.toml --target-dir targets/ddlog
