@@ -15,6 +15,12 @@ env_logger = "0.10"  # Logger implementation controlled via RUST_LOG
 serde = { version = "1.0", features = ["derive"] }
 color-eyre = "0.6"
 
+[dependencies.ddlog_lille]
+path = "generated/ddlog_lille"
+optional = true
+
+[features]
+ddlog = ["ddlog_lille"]
 [build-dependencies]
 build_support = { path = "build_support" }
 color-eyre = "0.6"

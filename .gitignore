@@ -6,3 +6,4 @@ assets/
 .env
 src/ddlog/constants.dl
 constants.rs
+generated/ddlog_lille/lib.rs

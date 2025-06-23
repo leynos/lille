@@ -4,16 +4,38 @@ pub mod constants;
 pub mod ddlog;
 pub mod font;
 
-/// Configuration options for the build pipeline.
-#[derive(Clone, Copy, Default)]
-pub struct BuildOptions {
-    /// If `true`, a failure to compile DDlog code causes [`build_with_options`]
-    /// to return an error. When `false`, DDlog errors are logged but ignored.
-    pub fail_on_ddlog_error: bool,
+use color_eyre::eyre::Result;
+use std::fs;
+use std::path::PathBuf;
+
+#[expect(
+    unexpected_cfgs,
+    non_snake_case,
+    unused_imports,
+    reason = "OrthoConfig macro generates names that trigger these lints"
+)]
+#[allow(unfulfilled_lint_expectations)]
+mod build_options {
+    use ortho_config::OrthoConfig;
+    use serde::Deserialize;
+
+    /// Configuration options for the build pipeline.
+    #[derive(Clone, Default, OrthoConfig, Debug, Deserialize)]
+    #[ortho_config(prefix = "BUILD_SUPPORT")]
+    #[expect(non_snake_case, reason = "OrthoConfig derives non-snake case fields")]
+    #[allow(unfulfilled_lint_expectations)]
+    pub struct BuildOptions {
+        /// If `true`, a failure to compile DDlog code causes [`build_with_options`]
+        /// to return an error. When `false`, DDlog errors are logged but ignored.
+        pub fail_on_ddlog_error: bool,
+
+        /// Destination directory for the generated `ddlog_lille` crate.
+        /// If not provided, defaults to `OUT_DIR/ddlog_lille`.
+        pub ddlog_dir: Option<std::path::PathBuf>,
+    }
 }
 
-use color_eyre::eyre::Result;
-use std::path::PathBuf;
+pub use build_options::BuildOptions;
 
 /// Execute all build steps required by `build.rs`.
 ///
@@ -55,7 +77,11 @@ pub fn build_with_options(options: &BuildOptions) -> Result<()> {
 
     constants::generate_constants(&manifest_dir, &out_dir)?;
     let font_path = font::download_font(&manifest_dir)?;
-    compile_ddlog_optional(&manifest_dir, &out_dir, options)?;
+    let ddlog_dir = options
+        .ddlog_dir
+        .clone()
+        .unwrap_or_else(|| out_dir.join("ddlog_lille"));
+    compile_ddlog_optional(&manifest_dir, &ddlog_dir, options)?;
 
     println!("cargo:rustc-env=FONT_PATH={}", font_path.display());
 
@@ -89,10 +115,11 @@ fn track_ddlog_files(dir: &PathBuf) {
 
 fn compile_ddlog_optional(
     manifest_dir: &PathBuf,
-    out_dir: &PathBuf,
+    ddlog_dir: &PathBuf,
     options: &BuildOptions,
 ) -> Result<()> {
-    match ddlog::compile_ddlog(manifest_dir, out_dir) {
+    fs::create_dir_all(ddlog_dir)?;
+    match ddlog::compile_ddlog(manifest_dir, ddlog_dir) {
         Ok(_) => Ok(()),
         Err(e) if !options.fail_on_ddlog_error => {
             println!("cargo:warning=DDlog build failed: {e}");
@@ -104,7 +131,7 @@ fn compile_ddlog_optional(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{build_with_options, BuildOptions};
     use std::env;
     use std::fs;
     use std::path::PathBuf;
@@ -127,7 +154,7 @@ mod tests {
     fn test_build_missing_cargo_manifest_dir() {
         cleanup_test_env();
         env::set_var("OUT_DIR", "/tmp/test_out");
-        let result = build();
+        let result = build_with_options(&BuildOptions::default());
         assert!(result.is_err());
         cleanup_test_env();
     }
@@ -136,7 +163,7 @@ mod tests {
     fn test_build_missing_out_dir() {
         cleanup_test_env();
         env::set_var("CARGO_MANIFEST_DIR", "/tmp/test_manifest");
-        let result = build();
+        let result = build_with_options(&BuildOptions::default());
         assert!(result.is_err());
         cleanup_test_env();
     }
@@ -144,7 +171,7 @@ mod tests {
     #[test]
     fn test_build_missing_both_env_vars() {
         cleanup_test_env();
-        let result = build();
+        let result = build_with_options(&BuildOptions::default());
         assert!(result.is_err());
         cleanup_test_env();
     }
@@ -176,7 +203,7 @@ mod tests {
         cleanup_test_env();
         env::set_var("CARGO_MANIFEST_DIR", "/nonexistent/path");
         env::set_var("OUT_DIR", "/nonexistent/out");
-        let result = build();
+        let result = build_with_options(&BuildOptions::default());
         assert!(result.is_err());
         cleanup_test_env();
     }
@@ -196,7 +223,7 @@ mod tests {
             "# test ddlog",
         )
         .ok();
-        let result = build();
+        let result = build_with_options(&BuildOptions::default());
         match result {
             Ok(_) => assert!(true),
             Err(e) => {
@@ -230,7 +257,7 @@ mod tests {
         cleanup_test_env();
         env::set_var("CARGO_MANIFEST_DIR", "");
         env::set_var("OUT_DIR", "");
-        let result = build();
+        let result = build_with_options(&BuildOptions::default());
         match result {
             Ok(_) => assert!(false, "Expected error with empty paths"),
             Err(_) => assert!(true, "Expected error with empty paths"),
@@ -264,7 +291,7 @@ mod tests {
     #[test]
     fn test_build_function_return_type() {
         let (_manifest_temp, _out_temp) = setup_test_env();
-        let result = build();
+        let result = build_with_options(&BuildOptions::default());
         match result {
             Ok(unit_value) => assert_eq!(unit_value, ()),
             Err(error) => assert!(!error.to_string().is_empty()),
@@ -279,8 +306,8 @@ mod tests {
         fs::create_dir_all(manifest_temp.path().join("src/ddlog")).ok();
         fs::write(manifest_temp.path().join("constants.toml"), "").ok();
         fs::write(manifest_temp.path().join("src/ddlog/lille.dl"), "").ok();
-        let result1 = build();
-        let result2 = build();
+        let result1 = build_with_options(&BuildOptions::default());
+        let result2 = build_with_options(&BuildOptions::default());
         assert_eq!(result1.is_ok(), result2.is_ok());
         cleanup_test_env();
     }

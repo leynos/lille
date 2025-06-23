@@ -3,10 +3,10 @@
 //! Allows running the build pipeline without compiling the entire game.
 use build_support::BuildOptions;
 use color_eyre::eyre::Result;
+use ortho_config::OrthoConfig;
 
 fn main() -> Result<()> {
     color_eyre::install()?;
-    build_support::build_with_options(&BuildOptions {
-        fail_on_ddlog_error: false,
-    })
+    let opts = BuildOptions::load().map_err(color_eyre::Report::from)?;
+    build_support::build_with_options(&opts)
 }

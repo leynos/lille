@@ -17,7 +17,7 @@ static DDLOG_AVAILABLE: OnceCell<bool> = OnceCell::new();
 /// # Parameters
 /// - `manifest_dir`: The crate's manifest directory containing
 ///   `src/ddlog/lille.dl`.
-/// - `out_dir`: The output directory for generated Rust code.
+/// - `crate_dir`: Directory where the `ddlog_lille` crate will be generated.
 ///
 /// # Returns
 /// `Ok(())` if the sources compile successfully or compilation is skipped.
@@ -29,13 +29,13 @@ static DDLOG_AVAILABLE: OnceCell<bool> = OnceCell::new();
 /// ```rust,no_run
 /// # use std::path::Path;
 /// use build_support::ddlog::compile_ddlog;
-/// compile_ddlog(Path::new("."), Path::new("./target"))?;
+/// compile_ddlog(Path::new("."), Path::new("./target/ddlog_lille"))?;
 /// # Ok::<(), color_eyre::Report>(())
 /// ```
-pub fn compile_ddlog(manifest_dir: impl AsRef<Path>, out_dir: impl AsRef<Path>) -> Result<()> {
+pub fn compile_ddlog(manifest_dir: impl AsRef<Path>, crate_dir: impl AsRef<Path>) -> Result<()> {
     dotenvy::dotenv_override().ok();
     let manifest_dir = manifest_dir.as_ref();
-    let out_dir = out_dir.as_ref();
+    let crate_dir = crate_dir.as_ref();
     if !ddlog_available() {
         return Ok(());
     }
@@ -46,7 +46,7 @@ pub fn compile_ddlog(manifest_dir: impl AsRef<Path>, out_dir: impl AsRef<Path>) 
         return Ok(());
     }
 
-    run_ddlog(&ddlog_file, out_dir)
+    run_ddlog(&ddlog_file, crate_dir)
 }
 
 /// Check whether the `ddlog` executable can be invoked.
@@ -74,7 +74,7 @@ fn ddlog_available() -> bool {
 ///
 /// # Parameters
 /// - `ddlog_file`: Path to the Differential Datalog source file.
-/// - `out_dir`: Directory where generated Rust code will be written.
+/// - `crate_dir`: Directory where generated Rust code will be written.
 ///
 /// # Returns
 /// `Ok(())` if the compiler succeeds, otherwise an error describing the
@@ -83,8 +83,7 @@ fn ddlog_available() -> bool {
 /// # Errors
 /// Returns an error for I/O failures or if the compiler exits with a non-zero
 /// status.
-fn run_ddlog(ddlog_file: &Path, out_dir: &Path) -> Result<()> {
-    let target_dir = out_dir.join("ddlog_lille");
+fn run_ddlog(ddlog_file: &Path, crate_dir: &Path) -> Result<()> {
     let mut cmd = Command::new("ddlog");
     if let Ok(home) = env::var("DDLOG_HOME") {
         cmd.arg("-L").arg(format!("{home}/lib"));
@@ -93,7 +92,7 @@ fn run_ddlog(ddlog_file: &Path, out_dir: &Path) -> Result<()> {
         .arg("-i")
         .arg(ddlog_file)
         .arg("-o")
-        .arg(&target_dir)
+        .arg(crate_dir)
         .output()?;
     if output.status.success() {
         Ok(())
