@@ -1,0 +1,14 @@
+*** Begin Patch
+*** Update File: differential_datalog/src/dataflow/consolidate.rs
+@@
+-    O: OrdOffset,
++    O: OrdOffset + 'static,
+@@
+-    O: OrdOffset,
++    O: OrdOffset + 'static,
+*** End Patch
+*** Update File: differential_datalog/src/dataflow/distinct.rs
+@@
+-    O: OrdOffset,
++    O: OrdOffset + 'static,
+*** End Patch
