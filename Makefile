@@ -1,4 +1,4 @@
-.PHONY: all clean build test fmt build-support-run targets/ddlog/debug/lille generated/lille_ddlog/lib.rs test-ddlog lint markdownlint nixie
+.PHONY: all clean build test fmt build-support-run targets/ddlog/debug/lille generated/ddlog_lille/lib.rs test-ddlog lint markdownlint nixie
 
 .ONESHELL:
 SHELL := bash
@@ -23,12 +23,12 @@ fmt:
 build-support-run:
 	./scripts/build_support_runner.sh -- --ddlog-dir generated/lille_ddlog
 
-generated/lille_ddlog/lib.rs: build-support-run
+generated/ddlog_lille/lib.rs: build-support-run
 
-targets/ddlog/debug/lille: generated/lille_ddlog/lib.rs
+targets/ddlog/debug/lille: generated/ddlog_lille/lib.rs
 	RUSTFLAGS="-D warnings" cargo build --features ddlog --target-dir targets/ddlog
 
-test-ddlog: generated/lille_ddlog/lib.rs
+test-ddlog: generated/ddlog_lille/lib.rs
 	RUSTFLAGS="-D warnings" cargo test --features ddlog --target-dir targets/ddlog
 
 lint:

@@ -23,7 +23,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MANIFEST_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Default OUT_DIR writes into the src directory like build.rs.
-OUT_DIR="$MANIFEST_DIR/src"
+OUT_DIR="$MANIFEST_DIR/generated"
 BUILD_ARGS=()
 CLEAN_MODE=""
 
