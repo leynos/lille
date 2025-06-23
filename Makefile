@@ -46,4 +46,4 @@ nixie:
 # Generate, patch, and compile the DDlog inferencer
 build-inferencer: generated/ddlog_lille/lib.rs generated/ddlog_lille/patches/fix_static.patch
 	patch -N -p1 -d generated/ddlog_lille/lille_ddlog < generated/ddlog_lille/patches/fix_static.patch
-	RUSTFLAGS="-D warnings" cargo build --manifest-path generated/ddlog_lille/lille_ddlog/Cargo.toml
+	RUSTFLAGS="-D warnings" cargo build --manifest-path generated/ddlog_lille/lille_ddlog/Cargo.toml --target-dir targets/ddlog
