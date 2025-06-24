@@ -11,6 +11,14 @@ RUSTFLAGS_STRICT := RUSTFLAGS="-D warnings"
 WORKSPACE_PACKAGES := --package lille --package build_support --package test_utils
 DDLOG_TARGET_DIR := --target-dir targets/ddlog
 
+# Portable sed in-place editing (GNU sed vs BSD/macOS sed compatibility)
+UNAME_S := $(shell uname -s 2>/dev/null || echo "Unknown")
+ifeq ($(UNAME_S),Darwin)
+    SED_INPLACE := sed -i ''
+else
+    SED_INPLACE := sed -i
+endif
+
 all: build
 
 clean:
@@ -64,12 +72,12 @@ generated/lille_ddlog/lib.rs: build-support-run
 	# Apply patches to fix static linking issues in generated DDlog code
 	patch -N -p1 -d generated/lille_ddlog < patches/fix_static.patch
 	# Rename the generated crate from "lille" to "lille-ddlog" to avoid conflicts
-	sed -i 's/^name = "lille"/name = "lille-ddlog"/' generated/lille_ddlog/Cargo.toml
+	$(SED_INPLACE) 's/^name = "lille"/name = "lille-ddlog"/' generated/lille_ddlog/Cargo.toml
 	# Remove workspace configuration from generated Cargo.toml (DDlog generates this incorrectly)
-	sed -i '/^\[workspace\]/,$$d' generated/lille_ddlog/Cargo.toml
+	$(SED_INPLACE) '/^\[workspace\]/,$$d' generated/lille_ddlog/Cargo.toml
 	# Suppress all clippy warnings on generated ddlog code (not worth fixing generated code)
 	for lib in ddlog_profiler ddlog_derive; do \
-		sed -i '1i#![allow(clippy::all)]' generated/lille_ddlog/$$lib/src/lib.rs; \
+		$(SED_INPLACE) '1i#![allow(clippy::all)]' generated/lille_ddlog/$$lib/src/lib.rs; \
 	done
 
 targets/ddlog/debug/lille: generated/lille_ddlog/lib.rs
