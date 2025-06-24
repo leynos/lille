@@ -19,11 +19,11 @@ build-ddlog: targets/ddlog/debug/lille
 test:
 	RUSTFLAGS="-D warnings" cargo test
 
-fmt: generated/lille_ddlog/lib.rs
+fmt:
 	cargo fmt --package lille --package build_support --package test_utils
 	mdformat-all
 
-fmt-check: generated/lille_ddlog/lib.rs
+fmt-check:
 	cargo fmt --package lille --package build_support --package test_utils -- --check
 
 generated:
