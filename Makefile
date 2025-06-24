@@ -1,7 +1,7 @@
 .PHONY: all clean build fmt fmt-check test lint \
-        build-support-run \
-        build-ddlog test-ddlog build-inferencer \
-        markdownlint nixie
+	    build-support-run \
+	    build-ddlog test-ddlog build-inferencer \
+	    markdownlint nixie
 
 .ONESHELL:
 SHELL := bash
@@ -14,9 +14,9 @@ DDLOG_TARGET_DIR := --target-dir targets/ddlog
 # Portable sed in-place editing (GNU sed vs BSD/macOS sed compatibility)
 UNAME_S := $(shell uname -s 2>/dev/null || echo "Unknown")
 ifeq ($(UNAME_S),Darwin)
-    SED_INPLACE := sed -i ''
+	SED_INPLACE := sed -i ''
 else
-    SED_INPLACE := sed -i
+	SED_INPLACE := sed -i
 endif
 
 all: build
@@ -66,7 +66,7 @@ generated/lille_ddlog/lib.rs.stub: generated
 		'' \
 		'// Minimal stub to make this a valid Rust library' \
 		> generated/lille_ddlog/lib.rs
-	> generated/lille_ddlog/lib.rs.stub
+	touch generated/lille_ddlog/lib.rs.stub
 
 generated/lille_ddlog/lib.rs: build-support-run
 	# Apply patches to fix static linking issues in generated DDlog code
@@ -77,12 +77,11 @@ generated/lille_ddlog/lib.rs: build-support-run
 	$(SED_INPLACE) '/^\[workspace\]/,$$d' generated/lille_ddlog/Cargo.toml
 	# Suppress all warnings and clippy on generated ddlog code (not worth fixing generated code)
 	find generated/lille_ddlog -name "*.rs" -type f -print0 | \
-		while IFS= read -r -d $$'\0' file; do \
-			if ! head -2 "$$file" | grep -q "^#!\[allow(clippy::all)\]"; then \
-				$(SED_INPLACE) "1i#![allow(warnings)]" "$$file"; \
-				$(SED_INPLACE) "2i#![allow(clippy::all)]" "$$file"; \
-			fi; \
-		done
+	           while IFS= read -r -d $$'\0' file; do \
+	                   if ! head -2 "$$file" | grep -q "^#!\[allow(clippy::all)\]"; then \
+	                           $(SED_INPLACE) '1s;^;#![allow(warnings)]\\n#![allow(clippy::all)]\\n;' "$$file"; \
+	                   fi; \
+	           done
 
 targets/ddlog/debug/lille: generated/lille_ddlog/lib.rs
 	$(RUSTFLAGS_STRICT) cargo build --features ddlog $(DDLOG_TARGET_DIR)
