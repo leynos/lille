@@ -40,24 +40,24 @@ build-support-run: generated
 # Create a stub lib.rs file for formatting and dependency resolution
 generated/lille_ddlog/lib.rs.stub: generated
 	mkdir -p generated/lille_ddlog
-	cat > generated/lille_ddlog/Cargo.toml << 'EOF'
-[package]
-name = "lille-ddlog"
-version = "0.1.0"
-edition = "2018"
-
-[lib]
-path = "lib.rs"
-EOF
-	cat > generated/lille_ddlog/lib.rs << 'EOF'
-//! Stub file for lille-ddlog crate.
-//! This file is replaced during the build process with generated DDlog code.
-//! It exists to satisfy Cargo's dependency resolution during formatting and other operations.
-
-#![allow(dead_code)]
-
-// Minimal stub to make this a valid Rust library
-EOF
+	printf '%s\n' \
+		'[package]' \
+		'name = "lille-ddlog"' \
+		'version = "0.1.0"' \
+		'edition = "2018"' \
+		'' \
+		'[lib]' \
+		'path = "lib.rs"' \
+		> generated/lille_ddlog/Cargo.toml
+	printf '%s\n' \
+		'//! Stub file for lille-ddlog crate.' \
+		'//! This file is replaced during the build process with generated DDlog code.' \
+		'//! It exists to satisfy Cargo'\''s dependency resolution during formatting and other operations.' \
+		'' \
+		'#![allow(dead_code)]' \
+		'' \
+		'// Minimal stub to make this a valid Rust library' \
+		> generated/lille_ddlog/lib.rs
 	> generated/lille_ddlog/lib.rs.stub
 
 generated/lille_ddlog/lib.rs: build-support-run
