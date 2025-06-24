@@ -34,7 +34,7 @@ jobs:
         run: cargo tarpaulin --out lcov
       - name: Upload coverage data to CodeScene
         if: env.CS_ACCESS_TOKEN
-        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@v1.1.0
+        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@v1.1.1
         with:
           format: lcov
           access-token: ${{ env.CS_ACCESS_TOKEN }}
