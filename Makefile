@@ -54,7 +54,7 @@ generated/lille_ddlog/lib.rs.stub: generated
 generated/lille_ddlog/lib.rs: build-support-run
 	patch -N -p1 -d generated/lille_ddlog < patches/fix_static.patch
 	sed -i 's/^name = "lille"/name = "lille-ddlog"/' generated/lille_ddlog/Cargo.toml
-	sed -i '/^\[workspace\]/,$d' generated/lille_ddlog/Cargo.toml
+	sed -i '/^\[workspace\]/,$$d' generated/lille_ddlog/Cargo.toml
 
 targets/ddlog/debug/lille: generated/lille_ddlog/lib.rs
 	RUSTFLAGS="-D warnings" cargo build --features ddlog --target-dir targets/ddlog
