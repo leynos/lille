@@ -79,7 +79,7 @@ generated/lille_ddlog/lib.rs: build-support-run
 	find generated/lille_ddlog -name "*.rs" -type f -print0 | \
 	           while IFS= read -r -d $$'\0' file; do \
 	                   if ! head -2 "$$file" | grep -q "^#!\[allow(clippy::all)\]"; then \
-	                           $(SED_INPLACE) '1s;^;#![allow(warnings)]\\n#![allow(clippy::all)]\\n;' "$$file"; \
+                               $(SED_INPLACE) '1s;^;#![allow(warnings)]\n#![allow(clippy::all)]\n;' "$$file"; \
 	                   fi; \
 	           done
 
