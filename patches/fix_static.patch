@@ -1,14 +1,32 @@
-*** Begin Patch
-*** Update File: differential_datalog/src/dataflow/consolidate.rs
-@@
+--- a/differential_datalog/src/dataflow/consolidate.rs
++++ b/differential_datalog/src/dataflow/consolidate.rs
+@@ -17,7 +17,7 @@
+     S::Timestamp: Lattice,
+     D: ExchangeData,
+     R: Semigroup + ExchangeData,
 -    O: OrdOffset,
 +    O: OrdOffset + 'static,
-@@
+     <O as TryFrom<usize>>::Error: Debug,
+     <O as TryInto<usize>>::Error: Debug,
+ {
+@@ -39,7 +39,7 @@
+     S::Timestamp: Lattice,
+     D: ExchangeData + Hashable,
+     R: Semigroup + ExchangeData,
 -    O: OrdOffset,
 +    O: OrdOffset + 'static,
-*** End Patch
-*** Update File: differential_datalog/src/dataflow/distinct.rs
-@@
+     <O as TryFrom<usize>>::Error: Debug,
+     <O as TryInto<usize>>::Error: Debug,
+ {
+--- a/differential_datalog/src/dataflow/distinct.rs
++++ b/differential_datalog/src/dataflow/distinct.rs
+@@ -34,7 +34,7 @@
+     S::Timestamp: Lattice,
+     D: ExchangeData + Hashable,
+     R: Abelian + ExchangeData + Add<Output = R> + From<i8>,
 -    O: OrdOffset,
 +    O: OrdOffset + 'static,
-*** End Patch
+     <O as TryFrom<usize>>::Error: Debug,
+     <O as TryInto<usize>>::Error: Debug,
+ {
+
