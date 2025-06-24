@@ -26,7 +26,10 @@ fmt: generated/lille_ddlog/lib.rs
 fmt-check: generated/lille_ddlog/lib.rs
 	cargo fmt --package lille --package build_support --package test_utils -- --check
 
-build-support-run:
+generated:
+	mkdir -p generated
+
+build-support-run: generated
 	./scripts/build_support_runner.sh
 
 generated/lille_ddlog/lib.rs: build-support-run
