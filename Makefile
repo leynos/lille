@@ -58,8 +58,9 @@ generated/lille_ddlog/lib.rs: build-support-run
 	sed -i 's/^name = "lille"/name = "lille-ddlog"/' generated/lille_ddlog/Cargo.toml
 	# Remove workspace configuration from generated Cargo.toml (DDlog generates this incorrectly)
 	sed -i '/^\[workspace\]/,$$d' generated/lille_ddlog/Cargo.toml
-	# Suppress all clippy warnings on generated profiler code (not worth fixing generated code)
+	# Suppress all clippy warnings on generated ddlog code (not worth fixing generated code)
 	sed -i '1i#![allow(clippy::all)]' generated/lille_ddlog/ddlog_profiler/src/lib.rs
+	sed -i '1i#![allow(clippy::all)]' generated/lille_ddlog/ddlog_derive/src/lib.rs
 
 targets/ddlog/debug/lille: generated/lille_ddlog/lib.rs
 	RUSTFLAGS="-D warnings" cargo build --features ddlog --target-dir targets/ddlog
