@@ -78,10 +78,7 @@ pub fn build_with_options(options: &BuildOptions) -> Result<()> {
 
     constants::generate_constants(&manifest_dir, &out_dir)?;
     let font_path = font::download_font(&manifest_dir)?;
-    let ddlog_dir = options
-        .ddlog_dir
-        .clone()
-        .unwrap_or_else(|| out_dir.clone());
+    let ddlog_dir = options.ddlog_dir.clone().unwrap_or_else(|| out_dir.clone());
     compile_ddlog_optional(&manifest_dir, &ddlog_dir, options)?;
 
     println!("cargo:rustc-env=FONT_PATH={}", font_path.display());
