@@ -52,9 +52,13 @@ generated/lille_ddlog/lib.rs.stub: generated
 	> generated/lille_ddlog/lib.rs.stub
 
 generated/lille_ddlog/lib.rs: build-support-run
+	# Apply patches to fix static linking issues in generated DDlog code
 	patch -N -p1 -d generated/lille_ddlog < patches/fix_static.patch
+	# Rename the generated crate from "lille" to "lille-ddlog" to avoid conflicts
 	sed -i 's/^name = "lille"/name = "lille-ddlog"/' generated/lille_ddlog/Cargo.toml
+	# Remove workspace configuration from generated Cargo.toml (DDlog generates this incorrectly)
 	sed -i '/^\[workspace\]/,$$d' generated/lille_ddlog/Cargo.toml
+	# Suppress all clippy warnings on generated profiler code (not worth fixing generated code)
 	sed -i '1i#![allow(clippy::all)]' generated/lille_ddlog/ddlog_profiler/src/lib.rs
 
 targets/ddlog/debug/lille: generated/lille_ddlog/lib.rs
