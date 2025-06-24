@@ -23,7 +23,7 @@ jobs:
       - name: Format
         run: make fmt-check
       - name: Build ddlog inferencer
-        run: make build-support-run
+        run: make generated/lille_ddlog/lib.rs
       - name: Lint
         run: cargo clippy --all-targets --all-features -- -D warnings
       - name: Test
