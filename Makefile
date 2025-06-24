@@ -76,9 +76,12 @@ generated/lille_ddlog/lib.rs: build-support-run
 	# Remove workspace configuration from generated Cargo.toml (DDlog generates this incorrectly)
 	$(SED_INPLACE) '/^\[workspace\]/,$$d' generated/lille_ddlog/Cargo.toml
 	# Suppress all clippy warnings on generated ddlog code (not worth fixing generated code)
-	for lib in ddlog_profiler ddlog_derive; do \
-		$(SED_INPLACE) '1i#![allow(clippy::all)]' generated/lille_ddlog/$$lib/src/lib.rs; \
-	done
+	find generated/lille_ddlog -name "*.rs" -type f -print0 | \
+		while IFS= read -r -d $$'\0' file; do \
+			if ! head -1 "$$file" | grep -q "^#!\[allow(clippy::all)\]"; then \
+				$(SED_INPLACE) "1i#![allow(clippy::all)]" "$$file"; \
+			fi; \
+		done
 
 targets/ddlog/debug/lille: generated/lille_ddlog/lib.rs
 	$(RUSTFLAGS_STRICT) cargo build --features ddlog $(DDLOG_TARGET_DIR)
