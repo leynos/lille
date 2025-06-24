@@ -204,7 +204,7 @@ mod tests {
         let mut fetcher = MockFontFetcher::new();
         fetcher
             .expect_fetch()
-            .returning(|| Err("network error".into()));
+            .returning(|| Err(eyre!("network error")));
         let result = download_font_with(&fetcher, &manifest_path).unwrap();
         assert!(result == fallback_font_path() || result.exists());
     }
@@ -214,7 +214,7 @@ mod tests {
         let mut fetcher = MockFontFetcher::new();
         fetcher
             .expect_fetch()
-            .returning(|| Err("network error".into()));
+            .returning(|| Err(eyre!("network error")));
         let result = download_font_with(&fetcher, Path::new("/non/existent/path"));
         assert!(result.is_ok());
         let p = result.unwrap();
