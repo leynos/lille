@@ -27,11 +27,6 @@ case "$(uname -s)" in
     *) echo "Error: this installer only supports Linux" >&2; exit 1 ;;
 esac
 
-case "$(uname -m)" in
-    x86_64|amd64) ;;
-    *) echo "Error: prebuilt DDlog archive only available for x86_64" >&2; exit 1 ;;
-esac
-
 TMP_DIR="$(mktemp -d)"
 
 echo "Downloading DDlog archive..."
