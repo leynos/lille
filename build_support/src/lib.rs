@@ -30,8 +30,8 @@ mod build_options {
         #[ortho_config(default = false)]
         pub fail_on_ddlog_error: bool,
 
-        /// Destination directory for the generated `ddlog_lille` crate.
-        /// If not provided, defaults to `OUT_DIR/ddlog_lille`.
+        /// Destination directory for the generated `lille_ddlog` crate.
+        /// If not provided, defaults to `OUT_DIR/lille_ddlog`.
         pub ddlog_dir: Option<std::path::PathBuf>,
     }
 }
@@ -78,10 +78,7 @@ pub fn build_with_options(options: &BuildOptions) -> Result<()> {
 
     constants::generate_constants(&manifest_dir, &out_dir)?;
     let font_path = font::download_font(&manifest_dir)?;
-    let ddlog_dir = options
-        .ddlog_dir
-        .clone()
-        .unwrap_or_else(|| out_dir.join("ddlog_lille"));
+    let ddlog_dir = options.ddlog_dir.clone().unwrap_or_else(|| out_dir.clone());
     compile_ddlog_optional(&manifest_dir, &ddlog_dir, options)?;
 
     println!("cargo:rustc-env=FONT_PATH={}", font_path.display());

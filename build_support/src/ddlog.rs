@@ -17,7 +17,7 @@ static DDLOG_AVAILABLE: OnceCell<bool> = OnceCell::new();
 /// # Parameters
 /// - `manifest_dir`: The crate's manifest directory containing
 ///   `src/ddlog/lille.dl`.
-/// - `crate_dir`: Directory where the `ddlog_lille` crate will be generated.
+/// - `crate_dir`: Directory where the `lille_ddlog` crate will be generated.
 ///
 /// # Returns
 /// `Ok(())` if the sources compile successfully or compilation is skipped.
