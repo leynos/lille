@@ -2,21 +2,32 @@ pub mod api {
     use serde::{Deserialize, Serialize};
     use serde_json::Value;
 
-    #[derive(Clone, Debug, Default, Serialize, Deserialize)]
-    pub struct DDValue(pub Value);
+    pub mod ddval {
+        use super::*;
 
-    impl DDValue {
-        pub fn from<T: Serialize>(val: &T) -> Result<Self, serde_json::Error> {
-            Ok(Self(serde_json::to_value(val)?))
+        #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+        pub struct DDValue(pub Value);
+
+        impl DDValue {
+            pub fn from<T: Serialize>(val: &T) -> Result<Self, serde_json::Error> {
+                Ok(Self(serde_json::to_value(val)?))
+            }
         }
     }
 
-    #[derive(Clone, Debug)]
-    pub struct Update {
-        pub relid: usize,
-        pub weight: isize,
-        pub value: DDValue,
+    pub mod program {
+        use super::ddval::DDValue;
+
+        #[derive(Clone, Debug)]
+        pub struct Update {
+            pub relid: usize,
+            pub weight: isize,
+            pub value: DDValue,
+        }
     }
+
+    pub use ddval::DDValue;
+    pub use program::Update;
 
     #[derive(Default, Clone, Debug)]
     pub struct DeltaMap;

@@ -8,7 +8,7 @@ use crate::components::{Block, BlockSlope, UnitType};
 use crate::{GRACE_DISTANCE, GRAVITY_PULL};
 
 #[cfg(feature = "ddlog")]
-use differential_datalog::api::{self, DDValue, HDDlog, Update as DdlogUpdate};
+use differential_datalog::api::{self, ddval::DDValue, program::Update as DdlogUpdate, HDDlog};
 
 const GRACE_DISTANCE_F32: f32 = GRACE_DISTANCE as f32;
 const GRAVITY_PULL_F32: f32 = GRAVITY_PULL as f32;
