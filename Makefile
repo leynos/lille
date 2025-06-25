@@ -54,7 +54,7 @@ ddlog-stubs:
 	cp stubs/lille_ddlog/differential_datalog/lib.rs generated/lille_ddlog/differential_datalog/lib.rs
 
 
-generated/lille_ddlog/lib.rs: build-support-run
+generated/lille_ddlog/lib.rs: build-support-run patches/fix_static.patch
 	# Apply patches to fix static linking issues in generated DDlog code
 	patch -N -p1 -d generated/lille_ddlog < patches/fix_static.patch
 	# Rename the generated crate from "lille" to "lille-ddlog" to avoid conflicts
