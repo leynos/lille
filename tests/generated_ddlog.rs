@@ -9,17 +9,26 @@ fn generated_ddlog_crate_present() {
         "Directory {:?} missing",
         base.canonicalize().unwrap_or(base.clone())
     );
+    let lib_rs = base.join("lib.rs");
     assert!(
-        base.join("lib.rs").is_file(),
-        "generated/lille_ddlog/lib.rs missing"
+        lib_rs.is_file(),
+        "File {:?} missing",
+        lib_rs.canonicalize().unwrap_or_else(|_| lib_rs.clone())
     );
     let ddlog_subcrate = base.join("differential_datalog");
     assert!(
         ddlog_subcrate.is_dir(),
-        "differential_datalog subcrate missing"
+        "Directory {:?} missing",
+        ddlog_subcrate
+            .canonicalize()
+            .unwrap_or_else(|_| ddlog_subcrate.clone())
     );
+    let ddlog_lib = ddlog_subcrate.join("lib.rs");
     assert!(
-        ddlog_subcrate.join("lib.rs").is_file(),
-        "differential_datalog/lib.rs missing"
+        ddlog_lib.is_file(),
+        "File {:?} missing",
+        ddlog_lib
+            .canonicalize()
+            .unwrap_or_else(|_| ddlog_lib.clone())
     );
 }
