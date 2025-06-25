@@ -6,6 +6,9 @@ use hashbrown::HashMap;
 use crate::components::{Block, BlockSlope, DdlogId, Health, Target, UnitType};
 use crate::ddlog_handle::{DdlogEntity, DdlogHandle};
 
+#[cfg(feature = "ddlog")]
+use lille_ddlog::api::Update;
+
 /// Pushes the current ECS state into DDlog.
 /// This implementation is a stub that simply logs the state.
 pub fn push_state_to_ddlog_system(
@@ -49,6 +52,13 @@ pub fn push_state_to_ddlog_system(
     ddlog.entities = new_entities;
     ddlog.blocks = blocks;
     ddlog.slopes = slopes;
+
+    #[cfg(feature = "ddlog")]
+    {
+        ddlog.prog.transaction_start().ok();
+        let upds: Vec<Update> = Vec::new();
+        let _ = ddlog.prog.apply_updates(&mut upds.into_iter());
+    }
 }
 
 /// Applies the inferred movement deltas from the DDlog stub.

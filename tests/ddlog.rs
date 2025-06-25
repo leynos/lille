@@ -1,7 +1,11 @@
 //! Integration tests for the DDlog interface.
 //! Ensures that relations defined in the Datalog schema match expectations.
-use glam::{Vec2, Vec3};
-use lille::{ddlog_handle::DdlogEntity, DdlogHandle, UnitType};
+use bevy::prelude::*;
+use glam::Vec2;
+use lille::{
+    apply_ddlog_deltas_system, init_ddlog_system, push_state_to_ddlog_system, DdlogHandle, DdlogId,
+    Health, Target, UnitType,
+};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::collections::HashSet;
@@ -50,18 +54,26 @@ fn parsed_constants() -> HashSet<String> {
 
 #[test]
 fn ddlog_moves_towards_target() {
-    let mut handle = DdlogHandle::default();
-    handle.entities.insert(
-        1,
-        DdlogEntity {
-            position: Vec3::ZERO,
-            unit: UnitType::Civvy { fraidiness: 1.0 },
-            health: 100,
-            target: Some(Vec2::new(5.0, 0.0)),
-        },
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
+    app.add_systems(Startup, init_ddlog_system);
+    app.add_systems(
+        Update,
+        (push_state_to_ddlog_system, apply_ddlog_deltas_system).chain(),
     );
+    let _e = app
+        .world
+        .spawn((
+            DdlogId(1),
+            Transform::default(),
+            Health(100),
+            UnitType::Civvy { fraidiness: 1.0 },
+            Target(Vec2::new(5.0, 0.0)),
+        ))
+        .id();
 
-    handle.step();
+    app.update();
+    let handle = app.world.resource::<DdlogHandle>();
     let ent = handle.entities.get(&1).unwrap();
     assert!(
         ent.position.x > 0.1,
@@ -81,27 +93,32 @@ fn ddlog_moves_towards_target() {
 /// ddlog_flees_from_baddie();
 /// ```
 fn ddlog_flees_from_baddie() {
-    let mut handle = DdlogHandle::default();
-    handle.entities.insert(
-        1,
-        DdlogEntity {
-            position: Vec3::ZERO,
-            unit: UnitType::Civvy { fraidiness: 1.0 },
-            health: 100,
-            target: Some(Vec2::new(10.0, 0.0)),
-        },
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
+    app.add_systems(Startup, init_ddlog_system);
+    app.add_systems(
+        Update,
+        (push_state_to_ddlog_system, apply_ddlog_deltas_system).chain(),
     );
-    handle.entities.insert(
-        2,
-        DdlogEntity {
-            position: Vec3::new(1.0, 0.0, 0.0),
-            unit: UnitType::Baddie { meanness: 1.0 },
-            health: 100,
-            target: None,
-        },
-    );
+    let _civvy = app
+        .world
+        .spawn((
+            DdlogId(1),
+            Transform::default(),
+            Health(100),
+            UnitType::Civvy { fraidiness: 1.0 },
+            Target(Vec2::new(10.0, 0.0)),
+        ))
+        .id();
+    app.world.spawn((
+        DdlogId(2),
+        Transform::from_xyz(1.0, 0.0, 0.0),
+        Health(100),
+        UnitType::Baddie { meanness: 1.0 },
+    ));
 
-    handle.step();
+    app.update();
+    let handle = app.world.resource::<DdlogHandle>();
     let ent = handle.entities.get(&1).unwrap();
     assert!(
         ent.position.x < -0.1,

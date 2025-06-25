@@ -7,6 +7,9 @@ use serde::Serialize;
 use crate::components::{Block, BlockSlope, UnitType};
 use crate::{GRACE_DISTANCE, GRAVITY_PULL};
 
+#[cfg(feature = "ddlog")]
+use lille_ddlog::api::{self, HDDlog, Update};
+
 const GRACE_DISTANCE_F32: f32 = GRACE_DISTANCE as f32;
 const GRAVITY_PULL_F32: f32 = GRAVITY_PULL as f32;
 
@@ -37,12 +40,29 @@ pub struct NewPosition {
     pub z: f32,
 }
 
-#[derive(Resource, Default)]
+#[derive(Resource)]
 pub struct DdlogHandle {
+    #[cfg(feature = "ddlog")]
+    pub prog: HDDlog,
     pub blocks: Vec<Block>,
     pub slopes: HashMap<i64, BlockSlope>,
     pub entities: HashMap<i64, DdlogEntity>,
     pub deltas: Vec<NewPosition>,
+}
+
+impl Default for DdlogHandle {
+    fn default() -> Self {
+        #[cfg(feature = "ddlog")]
+        let (prog, _init) = api::run(1, false).expect("failed to start DDlog");
+        Self {
+            #[cfg(feature = "ddlog")]
+            prog,
+            blocks: Vec::new(),
+            slopes: HashMap::new(),
+            entities: HashMap::new(),
+            deltas: Vec::new(),
+        }
+    }
 }
 
 pub fn init_ddlog_system(mut commands: Commands) {
@@ -136,6 +156,14 @@ impl DdlogHandle {
     }
 
     pub fn step(&mut self) {
+        #[cfg(feature = "ddlog")]
+        {
+            self.prog.transaction_start().ok();
+            let upds: Vec<Update> = Vec::new();
+            let _ = self.prog.apply_updates(&mut upds.into_iter());
+            let _ = self.prog.transaction_commit_dump_changes();
+        }
+
         let updates: Vec<(i64, Vec3)> = self
             .entities
             .iter()
