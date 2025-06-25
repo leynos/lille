@@ -8,7 +8,7 @@ use crate::components::{Block, BlockSlope, UnitType};
 use crate::{GRACE_DISTANCE, GRAVITY_PULL};
 
 #[cfg(feature = "ddlog")]
-use lille_ddlog::api::{self, DDValue, HDDlog, Update};
+use lille_ddlog::api::{self, DDValue, HDDlog, Update as DdlogUpdate};
 
 const GRACE_DISTANCE_F32: f32 = GRACE_DISTANCE as f32;
 const GRAVITY_PULL_F32: f32 = GRAVITY_PULL as f32;
@@ -169,7 +169,7 @@ impl DdlogHandle {
             let mut upds = Vec::new();
             for (&id, ent) in self.entities.iter() {
                 match DDValue::from(&(id, ent)) {
-                    Ok(val) => upds.push(Update {
+                    Ok(val) => upds.push(DdlogUpdate {
                         relid: Relations::Position as usize,
                         weight: 1,
                         value: val,
