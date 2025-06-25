@@ -8,7 +8,9 @@ use crate::components::{Block, BlockSlope, UnitType};
 use crate::{GRACE_DISTANCE, GRAVITY_PULL};
 
 #[cfg(feature = "ddlog")]
-use differential_datalog::api::{self, DDValue, HDDlog, Update as DdlogUpdate};
+use differential_datalog::api::{DDValue, HDDlog, Update as DdlogUpdate};
+#[cfg(feature = "ddlog")]
+use differential_datalog::ddlog::{DDlog, DDlogDynamic};
 
 const GRACE_DISTANCE_F32: f32 = GRACE_DISTANCE as f32;
 const GRAVITY_PULL_F32: f32 = GRAVITY_PULL as f32;
@@ -53,7 +55,7 @@ pub struct DdlogHandle {
 impl Default for DdlogHandle {
     fn default() -> Self {
         #[cfg(feature = "ddlog")]
-        let prog = match api::run(1, false) {
+        let prog = match lille_ddlog::api::run(1, false) {
             Ok((p, _)) => Some(p),
             Err(e) => {
                 log::error!("failed to start DDlog: {e}");
@@ -182,9 +184,9 @@ impl DdlogHandle {
 
             if let Err(e) = prog.transaction_start() {
                 log::error!("DDlog transaction_start failed: {e}");
-            } else if let Err(e) = prog.apply_updates(&mut upds.into_iter()) {
+            } else if let Err(e) = prog.apply_updates_dynamic(&mut upds.into_iter()) {
                 log::error!("DDlog apply_updates failed: {e}");
-            } else if let Err(e) = prog.transaction_commit_dump_changes() {
+            } else if let Err(e) = prog.transaction_commit_dump_changes_dynamic() {
                 log::error!("DDlog commit failed: {e}");
             }
         }
