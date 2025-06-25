@@ -8,9 +8,14 @@ use crate::components::{Block, BlockSlope, UnitType};
 use crate::{GRACE_DISTANCE, GRAVITY_PULL};
 
 #[cfg(feature = "ddlog")]
-use differential_datalog::api::{DDValue, HDDlog, Update as DdlogUpdate};
+use differential_datalog::api::HDDlog;
 #[cfg(feature = "ddlog")]
-use differential_datalog::ddlog::{DDlog, DDlogDynamic};
+use differential_datalog::ddval::DDValue;
+#[cfg(feature = "ddlog")]
+use differential_datalog::program::Update as DdlogUpdate;
+#[cfg(feature = "ddlog")]
+#[allow(unused_imports)]
+use differential_datalog::{DDlog, DDlogDynamic};
 
 const GRACE_DISTANCE_F32: f32 = GRACE_DISTANCE as f32;
 const GRAVITY_PULL_F32: f32 = GRAVITY_PULL as f32;
@@ -55,7 +60,7 @@ pub struct DdlogHandle {
 impl Default for DdlogHandle {
     fn default() -> Self {
         #[cfg(feature = "ddlog")]
-        let prog = match lille_ddlog::api::run(1, false) {
+        let prog = match lille_ddlog::run(1, false) {
             Ok((p, _)) => Some(p),
             Err(e) => {
                 log::error!("failed to start DDlog: {e}");

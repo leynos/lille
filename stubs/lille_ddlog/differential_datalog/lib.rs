@@ -1,4 +1,4 @@
-pub mod api {
+pub mod record {
     use serde::{Deserialize, Serialize};
     use serde_json::Value;
 
@@ -10,6 +10,10 @@ pub mod api {
             Ok(Self(serde_json::to_value(val)?))
         }
     }
+}
+
+pub mod program {
+    use super::record::DDValue;
 
     #[derive(Clone, Debug)]
     pub struct Update {
@@ -20,6 +24,22 @@ pub mod api {
 
     #[derive(Default, Clone, Debug)]
     pub struct DeltaMap;
+
+    pub trait DDlog {}
+    pub trait DDlogDynamic {}
+}
+
+pub mod ddval {
+    pub use super::record::DDValue;
+}
+
+pub use record::DDValue;
+pub use program::{DeltaMap, Update, DDlog, DDlogDynamic};
+
+pub use api::run;
+
+pub mod api {
+    use super::program::{DeltaMap, Update};
 
     #[derive(Clone, Debug)]
     pub struct HDDlog;
@@ -36,8 +56,19 @@ pub mod api {
             Ok(())
         }
 
+        pub fn apply_updates_dynamic<I>(&self, updates: &mut I) -> Result<(), String>
+        where
+            I: Iterator<Item = Update>,
+        {
+            self.apply_updates(updates)
+        }
+
         pub fn transaction_commit_dump_changes(&self) -> Result<DeltaMap, String> {
             Ok(DeltaMap)
+        }
+
+        pub fn transaction_commit_dump_changes_dynamic(&self) -> Result<DeltaMap, String> {
+            self.transaction_commit_dump_changes()
         }
     }
 

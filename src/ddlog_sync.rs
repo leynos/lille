@@ -7,9 +7,12 @@ use crate::components::{Block, BlockSlope, DdlogId, Health, Target, UnitType};
 use crate::ddlog_handle::{DdlogEntity, DdlogHandle};
 
 #[cfg(feature = "ddlog")]
-use differential_datalog::ddlog::{DDlog, DDlogDynamic};
+use differential_datalog::ddval::DDValue;
 #[cfg(feature = "ddlog")]
-use lille_ddlog::api::{DDValue, Update as DdlogUpdate};
+use differential_datalog::program::Update as DdlogUpdate;
+#[cfg(feature = "ddlog")]
+#[allow(unused_imports)]
+use differential_datalog::{DDlog, DDlogDynamic};
 #[cfg(feature = "ddlog")]
 use lille_ddlog::Relations;
 
