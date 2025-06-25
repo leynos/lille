@@ -1,9 +1,14 @@
-#[cfg(feature = "ddlog")]
+#![cfg(feature = "ddlog")]
+
 #[test]
 fn generated_ddlog_crate_present() {
     use std::path::Path;
     let base = Path::new("generated").join("lille_ddlog");
-    assert!(base.exists(), "generated/lille_ddlog directory missing");
+    assert!(
+        base.is_dir(),
+        "Directory {:?} missing",
+        base.canonicalize().unwrap_or(base.clone())
+    );
     assert!(
         base.join("lib.rs").is_file(),
         "generated/lille_ddlog/lib.rs missing"

@@ -93,8 +93,9 @@ stubs are replaced by the actual inferencer generated from the DDlog ruleset.
 
 ## Running tests with DDlog
 
-Before executing any tests that use the `ddlog` feature, build the inferencer
-crate so that the generated sources are available:
+Before executing any tests that use the `ddlog` feature, make sure the DDlog
+tool-chain is installed (see *Installing DDlog* above) and then build the
+inferencer crate so that the generated sources are available:
 
 ```bash
 make generated/lille_ddlog/lib.rs
