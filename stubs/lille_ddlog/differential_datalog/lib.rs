@@ -40,4 +40,8 @@ pub mod api {
             Ok(DeltaMap)
         }
     }
+
+    pub fn run(_workers: usize, _do_store: bool) -> Result<(HDDlog, DeltaMap), String> {
+        Err("unimplemented".to_string())
+    }
 }

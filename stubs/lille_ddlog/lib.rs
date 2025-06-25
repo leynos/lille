@@ -9,8 +9,8 @@
 pub mod api {
     pub use differential_datalog::api::{DDValue, DeltaMap, HDDlog, Update};
 
-    pub fn run(_workers: usize, _do_store: bool) -> Result<(HDDlog, DeltaMap), String> {
-        Ok((HDDlog, DeltaMap))
+    pub fn run(workers: usize, do_store: bool) -> Result<(HDDlog, DeltaMap), String> {
+        differential_datalog::api::run(workers, do_store).map_err(|e| e.to_string())
     }
 }
 
