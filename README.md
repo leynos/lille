@@ -90,3 +90,21 @@ project can be formatted and linted without running the DDlog compiler. The
 `ddlog-stubs` Makefile target copies these stubs from the `stubs/` directory
 into `generated/`. When the `generated/lille_ddlog/lib.rs` target is built, the
 stubs are replaced by the actual inferencer generated from the DDlog ruleset.
+
+## Running tests with DDlog
+
+Before executing any tests that use the `ddlog` feature, build the inferencer
+crate so that the generated sources are available:
+
+```bash
+make generated/lille_ddlog/lib.rs
+```
+
+This command produces `generated/lille_ddlog/lib.rs` and the nested
+`differential_datalog` crate. Afterwards run:
+
+```bash
+make test-ddlog
+```
+
+which invokes `cargo test --features ddlog` with the compiled crate.
