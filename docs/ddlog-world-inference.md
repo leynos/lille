@@ -328,7 +328,7 @@ fn push_state_to_ddlog_system(
         // e.g., changes.push(DDlogRecord::insert("Command", ...));
     }
 
-    ddlog.apply_updates(&mut changes.into_iter()).unwrap();
+    ddlog.apply_updates_dynamic(&mut changes.into_iter()).unwrap();
 }
 
 // System to apply DDlog's computed changes back to the ECS
@@ -338,7 +338,7 @@ fn apply_ddlog_deltas_system(
     mut query: Query<(&mut Transform, &mut Health)>,
 ) {
     let mut ddlog = ddlog_handle.0.lock().unwrap();
-    let changes = ddlog.transaction_commit_dump_changes().unwrap();
+    let changes = ddlog.transaction_commit_dump_changes_dynamic().unwrap();
 
     // Apply NewPosition changes
     for rec in changes.get_records("NewPosition") {

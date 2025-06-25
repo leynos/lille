@@ -16,10 +16,9 @@ pub mod program {
     use super::record::DDValue;
 
     #[derive(Clone, Debug)]
-    pub struct Update {
-        pub relid: usize,
-        pub weight: isize,
-        pub value: DDValue,
+    pub enum Update {
+        Insert { relid: usize, value: DDValue },
+        Delete { relid: usize, value: DDValue },
     }
 
     #[derive(Default, Clone, Debug)]

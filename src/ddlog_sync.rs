@@ -65,9 +65,8 @@ pub fn push_state_to_ddlog_system(
         let mut upds = Vec::new();
         for (&id, ent) in ddlog.entities.iter() {
             match DDValue::from(&(id, ent)) {
-                Ok(val) => upds.push(DdlogUpdate {
+                Ok(val) => upds.push(DdlogUpdate::Insert {
                     relid: Relations::Position as usize,
-                    weight: 1,
                     value: val,
                 }),
                 Err(e) => log::error!("failed to encode entity {id}: {e}"),

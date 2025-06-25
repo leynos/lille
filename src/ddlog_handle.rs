@@ -176,9 +176,8 @@ impl DdlogHandle {
             let mut upds = Vec::new();
             for (&id, ent) in self.entities.iter() {
                 match DDValue::from(&(id, ent)) {
-                    Ok(val) => upds.push(DdlogUpdate {
+                    Ok(val) => upds.push(DdlogUpdate::Insert {
                         relid: Relations::Position as usize,
-                        weight: 1,
                         value: val,
                     }),
                     Err(e) => {
