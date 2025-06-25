@@ -1,7 +1,7 @@
 .PHONY: all clean build fmt fmt-check test lint \
-	    build-support-run \
-	    build-ddlog test-ddlog build-inferencer \
-	    markdownlint nixie
+            build-support-run ddlog-stubs \
+            build-ddlog test-ddlog build-inferencer \
+            markdownlint nixie
 
 .ONESHELL:
 SHELL := bash
@@ -24,19 +24,19 @@ all: build
 clean:
 	cargo clean
 
-build: generated/lille_ddlog/lib.rs.stub
+build: ddlog-stubs
 	$(RUSTFLAGS_STRICT) cargo build
 
 build-ddlog: targets/ddlog/debug/lille
 
-test: generated/lille_ddlog/lib.rs.stub
+test: ddlog-stubs
 	$(RUSTFLAGS_STRICT) cargo test
 
-fmt: generated/lille_ddlog/lib.rs.stub
+fmt: ddlog-stubs
 	cargo fmt $(WORKSPACE_PACKAGES)
 	mdformat-all
 
-fmt-check: generated/lille_ddlog/lib.rs.stub
+fmt-check: ddlog-stubs
 	cargo fmt $(WORKSPACE_PACKAGES) -- --check
 
 generated/lille_ddlog:
@@ -45,26 +45,16 @@ generated/lille_ddlog:
 build-support-run: generated
 	./scripts/build_support_runner.sh
 
-# Create a stub lib.rs file for formatting and dependency resolution
-generated/lille_ddlog/lib.rs.stub: generated/lille_ddlog
-	mkdir -p generated/lille_ddlog
-	[[ -f generated/lille_ddlog/Cargo.toml ]] || \
-	printf '%s\n' \
-	'[package]' \
-	'name = "lille-ddlog"' \
-	'version = "0.1.0"' \
-	'edition = "2021"' \
-	'' \
-	'[lib]' \
-	'path = "lib.rs"' \
-	> generated/lille_ddlog/Cargo.toml
-	[[ -f generated/lille_ddlog/lib.rs ]] || \
-	printf '%s\n' \
-	'//! Stub file for lille-ddlog crate.' \
-	'//! This file is replaced during the build process with generated DDlog code.' \
-	> generated/lille_ddlog/lib.rs
+# Copy prebuilt DDlog stubs into the generated directory
+ddlog-stubs:
+	mkdir -p generated/lille_ddlog/differential_datalog
+	cp stubs/lille_ddlog/Cargo.toml generated/lille_ddlog/Cargo.toml
+	cp stubs/lille_ddlog/lib.rs generated/lille_ddlog/lib.rs
+	cp stubs/lille_ddlog/differential_datalog/Cargo.toml generated/lille_ddlog/differential_datalog/Cargo.toml
+	cp stubs/lille_ddlog/differential_datalog/lib.rs generated/lille_ddlog/differential_datalog/lib.rs
 
-generated/lille_ddlog/lib.rs: build-support-run
+
+generated/lille_ddlog/lib.rs: build-support-run patches/fix_static.patch
 	# Apply patches to fix static linking issues in generated DDlog code
 	patch -N -p1 -d generated/lille_ddlog < patches/fix_static.patch
 	# Rename the generated crate from "lille" to "lille-ddlog" to avoid conflicts
@@ -85,7 +75,7 @@ targets/ddlog/debug/lille: generated/lille_ddlog/lib.rs
 test-ddlog: build-inferencer
 	$(RUSTFLAGS_STRICT) cargo test --features ddlog $(DDLOG_TARGET_DIR)
 	
-lint: generated/lille_ddlog/lib.rs.stub
+lint: ddlog-stubs
 	cargo clippy --all-targets --all-features -- -D warnings
 
 markdownlint:

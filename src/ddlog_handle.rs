@@ -164,19 +164,29 @@ impl DdlogHandle {
     pub fn step(&mut self) {
         #[cfg(feature = "ddlog")]
         if let Some(prog) = &self.prog {
+            use lille_ddlog::Relations;
+
             let mut upds = Vec::new();
             for (&id, ent) in self.entities.iter() {
-                let _ = id;
-                let _ = ent;
-                upds.push(Update {
-                    relid: 0,
-                    weight: 1,
-                    value: DDValue,
-                });
+                match DDValue::from(&(id, ent)) {
+                    Ok(val) => upds.push(Update {
+                        relid: Relations::Position as usize,
+                        weight: 1,
+                        value: val,
+                    }),
+                    Err(e) => {
+                        log::error!("failed to encode entity {id}: {e}");
+                    }
+                }
             }
-            prog.transaction_start().ok();
-            let _ = prog.apply_updates(&mut upds.into_iter());
-            let _ = prog.transaction_commit_dump_changes();
+
+            if let Err(e) = prog.transaction_start() {
+                log::error!("DDlog transaction_start failed: {e}");
+            } else if let Err(e) = prog.apply_updates(&mut upds.into_iter()) {
+                log::error!("DDlog apply_updates failed: {e}");
+            } else if let Err(e) = prog.transaction_commit_dump_changes() {
+                log::error!("DDlog commit failed: {e}");
+            }
         }
 
         let updates: Vec<(i64, Vec3)> = self

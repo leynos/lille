@@ -55,18 +55,25 @@ pub fn push_state_to_ddlog_system(
 
     #[cfg(feature = "ddlog")]
     if let Some(prog) = &ddlog.prog {
+        use lille_ddlog::Relations;
+
         let mut upds = Vec::new();
-        for (id, ent) in ddlog.entities.iter() {
-            let _ = id;
-            let _ = ent;
-            upds.push(Update {
-                relid: 0,
-                weight: 1,
-                value: DDValue,
-            });
+        for (&id, ent) in ddlog.entities.iter() {
+            match DDValue::from(&(id, ent)) {
+                Ok(val) => upds.push(Update {
+                    relid: Relations::Position as usize,
+                    weight: 1,
+                    value: val,
+                }),
+                Err(e) => log::error!("failed to encode entity {id}: {e}"),
+            }
         }
-        prog.transaction_start().ok();
-        let _ = prog.apply_updates(&mut upds.into_iter());
+
+        if let Err(e) = prog.transaction_start() {
+            log::error!("DDlog transaction_start failed: {e}");
+        } else if let Err(e) = prog.apply_updates(&mut upds.into_iter()) {
+            log::error!("DDlog apply_updates failed: {e}");
+        }
     }
 }
 

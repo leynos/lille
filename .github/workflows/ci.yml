@@ -17,15 +17,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Generate placeholder crate
-        run: make generated/lille_ddlog/lib.rs.stub
+        run: make ddlog-stubs
       - name: Setup Rust
         uses: leynos/shared-actions/.github/actions/setup-rust@v1.1.0
       - name: Setup DDlog
         uses: ./.github/actions/setup-ddlog
-      - name: Format
-        run: make fmt-check
       - name: Build ddlog inferencer
         run: make generated/lille_ddlog/lib.rs
+      - name: Format
+        run: make fmt-check
       - name: Lint
         run: cargo clippy --all-targets --all-features -- -D warnings
       - name: Test

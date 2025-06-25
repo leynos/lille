@@ -82,3 +82,11 @@ This performs the same steps as `build.rs`, generating constants, downloading
 the font, and compiling the DDlog ruleset when available. The helper does not
 output "No such file or directory" errors when locating `constants.toml`, though
 compilation may still fail if the DDlog compiler is missing.
+
+## DDlog stubs
+
+The `generated/lille_ddlog` directory is populated with placeholder code so the
+project can be formatted and linted without running the DDlog compiler. The
+`ddlog-stubs` Makefile target copies these stubs from the `stubs/` directory
+into `generated/`. When the `generated/lille_ddlog/lib.rs` target is built, the
+stubs are replaced by the actual inferencer generated from the DDlog ruleset.
