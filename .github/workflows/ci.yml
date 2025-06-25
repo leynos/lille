@@ -32,10 +32,10 @@ jobs:
         run: cargo test
       - name: Test with DDlog
         run: make test-ddlog
-      - name: Install cargo-tarpaulin
-        run: cargo install cargo-tarpaulin
+      - name: Install cargo-llvm-cov
+        run: cargo install cargo-llvm-cov
       - name: Run coverage
-        run: cargo tarpaulin --out lcov
+        run: cargo llvm-cov --workspace --all-features --lcov --output-path lcov.info
       - name: Upload coverage data to CodeScene
         if: env.CS_ACCESS_TOKEN
         uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@v1.1.1
