@@ -24,49 +24,45 @@ all: build
 clean:
 	cargo clean
 
-build:
+build: generated/lille_ddlog/lib.rs.stub
 	$(RUSTFLAGS_STRICT) cargo build
 
 build-ddlog: targets/ddlog/debug/lille
 
-test:
+test: generated/lille_ddlog/lib.rs.stub
 	$(RUSTFLAGS_STRICT) cargo test
 
-fmt:
+fmt: generated/lille_ddlog/lib.rs.stub
 	cargo fmt $(WORKSPACE_PACKAGES)
 	mdformat-all
 
 fmt-check: generated/lille_ddlog/lib.rs.stub
 	cargo fmt $(WORKSPACE_PACKAGES) -- --check
 
-generated:
+generated/lille_ddlog:
 	mkdir -p generated
 
 build-support-run: generated
 	./scripts/build_support_runner.sh
 
 # Create a stub lib.rs file for formatting and dependency resolution
-generated/lille_ddlog/lib.rs.stub: generated
+generated/lille_ddlog/lib.rs.stub: generated/lille_ddlog
 	mkdir -p generated/lille_ddlog
+	[[ -f generated/lille_ddlog/Cargo.toml ]] || \
 	printf '%s\n' \
-		'[package]' \
-		'name = "lille-ddlog"' \
-		'version = "0.1.0"' \
-		'edition = "2018"' \
-		'' \
-		'[lib]' \
-		'path = "lib.rs"' \
-		> generated/lille_ddlog/Cargo.toml
+	'[package]' \
+	'name = "lille-ddlog"' \
+	'version = "0.1.0"' \
+	'edition = "2021"' \
+	'' \
+	'[lib]' \
+	'path = "lib.rs"' \
+	> generated/lille_ddlog/Cargo.toml
+	[[ -f generated/lille_ddlog/lib.rs ]] || \
 	printf '%s\n' \
-		'//! Stub file for lille-ddlog crate.' \
-		'//! This file is replaced during the build process with generated DDlog code.' \
-		'//! It exists to satisfy Cargo'\''s dependency resolution during formatting and other operations.' \
-		'' \
-		'#![allow(dead_code)]' \
-		'' \
-		'// Minimal stub to make this a valid Rust library' \
-		> generated/lille_ddlog/lib.rs
-	touch generated/lille_ddlog/lib.rs.stub
+	'//! Stub file for lille-ddlog crate.' \
+	'//! This file is replaced during the build process with generated DDlog code.' \
+	> generated/lille_ddlog/lib.rs
 
 generated/lille_ddlog/lib.rs: build-support-run
 	# Apply patches to fix static linking issues in generated DDlog code
@@ -86,10 +82,10 @@ generated/lille_ddlog/lib.rs: build-support-run
 targets/ddlog/debug/lille: generated/lille_ddlog/lib.rs
 	$(RUSTFLAGS_STRICT) cargo build --features ddlog $(DDLOG_TARGET_DIR)
 
-test-ddlog: build-inferencer
-	0 0RUSTFLAGS_STRICT) cargo test --features ddlog 0 0DDLOG_TARGET_DIR)
-
-lint:
+test-ddlog: generated/lille_ddlog/lib.rs
+	$(RUSTFLAGS_STRICT) cargo test --features ddlog $(DDLOG_TARGET_DIR)
+	
+lint: generated/lille_ddlog/lib.rs.stub
 	cargo clippy --all-targets --all-features -- -D warnings
 
 markdownlint:
