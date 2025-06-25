@@ -7,7 +7,7 @@ use crate::components::{Block, BlockSlope, DdlogId, Health, Target, UnitType};
 use crate::ddlog_handle::{DdlogEntity, DdlogHandle};
 
 #[cfg(feature = "ddlog")]
-use lille_ddlog::api::{DDValue, Update};
+use lille_ddlog::api::{DDValue, Update as DdlogUpdate};
 
 /// Pushes the current ECS state into DDlog.
 /// This implementation is a stub that simply logs the state.
@@ -60,7 +60,7 @@ pub fn push_state_to_ddlog_system(
         let mut upds = Vec::new();
         for (&id, ent) in ddlog.entities.iter() {
             match DDValue::from(&(id, ent)) {
-                Ok(val) => upds.push(Update {
+                Ok(val) => upds.push(DdlogUpdate {
                     relid: Relations::Position as usize,
                     weight: 1,
                     value: val,
