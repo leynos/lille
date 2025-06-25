@@ -7,8 +7,17 @@
 // Minimal stub API mirroring the expected interface of generated DDlog code.
 
 pub mod api {
-    #[derive(Clone, Debug)]
-    pub struct DDValue;
+    use serde::{Deserialize, Serialize};
+    use serde_json::Value;
+
+    #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+    pub struct DDValue(pub Value);
+
+    impl DDValue {
+        pub fn from<T: Serialize>(val: &T) -> Result<Self, serde_json::Error> {
+            Ok(Self(serde_json::to_value(val)?))
+        }
+    }
 
     #[derive(Clone, Debug)]
     pub struct Update {

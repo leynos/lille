@@ -13,6 +13,7 @@ bevy = { version = "0.12", default-features = false, features = ["bevy_asset","b
 log = "0.4"  # Structured logging facade
 env_logger = "0.10"  # Logger implementation controlled via RUST_LOG
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 color-eyre = "0.6"
 
 [dependencies.lille-ddlog]
