@@ -40,7 +40,7 @@ fmt-check: generated/lille_ddlog/lib.rs.stub
 	cargo fmt $(WORKSPACE_PACKAGES) -- --check
 
 generated/lille_ddlog:
-	mkdir -p generated
+	mkdir -p generated/lille_ddlog
 
 build-support-run: generated
 	./scripts/build_support_runner.sh
@@ -96,4 +96,4 @@ nixie:
 
 # Generate, patch, and compile the DDlog inferencer
 build-inferencer: generated/lille_ddlog/lib.rs patches/fix_static.patch
-	$(RUSTFLAGS_STRICT) cargo build --manifest-path generated/ddlog_lille/lille_ddlog/Cargo.toml $(DDLOG_TARGET_DIR)
+	$(RUSTFLAGS_STRICT) cargo build --manifest-path generated/lille_ddlog/Cargo.toml $(DDLOG_TARGET_DIR)

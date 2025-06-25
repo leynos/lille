@@ -8,6 +8,7 @@ use lille::{
 };
 use once_cell::sync::Lazy;
 use regex::Regex;
+use rstest::{fixture, rstest};
 use std::collections::HashSet;
 
 const DL_SRC: &str = concat!(
@@ -52,8 +53,8 @@ fn parsed_constants() -> HashSet<String> {
     capture_set(&CONST_RE)
 }
 
-#[test]
-fn ddlog_moves_towards_target() {
+#[fixture]
+fn ddlog_app() -> App {
     let mut app = App::new();
     app.add_plugins(MinimalPlugins);
     app.add_systems(Startup, init_ddlog_system);
@@ -61,6 +62,12 @@ fn ddlog_moves_towards_target() {
         Update,
         (push_state_to_ddlog_system, apply_ddlog_deltas_system).chain(),
     );
+    app
+}
+
+#[rstest]
+fn ddlog_moves_towards_target(ddlog_app: App) {
+    let mut app = ddlog_app;
     let _e = app
         .world
         .spawn((
@@ -82,7 +89,6 @@ fn ddlog_moves_towards_target() {
     );
 }
 
-#[test]
 /// Tests that a civilian entity flees away from a nearby baddie after movement inference.
 ///
 /// This test sets up a civilian at the origin with a target position and a baddie nearby. After calling `step()`, it asserts that the civilian's x-position is negative, confirming it moved away from the threat.
@@ -92,14 +98,9 @@ fn ddlog_moves_towards_target() {
 /// ```
 /// ddlog_flees_from_baddie();
 /// ```
-fn ddlog_flees_from_baddie() {
-    let mut app = App::new();
-    app.add_plugins(MinimalPlugins);
-    app.add_systems(Startup, init_ddlog_system);
-    app.add_systems(
-        Update,
-        (push_state_to_ddlog_system, apply_ddlog_deltas_system).chain(),
-    );
+#[rstest]
+fn ddlog_flees_from_baddie(ddlog_app: App) {
+    let mut app = ddlog_app;
     let _civvy = app
         .world
         .spawn((
