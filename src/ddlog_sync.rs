@@ -7,7 +7,7 @@ use crate::components::{Block, BlockSlope, DdlogId, Health, Target, UnitType};
 use crate::ddlog_handle::{DdlogEntity, DdlogHandle};
 
 #[cfg(feature = "ddlog")]
-use lille_ddlog::api::Update;
+use differential_datalog::{ddval::DDValue, program::Update, DDlog, DDlogDynamic};
 
 /// Pushes the current ECS state into DDlog.
 /// This implementation is a stub that simply logs the state.
@@ -56,7 +56,7 @@ pub fn push_state_to_ddlog_system(
     #[cfg(feature = "ddlog")]
     {
         ddlog.prog.transaction_start().ok();
-        let upds: Vec<Update> = Vec::new();
+        let upds: Vec<Update<DDValue>> = Vec::new();
         let _ = ddlog.prog.apply_updates(&mut upds.into_iter());
     }
 }

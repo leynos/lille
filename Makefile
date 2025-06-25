@@ -82,7 +82,7 @@ generated/lille_ddlog/lib.rs: build-support-run
 targets/ddlog/debug/lille: generated/lille_ddlog/lib.rs
 	$(RUSTFLAGS_STRICT) cargo build --features ddlog $(DDLOG_TARGET_DIR)
 
-test-ddlog: generated/lille_ddlog/lib.rs
+test-ddlog: build-inferencer
 	$(RUSTFLAGS_STRICT) cargo test --features ddlog $(DDLOG_TARGET_DIR)
 	
 lint: generated/lille_ddlog/lib.rs.stub

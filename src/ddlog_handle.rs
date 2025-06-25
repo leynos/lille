@@ -8,7 +8,15 @@ use crate::components::{Block, BlockSlope, UnitType};
 use crate::{GRACE_DISTANCE, GRAVITY_PULL};
 
 #[cfg(feature = "ddlog")]
-use lille_ddlog::api::{self, HDDlog, Update};
+use differential_datalog::{
+    api::HDDlog,
+    ddval::DDValue,
+    program::Update,
+    DDlog,
+    DDlogDynamic,
+};
+#[cfg(feature = "ddlog")]
+use lille_ddlog::run;
 
 const GRACE_DISTANCE_F32: f32 = GRACE_DISTANCE as f32;
 const GRAVITY_PULL_F32: f32 = GRAVITY_PULL as f32;
@@ -53,7 +61,7 @@ pub struct DdlogHandle {
 impl Default for DdlogHandle {
     fn default() -> Self {
         #[cfg(feature = "ddlog")]
-        let (prog, _init) = api::run(1, false).expect("failed to start DDlog");
+        let (prog, _init) = run(1, false).expect("failed to start DDlog");
         Self {
             #[cfg(feature = "ddlog")]
             prog,
@@ -159,7 +167,7 @@ impl DdlogHandle {
         #[cfg(feature = "ddlog")]
         {
             self.prog.transaction_start().ok();
-            let upds: Vec<Update> = Vec::new();
+            let upds: Vec<Update<DDValue>> = Vec::new();
             let _ = self.prog.apply_updates(&mut upds.into_iter());
             let _ = self.prog.transaction_commit_dump_changes();
         }
