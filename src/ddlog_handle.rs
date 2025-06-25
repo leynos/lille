@@ -10,12 +10,14 @@ use crate::{GRACE_DISTANCE, GRAVITY_PULL};
 #[cfg(feature = "ddlog")]
 use differential_datalog::api::HDDlog;
 #[cfg(feature = "ddlog")]
-use differential_datalog::ddval::DDValue;
+use differential_datalog::program::UpdCmd;
 #[cfg(feature = "ddlog")]
 use differential_datalog::program::Update as DdlogUpdate;
 #[cfg(feature = "ddlog")]
 #[allow(unused_imports)]
 use differential_datalog::{DDlog, DDlogDynamic};
+#[cfg(feature = "ddlog")]
+use ordered_float::OrderedFloat;
 
 const GRACE_DISTANCE_F32: f32 = GRACE_DISTANCE as f32;
 const GRAVITY_PULL_F32: f32 = GRAVITY_PULL as f32;
@@ -171,27 +173,31 @@ impl DdlogHandle {
     pub fn step(&mut self) {
         #[cfg(feature = "ddlog")]
         if let Some(prog) = &self.prog {
-            use lille_ddlog::Relations;
+            use lille_ddlog::{relations::Position, Record};
 
             let mut upds = Vec::new();
             for (&id, ent) in self.entities.iter() {
-                match DDValue::from(&(id, ent)) {
-                    Ok(val) => upds.push(DdlogUpdate::Insert {
-                        relid: Relations::Position as usize,
-                        value: val,
-                    }),
-                    Err(e) => {
-                        log::error!("failed to encode entity {id}: {e}");
-                    }
-                }
+                let record = Record::Position {
+                    entity: id,
+                    x: OrderedFloat(ent.position.x),
+                    y: OrderedFloat(ent.position.y),
+                    z: OrderedFloat(ent.position.z),
+                };
+                upds.push(DdlogUpdate::Insert {
+                    relid: Position,
+                    rec: record,
+                });
             }
 
             if let Err(e) = prog.transaction_start() {
                 log::error!("DDlog transaction_start failed: {e}");
-            } else if let Err(e) = prog.apply_updates_dynamic(&mut upds.into_iter()) {
-                log::error!("DDlog apply_updates failed: {e}");
-            } else if let Err(e) = prog.transaction_commit_dump_changes_dynamic() {
-                log::error!("DDlog commit failed: {e}");
+            } else {
+                let cmds: Vec<UpdCmd> = upds.into_iter().map(Into::into).collect();
+                if let Err(e) = prog.apply_updates_dynamic(&mut cmds.into_iter()) {
+                    log::error!("DDlog apply_updates failed: {e}");
+                } else if let Err(e) = prog.transaction_commit_dump_changes_dynamic() {
+                    log::error!("DDlog commit failed: {e}");
+                }
             }
         }
 

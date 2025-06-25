@@ -951,6 +951,8 @@ fn main() -> Result<(), String> {
     // ddlog_api.insert_edge(1, 2)?;
     // ddlog_api.insert_edge(2, 3)?;
     println!("Inserted edges: 0->1, 1->2, 2->3");
+    // let mut cmds: Vec<UpdCmd> = updates.into_iter().map(Into::into).collect();
+    // ddlog_api.apply_updates_dynamic(&mut cmds.into_iter())?;
 
     // ddlog_api.transaction_commit_dump_changes_dynamic()?;
     println!("Committed transaction 1.");

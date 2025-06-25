@@ -29,3 +29,33 @@ pub enum Relations {
     NewPosition,
     NewVelocity,
 }
+
+#[allow(non_upper_case_globals)]
+pub mod relations {
+    pub const Position: usize = 0;
+    pub const Velocity: usize = 1;
+    pub const Mass: usize = 2;
+    pub const Force: usize = 3;
+    pub const NewPosition: usize = 4;
+    pub const NewVelocity: usize = 5;
+}
+
+use ordered_float::OrderedFloat;
+use serde::Serialize;
+use differential_datalog::ddval::DDValue;
+
+#[derive(Clone, Debug, Serialize)]
+pub enum Record {
+    Position {
+        entity: i64,
+        x: OrderedFloat<f32>,
+        y: OrderedFloat<f32>,
+        z: OrderedFloat<f32>,
+    },
+}
+
+impl From<Record> for DDValue {
+    fn from(rec: Record) -> Self {
+        DDValue::from(&rec).unwrap_or_default()
+    }
+}

@@ -286,6 +286,7 @@ fn push_state_to_ddlog_system(
     // EventReader for player commands
     mut player_commands: EventReader<PlayerCommand>,
 ) {
+    use differential_datalog::program::UpdCmd;
     let mut ddlog = ddlog_handle.0.lock().unwrap();
     ddlog.transaction_start().unwrap();
 
@@ -328,7 +329,8 @@ fn push_state_to_ddlog_system(
         // e.g., changes.push(DDlogRecord::insert("Command", ...));
     }
 
-    ddlog.apply_updates_dynamic(&mut changes.into_iter()).unwrap();
+    let mut cmds: Vec<UpdCmd> = changes.into_iter().map(Into::into).collect();
+    ddlog.apply_updates_dynamic(&mut cmds.into_iter()).unwrap();
 }
 
 // System to apply DDlog's computed changes back to the ECS

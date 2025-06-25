@@ -7,14 +7,14 @@ use crate::components::{Block, BlockSlope, DdlogId, Health, Target, UnitType};
 use crate::ddlog_handle::{DdlogEntity, DdlogHandle};
 
 #[cfg(feature = "ddlog")]
-use differential_datalog::ddval::DDValue;
+use differential_datalog::program::UpdCmd;
 #[cfg(feature = "ddlog")]
 use differential_datalog::program::Update as DdlogUpdate;
 #[cfg(feature = "ddlog")]
 #[allow(unused_imports)]
 use differential_datalog::{DDlog, DDlogDynamic};
 #[cfg(feature = "ddlog")]
-use lille_ddlog::Relations;
+use ordered_float::OrderedFloat;
 
 /// Pushes the current ECS state into DDlog.
 /// This implementation is a stub that simply logs the state.
@@ -61,22 +61,31 @@ pub fn push_state_to_ddlog_system(
     ddlog.slopes = slopes;
 
     #[cfg(feature = "ddlog")]
-    if let Some(prog) = &ddlog.prog {
+    {
+        use lille_ddlog::{relations::Position, Record};
+
         let mut upds = Vec::new();
         for (&id, ent) in ddlog.entities.iter() {
-            match DDValue::from(&(id, ent)) {
-                Ok(val) => upds.push(DdlogUpdate::Insert {
-                    relid: Relations::Position as usize,
-                    value: val,
-                }),
-                Err(e) => log::error!("failed to encode entity {id}: {e}"),
-            }
+            let record = Record::Position {
+                entity: id,
+                x: OrderedFloat(ent.position.x),
+                y: OrderedFloat(ent.position.y),
+                z: OrderedFloat(ent.position.z),
+            };
+            upds.push(DdlogUpdate::Insert {
+                relid: Position,
+                rec: record,
+            });
         }
-
-        if let Err(e) = prog.transaction_start() {
-            log::error!("DDlog transaction_start failed: {e}");
-        } else if let Err(e) = prog.apply_updates_dynamic(&mut upds.into_iter()) {
-            log::error!("DDlog apply_updates failed: {e}");
+        if let Some(prog) = ddlog.prog.as_mut() {
+            if let Err(e) = prog.transaction_start() {
+                log::error!("DDlog transaction_start failed: {e}");
+            } else {
+                let cmds: Vec<UpdCmd> = upds.into_iter().map(Into::into).collect();
+                if let Err(e) = prog.apply_updates_dynamic(&mut cmds.into_iter()) {
+                    log::error!("DDlog apply_updates failed: {e}");
+                }
+            }
         }
     }
 }

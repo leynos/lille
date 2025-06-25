@@ -16,9 +16,24 @@ pub mod program {
     use super::record::DDValue;
 
     #[derive(Clone, Debug)]
-    pub enum Update {
-        Insert { relid: usize, value: DDValue },
-        Delete { relid: usize, value: DDValue },
+    pub enum Update<R = DDValue> {
+        Insert { relid: usize, rec: R },
+        Delete { relid: usize, rec: R },
+    }
+
+    #[derive(Clone, Debug)]
+    pub enum UpdCmd {
+        Insert { relid: usize, val: DDValue },
+        Delete { relid: usize, val: DDValue },
+    }
+
+    impl<R: Into<DDValue>> From<Update<R>> for UpdCmd {
+        fn from(upd: Update<R>) -> Self {
+            match upd {
+                Update::Insert { relid, rec } => UpdCmd::Insert { relid, val: rec.into() },
+                Update::Delete { relid, rec } => UpdCmd::Delete { relid, val: rec.into() },
+            }
+        }
     }
 
     #[derive(Default, Clone, Debug)]
@@ -33,12 +48,12 @@ pub mod ddval {
 }
 
 pub use record::DDValue;
-pub use program::{DeltaMap, Update, DDlog, DDlogDynamic};
+pub use program::{DeltaMap, Update, UpdCmd, DDlog, DDlogDynamic};
 
 pub use api::run;
 
 pub mod api {
-    use super::program::{DeltaMap, Update};
+    use super::program::{DeltaMap, UpdCmd};
 
     #[derive(Clone, Debug)]
     pub struct HDDlog;
@@ -50,14 +65,14 @@ pub mod api {
 
         pub fn apply_updates<I>(&self, _updates: &mut I) -> Result<(), String>
         where
-            I: Iterator<Item = Update>,
+            I: Iterator<Item = UpdCmd>,
         {
             Ok(())
         }
 
         pub fn apply_updates_dynamic<I>(&self, updates: &mut I) -> Result<(), String>
         where
-            I: Iterator<Item = Update>,
+            I: Iterator<Item = UpdCmd>,
         {
             self.apply_updates(updates)
         }
