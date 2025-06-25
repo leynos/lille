@@ -4,4 +4,54 @@
 
 #![allow(dead_code)]
 
-// Minimal stub to make this a valid Rust library
+// Minimal stub API mirroring the expected interface of generated DDlog code.
+
+pub mod api {
+    #[derive(Clone, Debug)]
+    pub struct DDValue;
+
+    #[derive(Clone, Debug)]
+    pub struct Update {
+        pub relid: usize,
+        pub weight: isize,
+        pub value: DDValue,
+    }
+
+    #[derive(Default, Clone, Debug)]
+    pub struct DeltaMap;
+
+    #[derive(Clone, Debug)]
+    pub struct HDDlog;
+
+    pub fn run(_workers: usize, _do_store: bool) -> Result<(HDDlog, DeltaMap), String> {
+        Ok((HDDlog, DeltaMap))
+    }
+
+    impl HDDlog {
+        pub fn transaction_start(&self) -> Result<(), String> {
+            Ok(())
+        }
+
+        pub fn apply_updates<I>(&self, _updates: &mut I) -> Result<(), String>
+        where
+            I: Iterator<Item = Update>,
+        {
+            Ok(())
+        }
+
+        pub fn transaction_commit_dump_changes(&self) -> Result<DeltaMap, String> {
+            Ok(DeltaMap)
+        }
+    }
+}
+
+#[allow(clippy::upper_case_acronyms)]
+#[derive(Copy, Clone, Debug)]
+pub enum Relations {
+    Position,
+    Velocity,
+    Mass,
+    Force,
+    NewPosition,
+    NewVelocity,
+}

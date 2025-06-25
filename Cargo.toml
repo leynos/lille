@@ -20,7 +20,11 @@ path = "generated/lille_ddlog"
 optional = true
 
 [features]
-ddlog = ["lille-ddlog"]
+ddlog = ["lille-ddlog", "differential_datalog"]
+
+[dependencies.differential_datalog]
+path = "generated/lille_ddlog/differential_datalog"
+optional = true
 [build-dependencies]
 build_support = { path = "build_support" }
 color-eyre = "0.6"

@@ -7,6 +7,9 @@ use serde::Serialize;
 use crate::components::{Block, BlockSlope, UnitType};
 use crate::{GRACE_DISTANCE, GRAVITY_PULL};
 
+#[cfg(feature = "ddlog")]
+use lille_ddlog::api::{self, DDValue, HDDlog, Update};
+
 const GRACE_DISTANCE_F32: f32 = GRACE_DISTANCE as f32;
 const GRAVITY_PULL_F32: f32 = GRAVITY_PULL as f32;
 
@@ -37,12 +40,35 @@ pub struct NewPosition {
     pub z: f32,
 }
 
-#[derive(Resource, Default)]
+#[derive(Resource)]
 pub struct DdlogHandle {
+    #[cfg(feature = "ddlog")]
+    pub prog: Option<HDDlog>,
     pub blocks: Vec<Block>,
     pub slopes: HashMap<i64, BlockSlope>,
     pub entities: HashMap<i64, DdlogEntity>,
     pub deltas: Vec<NewPosition>,
+}
+
+impl Default for DdlogHandle {
+    fn default() -> Self {
+        #[cfg(feature = "ddlog")]
+        let prog = match api::run(1, false) {
+            Ok((p, _)) => Some(p),
+            Err(e) => {
+                log::error!("failed to start DDlog: {e}");
+                None
+            }
+        };
+        Self {
+            #[cfg(feature = "ddlog")]
+            prog,
+            blocks: Vec::new(),
+            slopes: HashMap::new(),
+            entities: HashMap::new(),
+            deltas: Vec::new(),
+        }
+    }
 }
 
 pub fn init_ddlog_system(mut commands: Commands) {
@@ -136,6 +162,23 @@ impl DdlogHandle {
     }
 
     pub fn step(&mut self) {
+        #[cfg(feature = "ddlog")]
+        if let Some(prog) = &self.prog {
+            let mut upds = Vec::new();
+            for (&id, ent) in self.entities.iter() {
+                let _ = id;
+                let _ = ent;
+                upds.push(Update {
+                    relid: 0,
+                    weight: 1,
+                    value: DDValue,
+                });
+            }
+            prog.transaction_start().ok();
+            let _ = prog.apply_updates(&mut upds.into_iter());
+            let _ = prog.transaction_commit_dump_changes();
+        }
+
         let updates: Vec<(i64, Vec3)> = self
             .entities
             .iter()
