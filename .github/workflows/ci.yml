@@ -20,6 +20,8 @@ jobs:
         run: make ddlog-stubs
       - name: Setup Rust
         uses: leynos/shared-actions/.github/actions/setup-rust@v1.1.0
+      # Cache ~/.cargo and target/
+      - uses: Swatinem/rust-cache@v2
       - name: Setup DDlog
         uses: ./.github/actions/setup-ddlog
       - name: Build ddlog inferencer
