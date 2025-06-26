@@ -1,61 +1,13 @@
-pub mod record {
-    use serde::{Deserialize, Serialize};
-    use serde_json::Value;
+//! Stub file for differential_datalog crate.
+#![allow(dead_code)]
+#![allow(warnings)]
+#![allow(clippy::all)]
+use serde::{Deserialize, Serialize};
 
-    #[derive(Clone, Debug, Default, Serialize, Deserialize)]
-    pub struct DDValue(pub Value);
-
-    impl DDValue {
-        pub fn from<T: Serialize>(val: &T) -> Result<Self, serde_json::Error> {
-            Ok(Self(serde_json::to_value(val)?))
-        }
-    }
-
-    pub use crate::program::UpdCmd;
-}
-
-pub mod program {
-    use super::record::DDValue;
-
-    #[derive(Clone, Debug)]
-    pub enum Update<R = DDValue> {
-        Insert { relid: usize, v: R },
-        Delete { relid: usize, v: R },
-    }
-
-    #[derive(Clone, Debug)]
-    pub enum UpdCmd {
-        Insert { relid: usize, val: DDValue },
-        Delete { relid: usize, val: DDValue },
-    }
-
-    impl<R: Into<DDValue>> From<Update<R>> for UpdCmd {
-        fn from(upd: Update<R>) -> Self {
-            match upd {
-                Update::Insert { relid, v } => UpdCmd::Insert { relid, val: v.into() },
-                Update::Delete { relid, v } => UpdCmd::Delete { relid, val: v.into() },
-            }
-        }
-    }
-
+// --- `api` module stub ---
+pub mod api {
     #[derive(Default, Clone, Debug)]
     pub struct DeltaMap;
-
-    pub trait DDlog {}
-    pub trait DDlogDynamic {}
-}
-
-pub mod ddval {
-    pub use super::record::DDValue;
-}
-
-pub use record::DDValue;
-pub use program::{DeltaMap, Update, UpdCmd, DDlog, DDlogDynamic};
-
-pub use api::run;
-
-pub mod api {
-    use super::program::{DeltaMap, UpdCmd};
 
     #[derive(Clone, Debug)]
     pub struct HDDlog;
@@ -65,30 +17,81 @@ pub mod api {
             Ok(())
         }
 
-        pub fn apply_updates<I>(&self, _updates: &mut I) -> Result<(), String>
+        pub fn apply_updates_dynamic<I>(
+            &mut self,
+            _updates: I,
+        ) -> Result<(), String>
         where
-            I: Iterator<Item = UpdCmd>,
+            I: IntoIterator<Item = super::record::UpdCmd>,
         {
             Ok(())
         }
 
-        pub fn apply_updates_dynamic<I>(&self, updates: &mut I) -> Result<(), String>
-        where
-            I: Iterator<Item = UpdCmd>,
-        {
-            self.apply_updates(updates)
-        }
-
-        pub fn transaction_commit_dump_changes(&self) -> Result<DeltaMap, String> {
+        pub fn transaction_commit_dump_changes_dynamic(&mut self) -> Result<DeltaMap, String> {
             Ok(DeltaMap)
         }
+    }
+}
 
-        pub fn transaction_commit_dump_changes_dynamic(&self) -> Result<DeltaMap, String> {
-            self.transaction_commit_dump_changes()
+// --- `record` module stub ---
+pub mod record {
+    use super::*;
+
+    #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+    pub struct DDValue(serde_json::Value);
+
+    #[derive(Clone, Debug)]
+    pub struct Record;
+
+    #[derive(Clone, Debug)]
+    pub enum RelIdentifier {
+        RelId(usize),
+    }
+
+    pub trait IntoRecord {
+        fn into_record(self) -> Record;
+    }
+
+    impl IntoRecord for Record {
+        fn into_record(self) -> Record {
+            self
         }
     }
 
-    pub fn run(_workers: usize, _do_store: bool) -> Result<(HDDlog, DeltaMap), String> {
-        Err("unimplemented".to_string())
+    #[derive(Clone, Debug)]
+    pub enum UpdCmd {
+        Insert(RelIdentifier, Record),
+        Delete(RelIdentifier, Record),
     }
 }
+
+// --- `ddval` module stub ---
+pub mod ddval {
+    use super::record::DDValue;
+
+    pub trait DDValConvert {
+        fn into_ddvalue(self) -> DDValue;
+    }
+}
+
+pub use ddval::DDValConvert;
+
+// --- `program` module stub ---
+pub mod program {
+    use super::record::DDValue;
+
+    #[derive(Clone, Debug)]
+    pub enum Update {
+        Insert { relid: usize, v: DDValue },
+        Delete { relid: usize, v: DDValue },
+    }
+
+    pub trait DDlog {
+        // Stub trait
+    }
+    pub trait DDlogDynamic: DDlog {
+        // Stub trait
+    }
+}
+
+pub use program::{DDlog, DDlogDynamic};
