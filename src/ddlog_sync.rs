@@ -7,6 +7,8 @@ use crate::components::{Block, BlockSlope, DdlogId, Health, Target, UnitType};
 use crate::ddlog_handle::{DdlogEntity, DdlogHandle};
 
 #[cfg(feature = "ddlog")]
+use differential_datalog::ddval::DDValConvert;
+#[cfg(feature = "ddlog")]
 use differential_datalog::program::Update as DdlogUpdate;
 #[cfg(feature = "ddlog")]
 use differential_datalog::record::UpdCmd;
@@ -62,19 +64,19 @@ pub fn push_state_to_ddlog_system(
 
     #[cfg(feature = "ddlog")]
     {
-        use lille_ddlog::{record::Record, Relations};
+        use lille_ddlog::{entity_state::Position, Relations};
 
-        let mut upds: Vec<DdlogUpdate> = Vec::new();
+        let mut upds = Vec::new();
         for (&id, ent) in ddlog.entities.iter() {
-            let record = Record::Position {
+            let record = Position {
                 entity: id,
                 x: OrderedFloat(ent.position.x),
                 y: OrderedFloat(ent.position.y),
                 z: OrderedFloat(ent.position.z),
             };
             upds.push(DdlogUpdate::Insert {
-                relid: Relations::Position as usize,
-                v: record.into(),
+                relid: Relations::entity_state_Position as usize,
+                v: record.into_ddvalue(),
             });
         }
         if let Some(prog) = ddlog.prog.as_mut() {
@@ -82,7 +84,8 @@ pub fn push_state_to_ddlog_system(
                 log::error!("DDlog transaction_start failed: {e}");
             } else {
                 let cmds: Vec<UpdCmd> = upds.into_iter().map(Into::into).collect();
-                if let Err(e) = prog.apply_updates_dynamic(&mut cmds.into_iter()) {
+                let mut iter = cmds.into_iter();
+                if let Err(e) = prog.apply_updates_dynamic(&mut iter) {
                     log::error!("DDlog apply_updates failed: {e}");
                 }
             }
