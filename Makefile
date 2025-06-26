@@ -42,7 +42,7 @@ fmt-check: ddlog-stubs
 generated/lille_ddlog:
 	mkdir -p generated/lille_ddlog
 
-build-support-run: generated
+build-support-run: generated/lille_ddlog
 	./scripts/build_support_runner.sh
 
 # Copy prebuilt DDlog stubs into the generated directory
@@ -85,5 +85,5 @@ nixie:
 	find . -name '*.md' -print0 | xargs -0 nixie
 
 # Generate, patch, and compile the DDlog inferencer
-build-inferencer: generated/lille_ddlog/lib.rs patches/fix_static.patch
+build-inferencer: generated/lille_ddlog/lib.rs
 	$(RUSTFLAGS_STRICT) cargo build --manifest-path generated/lille_ddlog/Cargo.toml $(DDLOG_TARGET_DIR)
