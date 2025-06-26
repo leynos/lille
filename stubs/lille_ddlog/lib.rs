@@ -1,24 +1,14 @@
 //! Stub file for lille-ddlog crate.
-//! This file is replaced during the build process with generated DDlog code.
-//! It exists to satisfy Cargo's dependency resolution during formatting and other operations.
+#![allow(dead_code, unused_variables)]
 
-#![allow(dead_code)]
+// Stub for the top-level items in the generated crate
+pub use differential_datalog::api::{DeltaMap, HDDlog};
 
-// Minimal stub API mirroring the expected interface of generated DDlog code.
-
-pub mod api {
-    pub use differential_datalog::api::HDDlog;
-    pub use differential_datalog::{DDlog, DDlogDynamic};
-    pub use differential_datalog::program::{Update, DeltaMap};
-    pub use differential_datalog::ddval::DDValue;
-
-    pub fn run(workers: usize, do_store: bool) -> Result<(HDDlog, DeltaMap), String> {
-        differential_datalog::api::run(workers, do_store).map_err(|e| e.to_string())
-    }
+pub fn run(workers: usize, do_store: bool) -> Result<(HDDlog, DeltaMap), String> {
+    Err("not implemented in stub".to_string())
 }
 
-pub use api::run;
-
+// Stub for the Relations enum
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Copy, Clone, Debug)]
 pub enum Relations {
@@ -30,36 +20,24 @@ pub enum Relations {
     NewVelocity,
 }
 
-#[allow(non_upper_case_globals)]
-pub mod relations {
-    pub const Position: usize = 0;
-    pub const Velocity: usize = 1;
-    pub const Mass: usize = 2;
-    pub const Force: usize = 3;
-    pub const NewPosition: usize = 4;
-    pub const NewVelocity: usize = 5;
-}
-
-use ordered_float::OrderedFloat;
-use serde::Serialize;
-use differential_datalog::ddval::DDValue;
-
-#[derive(Clone, Debug, Serialize)]
-pub enum Record {
-    Position {
-        entity: i64,
-        x: OrderedFloat<f32>,
-        y: OrderedFloat<f32>,
-        z: OrderedFloat<f32>,
-    },
-}
-
+// Stub for the record module and Record enum
 pub mod record {
-    pub use super::Record;
-}
+    use differential_datalog::record::DDValue;
+    use serde::Serialize;
 
-impl From<Record> for DDValue {
-    fn from(rec: Record) -> Self {
-        DDValue::from(&rec).unwrap_or_default()
+    #[derive(Clone, Debug, Serialize)]
+    pub enum Record {
+        Position {
+            entity: i64,
+            x: ordered_float::OrderedFloat<f32>,
+            y: ordered_float::OrderedFloat<f32>,
+            z: ordered_float::OrderedFloat<f32>,
+        },
+    }
+
+    impl From<Record> for DDValue {
+        fn from(rec: Record) -> Self {
+            unimplemented!("stub for From<Record> for DDValue")
+        }
     }
 }
