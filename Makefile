@@ -50,6 +50,7 @@ build-support-run: ddlog-stubs
 
 # Copy prebuilt DDlog stubs into the generated directory
 ddlog-stubs: $(GENERATED_SRC)
+	mkdir -p '$(GENERATED_SRC)/src'
 	cp stubs/lille_ddlog/Cargo.toml '$(GENERATED_SRC)/Cargo.toml'
 	cp stubs/lille_ddlog/lib.rs '$(GENERATED_SRC)/src/lib.rs'
 	mkdir -p '$(GENERATED_SRC)/differential_datalog/src'
