@@ -26,7 +26,7 @@ pub enum Relations {
 pub mod entity_state {
     use ordered_float::OrderedFloat;
     use differential_datalog::ddval::DDValConvert;
-    use differential_datalog::record::{DDValue, IntoRecord, Record};
+    use differential_datalog::record::{DDValue, IntoRecord, Record, FromRecord};
 
     #[derive(Clone, Debug)]
     pub struct Position {
@@ -49,6 +49,38 @@ pub mod entity_state {
     }
 }
 
+pub mod physics {
+    use ordered_float::OrderedFloat;
+    use differential_datalog::ddval::DDValConvert;
+    use differential_datalog::record::{DDValue, IntoRecord, Record, FromRecord};
+
+    #[derive(Clone, Debug)]
+    pub struct NewPosition {
+        pub entity: i64,
+        pub x: OrderedFloat<f32>,
+        pub y: OrderedFloat<f32>,
+        pub z: OrderedFloat<f32>,
+    }
+
+    impl DDValConvert for NewPosition {
+        fn into_ddvalue(self) -> DDValue {
+            unimplemented!("stub into_ddvalue")
+        }
+    }
+
+    impl IntoRecord for NewPosition {
+        fn into_record(self) -> Record {
+            unimplemented!("stub into_record")
+        }
+    }
+
+    impl FromRecord for NewPosition {
+        fn from_record(_val: &Record) -> Result<Self, String> {
+            Err("stub".into())
+        }
+    }
+}
+
 pub mod types__entity_state {
     pub use super::entity_state::Position;
 }
@@ -56,6 +88,9 @@ pub mod types__entity_state {
 pub mod typedefs {
     pub mod entity_state {
         pub use crate::entity_state::Position;
+    }
+    pub mod physics {
+        pub use crate::physics::NewPosition;
     }
 }
 
