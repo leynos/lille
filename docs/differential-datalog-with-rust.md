@@ -951,8 +951,10 @@ fn main() -> Result<(), String> {
     // ddlog_api.insert_edge(1, 2)?;
     // ddlog_api.insert_edge(2, 3)?;
     println!("Inserted edges: 0->1, 1->2, 2->3");
+    // let mut cmds: Vec<UpdCmd> = updates.into_iter().map(Into::into).collect();
+    // ddlog_api.apply_updates_dynamic(&mut cmds.into_iter())?;
 
-    // ddlog_api.transaction_commit_dump_changes()?;
+    // ddlog_api.transaction_commit_dump_changes_dynamic()?;
     println!("Committed transaction 1.");
 
     // At this point, the `print_reachable_updates` callback would have been invoked
@@ -967,7 +969,7 @@ Starting transaction 2...");
     // ddlog_api.insert_edge(0, 4)?; // Add a new branch
     println!("Inserted edges: 3->0 (cycle), 0->4");
 
-    // ddlog_api.transaction_commit_dump_changes()?;
+    // ddlog_api.transaction_commit_dump_changes_dynamic()?;
     println!("Committed transaction 2.");
     
     // The callback would again show new Reachable paths, including those
