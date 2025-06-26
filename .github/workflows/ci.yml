@@ -25,7 +25,7 @@ jobs:
       - name: Setup DDlog
         uses: ./.github/actions/setup-ddlog
       - name: Build ddlog inferencer
-        run: make generated/lille_ddlog/lib.rs
+        run: make generated/lille_ddlog/src/lib.rs
       - name: Format
         run: make fmt-check
       - name: Lint
