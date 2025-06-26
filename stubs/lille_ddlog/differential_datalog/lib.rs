@@ -33,6 +33,12 @@ pub mod api {
     }
 }
 
+impl api::DeltaMap {
+    pub fn clear_rel(&mut self, _relid: usize) -> Vec<(record::DDValue, isize)> {
+        Vec::new()
+    }
+}
+
 // --- `record` module stub ---
 pub mod record {
     use super::*;
@@ -52,9 +58,25 @@ pub mod record {
         fn into_record(self) -> Record;
     }
 
+    pub trait FromRecord: Sized {
+        fn from_record(_val: &Record) -> Result<Self, String>;
+    }
+
     impl IntoRecord for Record {
         fn into_record(self) -> Record {
             self
+        }
+    }
+
+    impl FromRecord for Record {
+        fn from_record(val: &Record) -> Result<Self, String> {
+            Ok(val.clone())
+        }
+    }
+
+    impl IntoRecord for DDValue {
+        fn into_record(self) -> Record {
+            Record
         }
     }
 
@@ -75,6 +97,7 @@ pub mod ddval {
 }
 
 pub use ddval::DDValConvert;
+pub use record::FromRecord;
 
 // --- `program` module stub ---
 pub mod program {
