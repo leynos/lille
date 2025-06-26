@@ -54,6 +54,10 @@ pub enum Record {
     },
 }
 
+pub mod record {
+    pub use super::Record;
+}
+
 impl From<Record> for DDValue {
     fn from(rec: Record) -> Self {
         DDValue::from(&rec).unwrap_or_default()

@@ -10,6 +10,8 @@ pub mod record {
             Ok(Self(serde_json::to_value(val)?))
         }
     }
+
+    pub use crate::program::UpdCmd;
 }
 
 pub mod program {
@@ -17,8 +19,8 @@ pub mod program {
 
     #[derive(Clone, Debug)]
     pub enum Update<R = DDValue> {
-        Insert { relid: usize, rec: R },
-        Delete { relid: usize, rec: R },
+        Insert { relid: usize, v: R },
+        Delete { relid: usize, v: R },
     }
 
     #[derive(Clone, Debug)]
@@ -30,8 +32,8 @@ pub mod program {
     impl<R: Into<DDValue>> From<Update<R>> for UpdCmd {
         fn from(upd: Update<R>) -> Self {
             match upd {
-                Update::Insert { relid, rec } => UpdCmd::Insert { relid, val: rec.into() },
-                Update::Delete { relid, rec } => UpdCmd::Delete { relid, val: rec.into() },
+                Update::Insert { relid, v } => UpdCmd::Insert { relid, val: v.into() },
+                Update::Delete { relid, v } => UpdCmd::Delete { relid, val: v.into() },
             }
         }
     }

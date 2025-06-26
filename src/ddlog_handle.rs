@@ -10,9 +10,9 @@ use crate::{GRACE_DISTANCE, GRAVITY_PULL};
 #[cfg(feature = "ddlog")]
 use differential_datalog::api::HDDlog;
 #[cfg(feature = "ddlog")]
-use differential_datalog::program::UpdCmd;
-#[cfg(feature = "ddlog")]
 use differential_datalog::program::Update as DdlogUpdate;
+#[cfg(feature = "ddlog")]
+use differential_datalog::record::UpdCmd;
 #[cfg(feature = "ddlog")]
 #[allow(unused_imports)]
 use differential_datalog::{DDlog, DDlogDynamic};
@@ -173,9 +173,9 @@ impl DdlogHandle {
     pub fn step(&mut self) {
         #[cfg(feature = "ddlog")]
         if let Some(prog) = &self.prog {
-            use lille_ddlog::{relations::Position, Record};
+            use lille_ddlog::{record::Record, Relations};
 
-            let mut upds = Vec::new();
+            let mut upds: Vec<DdlogUpdate> = Vec::new();
             for (&id, ent) in self.entities.iter() {
                 let record = Record::Position {
                     entity: id,
@@ -184,8 +184,8 @@ impl DdlogHandle {
                     z: OrderedFloat(ent.position.z),
                 };
                 upds.push(DdlogUpdate::Insert {
-                    relid: Position,
-                    rec: record,
+                    relid: Relations::Position as usize,
+                    v: record.into(),
                 });
             }
 

@@ -7,9 +7,9 @@ use crate::components::{Block, BlockSlope, DdlogId, Health, Target, UnitType};
 use crate::ddlog_handle::{DdlogEntity, DdlogHandle};
 
 #[cfg(feature = "ddlog")]
-use differential_datalog::program::UpdCmd;
-#[cfg(feature = "ddlog")]
 use differential_datalog::program::Update as DdlogUpdate;
+#[cfg(feature = "ddlog")]
+use differential_datalog::record::UpdCmd;
 #[cfg(feature = "ddlog")]
 #[allow(unused_imports)]
 use differential_datalog::{DDlog, DDlogDynamic};
@@ -62,9 +62,9 @@ pub fn push_state_to_ddlog_system(
 
     #[cfg(feature = "ddlog")]
     {
-        use lille_ddlog::{relations::Position, Record};
+        use lille_ddlog::{record::Record, Relations};
 
-        let mut upds = Vec::new();
+        let mut upds: Vec<DdlogUpdate> = Vec::new();
         for (&id, ent) in ddlog.entities.iter() {
             let record = Record::Position {
                 entity: id,
@@ -73,8 +73,8 @@ pub fn push_state_to_ddlog_system(
                 z: OrderedFloat(ent.position.z),
             };
             upds.push(DdlogUpdate::Insert {
-                relid: Position,
-                rec: record,
+                relid: Relations::Position as usize,
+                v: record.into(),
             });
         }
         if let Some(prog) = ddlog.prog.as_mut() {
