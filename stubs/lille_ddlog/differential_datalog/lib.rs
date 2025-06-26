@@ -6,8 +6,20 @@ use serde::{Deserialize, Serialize};
 
 // --- `api` module stub ---
 pub mod api {
+    use super::program::Update;
+    use std::collections::HashMap;
+
     #[derive(Default, Clone, Debug)]
-    pub struct DeltaMap;
+    pub struct DeltaMap(pub HashMap<usize, Vec<Update>>);
+
+    impl IntoIterator for DeltaMap {
+        type Item = (usize, Vec<Update>);
+        type IntoIter = std::collections::hash_map::IntoIter<usize, Vec<Update>>;
+
+        fn into_iter(self) -> Self::IntoIter {
+            self.0.into_iter()
+        }
+    }
 
     #[derive(Clone, Debug)]
     pub struct HDDlog;
@@ -28,7 +40,7 @@ pub mod api {
         }
 
         pub fn transaction_commit_dump_changes_dynamic(&mut self) -> Result<DeltaMap, String> {
-            Ok(DeltaMap)
+            Ok(DeltaMap::default())
         }
     }
 }
@@ -38,7 +50,13 @@ pub mod record {
     use super::*;
 
     #[derive(Clone, Debug, Default, Serialize, Deserialize)]
-    pub struct DDValue(serde_json::Value);
+    pub struct DDValue(pub serde_json::Value);
+
+    impl DDValue {
+        pub fn into_json(self) -> serde_json::Value {
+            self.0
+        }
+    }
 
     #[derive(Clone, Debug)]
     pub struct Record;
