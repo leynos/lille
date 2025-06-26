@@ -51,13 +51,13 @@ build-support-run: ddlog-stubs
 # Copy prebuilt DDlog stubs into the generated directory
 ddlog-stubs: $(GENERATED_SRC)
 	cp stubs/lille_ddlog/Cargo.toml '$(GENERATED_SRC)/Cargo.toml'
-	cp stubs/lille_ddlog/lib.rs '$(GENERATED_SRC)/lib.rs'
-	mkdir -p '$(GENERATED_SRC)/differential_datalog'
+	cp stubs/lille_ddlog/lib.rs '$(GENERATED_SRC)/src/lib.rs'
+	mkdir -p '$(GENERATED_SRC)/differential_datalog/src'
 	cp stubs/lille_ddlog/differential_datalog/Cargo.toml '$(GENERATED_SRC)/differential_datalog/Cargo.toml'
-	cp stubs/lille_ddlog/differential_datalog/lib.rs '$(GENERATED_SRC)/differential_datalog/lib.rs'
+	cp stubs/lille_ddlog/differential_datalog/lib.rs '$(GENERATED_SRC)/differential_datalog/src/lib.rs'
 
 
-$(GENERATED_SRC)/lib.rs: build-support-run patches/fix_static.patch
+$(GENERATED_SRC)/src/lib.rs: build-support-run patches/fix_static.patch
 	# Apply patches to fix static linking issues in generated DDlog code
 	patch -N -p1 -d '$(GENERATED_SRC)' < patches/fix_static.patch
 	# Rename the generated crate from "lille" to "lille-ddlog" to avoid conflicts
@@ -88,6 +88,6 @@ nixie:
 	find . -name '*.md' -print0 | xargs -0 nixie
 
 # Generate, patch, and compile the DDlog inferencer
-$(DDLOG_TARGET_DIR)/debug/liblille_ddlog.rlib: $(GENERATED_SRC)/lib.rs
+$(DDLOG_TARGET_DIR)/debug/liblille_ddlog.rlib: $(GENERATED_SRC)/src/lib.rs
 	mkdir -p '$(DDLOG_TARGET_DIR)'
 	$(RUSTFLAGS_STRICT) cargo build --manifest-path generated/lille_ddlog/Cargo.toml --target-dir '$(DDLOG_TARGET_DIR)'

@@ -9,7 +9,7 @@ fn generated_ddlog_crate_present() {
         "Directory {:?} missing",
         base.canonicalize().unwrap_or(base.clone())
     );
-    let lib_rs = base.join("lib.rs");
+    let lib_rs = base.join("src").join("lib.rs");
     assert!(
         lib_rs.is_file(),
         "File {:?} missing",
@@ -23,7 +23,7 @@ fn generated_ddlog_crate_present() {
             .canonicalize()
             .unwrap_or_else(|_| ddlog_subcrate.clone())
     );
-    let ddlog_lib = ddlog_subcrate.join("lib.rs");
+    let ddlog_lib = ddlog_subcrate.join("src").join("lib.rs");
     assert!(
         ddlog_lib.is_file(),
         "File {:?} missing",
