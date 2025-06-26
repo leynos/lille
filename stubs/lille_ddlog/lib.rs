@@ -7,7 +7,7 @@
 pub use differential_datalog::api::{DeltaMap, HDDlog};
 
 pub fn run(_workers: usize, _do_store: bool) -> Result<(HDDlog, DeltaMap), String> {
-    Ok((HDDlog, DeltaMap))
+    Ok((HDDlog, DeltaMap::default()))
 }
 
 // Stub for the Relations enum
@@ -56,6 +56,36 @@ pub mod types__entity_state {
 pub mod typedefs {
     pub mod entity_state {
         pub use crate::entity_state::Position;
+    }
+    pub mod physics {
+        pub use crate::physics::NewPosition;
+    }
+}
+
+pub mod physics {
+    use ordered_float::OrderedFloat;
+    use differential_datalog::ddval::DDValConvert;
+    use differential_datalog::record::{DDValue, IntoRecord, Record};
+    use serde::Deserialize;
+
+    #[derive(Clone, Debug, Deserialize)]
+    pub struct NewPosition {
+        pub entity: i64,
+        pub x: OrderedFloat<f32>,
+        pub y: OrderedFloat<f32>,
+        pub z: OrderedFloat<f32>,
+    }
+
+    impl DDValConvert for NewPosition {
+        fn into_ddvalue(self) -> DDValue {
+            unimplemented!("stub into_ddvalue")
+        }
+    }
+
+    impl IntoRecord for NewPosition {
+        fn into_record(self) -> Record {
+            unimplemented!("stub into_record")
+        }
     }
 }
 

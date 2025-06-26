@@ -192,8 +192,29 @@ impl DdlogHandle {
                 let mut iter = cmds.into_iter();
                 if let Err(e) = prog.apply_updates_dynamic(&mut iter) {
                     log::error!("DDlog apply_updates failed: {e}");
-                } else if let Err(e) = prog.transaction_commit_dump_changes_dynamic() {
-                    log::error!("DDlog commit failed: {e}");
+                } else if prog.transaction_commit_dump_changes_dynamic().is_ok() {
+                    // Fallback processing until real DDlog parsing is implemented
+                    let updates: Vec<(i64, Vec3)> = self
+                        .entities
+                        .iter()
+                        .map(|(&id, ent)| (id, self.compute_entity_update(id, ent)))
+                        .collect();
+
+                    self.deltas.clear();
+                    for (id, pos) in updates {
+                        if let Some(ent) = self.entities.get_mut(&id) {
+                            if pos != ent.position {
+                                ent.position = pos;
+                                self.deltas.push(NewPosition {
+                                    entity: id,
+                                    x: pos.x,
+                                    y: pos.y,
+                                    z: pos.z,
+                                });
+                            }
+                        }
+                    }
+                    return;
                 }
             }
         }
