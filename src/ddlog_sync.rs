@@ -9,10 +9,10 @@ use crate::ddlog_handle::{DdlogEntity, DdlogHandle};
 #[cfg(feature = "ddlog")]
 use differential_datalog::program::Update as DdlogUpdate;
 #[cfg(feature = "ddlog")]
-use differential_datalog::record::UpdCmd;
-#[cfg(feature = "ddlog")]
 #[allow(unused_imports)]
-use differential_datalog::{DDlog, DDlogDynamic};
+use differential_datalog::program::{DDlog, DDlogDynamic};
+#[cfg(feature = "ddlog")]
+use differential_datalog::record::UpdCmd;
 #[cfg(feature = "ddlog")]
 use ordered_float::OrderedFloat;
 
@@ -77,12 +77,12 @@ pub fn push_state_to_ddlog_system(
                 v: record.into(),
             });
         }
-        if let Some(prog) = ddlog.prog.as_mut() {
+        if let Some(prog) = &mut ddlog.prog {
             if let Err(e) = prog.transaction_start() {
                 log::error!("DDlog transaction_start failed: {e}");
             } else {
-                let cmds: Vec<UpdCmd> = upds.into_iter().map(Into::into).collect();
-                if let Err(e) = prog.apply_updates_dynamic(&mut cmds.into_iter()) {
+                let commands: Vec<UpdCmd> = upds.into_iter().map(Into::into).collect();
+                if let Err(e) = prog.apply_updates_dynamic(&mut commands.into_iter()) {
                     log::error!("DDlog apply_updates failed: {e}");
                 }
             }

@@ -12,10 +12,10 @@ use differential_datalog::api::HDDlog;
 #[cfg(feature = "ddlog")]
 use differential_datalog::program::Update as DdlogUpdate;
 #[cfg(feature = "ddlog")]
-use differential_datalog::record::UpdCmd;
-#[cfg(feature = "ddlog")]
 #[allow(unused_imports)]
-use differential_datalog::{DDlog, DDlogDynamic};
+use differential_datalog::program::{DDlog, DDlogDynamic};
+#[cfg(feature = "ddlog")]
+use differential_datalog::record::UpdCmd;
 #[cfg(feature = "ddlog")]
 use ordered_float::OrderedFloat;
 
@@ -172,7 +172,7 @@ impl DdlogHandle {
 
     pub fn step(&mut self) {
         #[cfg(feature = "ddlog")]
-        if let Some(prog) = &self.prog {
+        if let Some(prog) = &mut self.prog {
             use lille_ddlog::{record::Record, Relations};
 
             let mut upds: Vec<DdlogUpdate> = Vec::new();
@@ -192,8 +192,8 @@ impl DdlogHandle {
             if let Err(e) = prog.transaction_start() {
                 log::error!("DDlog transaction_start failed: {e}");
             } else {
-                let cmds: Vec<UpdCmd> = upds.into_iter().map(Into::into).collect();
-                if let Err(e) = prog.apply_updates_dynamic(&mut cmds.into_iter()) {
+                let commands: Vec<UpdCmd> = upds.into_iter().map(Into::into).collect();
+                if let Err(e) = prog.apply_updates_dynamic(&mut commands.into_iter()) {
                     log::error!("DDlog apply_updates failed: {e}");
                 } else if let Err(e) = prog.transaction_commit_dump_changes_dynamic() {
                     log::error!("DDlog commit failed: {e}");
