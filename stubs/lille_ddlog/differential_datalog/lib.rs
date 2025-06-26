@@ -41,15 +41,27 @@ pub mod record {
     pub struct DDValue(serde_json::Value);
 
     #[derive(Clone, Debug)]
-    pub enum UpdCmd {
-        Insert(usize, DDValue),
-        Delete(usize, DDValue),
+    pub struct Record;
+
+    #[derive(Clone, Debug)]
+    pub enum RelIdentifier {
+        RelId(usize),
     }
 
-    impl From<super::program::Update> for UpdCmd {
-        fn from(_upd: super::program::Update) -> Self {
-            unimplemented!("stub for From<Update> for UpdCmd")
+    pub trait IntoRecord {
+        fn into_record(self) -> Record;
+    }
+
+    impl IntoRecord for Record {
+        fn into_record(self) -> Record {
+            self
         }
+    }
+
+    #[derive(Clone, Debug)]
+    pub enum UpdCmd {
+        Insert(RelIdentifier, Record),
+        Delete(RelIdentifier, Record),
     }
 }
 

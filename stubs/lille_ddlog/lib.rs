@@ -26,7 +26,7 @@ pub enum Relations {
 pub mod entity_state {
     use ordered_float::OrderedFloat;
     use differential_datalog::ddval::DDValConvert;
-    use differential_datalog::record::DDValue;
+    use differential_datalog::record::{DDValue, IntoRecord, Record};
 
     #[derive(Clone, Debug)]
     pub struct Position {
@@ -41,10 +41,22 @@ pub mod entity_state {
             unimplemented!("stub into_ddvalue")
         }
     }
+
+    impl IntoRecord for Position {
+        fn into_record(self) -> Record {
+            unimplemented!("stub into_record")
+        }
+    }
 }
 
 pub mod types__entity_state {
     pub use super::entity_state::Position;
+}
+
+pub mod typedefs {
+    pub mod entity_state {
+        pub use crate::entity_state::Position;
+    }
 }
 
 // Stub for the record module and Record enum
