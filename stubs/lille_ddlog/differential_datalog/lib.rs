@@ -6,8 +6,18 @@ use serde::{Deserialize, Serialize};
 
 // --- `api` module stub ---
 pub mod api {
+    use std::collections::BTreeMap;
     #[derive(Default, Clone, Debug)]
     pub struct DeltaMap;
+
+    impl DeltaMap {
+        pub fn try_get_rel(
+            &self,
+            _relid: usize,
+        ) -> Option<&BTreeMap<super::record::DDValue, isize>> {
+            None
+        }
+    }
 
     #[derive(Clone, Debug)]
     pub struct HDDlog;
