@@ -42,11 +42,11 @@ fmt-check: ddlog-stubs
 generated/lille_ddlog:
 	mkdir -p generated/lille_ddlog
 
-build-support-run: generated/lille_ddlog
+build-support-run: ddlog-stubs
 	./scripts/build_support_runner.sh
 
 # Copy prebuilt DDlog stubs into the generated directory
-ddlog-stubs:
+ddlog-stubs: generated/lille_ddlog 
 	mkdir -p generated/lille_ddlog/differential_datalog
 	cp stubs/lille_ddlog/Cargo.toml generated/lille_ddlog/Cargo.toml
 	cp stubs/lille_ddlog/lib.rs generated/lille_ddlog/lib.rs
