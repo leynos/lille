@@ -86,7 +86,7 @@ compilation may still fail if the DDlog compiler is missing.
 ## DDlog stubs
 
 The `generated/lille_ddlog` directory is populated with placeholder code so the
-project can be formatted and linted without running the DDlog compiler. The
+project can be formatted and linted without the ddlog components. The
 `ddlog-stubs` Makefile target copies these stubs from the `stubs/` directory
 into `generated/`. When the `generated/lille_ddlog/lib.rs` target is built, the
 stubs are replaced by the actual inferencer generated from the DDlog ruleset.
@@ -94,18 +94,13 @@ stubs are replaced by the actual inferencer generated from the DDlog ruleset.
 ## Running tests with DDlog
 
 Before executing any tests that use the `ddlog` feature, make sure the DDlog
-tool-chain is installed (see *Installing DDlog* above) and then build the
-inferencer crate so that the generated sources are available:
+tool-chain is installed (see *Installing DDlog* above).
 
-```bash
-make generated/lille_ddlog/lib.rs
-```
-
-This command produces `generated/lille_ddlog/lib.rs` and the nested
-`differential_datalog` crate. Afterwards run:
+The `-ddlog` targets, will generate the lille-ddlog crate prior to performing
+the relevant action:
 
 ```bash
 make test-ddlog
 ```
 
-which invokes `cargo test --features ddlog` with the compiled crate.
+The above invokes `cargo test --features ddlog` with the compiled crate.
