@@ -53,6 +53,11 @@ pub mod api {
 
 pub use api::DeltaMap;
 
+// Provide a `valmap` module for compatibility with the real crate.
+pub mod valmap {
+    pub use crate::api::DeltaMap;
+}
+
 // --- `record` module stub ---
 pub mod record {
     use super::*;

@@ -10,6 +10,8 @@ use crate::{GRACE_DISTANCE, GRAVITY_PULL};
 #[cfg(feature = "ddlog")]
 use differential_datalog::api::HDDlog;
 #[cfg(feature = "ddlog")]
+use differential_datalog::DeltaMap;
+#[cfg(feature = "ddlog")]
 #[allow(unused_imports)]
 use differential_datalog::{DDlog, DDlogDynamic};
 #[cfg(feature = "ddlog")]
@@ -167,7 +169,7 @@ impl DdlogHandle {
     }
 
     #[cfg(feature = "ddlog")]
-    fn apply_ddlog_deltas(&mut self, changes: &lille_ddlog::DeltaMap) {
+    fn apply_ddlog_deltas(&mut self, changes: &DeltaMap) {
         use differential_datalog::ddval::DDValConvert;
         use lille_ddlog::typedefs::physics::NewPosition as OutNewPos;
         self.deltas.clear();
