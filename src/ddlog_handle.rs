@@ -259,12 +259,8 @@ impl DdlogHandle {
     fn execute_ddlog_transaction(
         prog: &mut differential_datalog::api::HDDlog,
         cmds: Vec<differential_datalog::record::UpdCmd>,
-    ) -> Option<
-        std::collections::BTreeMap<
-            usize,
-            Vec<(differential_datalog::record::Record, isize)>,
-        >,
-    > {
+    ) -> Option<std::collections::BTreeMap<usize, Vec<(differential_datalog::record::Record, isize)>>>
+    {
         if let Err(e) = prog.transaction_start() {
             log::error!("DDlog transaction_start failed: {e}");
             return None;
