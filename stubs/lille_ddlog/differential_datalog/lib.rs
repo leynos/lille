@@ -7,10 +7,18 @@ use serde::{Deserialize, Serialize};
 // --- `api` module stub ---
 pub mod api {
     use std::collections::BTreeMap;
-    #[derive(Default, Clone, Debug)]
-    pub struct DeltaMap;
+    use std::marker::PhantomData;
 
-    impl DeltaMap {
+    #[derive(Clone, Debug)]
+    pub struct DeltaMap<V = super::record::DDValue>(PhantomData<V>);
+
+    impl<V> Default for DeltaMap<V> {
+        fn default() -> Self {
+            DeltaMap(PhantomData)
+        }
+    }
+
+    impl<V> DeltaMap<V> {
         pub fn try_get_rel(
             &self,
             _relid: usize,
@@ -38,10 +46,12 @@ pub mod api {
         }
 
         pub fn transaction_commit_dump_changes_dynamic(&mut self) -> Result<DeltaMap, String> {
-            Ok(DeltaMap)
+            Ok(DeltaMap::default())
         }
     }
 }
+
+pub use api::DeltaMap;
 
 // --- `record` module stub ---
 pub mod record {
@@ -81,6 +91,12 @@ pub mod ddval {
 
     pub trait DDValConvert {
         fn into_ddvalue(self) -> DDValue;
+        fn try_from_ddvalue(_val: DDValue) -> Option<Self>
+        where
+            Self: Sized,
+        {
+            None
+        }
     }
 }
 

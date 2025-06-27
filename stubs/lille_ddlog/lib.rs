@@ -7,7 +7,7 @@
 pub use differential_datalog::api::{DeltaMap, HDDlog};
 
 pub fn run(_workers: usize, _do_store: bool) -> Result<(HDDlog, DeltaMap), String> {
-    Ok((HDDlog, DeltaMap))
+    Ok((HDDlog, DeltaMap::default()))
 }
 
 // Stub for the Relations enum
@@ -23,52 +23,7 @@ pub enum Relations {
     physics_NewVelocity,
 }
 
-pub mod physics {
-    use ordered_float::OrderedFloat;
-    use differential_datalog::ddval::DDValConvert;
-    use differential_datalog::record::{DDValue, IntoRecord, Record};
-
-    #[derive(Clone, Debug)]
-    pub struct NewPosition {
-        pub entity: i64,
-        pub x: OrderedFloat<f32>,
-        pub y: OrderedFloat<f32>,
-        pub z: OrderedFloat<f32>,
-    }
-
-    impl DDValConvert for NewPosition {
-        fn into_ddvalue(self) -> DDValue {
-            unimplemented!("stub into_ddvalue")
-        }
-    }
-
-    impl NewPosition {
-        pub fn try_from_ddvalue(_val: DDValue) -> Option<Self> {
-            None
-        }
-    }
-
-    impl IntoRecord for NewPosition {
-        fn into_record(self) -> Record {
-            unimplemented!("stub into_record")
-        }
-    }
-}
-
-pub mod types__physics {
-    pub use super::physics::NewPosition;
-}
-
-pub mod typedefs {
-    pub mod entity_state {
-        pub use crate::entity_state::Position;
-    }
-    pub mod physics {
-        pub use crate::physics::NewPosition;
-    }
-}
-
-pub mod entity_state {
+pub mod shared {
     use ordered_float::OrderedFloat;
     use differential_datalog::ddval::DDValConvert;
     use differential_datalog::record::{DDValue, IntoRecord, Record};
@@ -87,6 +42,12 @@ pub mod entity_state {
         }
     }
 
+    impl Position {
+        pub fn try_from_ddvalue(_val: DDValue) -> Option<Self> {
+            None
+        }
+    }
+
     impl IntoRecord for Position {
         fn into_record(self) -> Record {
             unimplemented!("stub into_record")
@@ -94,8 +55,29 @@ pub mod entity_state {
     }
 }
 
+pub mod physics {
+    pub use crate::shared::Position as NewPosition;
+}
+
+pub mod types__physics {
+    pub use crate::shared::Position as NewPosition;
+}
+
+pub mod typedefs {
+    pub mod entity_state {
+        pub use crate::shared::Position;
+    }
+    pub mod physics {
+        pub use crate::shared::Position as NewPosition;
+    }
+}
+
+pub mod entity_state {
+    pub use crate::shared::Position;
+}
+
 pub mod types__entity_state {
-    pub use super::entity_state::Position;
+    pub use crate::shared::Position;
 }
 
 // Stub for the record module and Record enum
