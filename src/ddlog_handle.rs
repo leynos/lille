@@ -5,6 +5,7 @@ use hashbrown::HashMap;
 use serde::Serialize;
 
 use crate::components::{Block, BlockSlope, UnitType};
+#[cfg(not(feature = "ddlog"))]
 use crate::{GRACE_DISTANCE, GRAVITY_PULL};
 
 #[cfg(feature = "ddlog")]
@@ -15,7 +16,9 @@ use differential_datalog::{DDlog, DDlogDynamic};
 #[cfg(feature = "ddlog")]
 use ordered_float::OrderedFloat;
 
+#[cfg(not(feature = "ddlog"))]
 const GRACE_DISTANCE_F32: f32 = GRACE_DISTANCE as f32;
+#[cfg(not(feature = "ddlog"))]
 const GRAVITY_PULL_F32: f32 = GRAVITY_PULL as f32;
 
 #[derive(Clone, Serialize)]
@@ -82,6 +85,7 @@ pub fn init_ddlog_system(mut commands: Commands) {
 }
 
 impl DdlogHandle {
+    #[cfg(not(feature = "ddlog"))]
     fn highest_block_at(&self, x: i32, y: i32) -> Option<&Block> {
         self.blocks
             .iter()
@@ -90,6 +94,7 @@ impl DdlogHandle {
     }
 
     /// Calculates the floor height at `(x, y)` relative to a block.
+    #[cfg(not(feature = "ddlog"))]
     pub fn floor_height_at(block: &Block, slope: Option<&BlockSlope>, x: f32, y: f32) -> f32 {
         let base = block.z as f32 + 1.0;
         if let Some(s) = slope {
@@ -99,6 +104,7 @@ impl DdlogHandle {
         }
     }
 
+    #[cfg(not(feature = "ddlog"))]
     fn floor_height_at_point(&self, x: f32, y: f32) -> f32 {
         let x_grid = x.floor() as i32;
         let y_grid = y.floor() as i32;
@@ -110,6 +116,7 @@ impl DdlogHandle {
         }
     }
 
+    #[cfg(not(feature = "ddlog"))]
     fn apply_gravity(&self, pos: &mut Vec3, floor: f32) {
         if pos.z > floor + GRACE_DISTANCE_F32 {
             pos.z += GRAVITY_PULL_F32;
@@ -117,6 +124,7 @@ impl DdlogHandle {
             pos.z = floor;
         }
     }
+    #[cfg(not(feature = "ddlog"))]
     fn civvy_move(&self, id: i64, ent: &DdlogEntity, pos: Vec3) -> Vec2 {
         let fraidiness = match ent.unit {
             UnitType::Civvy { fraidiness } => fraidiness,
@@ -156,6 +164,7 @@ impl DdlogHandle {
         Vec2::ZERO
     }
 
+    #[cfg(not(feature = "ddlog"))]
     fn compute_entity_update(&self, id: i64, ent: &DdlogEntity) -> Vec3 {
         let floor = self.floor_height_at_point(ent.position.x, ent.position.y);
         let mut pos = ent.position;
@@ -214,6 +223,12 @@ impl DdlogHandle {
         }
     }
 
+    /// Advances the simulation by one tick.
+    ///
+    /// When the `ddlog` feature is enabled, this function streams the current
+    /// entity state into the DDlog program and applies the resulting deltas. In
+    /// builds without DDlog, it falls back to a simplified Rust implementation
+    /// that directly updates positions.
     pub fn step(&mut self) {
         #[cfg(feature = "ddlog")]
         if let Some(prog) = &mut self.prog {
@@ -248,7 +263,6 @@ impl DdlogHandle {
                     Ok(()) => match prog.transaction_commit_dump_changes_dynamic() {
                         Ok(changes) => {
                             self.apply_ddlog_deltas(&changes);
-                            return;
                         }
                         Err(e) => log::error!("DDlog commit failed: {e}"),
                     },
@@ -256,23 +270,26 @@ impl DdlogHandle {
             }
         }
 
-        let updates: Vec<(i64, Vec3)> = self
-            .entities
-            .iter()
-            .map(|(&id, ent)| (id, self.compute_entity_update(id, ent)))
-            .collect();
+        #[cfg(not(feature = "ddlog"))]
+        {
+            let updates: Vec<(i64, Vec3)> = self
+                .entities
+                .iter()
+                .map(|(&id, ent)| (id, self.compute_entity_update(id, ent)))
+                .collect();
 
-        self.deltas.clear();
-        for (id, pos) in updates {
-            if let Some(ent) = self.entities.get_mut(&id) {
-                if pos != ent.position {
-                    ent.position = pos;
-                    self.deltas.push(NewPosition {
-                        entity: id,
-                        x: pos.x,
-                        y: pos.y,
-                        z: pos.z,
-                    });
+            self.deltas.clear();
+            for (id, pos) in updates {
+                if let Some(ent) = self.entities.get_mut(&id) {
+                    if pos != ent.position {
+                        ent.position = pos;
+                        self.deltas.push(NewPosition {
+                            entity: id,
+                            x: pos.x,
+                            y: pos.y,
+                            z: pos.z,
+                        });
+                    }
                 }
             }
         }
