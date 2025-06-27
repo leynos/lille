@@ -26,6 +26,13 @@ pub enum Relations {
     physics_NewVelocity,
 }
 
+pub fn relval_from_record(
+    _relation: Relations,
+    _record: &differential_datalog::record::Record,
+) -> Result<differential_datalog::record::DDValue, String> {
+    Ok(differential_datalog::record::DDValue::default())
+}
+
 pub mod shared {
     use ordered_float::OrderedFloat;
     use differential_datalog::ddval::DDValConvert;

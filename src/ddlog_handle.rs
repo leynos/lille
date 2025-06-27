@@ -175,32 +175,36 @@ impl DdlogHandle {
         >,
     ) {
         use differential_datalog::ddval::DDValConvert;
-        use differential_datalog::ddval::DDValue;
         use lille_ddlog::typedefs::physics::NewPosition as OutNewPos;
+        use lille_ddlog::{relval_from_record, Relations};
         self.deltas.clear();
-        if let Some(delta) = changes.get(&(lille_ddlog::Relations::physics_NewPosition as usize)) {
+        if let Some(delta) = changes.get(&(Relations::physics_NewPosition as usize)) {
             for (val, weight) in delta {
                 if *weight > 0 {
-                    let ddval: DDValue = val.clone().into();
-                    match <OutNewPos as DDValConvert>::try_from_ddvalue(ddval) {
-                        Some(out) => {
-                            let pos = Vec3::new(
-                                out.x.into_inner(),
-                                out.y.into_inner(),
-                                out.z.into_inner(),
-                            );
-                            if let Some(ent) = self.entities.get_mut(&out.entity) {
-                                ent.position = pos;
+                    match relval_from_record(Relations::physics_NewPosition, val) {
+                        Ok(ddval) => match <OutNewPos as DDValConvert>::try_from_ddvalue(ddval) {
+                            Some(out) => {
+                                let pos = Vec3::new(
+                                    out.x.into_inner(),
+                                    out.y.into_inner(),
+                                    out.z.into_inner(),
+                                );
+                                if let Some(ent) = self.entities.get_mut(&out.entity) {
+                                    ent.position = pos;
+                                }
+                                self.deltas.push(NewPosition {
+                                    entity: out.entity,
+                                    x: pos.x,
+                                    y: pos.y,
+                                    z: pos.z,
+                                });
                             }
-                            self.deltas.push(NewPosition {
-                                entity: out.entity,
-                                x: pos.x,
-                                y: pos.y,
-                                z: pos.z,
-                            });
-                        }
-                        None => {
-                            log::warn!("failed to parse NewPosition delta: {val:?}");
+                            None => {
+                                log::warn!("failed to parse NewPosition delta: {val:?}");
+                            }
+                        },
+                        Err(e) => {
+                            log::warn!("failed to convert NewPosition record: {e}");
                         }
                     }
                 } else if *weight < 0 {
