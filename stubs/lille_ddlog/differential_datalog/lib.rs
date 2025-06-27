@@ -6,8 +6,26 @@ use serde::{Deserialize, Serialize};
 
 // --- `api` module stub ---
 pub mod api {
-    #[derive(Default, Clone, Debug)]
-    pub struct DeltaMap;
+    use std::collections::BTreeMap;
+    use std::marker::PhantomData;
+
+    #[derive(Clone, Debug)]
+    pub struct DeltaMap<V>(PhantomData<V>);
+
+    impl<V> Default for DeltaMap<V> {
+        fn default() -> Self {
+            DeltaMap(PhantomData)
+        }
+    }
+
+    impl<V> DeltaMap<V> {
+        pub fn try_get_rel(
+            &self,
+            _relid: usize,
+        ) -> Option<&BTreeMap<super::record::DDValue, isize>> {
+            None
+        }
+    }
 
     #[derive(Clone, Debug)]
     pub struct HDDlog;
@@ -27,10 +45,19 @@ pub mod api {
             Ok(())
         }
 
-        pub fn transaction_commit_dump_changes_dynamic(&mut self) -> Result<DeltaMap, String> {
-            Ok(DeltaMap)
+        pub fn transaction_commit_dump_changes_dynamic(
+            &mut self,
+        ) -> Result<std::collections::BTreeMap<usize, Vec<(super::record::Record, isize)>>, String> {
+            Ok(std::collections::BTreeMap::new())
         }
     }
+}
+
+pub use api::DeltaMap;
+
+// Provide a `valmap` module for compatibility with the real crate.
+pub mod valmap {
+    pub use crate::api::DeltaMap;
 }
 
 // --- `record` module stub ---
@@ -63,14 +90,26 @@ pub mod record {
         Insert(RelIdentifier, Record),
         Delete(RelIdentifier, Record),
     }
+
+    impl From<Record> for DDValue {
+        fn from(_rec: Record) -> Self {
+            DDValue(serde_json::Value::Null)
+        }
+    }
 }
 
 // --- `ddval` module stub ---
 pub mod ddval {
-    use super::record::DDValue;
+    pub use super::record::DDValue;
 
     pub trait DDValConvert {
         fn into_ddvalue(self) -> DDValue;
+        fn try_from_ddvalue(_val: DDValue) -> Option<Self>
+        where
+            Self: Sized,
+        {
+            None
+        }
     }
 }
 

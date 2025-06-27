@@ -6,8 +6,11 @@
 // Stub for the top-level items in the generated crate
 pub use differential_datalog::api::{DeltaMap, HDDlog};
 
-pub fn run(_workers: usize, _do_store: bool) -> Result<(HDDlog, DeltaMap), String> {
-    Ok((HDDlog, DeltaMap))
+pub fn run(
+    _workers: usize,
+    _do_store: bool,
+) -> Result<(HDDlog, DeltaMap<differential_datalog::record::DDValue>), String> {
+    Ok((HDDlog, DeltaMap::<differential_datalog::record::DDValue>::default()))
 }
 
 // Stub for the Relations enum
@@ -23,7 +26,14 @@ pub enum Relations {
     physics_NewVelocity,
 }
 
-pub mod entity_state {
+pub fn relval_from_record(
+    _relation: Relations,
+    _record: &differential_datalog::record::Record,
+) -> Result<differential_datalog::record::DDValue, String> {
+    Ok(differential_datalog::record::DDValue::default())
+}
+
+pub mod shared {
     use ordered_float::OrderedFloat;
     use differential_datalog::ddval::DDValConvert;
     use differential_datalog::record::{DDValue, IntoRecord, Record};
@@ -42,6 +52,12 @@ pub mod entity_state {
         }
     }
 
+    impl Position {
+        pub fn try_from_ddvalue(_val: DDValue) -> Option<Self> {
+            None
+        }
+    }
+
     impl IntoRecord for Position {
         fn into_record(self) -> Record {
             unimplemented!("stub into_record")
@@ -49,14 +65,29 @@ pub mod entity_state {
     }
 }
 
-pub mod types__entity_state {
-    pub use super::entity_state::Position;
+pub mod physics {
+    pub use crate::shared::Position as NewPosition;
+}
+
+pub mod types__physics {
+    pub use crate::shared::Position as NewPosition;
 }
 
 pub mod typedefs {
     pub mod entity_state {
-        pub use crate::entity_state::Position;
+        pub use crate::shared::Position;
     }
+    pub mod physics {
+        pub use crate::shared::Position as NewPosition;
+    }
+}
+
+pub mod entity_state {
+    pub use crate::shared::Position;
+}
+
+pub mod types__entity_state {
+    pub use crate::shared::Position;
 }
 
 // Stub for the record module and Record enum
