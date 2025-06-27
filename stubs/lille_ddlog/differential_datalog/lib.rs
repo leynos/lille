@@ -10,7 +10,7 @@ pub mod api {
     use std::marker::PhantomData;
 
     #[derive(Clone, Debug)]
-    pub struct DeltaMap<V = super::record::DDValue>(PhantomData<V>);
+    pub struct DeltaMap<V>(PhantomData<V>);
 
     impl<V> Default for DeltaMap<V> {
         fn default() -> Self {
@@ -45,8 +45,10 @@ pub mod api {
             Ok(())
         }
 
-        pub fn transaction_commit_dump_changes_dynamic(&mut self) -> Result<DeltaMap, String> {
-            Ok(DeltaMap::default())
+        pub fn transaction_commit_dump_changes_dynamic(
+            &mut self,
+        ) -> Result<DeltaMap<super::record::DDValue>, String> {
+            Ok(DeltaMap::<super::record::DDValue>::default())
         }
     }
 }

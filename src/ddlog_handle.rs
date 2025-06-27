@@ -169,7 +169,7 @@ impl DdlogHandle {
     }
 
     #[cfg(feature = "ddlog")]
-    fn apply_ddlog_deltas(&mut self, changes: &DeltaMap) {
+    fn apply_ddlog_deltas(&mut self, changes: &DeltaMap<differential_datalog::record::DDValue>) {
         use differential_datalog::ddval::DDValConvert;
         use lille_ddlog::typedefs::physics::NewPosition as OutNewPos;
         self.deltas.clear();

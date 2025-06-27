@@ -6,8 +6,11 @@
 // Stub for the top-level items in the generated crate
 pub use differential_datalog::api::{DeltaMap, HDDlog};
 
-pub fn run(_workers: usize, _do_store: bool) -> Result<(HDDlog, DeltaMap), String> {
-    Ok((HDDlog, DeltaMap::default()))
+pub fn run(
+    _workers: usize,
+    _do_store: bool,
+) -> Result<(HDDlog, DeltaMap<differential_datalog::record::DDValue>), String> {
+    Ok((HDDlog, DeltaMap::<differential_datalog::record::DDValue>::default()))
 }
 
 // Stub for the Relations enum
