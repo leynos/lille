@@ -1,6 +1,6 @@
 //! Integration tests for the DDlog interface.
 //! Ensures that relations defined in the Datalog schema match expectations.
-#![cfg(not(feature = "ddlog"))]
+#![cfg(feature = "ddlog")]
 use bevy::prelude::*;
 use glam::Vec2;
 use lille::{
