@@ -16,11 +16,6 @@ use differential_datalog::{DDlog, DDlogDynamic};
 #[cfg(feature = "ddlog")]
 use ordered_float::OrderedFloat;
 
-#[cfg(not(feature = "ddlog"))]
-const GRACE_DISTANCE_F32: f32 = GRACE_DISTANCE as f32;
-#[cfg(not(feature = "ddlog"))]
-const GRAVITY_PULL_F32: f32 = GRAVITY_PULL as f32;
-
 #[derive(Clone, Serialize)]
 pub struct DdlogEntity {
     pub position: Vec3,
@@ -118,8 +113,8 @@ impl DdlogHandle {
 
     #[cfg(not(feature = "ddlog"))]
     fn apply_gravity(&self, pos: &mut Vec3, floor: f32) {
-        if pos.z > floor + GRACE_DISTANCE_F32 {
-            pos.z += GRAVITY_PULL_F32;
+        if pos.z > floor + GRACE_DISTANCE as f32 {
+            pos.z += GRAVITY_PULL as f32;
         } else {
             pos.z = floor;
         }
