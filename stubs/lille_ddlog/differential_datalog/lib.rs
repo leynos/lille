@@ -47,8 +47,8 @@ pub mod api {
 
         pub fn transaction_commit_dump_changes_dynamic(
             &mut self,
-        ) -> Result<DeltaMap<super::record::DDValue>, String> {
-            Ok(DeltaMap::<super::record::DDValue>::default())
+        ) -> Result<std::collections::BTreeMap<usize, Vec<(super::record::Record, isize)>>, String> {
+            Ok(std::collections::BTreeMap::new())
         }
     }
 }
@@ -90,11 +90,17 @@ pub mod record {
         Insert(RelIdentifier, Record),
         Delete(RelIdentifier, Record),
     }
+
+    impl From<Record> for DDValue {
+        fn from(_rec: Record) -> Self {
+            DDValue(serde_json::Value::Null)
+        }
+    }
 }
 
 // --- `ddval` module stub ---
 pub mod ddval {
-    use super::record::DDValue;
+    pub use super::record::DDValue;
 
     pub trait DDValConvert {
         fn into_ddvalue(self) -> DDValue;

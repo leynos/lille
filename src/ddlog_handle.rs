@@ -10,8 +10,6 @@ use crate::{GRACE_DISTANCE, GRAVITY_PULL};
 #[cfg(feature = "ddlog")]
 use differential_datalog::api::HDDlog;
 #[cfg(feature = "ddlog")]
-use differential_datalog::DeltaMap;
-#[cfg(feature = "ddlog")]
 #[allow(unused_imports)]
 use differential_datalog::{DDlog, DDlogDynamic};
 #[cfg(feature = "ddlog")]
@@ -169,16 +167,22 @@ impl DdlogHandle {
     }
 
     #[cfg(feature = "ddlog")]
-    fn apply_ddlog_deltas(&mut self, changes: &DeltaMap<differential_datalog::record::DDValue>) {
+    fn apply_ddlog_deltas(
+        &mut self,
+        changes: &std::collections::BTreeMap<
+            usize,
+            Vec<(differential_datalog::record::Record, isize)>,
+        >,
+    ) {
         use differential_datalog::ddval::DDValConvert;
+        use differential_datalog::ddval::DDValue;
         use lille_ddlog::typedefs::physics::NewPosition as OutNewPos;
         self.deltas.clear();
-        if let Some(delta) =
-            changes.try_get_rel(lille_ddlog::Relations::physics_NewPosition as usize)
-        {
+        if let Some(delta) = changes.get(&(lille_ddlog::Relations::physics_NewPosition as usize)) {
             for (val, weight) in delta {
                 if *weight > 0 {
-                    match <OutNewPos as DDValConvert>::try_from_ddvalue(val.clone()) {
+                    let ddval: DDValue = val.clone().into();
+                    match <OutNewPos as DDValConvert>::try_from_ddvalue(ddval) {
                         Some(out) => {
                             let pos = Vec3::new(
                                 out.x.into_inner(),
