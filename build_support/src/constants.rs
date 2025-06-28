@@ -4,13 +4,17 @@
 //! output Rust and Differential Datalog source files. It keeps the two
 //! languages in sync so both parts of the project share the same numerical and
 //! string constants.
-use color_eyre::eyre::{eyre, Result};
-use jsonschema::validator_for;
+use color_eyre::eyre::{eyre, Context, Result};
+use jsonschema::{validator_for, Validator};
+use once_cell::sync::OnceCell;
 use serde_json::Value as JsonValue;
 use std::fs;
 use std::path::Path;
 
 use toml::Value;
+
+/// Cached validator for constants schema
+static SCHEMA_VALIDATOR: OnceCell<Validator> = OnceCell::new();
 
 /// Format strings used when generating code.
 ///
@@ -104,26 +108,41 @@ pub fn generate_constants(manifest_dir: impl AsRef<Path>, out_dir: impl AsRef<Pa
 pub fn parse_constants(manifest_dir: impl AsRef<Path>) -> Result<Value> {
     let manifest_dir = manifest_dir.as_ref();
     let const_path = manifest_dir.join("constants.toml");
-    let toml_str = fs::read_to_string(&const_path)?;
-    let parsed: Value = toml_str.parse()?;
-    validate_constants(manifest_dir, &parsed)?;
+    let toml_str = fs::read_to_string(&const_path)
+        .with_context(|| format!("Failed to read constants file at {}", const_path.display()))?;
+    let parsed: Value = toml_str
+        .parse()
+        .with_context(|| format!("Failed to parse TOML from {}", const_path.display()))?;
+    validate_constants(manifest_dir, &parsed).with_context(|| {
+        format!(
+            "Schema validation failed for constants at {}",
+            const_path.display()
+        )
+    })?;
     Ok(parsed)
 }
 
 /// Validate `constants.toml` against `constants.schema.json`.
 fn validate_constants(dir: &Path, data: &Value) -> Result<()> {
-    let schema_path = dir.join("constants.schema.json");
-    let schema_str = fs::read_to_string(&schema_path)?;
-    let schema_json: JsonValue = serde_json::from_str(&schema_str)?;
+    let schema = load_schema(dir)?;
     let instance = serde_json::to_value(data)?;
-    let compiled = validator_for(&schema_json)?;
-    if let Err(error) = compiled.validate(&instance) {
-        Err(eyre!(format!(
-            "constants.toml schema validation failed: {error}"
-        )))
-    } else {
-        Ok(())
-    }
+    schema
+        .validate(&instance)
+        .map(|_| ())
+        .map_err(|error| eyre!(format!("constants.toml schema validation failed: {error}")))
+}
+
+fn load_schema(dir: &Path) -> Result<&'static Validator> {
+    SCHEMA_VALIDATOR.get_or_try_init(|| {
+        let schema_path = dir.join("constants.schema.json");
+        let schema_str = fs::read_to_string(&schema_path)
+            .with_context(|| format!("Failed to read schema file at {}", schema_path.display()))?;
+        let schema_json: JsonValue = serde_json::from_str(&schema_str).with_context(|| {
+            format!("Failed to parse JSON schema from {}", schema_path.display())
+        })?;
+        validator_for(&schema_json)
+            .with_context(|| format!("Failed to compile JSON schema at {}", schema_path.display()))
+    })
 }
 
 /// Traverse all scalar constants in the parsed TOML value.
@@ -255,9 +274,21 @@ mod tests {
         fs::write(dir.path().join("constants.toml"), "[physics]\nvalue = 1\n").unwrap();
         fs::write(
             dir.path().join("constants.schema.json"),
-            r#"{\"type\":\"object\",\"properties\":{\"physics\":{\"type\":\"object\",\"required\":[\"other\"]}}}"#,
+            r#"{"type":"object","properties":{"physics":{"type":"object","required":["other"]}}}"#,
         )
         .unwrap();
         assert!(parse_constants(dir.path()).is_err());
+    }
+
+    #[test]
+    fn parse_constants_succeeds_with_valid_schema() {
+        let dir = TempDir::new().unwrap();
+        fs::write(dir.path().join("constants.toml"), "[physics]\nvalue = 1\n").unwrap();
+        fs::write(
+            dir.path().join("constants.schema.json"),
+            r#"{"type":"object","required":["physics"],"properties":{"physics":{"type":"object","required":["value"],"properties":{"value":{"type":"integer"}}}}}"#,
+        )
+        .unwrap();
+        assert!(parse_constants(dir.path()).is_ok());
     }
 }
