@@ -83,6 +83,10 @@ the font, and compiling the DDlog ruleset when available. The helper does not
 output "No such file or directory" errors when locating `constants.toml`, though
 compilation may still fail if the DDlog compiler is missing.
 
+The `build-support-run` Makefile target exports
+`BUILD_SUPPORT_FAIL_ON_DDLOG_ERROR=true` so that any DDlog build errors abort
+the run. Unset this variable to continue with the fallback stub crate instead.
+
 ## DDlog stubs
 
 The `generated/lille_ddlog` directory is populated with placeholder code so the
