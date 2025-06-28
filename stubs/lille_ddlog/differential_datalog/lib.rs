@@ -6,8 +6,10 @@ use serde::{Deserialize, Serialize};
 
 // --- `api` module stub ---
 pub mod api {
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, BTreeSet};
     use std::marker::PhantomData;
+    use super::record::{DDValue, Record, UpdCmd};
+    use super::program::{DDlog, DDlogDynamic, Update};
 
     #[derive(Clone, Debug)]
     pub struct DeltaMap<V>(PhantomData<V>);
@@ -59,6 +61,83 @@ pub mod api {
         pub fn stop(self) -> Result<(), String> {
             STOP_CALLS.fetch_add(1, Ordering::SeqCst);
             Ok(())
+        }
+    }
+
+    impl super::program::DDlog for HDDlog {
+        fn transaction_commit_dump_changes(
+            &self,
+        ) -> Result<DeltaMap<DDValue>, String> {
+            Ok(DeltaMap::default())
+        }
+
+        fn apply_updates(
+            &self,
+            _upds: &mut dyn Iterator<Item = super::program::Update>,
+        ) -> Result<(), String> {
+            Ok(())
+        }
+
+        fn query_index(
+            &self,
+            _index: usize,
+            _key: DDValue,
+        ) -> Result<BTreeSet<DDValue>, String> {
+            Ok(BTreeSet::new())
+        }
+
+        fn dump_index(
+            &self,
+            _index: usize,
+        ) -> Result<BTreeSet<DDValue>, String> {
+            Ok(BTreeSet::new())
+        }
+    }
+
+    impl super::program::DDlogDynamic for HDDlog {
+        fn transaction_start(&self) -> Result<(), String> {
+            self.transaction_start()
+        }
+
+        fn transaction_commit_dump_changes_dynamic(
+            &self,
+        ) -> Result<std::collections::BTreeMap<usize, Vec<(Record, isize)>>, String> {
+            Ok(std::collections::BTreeMap::new())
+        }
+
+        fn transaction_commit(&self) -> Result<(), String> {
+            Ok(())
+        }
+
+        fn transaction_rollback(&self) -> Result<(), String> {
+            Ok(())
+        }
+
+        fn apply_updates_dynamic(
+            &self,
+            _upds: &mut dyn Iterator<Item = UpdCmd>,
+        ) -> Result<(), String> {
+            Ok(())
+        }
+
+        fn clear_relation(&self, _table: usize) -> Result<(), String> {
+            Ok(())
+        }
+
+        fn query_index_dynamic(
+            &self,
+            _index: usize,
+            _key: &Record,
+        ) -> Result<Vec<Record>, String> {
+            Ok(Vec::new())
+        }
+
+        fn dump_index_dynamic(&self, _index: usize) -> Result<Vec<Record>, String> {
+            Ok(Vec::new())
+        }
+
+        fn stop(&self) -> Result<(), String> {
+            self.clone().stop()
         }
     }
 }
@@ -127,7 +206,9 @@ pub use ddval::DDValConvert;
 
 // --- `program` module stub ---
 pub mod program {
-    use super::record::DDValue;
+    use super::api::DeltaMap;
+    use super::record::{DDValue, Record, UpdCmd};
+    use std::collections::BTreeSet;
 
     #[derive(Clone, Debug)]
     pub enum Update {
@@ -136,10 +217,35 @@ pub mod program {
     }
 
     pub trait DDlog {
-        // Stub trait
+        fn transaction_commit_dump_changes(
+            &self,
+        ) -> Result<DeltaMap<DDValue>, String>;
+        fn apply_updates(
+            &self,
+            upds: &mut dyn Iterator<Item = Update>,
+        ) -> Result<(), String>;
+        fn query_index(
+            &self,
+            index: usize,
+            key: DDValue,
+        ) -> Result<BTreeSet<DDValue>, String>;
+        fn dump_index(&self, index: usize) -> Result<BTreeSet<DDValue>, String>;
     }
     pub trait DDlogDynamic: DDlog {
-        // Stub trait
+        fn transaction_start(&self) -> Result<(), String>;
+        fn transaction_commit_dump_changes_dynamic(
+            &self,
+        ) -> Result<std::collections::BTreeMap<usize, Vec<(Record, isize)>>, String>;
+        fn transaction_commit(&self) -> Result<(), String>;
+        fn transaction_rollback(&self) -> Result<(), String>;
+        fn apply_updates_dynamic(
+            &self,
+            upds: &mut dyn Iterator<Item = UpdCmd>,
+        ) -> Result<(), String>;
+        fn clear_relation(&self, table: usize) -> Result<(), String>;
+        fn query_index_dynamic(&self, index: usize, key: &Record) -> Result<Vec<Record>, String>;
+        fn dump_index_dynamic(&self, index: usize) -> Result<Vec<Record>, String>;
+        fn stop(&self) -> Result<(), String>;
     }
 }
 

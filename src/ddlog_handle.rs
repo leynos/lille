@@ -35,14 +35,14 @@ pub trait DdlogApi: Send + Sync {
 #[cfg(feature = "ddlog")]
 impl DdlogApi for HDDlog {
     fn transaction_start(&mut self) -> Result<(), String> {
-        <differential_datalog::api::HDDlog>::transaction_start(self)
+        <HDDlog as DDlogDynamic>::transaction_start(self)
     }
 
     fn apply_updates_dynamic(
         &mut self,
         updates: &mut dyn Iterator<Item = differential_datalog::record::UpdCmd>,
     ) -> Result<(), String> {
-        <differential_datalog::api::HDDlog>::apply_updates_dynamic(self, updates)
+        <HDDlog as DDlogDynamic>::apply_updates_dynamic(self, updates)
     }
 
     fn transaction_commit_dump_changes_dynamic(
@@ -51,11 +51,11 @@ impl DdlogApi for HDDlog {
         std::collections::BTreeMap<usize, Vec<(differential_datalog::record::Record, isize)>>,
         String,
     > {
-        <differential_datalog::api::HDDlog>::transaction_commit_dump_changes_dynamic(self)
+        <HDDlog as DDlogDynamic>::transaction_commit_dump_changes_dynamic(self)
     }
 
     fn stop(self: Box<Self>) -> Result<(), String> {
-        <differential_datalog::api::HDDlog>::stop(*self)
+        <HDDlog as DDlogDynamic>::stop(&*self)
     }
 }
 use std::sync::atomic::AtomicUsize;
