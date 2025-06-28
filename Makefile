@@ -45,8 +45,10 @@ fmt-check: ddlog-stubs
 $(GENERATED_SRC):
 	mkdir -p '$(GENERATED_SRC)'
 
+BUILD_SUPPORT_FAIL_ON_DDLOG_ERROR ?= true
+
 build-support-run: ddlog-stubs
-	./scripts/build_support_runner.sh
+       BUILD_SUPPORT_FAIL_ON_DDLOG_ERROR=$(BUILD_SUPPORT_FAIL_ON_DDLOG_ERROR) ./scripts/build_support_runner.sh
 
 # Copy prebuilt DDlog stubs into the generated directory
 ddlog-stubs: $(GENERATED_SRC)
