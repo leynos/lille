@@ -13,9 +13,14 @@ fn dropping_handle_does_not_call_stop_without_feature() {
     assert_eq!(STOP_CALLS.load(Ordering::SeqCst), 0);
 }
 
-#[cfg(feature = "ddlog")]
-#[test]
-fn dropping_handle_stops_program() {
-    let handle = lille::DdlogHandle::default();
-    drop(handle);
-}
+ #[cfg(feature = "ddlog")]
+ #[test]
+ fn dropping_handle_stops_program() {
+     use differential_datalog::api::STOP_CALLS;
+     use std::sync::atomic::Ordering;
+
+     let initial_count = STOP_CALLS.load(Ordering::SeqCst);
+     let handle = lille::DdlogHandle::default();
+     drop(handle);
+     assert_eq!(STOP_CALLS.load(Ordering::SeqCst), initial_count + 1);
+ }
