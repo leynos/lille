@@ -7,21 +7,10 @@ use serial_test::serial;
 use std::sync::atomic::Ordering;
 
 #[fixture]
-fn reset_stop_calls() {
+fn handle_and_initial_count() -> (DdlogHandle, usize) {
     STOP_CALLS.store(0, Ordering::SeqCst);
-}
-
-#[fixture]
-fn ddlog_handle() -> DdlogHandle {
-    DdlogHandle::default()
-}
-
-#[fixture]
-fn handle_and_initial_count(
-    ddlog_handle: DdlogHandle,
-    _reset_stop_calls: (),
-) -> (DdlogHandle, usize) {
-    (ddlog_handle, STOP_CALLS.load(Ordering::SeqCst))
+    let handle = DdlogHandle::default();
+    (handle, STOP_CALLS.load(Ordering::SeqCst))
 }
 
 #[cfg(not(feature = "ddlog"))]
