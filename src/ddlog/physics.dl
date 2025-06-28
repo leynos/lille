@@ -137,15 +137,21 @@ FleeVector(actor, dx, dy) :-
     Dist2(actor, baddie, min_d2),
     Position(actor, ax, ay, _),
     Position(baddie, bx, by, _),
-    var dx = sign(ax - bx),
-    var dy = sign(ay - by).
+    var vx = ax - bx,
+    var vy = ay - by,
+    var n = vec_normalize(vx, vy, 0.0),
+    var dx = n.0,
+    var dy = n.1.
 
 relation TargetVector(actor: EntityID, dx: GCoord, dy: GCoord)
 TargetVector(actor, dx, dy) :-
     Target(actor, tx, ty),
     Position(actor, ax, ay, _),
-    var dx = sign(tx - ax),
-    var dy = sign(ty - ay).
+    var vx = tx - ax,
+    var vy = ty - ay,
+    var n = vec_normalize(vx, vy, 0.0),
+    var dx = n.0,
+    var dy = n.1.
 
 relation AiMoveVector(actor: EntityID, dx: GCoord, dy: GCoord)
 AiMoveVector(actor, dx, dy) :-

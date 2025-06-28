@@ -224,26 +224,27 @@ impl DdlogHandle {
             Relations,
         };
 
+        fn insert_record<T: IntoRecord>(cmds: &mut Vec<UpdCmd>, relation: usize, record: T) {
+            cmds.push(UpdCmd::Insert(
+                RelIdentifier::RelId(relation),
+                record.into_record(),
+            ));
+        }
+
         match unit {
             UnitType::Civvy { fraidiness } => {
                 let rec = Fraidiness {
                     entity: id,
                     factor: OrderedFloat(*fraidiness),
                 };
-                cmds.push(UpdCmd::Insert(
-                    RelIdentifier::RelId(Relations::entity_state_Fraidiness as usize),
-                    rec.into_record(),
-                ));
+                insert_record(cmds, Relations::entity_state_Fraidiness as usize, rec);
             }
             UnitType::Baddie { meanness } => {
                 let rec = Meanness {
                     entity: id,
                     factor: OrderedFloat(*meanness),
                 };
-                cmds.push(UpdCmd::Insert(
-                    RelIdentifier::RelId(Relations::entity_state_Meanness as usize),
-                    rec.into_record(),
-                ));
+                insert_record(cmds, Relations::entity_state_Meanness as usize, rec);
             }
         }
     }
