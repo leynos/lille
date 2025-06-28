@@ -68,6 +68,33 @@ use std::sync::atomic::Ordering;
 /// Uses sequentially consistent ordering for all operations.
 pub static STOP_CALLS: AtomicUsize = AtomicUsize::new(0);
 
+#[cfg(feature = "ddlog")]
+pub trait RelIdentifierExt {
+    fn as_id(&self) -> usize;
+}
+
+#[cfg(feature = "ddlog")]
+impl RelIdentifierExt for differential_datalog::record::RelIdentifier {
+    fn as_id(&self) -> usize {
+        match *self {
+            differential_datalog::record::RelIdentifier::RelId(id) => id,
+        }
+    }
+}
+
+#[cfg(feature = "ddlog")]
+pub fn extract_entity(rec: &differential_datalog::record::Record) -> i64 {
+    rec.entity
+}
+
+#[cfg(feature = "ddlog")]
+pub fn sort_cmds(cmds: &mut [differential_datalog::record::UpdCmd]) {
+    use differential_datalog::record::UpdCmd;
+    cmds.sort_by_key(|cmd| match cmd {
+        UpdCmd::Insert(rel, rec) | UpdCmd::Delete(rel, rec) => (rel.as_id(), extract_entity(rec)),
+    });
+}
+
 #[derive(Clone, Serialize)]
 pub struct DdlogEntity {
     pub position: Vec3,
@@ -284,6 +311,7 @@ impl DdlogHandle {
 
             Self::create_unit_commands(id, &ent.unit, &mut cmds);
         }
+        sort_cmds(cmds.as_mut_slice());
         cmds
     }
 
