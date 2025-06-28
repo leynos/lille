@@ -180,10 +180,12 @@ pub fn generate_code_from_constants(parsed: &Value, fmts: &Formats) -> String {
         code.push_str("import types\n\n");
     }
     let mut append = |k: &str, v: &Value| {
-        // Always emit UPPER_CASE constant names regardless of target language.
-        // DDlog typically uses lower_snake case for variables, but our
-        // generated constants are exported functions so casing is flexible.
-        let name = k.to_uppercase();
+        // Uppercase constant names for Rust but keep the original key for other
+        // formats. DDlog function names can retain their original casing.
+        let name = match fmts.flavor {
+            FormatFlavor::Rust => k.to_uppercase(),
+            _ => k.to_string(),
+        };
         match v {
             Value::Integer(i) => code.push_str(&fill2(fmts.int_fmt, name, i)),
             Value::Float(f) => {
