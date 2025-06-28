@@ -268,49 +268,35 @@ mod tests {
         assert!(!is_plain_integer_literal("NaN"));
     }
 
-    #[test]
-    fn parse_constants_validates_schema() {
-        let dir = TempDir::new().expect("failed to create temp dir");
-        fs::write(dir.path().join("constants.toml"), "[physics]\nvalue = 1\n")
-            .expect("unable to write constants.toml");
-        fs::write(
-            dir.path().join("constants.schema.json"),
-            r#"{
-                "type": "object",
-                "properties": {
-                    "physics": {
-                        "type": "object",
-                        "required": ["other"]
-                    }
-                }
-            }"#,
-        )
-        .expect("unable to write constants.schema.json");
-        assert!(parse_constants(dir.path()).is_err());
-    }
+    use rstest::rstest;
 
-    #[test]
-    fn parse_constants_succeeds_with_valid_schema() {
+    #[rstest]
+    #[case(
+        r#"{"type": "object", "properties": {"physics": {"type": "object", "required": ["other"]}}}"#,
+        false,
+        "validation should fail when required field missing"
+    )]
+    #[case(
+        r#"{"type": "object", "required": ["physics"], "properties": {"physics": {"type": "object", "required": ["value"], "properties": {"value": {"type": "integer"}}}}}"#,
+        true,
+        "validation should succeed with valid schema"
+    )]
+    fn parse_constants_schema_validation(
+        #[case] schema_json: &str,
+        #[case] should_succeed: bool,
+        #[case] description: &str,
+    ) {
         let dir = TempDir::new().expect("failed to create temp dir");
         fs::write(dir.path().join("constants.toml"), "[physics]\nvalue = 1\n")
             .expect("unable to write constants.toml");
-        fs::write(
-            dir.path().join("constants.schema.json"),
-            r#"{
-                "type": "object",
-                "required": ["physics"],
-                "properties": {
-                    "physics": {
-                        "type": "object",
-                        "required": ["value"],
-                        "properties": {
-                            "value": {"type": "integer"}
-                        }
-                    }
-                }
-            }"#,
-        )
-        .expect("unable to write constants.schema.json");
-        assert!(parse_constants(dir.path()).is_ok());
+        fs::write(dir.path().join("constants.schema.json"), schema_json)
+            .expect("unable to write constants.schema.json");
+        
+        let result = parse_constants(dir.path());
+        if should_succeed {
+            assert!(result.is_ok(), "{}", description);
+        } else {
+            assert!(result.is_err(), "{}", description);
+        }
     }
 }
