@@ -174,7 +174,7 @@ impl DdlogHandle {
     fn ddlog_position_cmds(&self) -> Vec<differential_datalog::record::UpdCmd> {
         use differential_datalog::record::{IntoRecord, RelIdentifier, UpdCmd};
         use lille_ddlog::{
-            typedefs::entity_state::{Fraidiness, Meanness, Position, Target},
+            typedefs::entity_state::{Position, Target},
             Relations,
         };
 
@@ -207,30 +207,45 @@ impl DdlogHandle {
                 }
             }
 
-            match ent.unit {
-                UnitType::Civvy { fraidiness } => {
-                    let rec = Fraidiness {
-                        entity: id,
-                        factor: OrderedFloat(fraidiness),
-                    };
-                    cmds.push(UpdCmd::Insert(
-                        RelIdentifier::RelId(Relations::entity_state_Fraidiness as usize),
-                        rec.into_record(),
-                    ));
-                }
-                UnitType::Baddie { meanness } => {
-                    let rec = Meanness {
-                        entity: id,
-                        factor: OrderedFloat(meanness),
-                    };
-                    cmds.push(UpdCmd::Insert(
-                        RelIdentifier::RelId(Relations::entity_state_Meanness as usize),
-                        rec.into_record(),
-                    ));
-                }
-            }
+            Self::create_unit_commands(id, &ent.unit, &mut cmds);
         }
         cmds
+    }
+
+    #[cfg(feature = "ddlog")]
+    fn create_unit_commands(
+        id: i64,
+        unit: &UnitType,
+        cmds: &mut Vec<differential_datalog::record::UpdCmd>,
+    ) {
+        use differential_datalog::record::{IntoRecord, RelIdentifier, UpdCmd};
+        use lille_ddlog::{
+            typedefs::entity_state::{Fraidiness, Meanness},
+            Relations,
+        };
+
+        match unit {
+            UnitType::Civvy { fraidiness } => {
+                let rec = Fraidiness {
+                    entity: id,
+                    factor: OrderedFloat(*fraidiness),
+                };
+                cmds.push(UpdCmd::Insert(
+                    RelIdentifier::RelId(Relations::entity_state_Fraidiness as usize),
+                    rec.into_record(),
+                ));
+            }
+            UnitType::Baddie { meanness } => {
+                let rec = Meanness {
+                    entity: id,
+                    factor: OrderedFloat(*meanness),
+                };
+                cmds.push(UpdCmd::Insert(
+                    RelIdentifier::RelId(Relations::entity_state_Meanness as usize),
+                    rec.into_record(),
+                ));
+            }
+        }
     }
 
     #[cfg(feature = "ddlog")]
