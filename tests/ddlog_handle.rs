@@ -7,24 +7,30 @@ use serial_test::serial;
 use std::sync::atomic::Ordering;
 
 #[fixture]
+fn reset_stop_calls() {
+    STOP_CALLS.store(0, Ordering::SeqCst);
+}
+
+#[fixture]
 fn ddlog_handle() -> DdlogHandle {
     DdlogHandle::default()
 }
 
 #[fixture]
-fn initial_stop_calls() -> usize {
-    STOP_CALLS.store(0, Ordering::SeqCst);
-    0
+fn handle_and_initial_count(
+    ddlog_handle: DdlogHandle,
+    _reset_stop_calls: (),
+) -> (DdlogHandle, usize) {
+    (ddlog_handle, STOP_CALLS.load(Ordering::SeqCst))
 }
 
 #[cfg(not(feature = "ddlog"))]
 #[rstest]
 #[serial]
 fn dropping_handle_does_not_call_stop_without_feature(
-    ddlog_handle: DdlogHandle,
-    initial_stop_calls: usize,
+    handle_and_initial_count: (DdlogHandle, usize),
 ) {
-    assert_eq!(initial_stop_calls, 0);
+    let (ddlog_handle, _initial_count) = handle_and_initial_count;
     assert_eq!(STOP_CALLS.load(Ordering::SeqCst), 0);
     drop(ddlog_handle);
     assert_eq!(STOP_CALLS.load(Ordering::SeqCst), 0);
@@ -33,8 +39,8 @@ fn dropping_handle_does_not_call_stop_without_feature(
 #[cfg(feature = "ddlog")]
 #[rstest]
 #[serial]
-fn dropping_handle_stops_program(ddlog_handle: DdlogHandle, initial_stop_calls: usize) {
-    assert_eq!(initial_stop_calls, 0);
+fn dropping_handle_stops_program(handle_and_initial_count: (DdlogHandle, usize)) {
+    let (ddlog_handle, initial_count) = handle_and_initial_count;
     drop(ddlog_handle);
-    assert_eq!(STOP_CALLS.load(Ordering::SeqCst), 1);
+    assert_eq!(STOP_CALLS.load(Ordering::SeqCst), initial_count + 1);
 }

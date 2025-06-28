@@ -7,3 +7,4 @@ assets/
 src/ddlog/constants.dl
 constants.rs
 generated/lille_ddlog/
+/targets
