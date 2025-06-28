@@ -158,7 +158,9 @@ pub mod record {
     pub struct DDValue(serde_json::Value);
 
     #[derive(Clone, Debug)]
-    pub struct Record;
+    pub struct Record {
+        pub entity: i64,
+    }
 
     #[derive(Clone, Debug)]
     pub enum RelIdentifier {
