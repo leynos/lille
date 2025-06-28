@@ -15,6 +15,14 @@ use differential_datalog::api::HDDlog;
 use differential_datalog::{DDlog, DDlogDynamic};
 #[cfg(feature = "ddlog")]
 use ordered_float::OrderedFloat;
+#[cfg(feature = "ddlog")]
+use std::sync::atomic::AtomicUsize;
+#[cfg(feature = "ddlog")]
+use std::sync::atomic::Ordering as AtomicOrdering;
+
+#[cfg(feature = "ddlog")]
+/// Counts the number of times [`HDDlog::stop`] has been called via [`DdlogHandle`].
+pub static STOP_CALLS: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Clone, Serialize)]
 pub struct DdlogEntity {
@@ -395,9 +403,12 @@ impl DdlogHandle {
 impl Drop for DdlogHandle {
     fn drop(&mut self) {
         #[cfg(feature = "ddlog")]
-        if let Some(prog) = self.prog.take() {
-            if let Err(e) = prog.stop() {
-                log::error!("failed to stop DDlog: {e}");
+        {
+            if let Some(prog) = self.prog.take() {
+                if let Err(e) = prog.stop() {
+                    log::error!("failed to stop DDlog: {e}");
+                }
+                STOP_CALLS.fetch_add(1, AtomicOrdering::SeqCst);
             }
         }
     }
