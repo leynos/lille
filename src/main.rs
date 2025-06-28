@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use clap::Parser;
 use color_eyre::eyre::Result;
 use lille::{
-    apply_ddlog_deltas_system, init_ddlog_system, init_logging, push_state_to_ddlog_system,
+    apply_ddlog_deltas_system, cache_state_for_ddlog_system, init_ddlog_system, init_logging,
     spawn_world_system,
 };
 
@@ -32,11 +32,11 @@ fn main() -> Result<()> {
         .add_systems(Startup, spawn_world_system.after(init_ddlog_system))
         .add_systems(
             Startup,
-            push_state_to_ddlog_system.after(spawn_world_system),
+            cache_state_for_ddlog_system.after(spawn_world_system),
         )
         .add_systems(
             Update,
-            (push_state_to_ddlog_system, apply_ddlog_deltas_system).chain(),
+            (cache_state_for_ddlog_system, apply_ddlog_deltas_system).chain(),
         )
         .run();
     Ok(())

@@ -279,7 +279,7 @@ fn init_ddlog_system(mut commands: Commands) {
 }
 
 // System to push ECS state into DDlog input relations
-fn push_state_to_ddlog_system(
+fn cache_state_for_ddlog_system(
     ddlog_handle: Res<DdlogHandle>,
     // Query for all entities that should be in the logic simulation
     query: Query<(Entity, &Transform, &Health, &UnitType, Option<&Target>)>,
@@ -389,7 +389,7 @@ fn main() {
         .add_startup_system(init_ddlog_system)
         .add_systems(
             (
-                push_state_to_ddlog_system,
+                cache_state_for_ddlog_system,
                 apply_ddlog_deltas_system,
             )
             .chain() // Ensures they run in order
