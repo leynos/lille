@@ -1,6 +1,7 @@
 //! Tests for the `build_support` constants generator.
 //! Ensures generated code is syntactically valid and handles edge cases.
-use build_support::constants::{generate_code_from_constants, DL_FMTS, RUST_FMTS};
+use build_support::constants::{generate_code_from_constants, Formats, DL_FMTS, RUST_FMTS};
+use rstest::rstest;
 use test_utils::{assert_all_absent, assert_all_present, assert_valid_rust_syntax};
 
 #[test]
@@ -162,8 +163,12 @@ fn handles_arrays() {
     assert!(code.starts_with("// @generated"));
 }
 
-#[test]
-fn handles_case_conversion_and_naming() {
+/// Ensures that key names with various casing styles are converted to
+/// `UPPER_CASE` in the generated output.
+#[rstest]
+#[case(&RUST_FMTS)]
+#[case(&DL_FMTS)]
+fn handles_case_conversion_and_naming(#[case] fmts: &Formats) {
     let toml_str = r#"
         [naming]
         camelCase = "value1"
@@ -176,9 +181,20 @@ fn handles_case_conversion_and_naming() {
         with_special-chars_and123 = "value8"
     "#;
     let parsed: toml::Value = toml_str.parse().unwrap();
-    let code = generate_code_from_constants(&parsed, &RUST_FMTS);
+    let code = generate_code_from_constants(&parsed, fmts);
 
-    assert!(code.starts_with("// @generated"));
+    for name in [
+        "CAMELCASE",
+        "SNAKE_CASE",
+        "KEBAB-CASE",
+        "PASCALCASE",
+        "LOWERCASE",
+        "UPPERCASE",
+        "MIXED123NUMBERS",
+        "WITH_SPECIAL-CHARS_AND123",
+    ] {
+        assert!(code.contains(name), "Missing {name} in generated output");
+    }
 }
 
 #[test]
@@ -346,7 +362,7 @@ fn generates_ddlog_functions() {
     let toml_str = "value = 5";
     let parsed: toml::Value = toml_str.parse().unwrap();
     let code = generate_code_from_constants(&parsed, &DL_FMTS);
-    assert!(code.contains("function value()"));
+    assert!(code.contains("function VALUE()"));
     assert!(code.contains("{ 5 }"));
 }
 
@@ -355,7 +371,7 @@ fn generates_ddlog_float_function() {
     let toml_str = "pi = 3.14";
     let parsed: toml::Value = toml_str.parse().unwrap();
     let code = generate_code_from_constants(&parsed, &DL_FMTS);
-    assert!(code.contains("function pi()"));
+    assert!(code.contains("function PI()"));
     assert!(code.contains("{ 3.14 }"));
 }
 
@@ -364,7 +380,7 @@ fn generates_ddlog_string_function() {
     let toml_str = r#"greeting = "hello \"world\"""#;
     let parsed: toml::Value = toml_str.parse().unwrap();
     let code = generate_code_from_constants(&parsed, &DL_FMTS);
-    assert!(code.contains("function greeting()"));
+    assert!(code.contains("function GREETING()"));
     assert!(code.contains("{ \"hello \\\"world\\\"\" }"));
 }
 
@@ -376,7 +392,7 @@ fn generates_ddlog_boolean_functions_absent() {
     "#;
     let parsed: toml::Value = toml_str.parse().unwrap();
     let code = generate_code_from_constants(&parsed, &DL_FMTS);
-    assert_all_absent(&code, &["function flag_true()", "function flag_false()"]);
+    assert_all_absent(&code, &["function FLAG_TRUE()", "function FLAG_FALSE()"]);
 }
 
 #[test]
@@ -393,9 +409,9 @@ fn generates_ddlog_nested_functions() {
     assert_all_present(
         &code,
         &[
-            "function inner_int()",
+            "function INNER_INT()",
             "{ 10 }",
-            "function deeper_str()",
+            "function DEEPER_STR()",
             "{ \"deep\" }",
         ],
     );
@@ -413,11 +429,11 @@ fn generates_ddlog_edge_case_functions() {
     assert_all_present(
         &code,
         &[
-            "function empty_str()",
+            "function EMPTY_STR()",
             "{ \"\" }",
-            "function large_int()",
+            "function LARGE_INT()",
             "{ 9223372036854775807 }",
-            "function special()",
+            "function SPECIAL()",
             "line\\nwith\\tspecial❤",
         ],
     );
