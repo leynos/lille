@@ -129,7 +129,8 @@ fn validate_constants(dir: &Path, data: &Value) -> Result<()> {
     schema
         .validate(&instance)
         .map(|_| ())
-        .map_err(|error| eyre!("constants.toml schema validation failed: {error}"))
+        .map_err(|error| eyre!(error.to_string()))
+        .wrap_err("constants.toml schema validation failed")
 }
 
 fn load_schema(dir: &Path) -> Result<&'static Validator> {
@@ -270,8 +271,9 @@ mod tests {
 
     #[test]
     fn parse_constants_validates_schema() {
-        let dir = TempDir::new().unwrap();
-        fs::write(dir.path().join("constants.toml"), "[physics]\nvalue = 1\n").unwrap();
+        let dir = TempDir::new().expect("failed to create temp dir");
+        fs::write(dir.path().join("constants.toml"), "[physics]\nvalue = 1\n")
+            .expect("unable to write constants.toml");
         fs::write(
             dir.path().join("constants.schema.json"),
             r#"{
@@ -284,14 +286,15 @@ mod tests {
                 }
             }"#,
         )
-        .unwrap();
+        .expect("unable to write constants.schema.json");
         assert!(parse_constants(dir.path()).is_err());
     }
 
     #[test]
     fn parse_constants_succeeds_with_valid_schema() {
-        let dir = TempDir::new().unwrap();
-        fs::write(dir.path().join("constants.toml"), "[physics]\nvalue = 1\n").unwrap();
+        let dir = TempDir::new().expect("failed to create temp dir");
+        fs::write(dir.path().join("constants.toml"), "[physics]\nvalue = 1\n")
+            .expect("unable to write constants.toml");
         fs::write(
             dir.path().join("constants.schema.json"),
             r#"{
@@ -308,7 +311,7 @@ mod tests {
                 }
             }"#,
         )
-        .unwrap();
+        .expect("unable to write constants.schema.json");
         assert!(parse_constants(dir.path()).is_ok());
     }
 }
