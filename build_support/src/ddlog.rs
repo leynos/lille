@@ -94,17 +94,15 @@ fn run_ddlog(ddlog_file: &Path, crate_dir: &Path) -> Result<()> {
         .arg("-o")
         .arg(crate_dir)
         .output()?;
+
     if output.status.success() {
         Ok(())
     } else {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        Err(eyre!(
-            "ddlog compiler exited with status: {}\nstdout:\n{}\nstderr:\n{}",
-            output.status,
-            stdout,
-            stderr
-        ))
+        println!(
+            "cargo:warning=ddlog compiler exited with status: {}",
+            output.status
+        );
+        Err(eyre!("ddlog compilation failed (exit {})", output.status))
     }
 }
 
