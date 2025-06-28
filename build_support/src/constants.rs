@@ -4,7 +4,9 @@
 //! output Rust and Differential Datalog source files. It keeps the two
 //! languages in sync so both parts of the project share the same numerical and
 //! string constants.
-use color_eyre::eyre::Result;
+use color_eyre::eyre::{eyre, Result};
+use jsonschema::validator_for;
+use serde_json::Value as JsonValue;
 use std::fs;
 use std::path::Path;
 
@@ -100,9 +102,28 @@ pub fn generate_constants(manifest_dir: impl AsRef<Path>, out_dir: impl AsRef<Pa
 /// assert!(value.is_table());
 /// ```
 pub fn parse_constants(manifest_dir: impl AsRef<Path>) -> Result<Value> {
-    let const_path = manifest_dir.as_ref().join("constants.toml");
-    let toml_str = fs::read_to_string(const_path)?;
-    Ok(toml_str.parse()?)
+    let manifest_dir = manifest_dir.as_ref();
+    let const_path = manifest_dir.join("constants.toml");
+    let toml_str = fs::read_to_string(&const_path)?;
+    let parsed: Value = toml_str.parse()?;
+    validate_constants(manifest_dir, &parsed)?;
+    Ok(parsed)
+}
+
+/// Validate `constants.toml` against `constants.schema.json`.
+fn validate_constants(dir: &Path, data: &Value) -> Result<()> {
+    let schema_path = dir.join("constants.schema.json");
+    let schema_str = fs::read_to_string(&schema_path)?;
+    let schema_json: JsonValue = serde_json::from_str(&schema_str)?;
+    let instance = serde_json::to_value(data)?;
+    let compiled = validator_for(&schema_json)?;
+    if let Err(error) = compiled.validate(&instance) {
+        Err(eyre!(format!(
+            "constants.toml schema validation failed: {error}"
+        )))
+    } else {
+        Ok(())
+    }
 }
 
 /// Traverse all scalar constants in the parsed TOML value.
@@ -209,6 +230,9 @@ pub fn generate_code_from_constants(parsed: &Value, fmts: &Formats) -> String {
 #[cfg(test)]
 mod tests {
     use super::is_plain_integer_literal;
+    use super::parse_constants;
+    use std::fs;
+    use tempfile::TempDir;
 
     #[test]
     fn identifies_plain_integers() {
@@ -223,5 +247,17 @@ mod tests {
         assert!(!is_plain_integer_literal("3E5"));
         assert!(!is_plain_integer_literal("inf"));
         assert!(!is_plain_integer_literal("NaN"));
+    }
+
+    #[test]
+    fn parse_constants_validates_schema() {
+        let dir = TempDir::new().unwrap();
+        fs::write(dir.path().join("constants.toml"), "[physics]\nvalue = 1\n").unwrap();
+        fs::write(
+            dir.path().join("constants.schema.json"),
+            r#"{\"type\":\"object\",\"properties\":{\"physics\":{\"type\":\"object\",\"required\":[\"other\"]}}}"#,
+        )
+        .unwrap();
+        assert!(parse_constants(dir.path()).is_err());
     }
 }

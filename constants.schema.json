@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Lille Constants",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["physics"],
+  "properties": {
+    "physics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "grace_distance",
+        "ground_friction",
+        "air_friction",
+        "terminal_velocity",
+        "gravity_pull",
+        "delta_time",
+        "default_mass",
+        "fear_radius_multiplier",
+        "fear_threshold"
+      ],
+      "properties": {
+        "grace_distance": {"type": "number"},
+        "ground_friction": {"type": "number"},
+        "air_friction": {"type": "number"},
+        "terminal_velocity": {"type": "number"},
+        "gravity_pull": {"type": "number"},
+        "delta_time": {"type": "number"},
+        "default_mass": {"type": "number"},
+        "fear_radius_multiplier": {"type": "number"},
+        "fear_threshold": {"type": "number"}
+      }
+    }
+  }
+}
