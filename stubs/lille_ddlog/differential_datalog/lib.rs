@@ -137,7 +137,8 @@ pub mod api {
         }
 
         fn stop(&mut self) -> Result<(), String> {
-            self.clone().stop()
+            STOP_CALLS.fetch_add(1, Ordering::SeqCst);
+            Ok(())
         }
     }
 }
