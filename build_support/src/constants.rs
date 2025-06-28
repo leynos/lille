@@ -129,7 +129,7 @@ fn validate_constants(dir: &Path, data: &Value) -> Result<()> {
     schema
         .validate(&instance)
         .map(|_| ())
-        .map_err(|error| eyre!(format!("constants.toml schema validation failed: {error}")))
+        .map_err(|error| eyre!("constants.toml schema validation failed: {error}"))
 }
 
 fn load_schema(dir: &Path) -> Result<&'static Validator> {
@@ -274,7 +274,15 @@ mod tests {
         fs::write(dir.path().join("constants.toml"), "[physics]\nvalue = 1\n").unwrap();
         fs::write(
             dir.path().join("constants.schema.json"),
-            r#"{"type":"object","properties":{"physics":{"type":"object","required":["other"]}}}"#,
+            r#"{
+                "type": "object",
+                "properties": {
+                    "physics": {
+                        "type": "object",
+                        "required": ["other"]
+                    }
+                }
+            }"#,
         )
         .unwrap();
         assert!(parse_constants(dir.path()).is_err());
@@ -286,7 +294,19 @@ mod tests {
         fs::write(dir.path().join("constants.toml"), "[physics]\nvalue = 1\n").unwrap();
         fs::write(
             dir.path().join("constants.schema.json"),
-            r#"{"type":"object","required":["physics"],"properties":{"physics":{"type":"object","required":["value"],"properties":{"value":{"type":"integer"}}}}}"#,
+            r#"{
+                "type": "object",
+                "required": ["physics"],
+                "properties": {
+                    "physics": {
+                        "type": "object",
+                        "required": ["value"],
+                        "properties": {
+                            "value": {"type": "integer"}
+                        }
+                    }
+                }
+            }"#,
         )
         .unwrap();
         assert!(parse_constants(dir.path()).is_ok());
