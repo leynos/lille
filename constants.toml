@@ -1,10 +1,19 @@
 [physics]
-GRACE_DISTANCE = 0.1
-GROUND_FRICTION = 0.1
-AIR_FRICTION = 0.02
-TERMINAL_VELOCITY = 2.0
-GRAVITY_PULL = -1.0
-DELTA_TIME = 1.0
-DEFAULT_MASS = 70.0
-FEAR_RADIUS_MULTIPLIER = 2.0
-FEAR_THRESHOLD = 0.2
+# Distance buffer before an entity is considered falling (metres)
+grace_distance = 0.1
+# Maximum horizontal deceleration while on the ground (m/s per tick)
+ground_friction = 0.1
+# Maximum horizontal deceleration while airborne (m/s per tick)
+air_friction = 0.02
+# Maximum falling speed (m/s)
+terminal_velocity = 2.0
+# Constant downward acceleration applied each tick (m/s^2)
+gravity_pull = -1.0
+# Length of a single physics tick (seconds)
+delta_time = 1.0
+# Default mass for entities lacking an explicit value (kg)
+default_mass = 70.0
+# Multiplier for the fear radius based on actor fraidiness and baddie meanness
+fear_radius_multiplier = 2.0
+# Minimum fear level to trigger fleeing behavior
+fear_threshold = 0.2
