@@ -192,15 +192,19 @@ impl DdlogHandle {
             ));
 
             if let Some(target) = ent.target {
-                let rec = Target {
-                    entity: id,
-                    tx: OrderedFloat(target.x),
-                    ty: OrderedFloat(target.y),
-                };
-                cmds.push(UpdCmd::Insert(
-                    RelIdentifier::RelId(Relations::entity_state_Target as usize),
-                    rec.into_record(),
-                ));
+                if target.x.is_finite() && target.y.is_finite() {
+                    let rec = Target {
+                        entity: id,
+                        tx: OrderedFloat(target.x),
+                        ty: OrderedFloat(target.y),
+                    };
+                    cmds.push(UpdCmd::Insert(
+                        RelIdentifier::RelId(Relations::entity_state_Target as usize),
+                        rec.into_record(),
+                    ));
+                } else {
+                    log::warn!("ignored non-finite target for entity {id}");
+                }
             }
 
             match ent.unit {

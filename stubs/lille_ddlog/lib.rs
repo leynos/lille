@@ -37,6 +37,7 @@ pub fn relval_from_record(
 }
 
 pub mod shared {
+    //! Shared struct definitions used throughout the stubs.
     use ordered_float::OrderedFloat;
     use differential_datalog::ddval::DDValConvert;
     use differential_datalog::record::{DDValue, IntoRecord, Record};
@@ -124,32 +125,39 @@ pub mod shared {
 }
 
 pub mod physics {
+    //! Stub module mirroring generated `physics` namespace.
     pub use crate::shared::Position as NewPosition;
 }
 
 pub mod types__physics {
+    //! Stub module mirroring generated `types::physics` namespace.
     pub use crate::shared::Position as NewPosition;
 }
 
 pub mod typedefs {
+    //! Stub module exposing typedef re-exports.
+    //! Re-exports `entity_state` structs for convenience.
     pub mod entity_state {
         pub use crate::shared::{Fraidiness, Meanness, Position, Target};
     }
     pub mod physics {
+        //! Re-exports `physics` structs for convenience.
         pub use crate::shared::Position as NewPosition;
     }
 }
 
 pub mod entity_state {
+    //! Flat re-exports of `entity_state` structs.
     pub use crate::shared::{Fraidiness, Meanness, Position, Target};
 }
 
 pub mod types__entity_state {
+    //! Stub module mirroring generated `types::entity_state` namespace.
     pub use crate::shared::{Fraidiness, Meanness, Position, Target};
 }
 
-// Stub for the record module and Record enum
 pub mod record {
+    //! Minimal record module used by the stubs.
     use differential_datalog::record::DDValue;
     use serde::Serialize;
 

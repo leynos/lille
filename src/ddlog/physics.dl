@@ -118,9 +118,9 @@ FearContribution(actor, baddie, fear) :-
     Fraidiness(actor, fraidiness),
     Meanness(baddie, meanness),
     Dist2(actor, baddie, d2),
-    var fear_radius = fraidiness * meanness * 2.0,
+    var fear_radius = fraidiness * meanness * fear_radius_multiplier(),
     d2 < fear_radius * fear_radius,
-    var fear = 1.0 / (d2 + 0.001).
+    var fear = fear_radius / (d2 + fear_radius * 0.1).
 
 relation TotalFear(actor: EntityID, total_fear: GCoord)
 TotalFear(actor, total_fear) :-
@@ -131,6 +131,7 @@ TotalFear(actor, total_fear) :-
 relation FleeVector(actor: EntityID, dx: GCoord, dy: GCoord)
 FleeVector(actor, dx, dy) :-
     TotalFear(actor, _),
+    FearContribution(actor, baddie, _),
     Dist2(actor, baddie, d2),
     var min_d2 = d2.group_by(actor).min(),
     Dist2(actor, baddie, min_d2),
@@ -148,10 +149,10 @@ TargetVector(actor, dx, dy) :-
 
 relation AiMoveVector(actor: EntityID, dx: GCoord, dy: GCoord)
 AiMoveVector(actor, dx, dy) :-
-    TotalFear(actor, fear), fear > 0.2,
+    TotalFear(actor, fear), fear > fear_threshold(),
     FleeVector(actor, dx, dy).
 AiMoveVector(actor, dx, dy) :-
-    TotalFear(actor, fear), fear <= 0.2,
+    TotalFear(actor, fear), fear <= fear_threshold(),
     TargetVector(actor, dx, dy).
 AiMoveVector(actor, dx, dy) :-
     TargetVector(actor, dx, dy),
