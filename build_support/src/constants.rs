@@ -128,7 +128,6 @@ fn validate_constants(dir: &Path, data: &Value) -> Result<()> {
     let instance = serde_json::to_value(data)?;
     schema
         .validate(&instance)
-        .map(|_| ())
         .map_err(|error| eyre!(error.to_string()))
         .wrap_err("constants.toml schema validation failed")
 }
