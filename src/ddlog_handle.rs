@@ -173,23 +173,80 @@ impl DdlogHandle {
     #[cfg(feature = "ddlog")]
     fn ddlog_position_cmds(&self) -> Vec<differential_datalog::record::UpdCmd> {
         use differential_datalog::record::{IntoRecord, RelIdentifier, UpdCmd};
-        use lille_ddlog::{typedefs::entity_state::Position, Relations};
+        use lille_ddlog::{
+            typedefs::entity_state::{Position, Target},
+            Relations,
+        };
 
-        self.entities
-            .iter()
-            .map(|(&id, ent)| {
-                let record = Position {
+        let mut cmds = Vec::new();
+        for (&id, ent) in &self.entities {
+            let pos = Position {
+                entity: id,
+                x: OrderedFloat(ent.position.x),
+                y: OrderedFloat(ent.position.y),
+                z: OrderedFloat(ent.position.z),
+            };
+            cmds.push(UpdCmd::Insert(
+                RelIdentifier::RelId(Relations::entity_state_Position as usize),
+                pos.into_record(),
+            ));
+
+            if let Some(target) = ent.target {
+                if target.x.is_finite() && target.y.is_finite() {
+                    let rec = Target {
+                        entity: id,
+                        tx: OrderedFloat(target.x),
+                        ty: OrderedFloat(target.y),
+                    };
+                    cmds.push(UpdCmd::Insert(
+                        RelIdentifier::RelId(Relations::entity_state_Target as usize),
+                        rec.into_record(),
+                    ));
+                } else {
+                    log::warn!("ignored non-finite target for entity {id}");
+                }
+            }
+
+            Self::create_unit_commands(id, &ent.unit, &mut cmds);
+        }
+        cmds
+    }
+
+    #[cfg(feature = "ddlog")]
+    fn create_unit_commands(
+        id: i64,
+        unit: &UnitType,
+        cmds: &mut Vec<differential_datalog::record::UpdCmd>,
+    ) {
+        use differential_datalog::record::{IntoRecord, RelIdentifier, UpdCmd};
+        use lille_ddlog::{
+            typedefs::entity_state::{Fraidiness, Meanness},
+            Relations,
+        };
+
+        fn insert_record<T: IntoRecord>(cmds: &mut Vec<UpdCmd>, relation: usize, record: T) {
+            cmds.push(UpdCmd::Insert(
+                RelIdentifier::RelId(relation),
+                record.into_record(),
+            ));
+        }
+
+        match unit {
+            UnitType::Civvy { fraidiness } => {
+                let rec = Fraidiness {
                     entity: id,
-                    x: OrderedFloat(ent.position.x),
-                    y: OrderedFloat(ent.position.y),
-                    z: OrderedFloat(ent.position.z),
+                    factor: OrderedFloat(*fraidiness),
                 };
-                UpdCmd::Insert(
-                    RelIdentifier::RelId(Relations::entity_state_Position as usize),
-                    record.into_record(),
-                )
-            })
-            .collect()
+                insert_record(cmds, Relations::entity_state_Fraidiness as usize, rec);
+            }
+            UnitType::Baddie { meanness } => {
+                let rec = Meanness {
+                    entity: id,
+                    factor: OrderedFloat(*meanness),
+                };
+                insert_record(cmds, Relations::entity_state_Meanness as usize, rec);
+            }
+        }
     }
 
     #[cfg(feature = "ddlog")]

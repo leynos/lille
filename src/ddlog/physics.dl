@@ -15,6 +15,7 @@ function sum_group(g: Group<EntityID, GCoord>): GCoord {
 
 extern function vec_mag(x: GCoord, y: GCoord, z: GCoord): GCoord
 extern function vec_normalize(x: GCoord, y: GCoord, z: GCoord): (GCoord, GCoord, GCoord)
+extern function sign(x: GCoord): GCoord
 
 // --- Entity Position Relations ---
 // `Force` captures all momentary forces acting on an entity during the
@@ -103,5 +104,69 @@ NewVelocity(e, nvx, nvy, 0.0) :-
     IsStanding(e),
     UnclampedNewVelocity(e, nvx, nvy, _).
 
-// Placeholder rule mirroring input to output
-NewPosition(e, x, y, z) :- Position(e, x, y, z).
+// --- Simple AI Movement ---
+relation Dist2(e1: EntityID, e2: EntityID, d2: GCoord)
+Dist2(e1, e2, d2) :-
+    Position(e1, x1, y1, _),
+    Position(e2, x2, y2, _),
+    var dx = x1 - x2,
+    var dy = y1 - y2,
+    var d2 = dx * dx + dy * dy.
+
+relation FearContribution(actor: EntityID, baddie: EntityID, fear: GCoord)
+FearContribution(actor, baddie, fear) :-
+    Fraidiness(actor, fraidiness),
+    Meanness(baddie, meanness),
+    Dist2(actor, baddie, d2),
+    var fear_radius = fraidiness * meanness * fear_radius_multiplier(),
+    d2 < fear_radius * fear_radius,
+    var fear = fear_radius / (d2 + fear_radius * 0.1).
+
+relation TotalFear(actor: EntityID, total_fear: GCoord)
+TotalFear(actor, total_fear) :-
+    FearContribution(actor, _, f),
+    var group = f.group_by(actor),
+    var total_fear = sum_group(group).
+
+relation FleeVector(actor: EntityID, dx: GCoord, dy: GCoord)
+FleeVector(actor, dx, dy) :-
+    TotalFear(actor, _),
+    FearContribution(actor, baddie, _),
+    Dist2(actor, baddie, d2),
+    var min_d2 = d2.group_by(actor).min(),
+    Dist2(actor, baddie, min_d2),
+    Position(actor, ax, ay, _),
+    Position(baddie, bx, by, _),
+    var vx = ax - bx,
+    var vy = ay - by,
+    var n = vec_normalize(vx, vy, 0.0),
+    var dx = n.0,
+    var dy = n.1.
+
+relation TargetVector(actor: EntityID, dx: GCoord, dy: GCoord)
+TargetVector(actor, dx, dy) :-
+    Target(actor, tx, ty),
+    Position(actor, ax, ay, _),
+    var vx = tx - ax,
+    var vy = ty - ay,
+    var n = vec_normalize(vx, vy, 0.0),
+    var dx = n.0,
+    var dy = n.1.
+
+relation AiMoveVector(actor: EntityID, dx: GCoord, dy: GCoord)
+AiMoveVector(actor, dx, dy) :-
+    TotalFear(actor, fear), fear > fear_threshold(),
+    FleeVector(actor, dx, dy).
+AiMoveVector(actor, dx, dy) :-
+    TotalFear(actor, fear), fear <= fear_threshold(),
+    TargetVector(actor, dx, dy).
+AiMoveVector(actor, dx, dy) :-
+    TargetVector(actor, dx, dy),
+    not TotalFear(actor, _).
+
+NewPosition(e, x + dx, y + dy, z) :-
+    Position(e, x, y, z),
+    AiMoveVector(e, dx, dy).
+NewPosition(e, x, y, z) :-
+    Position(e, x, y, z),
+    not AiMoveVector(e, _, _).
