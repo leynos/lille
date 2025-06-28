@@ -10,6 +10,7 @@ use lille::{
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rstest::{fixture, rstest};
+use serial_test::serial;
 use std::collections::HashSet;
 
 const DL_SRC: &str = concat!(
@@ -67,6 +68,7 @@ fn ddlog_app() -> App {
 }
 
 #[rstest]
+#[serial]
 fn ddlog_moves_towards_target(ddlog_app: App) {
     let mut app = ddlog_app;
     let _e = app
@@ -100,6 +102,7 @@ fn ddlog_moves_towards_target(ddlog_app: App) {
 /// ddlog_flees_from_baddie();
 /// ```
 #[rstest]
+#[serial]
 fn ddlog_flees_from_baddie(ddlog_app: App) {
     let mut app = ddlog_app;
     let _civvy = app
