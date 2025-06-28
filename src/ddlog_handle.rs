@@ -5,6 +5,7 @@ use hashbrown::HashMap;
 use serde::Serialize;
 
 use crate::components::{Block, BlockSlope, UnitType};
+#[cfg(not(feature = "ddlog"))]
 use crate::{GRACE_DISTANCE, GRAVITY_PULL};
 
 #[cfg(feature = "ddlog")]
@@ -14,9 +15,6 @@ use differential_datalog::api::HDDlog;
 use differential_datalog::{DDlog, DDlogDynamic};
 #[cfg(feature = "ddlog")]
 use ordered_float::OrderedFloat;
-
-const GRACE_DISTANCE_F32: f32 = GRACE_DISTANCE as f32;
-const GRAVITY_PULL_F32: f32 = GRAVITY_PULL as f32;
 
 #[derive(Clone, Serialize)]
 pub struct DdlogEntity {
@@ -82,6 +80,7 @@ pub fn init_ddlog_system(mut commands: Commands) {
 }
 
 impl DdlogHandle {
+    #[cfg(not(feature = "ddlog"))]
     fn highest_block_at(&self, x: i32, y: i32) -> Option<&Block> {
         self.blocks
             .iter()
@@ -90,6 +89,7 @@ impl DdlogHandle {
     }
 
     /// Calculates the floor height at `(x, y)` relative to a block.
+    #[cfg(not(feature = "ddlog"))]
     pub fn floor_height_at(block: &Block, slope: Option<&BlockSlope>, x: f32, y: f32) -> f32 {
         let base = block.z as f32 + 1.0;
         if let Some(s) = slope {
@@ -99,6 +99,7 @@ impl DdlogHandle {
         }
     }
 
+    #[cfg(not(feature = "ddlog"))]
     fn floor_height_at_point(&self, x: f32, y: f32) -> f32 {
         let x_grid = x.floor() as i32;
         let y_grid = y.floor() as i32;
@@ -110,13 +111,15 @@ impl DdlogHandle {
         }
     }
 
+    #[cfg(not(feature = "ddlog"))]
     fn apply_gravity(&self, pos: &mut Vec3, floor: f32) {
-        if pos.z > floor + GRACE_DISTANCE_F32 {
-            pos.z += GRAVITY_PULL_F32;
+        if pos.z > floor + GRACE_DISTANCE as f32 {
+            pos.z += GRAVITY_PULL as f32;
         } else {
             pos.z = floor;
         }
     }
+    #[cfg(not(feature = "ddlog"))]
     fn civvy_move(&self, id: i64, ent: &DdlogEntity, pos: Vec3) -> Vec2 {
         let fraidiness = match ent.unit {
             UnitType::Civvy { fraidiness } => fraidiness,
@@ -156,6 +159,7 @@ impl DdlogHandle {
         Vec2::ZERO
     }
 
+    #[cfg(not(feature = "ddlog"))]
     fn compute_entity_update(&self, id: i64, ent: &DdlogEntity) -> Vec3 {
         let floor = self.floor_height_at_point(ent.position.x, ent.position.y);
         let mut pos = ent.position;
@@ -167,6 +171,62 @@ impl DdlogHandle {
     }
 
     #[cfg(feature = "ddlog")]
+    fn ddlog_position_cmds(&self) -> Vec<differential_datalog::record::UpdCmd> {
+        use differential_datalog::record::{IntoRecord, RelIdentifier, UpdCmd};
+        use lille_ddlog::{typedefs::entity_state::Position, Relations};
+
+        self.entities
+            .iter()
+            .map(|(&id, ent)| {
+                let record = Position {
+                    entity: id,
+                    x: OrderedFloat(ent.position.x),
+                    y: OrderedFloat(ent.position.y),
+                    z: OrderedFloat(ent.position.z),
+                };
+                UpdCmd::Insert(
+                    RelIdentifier::RelId(Relations::entity_state_Position as usize),
+                    record.into_record(),
+                )
+            })
+            .collect()
+    }
+
+    #[cfg(feature = "ddlog")]
+    fn parse_new_position(
+        val: &differential_datalog::record::Record,
+    ) -> Option<lille_ddlog::typedefs::physics::NewPosition> {
+        use differential_datalog::ddval::DDValConvert;
+        use lille_ddlog::{relval_from_record, Relations};
+
+        match relval_from_record(Relations::physics_NewPosition, val) {
+            Ok(ddval) => {
+                <lille_ddlog::typedefs::physics::NewPosition as DDValConvert>::try_from_ddvalue(
+                    ddval,
+                )
+            }
+            Err(e) => {
+                log::warn!("failed to convert NewPosition record: {e}");
+                None
+            }
+        }
+    }
+
+    #[cfg(feature = "ddlog")]
+    fn handle_new_position(&mut self, out: lille_ddlog::typedefs::physics::NewPosition) {
+        let pos = Vec3::new(out.x.into_inner(), out.y.into_inner(), out.z.into_inner());
+        if let Some(ent) = self.entities.get_mut(&out.entity) {
+            ent.position = pos;
+        }
+        self.deltas.push(NewPosition {
+            entity: out.entity,
+            x: pos.x,
+            y: pos.y,
+            z: pos.z,
+        });
+    }
+
+    #[cfg(feature = "ddlog")]
     fn apply_ddlog_deltas(
         &mut self,
         changes: &std::collections::BTreeMap<
@@ -174,38 +234,14 @@ impl DdlogHandle {
             Vec<(differential_datalog::record::Record, isize)>,
         >,
     ) {
-        use differential_datalog::ddval::DDValConvert;
-        use lille_ddlog::typedefs::physics::NewPosition as OutNewPos;
-        use lille_ddlog::{relval_from_record, Relations};
+        use lille_ddlog::Relations;
+
         self.deltas.clear();
         if let Some(delta) = changes.get(&(Relations::physics_NewPosition as usize)) {
             for (val, weight) in delta {
                 if *weight > 0 {
-                    match relval_from_record(Relations::physics_NewPosition, val) {
-                        Ok(ddval) => match <OutNewPos as DDValConvert>::try_from_ddvalue(ddval) {
-                            Some(out) => {
-                                let pos = Vec3::new(
-                                    out.x.into_inner(),
-                                    out.y.into_inner(),
-                                    out.z.into_inner(),
-                                );
-                                if let Some(ent) = self.entities.get_mut(&out.entity) {
-                                    ent.position = pos;
-                                }
-                                self.deltas.push(NewPosition {
-                                    entity: out.entity,
-                                    x: pos.x,
-                                    y: pos.y,
-                                    z: pos.z,
-                                });
-                            }
-                            None => {
-                                log::warn!("failed to parse NewPosition delta: {val:?}");
-                            }
-                        },
-                        Err(e) => {
-                            log::warn!("failed to convert NewPosition record: {e}");
-                        }
+                    if let Some(out) = Self::parse_new_position(val) {
+                        self.handle_new_position(out);
                     }
                 } else if *weight < 0 {
                     log::warn!("ignoring negative weight {weight} for physics_NewPosition delta");
@@ -214,54 +250,43 @@ impl DdlogHandle {
         }
     }
 
-    pub fn step(&mut self) {
-        #[cfg(feature = "ddlog")]
-        if let Some(prog) = &mut self.prog {
-            #[allow(unused_imports)]
-            use differential_datalog::ddval::DDValConvert;
-            use differential_datalog::record::{IntoRecord, RelIdentifier, UpdCmd};
-            use lille_ddlog::{typedefs::entity_state::Position, Relations};
-
-            let cmds: Vec<_> = self
-                .entities
-                .iter()
-                .map(|(&id, ent)| {
-                    let record = Position {
-                        entity: id,
-                        x: OrderedFloat(ent.position.x),
-                        y: OrderedFloat(ent.position.y),
-                        z: OrderedFloat(ent.position.z),
-                    };
-                    UpdCmd::Insert(
-                        RelIdentifier::RelId(Relations::entity_state_Position as usize),
-                        record.into_record(),
-                    )
-                })
-                .collect();
-
-            if let Err(e) = prog.transaction_start() {
-                log::error!("DDlog transaction_start failed: {e}");
-            } else {
-                let mut iter = cmds.into_iter();
-                match prog.apply_updates_dynamic(&mut iter) {
-                    Err(e) => log::error!("DDlog apply_updates failed: {e}"),
-                    Ok(()) => match prog.transaction_commit_dump_changes_dynamic() {
-                        Ok(changes) => {
-                            self.apply_ddlog_deltas(&changes);
-                            return;
-                        }
-                        Err(e) => log::error!("DDlog commit failed: {e}"),
-                    },
-                }
-            }
+    #[cfg(feature = "ddlog")]
+    fn execute_ddlog_transaction(
+        prog: &mut differential_datalog::api::HDDlog,
+        cmds: Vec<differential_datalog::record::UpdCmd>,
+    ) -> Option<std::collections::BTreeMap<usize, Vec<(differential_datalog::record::Record, isize)>>>
+    {
+        if let Err(e) = prog.transaction_start() {
+            log::error!("DDlog transaction_start failed: {e}");
+            return None;
         }
 
-        let updates: Vec<(i64, Vec3)> = self
-            .entities
+        let mut iter = cmds.into_iter();
+        match prog.apply_updates_dynamic(&mut iter) {
+            Err(e) => {
+                log::error!("DDlog apply_updates failed: {e}");
+                None
+            }
+            Ok(()) => match prog.transaction_commit_dump_changes_dynamic() {
+                Ok(changes) => Some(changes),
+                Err(e) => {
+                    log::error!("DDlog commit failed: {e}");
+                    None
+                }
+            },
+        }
+    }
+
+    #[cfg(not(feature = "ddlog"))]
+    fn collect_fallback_updates(&self) -> Vec<(i64, Vec3)> {
+        self.entities
             .iter()
             .map(|(&id, ent)| (id, self.compute_entity_update(id, ent)))
-            .collect();
+            .collect()
+    }
 
+    #[cfg(not(feature = "ddlog"))]
+    fn apply_fallback_updates(&mut self, updates: Vec<(i64, Vec3)>) {
         self.deltas.clear();
         for (id, pos) in updates {
             if let Some(ent) = self.entities.get_mut(&id) {
@@ -275,6 +300,30 @@ impl DdlogHandle {
                     });
                 }
             }
+        }
+    }
+
+    /// Advances the simulation by one tick.
+    ///
+    /// When the `ddlog` feature is enabled, this function streams the current
+    /// entity state into the DDlog program and applies the resulting deltas. In
+    /// builds without DDlog, it falls back to a simplified Rust implementation
+    /// that directly updates positions.
+    pub fn step(&mut self) {
+        #[cfg(feature = "ddlog")]
+        {
+            let cmds = self.ddlog_position_cmds();
+            if let Some(prog) = &mut self.prog {
+                if let Some(changes) = Self::execute_ddlog_transaction(prog, cmds) {
+                    self.apply_ddlog_deltas(&changes);
+                }
+            }
+        }
+
+        #[cfg(not(feature = "ddlog"))]
+        {
+            let updates = self.collect_fallback_updates();
+            self.apply_fallback_updates(updates);
         }
     }
 }
