@@ -107,7 +107,7 @@ The movement calculation considers:
 - Command-line argument parsing for configuration
 - Visual debugging through density-based rendering
 
-### DDlog Transaction Flow
+### DDlog transaction flow
 
 The following sequence diagram illustrates how the game loop interacts with the
 DDlog system through the `DdlogHandle` during each simulation step:
