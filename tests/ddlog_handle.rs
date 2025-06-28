@@ -3,8 +3,7 @@
 #[cfg(not(feature = "ddlog"))]
 #[test]
 fn dropping_handle_does_not_call_stop_without_feature() {
-    use differential_datalog::api::STOP_CALLS;
-    use lille::DdlogHandle;
+    use lille::{DdlogHandle, STOP_CALLS};
     use std::sync::atomic::Ordering;
 
     let handle = DdlogHandle::default();
@@ -16,7 +15,7 @@ fn dropping_handle_does_not_call_stop_without_feature() {
 #[cfg(feature = "ddlog")]
 #[test]
 fn dropping_handle_stops_program() {
-    use lille::{DdlogHandle, STOP_CALLS};
+    use lille::STOP_CALLS;
     use std::sync::atomic::Ordering;
 
     let initial_count = STOP_CALLS.load(Ordering::SeqCst);
