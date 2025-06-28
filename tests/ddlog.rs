@@ -4,8 +4,8 @@
 use bevy::prelude::*;
 use glam::Vec2;
 use lille::{
-    apply_ddlog_deltas_system, init_ddlog_system, push_state_to_ddlog_system, DdlogHandle, DdlogId,
-    Health, Target, UnitType,
+    apply_ddlog_deltas_system, cache_state_for_ddlog_system, init_ddlog_system, DdlogHandle,
+    DdlogId, Health, Target, UnitType,
 };
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -61,7 +61,7 @@ fn ddlog_app() -> App {
     app.add_systems(Startup, init_ddlog_system);
     app.add_systems(
         Update,
-        (push_state_to_ddlog_system, apply_ddlog_deltas_system).chain(),
+        (cache_state_for_ddlog_system, apply_ddlog_deltas_system).chain(),
     );
     app
 }

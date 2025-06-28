@@ -4,10 +4,10 @@
 use bevy::prelude::*;
 use insta::assert_ron_snapshot;
 use lille::{
-    apply_ddlog_deltas_system,
+    apply_ddlog_deltas_system, cache_state_for_ddlog_system,
     components::{Block, BlockSlope, DdlogId, Health, UnitType},
     ddlog_handle::DdlogHandle,
-    init_ddlog_system, push_state_to_ddlog_system,
+    init_ddlog_system,
 };
 use rstest::rstest;
 
@@ -24,7 +24,7 @@ fn entity_transitions_between_standing_and_falling() {
     let mut app = setup_app();
     app.add_systems(
         Update,
-        (push_state_to_ddlog_system, apply_ddlog_deltas_system).chain(),
+        (cache_state_for_ddlog_system, apply_ddlog_deltas_system).chain(),
     );
     let block_entity = app
         .world

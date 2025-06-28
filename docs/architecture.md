@@ -107,6 +107,24 @@ The movement calculation considers:
 - Command-line argument parsing for configuration
 - Visual debugging through density-based rendering
 
+### DDlog Transaction Flow
+
+```mermaid
+sequenceDiagram
+    participant GameLoop
+    participant DdlogHandle
+    participant DDlogProgram
+
+    GameLoop->>DdlogHandle: step()
+    activate DdlogHandle
+    DdlogHandle->>DDlogProgram: transaction_start()
+    DdlogHandle->>DDlogProgram: stream cached state
+    DdlogHandle->>DDlogProgram: commit transaction
+    DDlogProgram-->>DdlogHandle: return deltas
+    DdlogHandle-->>GameLoop: apply deltas
+    deactivate DdlogHandle
+```
+
 ## Future Considerations
 
 The architecture supports several potential extensions:

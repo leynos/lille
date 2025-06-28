@@ -14,7 +14,7 @@ include!(concat!(env!("OUT_DIR"), "/constants.rs"));
 pub use actor::Actor;
 pub use components::{DdlogId, Health, Target, UnitType};
 pub use ddlog_handle::{init_ddlog_system, DdlogHandle};
-pub use ddlog_sync::{apply_ddlog_deltas_system, push_state_to_ddlog_system};
+pub use ddlog_sync::{apply_ddlog_deltas_system, cache_state_for_ddlog_system};
 pub use entity::{BadGuy, Entity};
 pub use logging::init as init_logging;
 pub use spawn_world::spawn_world_system;

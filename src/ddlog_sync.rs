@@ -6,9 +6,13 @@ use hashbrown::HashMap;
 use crate::components::{Block, BlockSlope, DdlogId, Health, Target, UnitType};
 use crate::ddlog_handle::{DdlogEntity, DdlogHandle};
 
-/// Pushes the current ECS state into DDlog.
-/// This implementation is a stub that simply logs the state.
-pub fn push_state_to_ddlog_system(
+/// Caches the current ECS state on [`DdlogHandle`].
+///
+/// This system no longer interacts with the DDlog runtime directly. It merely
+/// mirrors relevant component data into the [`DdlogHandle`] resource so that
+/// [`DdlogHandle::step`](crate::ddlog_handle::DdlogHandle::step) can process it
+/// later.
+pub fn cache_state_for_ddlog_system(
     mut ddlog: ResMut<DdlogHandle>,
     entity_query: Query<(&DdlogId, &Transform, &Health, &UnitType, Option<&Target>)>,
     block_query: Query<(&Block, Option<&BlockSlope>)>,
