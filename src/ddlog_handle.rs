@@ -15,6 +15,49 @@ use differential_datalog::api::HDDlog;
 use differential_datalog::{DDlog, DDlogDynamic};
 #[cfg(feature = "ddlog")]
 use ordered_float::OrderedFloat;
+#[cfg(feature = "ddlog")]
+#[cfg_attr(test, mockall::automock)]
+pub trait DdlogApi: Send + Sync {
+    fn transaction_start(&mut self) -> Result<(), String>;
+    fn apply_updates_dynamic(
+        &mut self,
+        updates: &mut dyn Iterator<Item = differential_datalog::record::UpdCmd>,
+    ) -> Result<(), String>;
+    fn transaction_commit_dump_changes_dynamic(
+        &mut self,
+    ) -> Result<
+        std::collections::BTreeMap<usize, Vec<(differential_datalog::record::Record, isize)>>,
+        String,
+    >;
+    fn stop(self: Box<Self>) -> Result<(), String>;
+}
+
+#[cfg(feature = "ddlog")]
+impl DdlogApi for HDDlog {
+    fn transaction_start(&mut self) -> Result<(), String> {
+        <differential_datalog::api::HDDlog>::transaction_start(self)
+    }
+
+    fn apply_updates_dynamic(
+        &mut self,
+        updates: &mut dyn Iterator<Item = differential_datalog::record::UpdCmd>,
+    ) -> Result<(), String> {
+        <differential_datalog::api::HDDlog>::apply_updates_dynamic(self, updates)
+    }
+
+    fn transaction_commit_dump_changes_dynamic(
+        &mut self,
+    ) -> Result<
+        std::collections::BTreeMap<usize, Vec<(differential_datalog::record::Record, isize)>>,
+        String,
+    > {
+        <differential_datalog::api::HDDlog>::transaction_commit_dump_changes_dynamic(self)
+    }
+
+    fn stop(self: Box<Self>) -> Result<(), String> {
+        <differential_datalog::api::HDDlog>::stop(*self)
+    }
+}
 use std::sync::atomic::AtomicUsize;
 #[cfg(feature = "ddlog")]
 use std::sync::atomic::Ordering;
@@ -57,7 +100,7 @@ pub struct NewPosition {
 #[derive(Resource)]
 pub struct DdlogHandle {
     #[cfg(feature = "ddlog")]
-    pub prog: Option<HDDlog>,
+    pub prog: Option<Box<dyn DdlogApi>>,
     pub blocks: Vec<Block>,
     pub slopes: HashMap<i64, BlockSlope>,
     pub entities: HashMap<i64, DdlogEntity>,
@@ -68,7 +111,7 @@ impl Default for DdlogHandle {
     fn default() -> Self {
         #[cfg(feature = "ddlog")]
         let prog = match lille_ddlog::run(1, false) {
-            Ok((p, _)) => Some(p),
+            Ok((p, _)) => Some(Box::new(p) as Box<dyn DdlogApi>),
             Err(e) => {
                 log::error!("failed to start DDlog: {e}");
                 None
@@ -320,7 +363,7 @@ impl DdlogHandle {
 
     #[cfg(feature = "ddlog")]
     fn execute_ddlog_transaction(
-        prog: &mut differential_datalog::api::HDDlog,
+        prog: &mut dyn DdlogApi,
         cmds: Vec<differential_datalog::record::UpdCmd>,
     ) -> Option<std::collections::BTreeMap<usize, Vec<(differential_datalog::record::Record, isize)>>>
     {
@@ -384,7 +427,7 @@ impl DdlogHandle {
         #[cfg(feature = "ddlog")]
         {
             let cmds = self.ddlog_position_cmds();
-            if let Some(prog) = &mut self.prog {
+            if let Some(prog) = self.prog.as_deref_mut() {
                 if let Some(changes) = Self::execute_ddlog_transaction(prog, cmds) {
                     self.apply_ddlog_deltas(&changes);
                 }
