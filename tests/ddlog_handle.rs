@@ -13,7 +13,7 @@ fn dropping_handle_does_not_call_stop_without_feature() {
     assert_eq!(STOP_CALLS.load(Ordering::SeqCst), 0);
 }
 
- #[cfg(feature = "ddlog")]
+#[cfg(feature = "ddlog")]
  #[test]
  fn dropping_handle_stops_program() {
      use differential_datalog::api::STOP_CALLS;
