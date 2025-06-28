@@ -45,3 +45,4 @@ regex = "1"
 once_cell = "1"
 approx = "0.5"
 ordered-float = { workspace = true }
+serial_test = "3.2"
