@@ -13,8 +13,6 @@ include!(concat!(env!("OUT_DIR"), "/constants.rs"));
 // Re-export commonly used items
 pub use actor::Actor;
 pub use components::{DdlogId, Health, Target, UnitType};
-#[cfg(feature = "ddlog")]
-pub use ddlog_handle::STOP_CALLS;
 pub use ddlog_handle::{init_ddlog_system, DdlogHandle};
 pub use ddlog_sync::{apply_ddlog_deltas_system, cache_state_for_ddlog_system};
 pub use entity::{BadGuy, Entity};

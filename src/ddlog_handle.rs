@@ -16,12 +16,56 @@ use differential_datalog::{DDlog, DDlogDynamic};
 #[cfg(feature = "ddlog")]
 use ordered_float::OrderedFloat;
 #[cfg(feature = "ddlog")]
-use std::sync::atomic::AtomicUsize;
-#[cfg(feature = "ddlog")]
-use std::sync::atomic::Ordering as AtomicOrdering;
+#[cfg_attr(test, mockall::automock)]
+pub trait DdlogApi: Send + Sync {
+    fn transaction_start(&mut self) -> Result<(), String>;
+    fn apply_updates_dynamic(
+        &mut self,
+        updates: &mut dyn Iterator<Item = differential_datalog::record::UpdCmd>,
+    ) -> Result<(), String>;
+    fn transaction_commit_dump_changes_dynamic(
+        &mut self,
+    ) -> Result<
+        std::collections::BTreeMap<usize, Vec<(differential_datalog::record::Record, isize)>>,
+        String,
+    >;
+    fn stop(self: Box<Self>) -> Result<(), String>;
+}
 
 #[cfg(feature = "ddlog")]
-/// Counts the number of times [`HDDlog::stop`] has been called via [`DdlogHandle`].
+impl DdlogApi for HDDlog {
+    fn transaction_start(&mut self) -> Result<(), String> {
+        <HDDlog as DDlogDynamic>::transaction_start(self)
+    }
+
+    fn apply_updates_dynamic(
+        &mut self,
+        updates: &mut dyn Iterator<Item = differential_datalog::record::UpdCmd>,
+    ) -> Result<(), String> {
+        <HDDlog as DDlogDynamic>::apply_updates_dynamic(self, updates)
+    }
+
+    fn transaction_commit_dump_changes_dynamic(
+        &mut self,
+    ) -> Result<
+        std::collections::BTreeMap<usize, Vec<(differential_datalog::record::Record, isize)>>,
+        String,
+    > {
+        <HDDlog as DDlogDynamic>::transaction_commit_dump_changes_dynamic(self)
+    }
+
+    fn stop(mut self: Box<Self>) -> Result<(), String> {
+        <HDDlog as DDlogDynamic>::stop(&mut *self)
+    }
+}
+use std::sync::atomic::AtomicUsize;
+#[cfg(feature = "ddlog")]
+use std::sync::atomic::Ordering;
+
+/// Counts the number of successful `HDDlog::stop` calls when dropping a
+/// [`DdlogHandle`].
+///
+/// Uses sequentially consistent ordering for all operations.
 pub static STOP_CALLS: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Clone, Serialize)]
@@ -58,7 +102,7 @@ pub struct NewPosition {
 #[derive(Resource)]
 pub struct DdlogHandle {
     #[cfg(feature = "ddlog")]
-    pub prog: Option<HDDlog>,
+    pub prog: Option<Box<dyn DdlogApi>>,
     pub blocks: Vec<Block>,
     pub slopes: HashMap<i64, BlockSlope>,
     pub entities: HashMap<i64, DdlogEntity>,
@@ -69,7 +113,7 @@ impl Default for DdlogHandle {
     fn default() -> Self {
         #[cfg(feature = "ddlog")]
         let prog = match lille_ddlog::run(1, false) {
-            Ok((p, _)) => Some(p),
+            Ok((p, _)) => Some(Box::new(p) as Box<dyn DdlogApi>),
             Err(e) => {
                 log::error!("failed to start DDlog: {e}");
                 None
@@ -83,6 +127,25 @@ impl Default for DdlogHandle {
             entities: HashMap::new(),
             deltas: Vec::new(),
         }
+    }
+}
+
+impl DdlogHandle {
+    /// Construct a new handle using an existing DDlog program.
+    #[cfg(feature = "ddlog")]
+    pub fn with_program(prog: Box<dyn DdlogApi>) -> Self {
+        Self {
+            prog: Some(prog),
+            blocks: Vec::new(),
+            slopes: HashMap::new(),
+            entities: HashMap::new(),
+            deltas: Vec::new(),
+        }
+    }
+
+    #[cfg(not(feature = "ddlog"))]
+    pub fn with_program((): ()) -> Self {
+        Self::default()
     }
 }
 
@@ -321,7 +384,7 @@ impl DdlogHandle {
 
     #[cfg(feature = "ddlog")]
     fn execute_ddlog_transaction(
-        prog: &mut differential_datalog::api::HDDlog,
+        prog: &mut dyn DdlogApi,
         cmds: Vec<differential_datalog::record::UpdCmd>,
     ) -> Option<std::collections::BTreeMap<usize, Vec<(differential_datalog::record::Record, isize)>>>
     {
@@ -385,7 +448,7 @@ impl DdlogHandle {
         #[cfg(feature = "ddlog")]
         {
             let cmds = self.ddlog_position_cmds();
-            if let Some(prog) = &mut self.prog {
+            if let Some(prog) = self.prog.as_deref_mut() {
                 if let Some(changes) = Self::execute_ddlog_transaction(prog, cmds) {
                     self.apply_ddlog_deltas(&changes);
                 }
@@ -403,12 +466,14 @@ impl DdlogHandle {
 impl Drop for DdlogHandle {
     fn drop(&mut self) {
         #[cfg(feature = "ddlog")]
-        {
-            if let Some(prog) = self.prog.take() {
-                if let Err(e) = prog.stop() {
+        if let Some(prog) = self.prog.take() {
+            match prog.stop() {
+                Ok(_) => {
+                    STOP_CALLS.fetch_add(1, Ordering::SeqCst);
+                }
+                Err(e) => {
                     log::error!("failed to stop DDlog: {e}");
                 }
-                STOP_CALLS.fetch_add(1, AtomicOrdering::SeqCst);
             }
         }
     }
