@@ -43,6 +43,10 @@ pub struct NewPosition {
     pub z: f32,
 }
 
+/// Resource that caches world state for the DDlog program.
+///
+/// When the `ddlog` feature is enabled, dropping this handle automatically
+/// stops the underlying DDlog runtime.
 #[derive(Resource)]
 pub struct DdlogHandle {
     #[cfg(feature = "ddlog")]
