@@ -27,8 +27,13 @@ pub mod api {
         }
     }
 
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
     #[derive(Clone, Debug)]
     pub struct HDDlog;
+
+    /// Counts the number of times [`HDDlog::stop`] has been called.
+    pub static STOP_CALLS: AtomicUsize = AtomicUsize::new(0);
 
     impl HDDlog {
         pub fn transaction_start(&self) -> Result<(), String> {
@@ -50,10 +55,15 @@ pub mod api {
         ) -> Result<std::collections::BTreeMap<usize, Vec<(super::record::Record, isize)>>, String> {
             Ok(std::collections::BTreeMap::new())
         }
+
+        pub fn stop(self) -> Result<(), String> {
+            STOP_CALLS.fetch_add(1, Ordering::SeqCst);
+            Ok(())
+        }
     }
 }
 
-pub use api::DeltaMap;
+pub use api::{DeltaMap, STOP_CALLS};
 
 // Provide a `valmap` module for compatibility with the real crate.
 pub mod valmap {

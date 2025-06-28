@@ -48,6 +48,8 @@ avoidance.
   to Cargo's `OUT_DIR` to keep the project root clean. The download client uses
   the system's root certificates to verify TLS connections.
 - A `DdlogHandle` resource is inserted during startup to manage transactions.
+- The handle automatically stops the DDlog program when removed or when the
+  application exits.
 - `DefaultPlugins` are loaded with `LogPlugin` disabled, so the custom logger
   from `logging.rs` controls output.
 - The grid-based visualization system from the original code remains and will be

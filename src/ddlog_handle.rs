@@ -43,6 +43,10 @@ pub struct NewPosition {
     pub z: f32,
 }
 
+/// Resource that caches world state for the DDlog program.
+///
+/// When the `ddlog` feature is enabled, dropping this handle automatically
+/// stops the underlying DDlog runtime.
 #[derive(Resource)]
 pub struct DdlogHandle {
     #[cfg(feature = "ddlog")]
@@ -384,6 +388,17 @@ impl DdlogHandle {
         {
             let updates = self.collect_fallback_updates();
             self.apply_fallback_updates(updates);
+        }
+    }
+}
+
+impl Drop for DdlogHandle {
+    fn drop(&mut self) {
+        #[cfg(feature = "ddlog")]
+        if let Some(prog) = self.prog.take() {
+            if let Err(e) = prog.stop() {
+                log::error!("failed to stop DDlog: {e}");
+            }
         }
     }
 }
