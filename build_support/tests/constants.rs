@@ -362,7 +362,7 @@ fn generates_ddlog_functions() {
     let toml_str = "value = 5";
     let parsed: toml::Value = toml_str.parse().unwrap();
     let code = generate_code_from_constants(&parsed, &DL_FMTS);
-    assert!(code.contains("function VALUE()"));
+    assert!(code.contains("function value()"));
     assert!(code.contains("{ 5 }"));
 }
 
@@ -371,7 +371,7 @@ fn generates_ddlog_float_function() {
     let toml_str = "pi = 3.14";
     let parsed: toml::Value = toml_str.parse().unwrap();
     let code = generate_code_from_constants(&parsed, &DL_FMTS);
-    assert!(code.contains("function PI()"));
+    assert!(code.contains("function pi()"));
     assert!(code.contains("{ 3.14 }"));
 }
 
@@ -380,7 +380,7 @@ fn generates_ddlog_string_function() {
     let toml_str = r#"greeting = "hello \"world\"""#;
     let parsed: toml::Value = toml_str.parse().unwrap();
     let code = generate_code_from_constants(&parsed, &DL_FMTS);
-    assert!(code.contains("function GREETING()"));
+    assert!(code.contains("function greeting()"));
     assert!(code.contains("{ \"hello \\\"world\\\"\" }"));
 }
 
@@ -392,7 +392,7 @@ fn generates_ddlog_boolean_functions_absent() {
     "#;
     let parsed: toml::Value = toml_str.parse().unwrap();
     let code = generate_code_from_constants(&parsed, &DL_FMTS);
-    assert_all_absent(&code, &["function FLAG_TRUE()", "function FLAG_FALSE()"]);
+    assert_all_absent(&code, &["function flag_true()", "function flag_false()"]);
 }
 
 #[test]
@@ -409,9 +409,9 @@ fn generates_ddlog_nested_functions() {
     assert_all_present(
         &code,
         &[
-            "function INNER_INT()",
+            "function inner_int()",
             "{ 10 }",
-            "function DEEPER_STR()",
+            "function deeper_str()",
             "{ \"deep\" }",
         ],
     );
@@ -429,11 +429,11 @@ fn generates_ddlog_edge_case_functions() {
     assert_all_present(
         &code,
         &[
-            "function EMPTY_STR()",
+            "function empty_str()",
             "{ \"\" }",
-            "function LARGE_INT()",
+            "function large_int()",
             "{ 9223372036854775807 }",
-            "function SPECIAL()",
+            "function special()",
             "line\\nwith\\tspecial❤",
         ],
     );
