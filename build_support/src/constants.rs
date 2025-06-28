@@ -4,11 +4,17 @@
 //! output Rust and Differential Datalog source files. It keeps the two
 //! languages in sync so both parts of the project share the same numerical and
 //! string constants.
-use color_eyre::eyre::Result;
+use color_eyre::eyre::{eyre, Context, Result};
+use jsonschema::{validator_for, Validator};
+use once_cell::sync::OnceCell;
+use serde_json::Value as JsonValue;
 use std::fs;
 use std::path::Path;
 
 use toml::Value;
+
+/// Cached validator for constants schema
+static SCHEMA_VALIDATOR: OnceCell<Validator> = OnceCell::new();
 
 /// Format strings used when generating code.
 ///
@@ -100,9 +106,43 @@ pub fn generate_constants(manifest_dir: impl AsRef<Path>, out_dir: impl AsRef<Pa
 /// assert!(value.is_table());
 /// ```
 pub fn parse_constants(manifest_dir: impl AsRef<Path>) -> Result<Value> {
-    let const_path = manifest_dir.as_ref().join("constants.toml");
-    let toml_str = fs::read_to_string(const_path)?;
-    Ok(toml_str.parse()?)
+    let manifest_dir = manifest_dir.as_ref();
+    let const_path = manifest_dir.join("constants.toml");
+    let toml_str = fs::read_to_string(&const_path)
+        .with_context(|| format!("Failed to read constants file at {}", const_path.display()))?;
+    let parsed: Value = toml_str
+        .parse()
+        .with_context(|| format!("Failed to parse TOML from {}", const_path.display()))?;
+    validate_constants(manifest_dir, &parsed).with_context(|| {
+        format!(
+            "Schema validation failed for constants at {}",
+            const_path.display()
+        )
+    })?;
+    Ok(parsed)
+}
+
+/// Validate `constants.toml` against `constants.schema.json`.
+fn validate_constants(dir: &Path, data: &Value) -> Result<()> {
+    let schema = load_schema(dir)?;
+    let instance = serde_json::to_value(data)?;
+    schema
+        .validate(&instance)
+        .map_err(|error| eyre!(error.to_string()))
+        .wrap_err("constants.toml schema validation failed")
+}
+
+fn load_schema(dir: &Path) -> Result<&'static Validator> {
+    SCHEMA_VALIDATOR.get_or_try_init(|| {
+        let schema_path = dir.join("constants.schema.json");
+        let schema_str = fs::read_to_string(&schema_path)
+            .with_context(|| format!("Failed to read schema file at {}", schema_path.display()))?;
+        let schema_json: JsonValue = serde_json::from_str(&schema_str).with_context(|| {
+            format!("Failed to parse JSON schema from {}", schema_path.display())
+        })?;
+        validator_for(&schema_json)
+            .with_context(|| format!("Failed to compile JSON schema at {}", schema_path.display()))
+    })
 }
 
 /// Traverse all scalar constants in the parsed TOML value.
@@ -211,6 +251,9 @@ pub fn generate_code_from_constants(parsed: &Value, fmts: &Formats) -> String {
 #[cfg(test)]
 mod tests {
     use super::is_plain_integer_literal;
+    use super::parse_constants;
+    use std::fs;
+    use tempfile::TempDir;
 
     #[test]
     fn identifies_plain_integers() {
@@ -225,5 +268,36 @@ mod tests {
         assert!(!is_plain_integer_literal("3E5"));
         assert!(!is_plain_integer_literal("inf"));
         assert!(!is_plain_integer_literal("NaN"));
+    }
+
+    use rstest::rstest;
+
+    #[rstest]
+    #[case(
+        r#"{"type": "object", "properties": {"physics": {"type": "object", "required": ["other"]}}}"#,
+        false,
+        "validation should fail when required field missing"
+    )]
+    #[case(
+        r#"{"type": "object", "required": ["physics"], "properties": {"physics": {"type": "object", "required": ["value"], "properties": {"value": {"type": "integer"}}}}}"#,
+        true,
+        "validation should succeed with valid schema"
+    )]
+    fn parse_constants_schema_validation(
+        #[case] schema_json: &str,
+        #[case] should_succeed: bool,
+        #[case] description: &str,
+    ) {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        fs::write(dir.path().join("constants.toml"), "[physics]\nvalue = 1\n")
+            .expect("unable to write constants.toml");
+        fs::write(dir.path().join("constants.schema.json"), schema_json)
+            .expect("unable to write constants.schema.json");
+        let result = parse_constants(dir.path());
+        if should_succeed {
+            assert!(result.is_ok(), "{}", description);
+        } else {
+            assert!(result.is_err(), "{}", description);
+        }
     }
 }
