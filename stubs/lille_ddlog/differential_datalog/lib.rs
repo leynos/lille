@@ -50,6 +50,10 @@ pub mod api {
         ) -> Result<std::collections::BTreeMap<usize, Vec<(super::record::Record, isize)>>, String> {
             Ok(std::collections::BTreeMap::new())
         }
+
+        pub fn stop(self) -> Result<(), String> {
+            Ok(())
+        }
     }
 }
 

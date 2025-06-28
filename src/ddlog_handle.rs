@@ -387,3 +387,14 @@ impl DdlogHandle {
         }
     }
 }
+
+impl Drop for DdlogHandle {
+    fn drop(&mut self) {
+        #[cfg(feature = "ddlog")]
+        if let Some(prog) = self.prog.take() {
+            if let Err(e) = prog.stop() {
+                log::error!("failed to stop DDlog: {e}");
+            }
+        }
+    }
+}
