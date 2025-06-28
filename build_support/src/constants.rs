@@ -291,7 +291,6 @@ mod tests {
             .expect("unable to write constants.toml");
         fs::write(dir.path().join("constants.schema.json"), schema_json)
             .expect("unable to write constants.schema.json");
-        
         let result = parse_constants(dir.path());
         if should_succeed {
             assert!(result.is_ok(), "{}", description);
