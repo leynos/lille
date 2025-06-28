@@ -305,10 +305,11 @@ impl DdlogHandle {
 
     /// Advances the simulation by one tick.
     ///
-    /// When the `ddlog` feature is enabled, this function streams the current
-    /// entity state into the DDlog program and applies the resulting deltas. In
-    /// builds without DDlog, it falls back to a simplified Rust implementation
-    /// that directly updates positions.
+    /// When the `ddlog` feature is enabled, this method manages the full
+    /// lifecycle of a DDlog transaction. It streams the cached state from
+    /// [`DdlogHandle`] into the DDlog program, commits the transaction, and
+    /// applies any returned deltas. In builds without DDlog, it falls back to a
+    /// simplified Rust implementation that directly updates positions.
     pub fn step(&mut self) {
         #[cfg(feature = "ddlog")]
         {
