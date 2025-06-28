@@ -39,7 +39,6 @@ mock! {
 #[cfg(feature = "ddlog")]
 #[test]
 fn dropping_handle_stops_program() {
-    use hashbrown::HashMap;
     use lille::ddlog_handle::{DdlogHandle, STOP_CALLS};
     use std::sync::atomic::Ordering;
 
@@ -47,13 +46,7 @@ fn dropping_handle_stops_program() {
     let mut mock_prog = MockApi::new();
     mock_prog.expect_stop().times(1).returning(|| Ok(()));
 
-    let handle = DdlogHandle {
-        prog: Some(Box::new(mock_prog)),
-        blocks: Vec::new(),
-        slopes: HashMap::new(),
-        entities: HashMap::new(),
-        deltas: Vec::new(),
-    };
+    let handle = DdlogHandle::with_program(Box::new(mock_prog));
     drop(handle);
     assert_eq!(STOP_CALLS.load(Ordering::SeqCst), initial_count + 1);
 }

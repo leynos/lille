@@ -54,8 +54,8 @@ impl DdlogApi for HDDlog {
         <HDDlog as DDlogDynamic>::transaction_commit_dump_changes_dynamic(self)
     }
 
-    fn stop(self: Box<Self>) -> Result<(), String> {
-        <HDDlog as DDlogDynamic>::stop(&*self)
+    fn stop(mut self: Box<Self>) -> Result<(), String> {
+        <HDDlog as DDlogDynamic>::stop(&mut *self)
     }
 }
 use std::sync::atomic::AtomicUsize;
@@ -64,6 +64,8 @@ use std::sync::atomic::Ordering;
 
 /// Counts the number of successful `HDDlog::stop` calls when dropping a
 /// [`DdlogHandle`].
+///
+/// Uses sequentially consistent ordering for all operations.
 pub static STOP_CALLS: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Clone, Serialize)]
@@ -125,6 +127,25 @@ impl Default for DdlogHandle {
             entities: HashMap::new(),
             deltas: Vec::new(),
         }
+    }
+}
+
+impl DdlogHandle {
+    /// Construct a new handle using an existing DDlog program.
+    #[cfg(feature = "ddlog")]
+    pub fn with_program(prog: Box<dyn DdlogApi>) -> Self {
+        Self {
+            prog: Some(prog),
+            blocks: Vec::new(),
+            slopes: HashMap::new(),
+            entities: HashMap::new(),
+            deltas: Vec::new(),
+        }
+    }
+
+    #[cfg(not(feature = "ddlog"))]
+    pub fn with_program((): ()) -> Self {
+        Self::default()
     }
 }
 

@@ -95,48 +95,48 @@ pub mod api {
     }
 
     impl super::program::DDlogDynamic for HDDlog {
-        fn transaction_start(&self) -> Result<(), String> {
+        fn transaction_start(&mut self) -> Result<(), String> {
             self.transaction_start()
         }
 
         fn transaction_commit_dump_changes_dynamic(
-            &self,
+            &mut self,
         ) -> Result<std::collections::BTreeMap<usize, Vec<(Record, isize)>>, String> {
             Ok(std::collections::BTreeMap::new())
         }
 
-        fn transaction_commit(&self) -> Result<(), String> {
+        fn transaction_commit(&mut self) -> Result<(), String> {
             Ok(())
         }
 
-        fn transaction_rollback(&self) -> Result<(), String> {
+        fn transaction_rollback(&mut self) -> Result<(), String> {
             Ok(())
         }
 
         fn apply_updates_dynamic(
-            &self,
+            &mut self,
             _upds: &mut dyn Iterator<Item = UpdCmd>,
         ) -> Result<(), String> {
             Ok(())
         }
 
-        fn clear_relation(&self, _table: usize) -> Result<(), String> {
+        fn clear_relation(&mut self, _table: usize) -> Result<(), String> {
             Ok(())
         }
 
         fn query_index_dynamic(
-            &self,
+            &mut self,
             _index: usize,
             _key: &Record,
         ) -> Result<Vec<Record>, String> {
             Ok(Vec::new())
         }
 
-        fn dump_index_dynamic(&self, _index: usize) -> Result<Vec<Record>, String> {
+        fn dump_index_dynamic(&mut self, _index: usize) -> Result<Vec<Record>, String> {
             Ok(Vec::new())
         }
 
-        fn stop(&self) -> Result<(), String> {
+        fn stop(&mut self) -> Result<(), String> {
             self.clone().stop()
         }
     }
@@ -232,20 +232,20 @@ pub mod program {
         fn dump_index(&self, index: usize) -> Result<BTreeSet<DDValue>, String>;
     }
     pub trait DDlogDynamic: DDlog {
-        fn transaction_start(&self) -> Result<(), String>;
+        fn transaction_start(&mut self) -> Result<(), String>;
         fn transaction_commit_dump_changes_dynamic(
-            &self,
+            &mut self,
         ) -> Result<std::collections::BTreeMap<usize, Vec<(Record, isize)>>, String>;
-        fn transaction_commit(&self) -> Result<(), String>;
-        fn transaction_rollback(&self) -> Result<(), String>;
+        fn transaction_commit(&mut self) -> Result<(), String>;
+        fn transaction_rollback(&mut self) -> Result<(), String>;
         fn apply_updates_dynamic(
-            &self,
+            &mut self,
             upds: &mut dyn Iterator<Item = UpdCmd>,
         ) -> Result<(), String>;
-        fn clear_relation(&self, table: usize) -> Result<(), String>;
-        fn query_index_dynamic(&self, index: usize, key: &Record) -> Result<Vec<Record>, String>;
-        fn dump_index_dynamic(&self, index: usize) -> Result<Vec<Record>, String>;
-        fn stop(&self) -> Result<(), String>;
+        fn clear_relation(&mut self, table: usize) -> Result<(), String>;
+        fn query_index_dynamic(&mut self, index: usize, key: &Record) -> Result<Vec<Record>, String>;
+        fn dump_index_dynamic(&mut self, index: usize) -> Result<Vec<Record>, String>;
+        fn stop(&mut self) -> Result<(), String>;
     }
 }
 
