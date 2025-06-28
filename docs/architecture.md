@@ -109,6 +109,9 @@ The movement calculation considers:
 
 ### DDlog Transaction Flow
 
+The following sequence diagram illustrates how the game loop interacts with the
+DDlog system through the `DdlogHandle` during each simulation step:
+
 ```mermaid
 sequenceDiagram
     participant GameLoop
