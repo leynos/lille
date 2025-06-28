@@ -7,3 +7,7 @@ input relation Velocity(entity: EntityID,
                         vx: GCoord, vy: GCoord, vz: GCoord)
 // Mass of an entity in kilograms; must be positive to avoid divide by zero
 input relation Mass(entity: EntityID, kg: GCoord)
+// AI metadata used by movement rules
+input relation Target(entity: EntityID, tx: GCoord, ty: GCoord)
+input relation Fraidiness(entity: EntityID, factor: GCoord)
+input relation Meanness(entity: EntityID, factor: GCoord)

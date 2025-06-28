@@ -31,6 +31,16 @@ pub mod helpers {
             None => ddlog_std::tuple3(OrderedFloat(0.0), OrderedFloat(0.0), OrderedFloat(0.0)),
         }
     }
+
+    /// Returns -1.0, 0.0, or 1.0 depending on the sign of `x`.
+    pub fn sign(x: &OrderedFloat<f32>) -> OrderedFloat<f32> {
+        let v = x.into_inner();
+        if !v.is_finite() {
+            OrderedFloat(0.0)
+        } else {
+            OrderedFloat(v.signum())
+        }
+    }
 }
 
-pub use helpers::{vec_mag, vec_normalize};
+pub use helpers::{sign, vec_mag, vec_normalize};

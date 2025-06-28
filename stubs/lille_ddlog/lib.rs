@@ -21,6 +21,9 @@ pub enum Relations {
     entity_state_Position,
     entity_state_Velocity,
     entity_state_Mass,
+    entity_state_Target,
+    entity_state_Fraidiness,
+    entity_state_Meanness,
     physics_Force,
     physics_NewPosition,
     physics_NewVelocity,
@@ -46,6 +49,25 @@ pub mod shared {
         pub z: OrderedFloat<f32>,
     }
 
+    #[derive(Clone, Debug)]
+    pub struct Target {
+        pub entity: i64,
+        pub tx: OrderedFloat<f32>,
+        pub ty: OrderedFloat<f32>,
+    }
+
+    #[derive(Clone, Debug)]
+    pub struct Fraidiness {
+        pub entity: i64,
+        pub factor: OrderedFloat<f32>,
+    }
+
+    #[derive(Clone, Debug)]
+    pub struct Meanness {
+        pub entity: i64,
+        pub factor: OrderedFloat<f32>,
+    }
+
     impl DDValConvert for Position {
         fn into_ddvalue(self) -> DDValue {
             unimplemented!("stub into_ddvalue")
@@ -63,6 +85,42 @@ pub mod shared {
             unimplemented!("stub into_record")
         }
     }
+
+    impl DDValConvert for Target {
+        fn into_ddvalue(self) -> DDValue {
+            unimplemented!("stub into_ddvalue")
+        }
+    }
+
+    impl IntoRecord for Target {
+        fn into_record(self) -> Record {
+            unimplemented!("stub into_record")
+        }
+    }
+
+    impl DDValConvert for Fraidiness {
+        fn into_ddvalue(self) -> DDValue {
+            unimplemented!("stub into_ddvalue")
+        }
+    }
+
+    impl IntoRecord for Fraidiness {
+        fn into_record(self) -> Record {
+            unimplemented!("stub into_record")
+        }
+    }
+
+    impl DDValConvert for Meanness {
+        fn into_ddvalue(self) -> DDValue {
+            unimplemented!("stub into_ddvalue")
+        }
+    }
+
+    impl IntoRecord for Meanness {
+        fn into_record(self) -> Record {
+            unimplemented!("stub into_record")
+        }
+    }
 }
 
 pub mod physics {
@@ -75,7 +133,7 @@ pub mod types__physics {
 
 pub mod typedefs {
     pub mod entity_state {
-        pub use crate::shared::Position;
+        pub use crate::shared::{Fraidiness, Meanness, Position, Target};
     }
     pub mod physics {
         pub use crate::shared::Position as NewPosition;
@@ -83,11 +141,11 @@ pub mod typedefs {
 }
 
 pub mod entity_state {
-    pub use crate::shared::Position;
+    pub use crate::shared::{Fraidiness, Meanness, Position, Target};
 }
 
 pub mod types__entity_state {
-    pub use crate::shared::Position;
+    pub use crate::shared::{Fraidiness, Meanness, Position, Target};
 }
 
 // Stub for the record module and Record enum
@@ -102,6 +160,19 @@ pub mod record {
             x: ordered_float::OrderedFloat<f32>,
             y: ordered_float::OrderedFloat<f32>,
             z: ordered_float::OrderedFloat<f32>,
+        },
+        Target {
+            entity: i64,
+            tx: ordered_float::OrderedFloat<f32>,
+            ty: ordered_float::OrderedFloat<f32>,
+        },
+        Fraidiness {
+            entity: i64,
+            factor: ordered_float::OrderedFloat<f32>,
+        },
+        Meanness {
+            entity: i64,
+            factor: ordered_float::OrderedFloat<f32>,
         },
     }
 
