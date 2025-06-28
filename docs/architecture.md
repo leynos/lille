@@ -3,96 +3,83 @@
 ## Overview
 
 Lille is a real-time strategy game built in Rust. The original prototype used a
-custom tick-based loop with the Piston engine. The project is now transitioning
-toward a Bevy and DDlog driven design. Phase 0 established the new scaffolding
-with a minimal Bevy `App` and a placeholder DDlog handle.
+tick-based loop with the Piston engine. The project has since moved to Bevy and
+DDlog. Phase 1 of the migration spawns a small demo world using Bevy's ECS and
+synchronises that state into DDlog each frame.
 
 ## Core Components
 
-### GameWorld
+### Bevy ECS
 
-The central component that manages the game state and coordinates all entities.
-It maintains:
+The game state is held entirely in Bevy's entity-component system. Key
+components include:
 
-- Lists of entities, actors, and bad guys
-- Tick-based update system (500ms intervals)
-- Position tracking for all game objects
-- Threat detection and management
+- `DdlogId`: Unique identifier shared with the DDlog program.
+- `Health`: Current hit points.
+- `UnitType`: Enum describing civilians and baddies.
+- `Target`: Optional goal position for units.
+- `Block` and `BlockSlope`: Terrain data used by the physics stub.
 
-### Entity System
-
-The game uses a component-based entity system with several key types:
-
-- `Entity`: Base component with position tracking
-- `Actor`: Autonomous agents that navigate towards targets while avoiding
-  threats
-- `BadGuy`: Threatening entities that influence actor behavior through fear
-  mechanics
+The `spawn_world_system` populates the world with a landmark, a single civilian
+unit, a hostile baddie and a camera.
 
 ### Movement and Behavior System
 
 #### Actor Behavior
 
-Actors implement sophisticated movement behavior that balances:
+Actor movement is computed by DDlog when the `ddlog` feature is enabled. The
+rules mirror the original Rust implementation which balanced:
 
 - Goal-seeking behavior towards target positions
 - Threat avoidance using fear vectors
 - Dynamic weighting between target pursuit and threat avoidance
 - Perpendicular movement for natural-looking threat avoidance
 
-The movement calculation considers:
-
-- Fear radius based on threat meanness and actor "fraidiness"
-- Distance-based fear scaling
-- Combined vector influence from both target direction and threat avoidance
+The calculation considers fear radius based on threat meanness and actor
+"fraidiness", distance scaling and a combination of target direction with threat
+avoidance.
 
 ### Graphics and Rendering
 
-- The legacy prototype uses the Piston game engine for window management and
-  rendering.
-- Phase 0 introduced Bevy as the new runtime. The current binary starts a Bevy
-  window and prints a greeting.
+- Rendering is handled entirely by Bevy. Simple sprites are spawned for each
+  entity and a 2D camera shows the scene.
 - The `build.rs` script downloads the Fira Sans font if needed and compiles
   `src/ddlog/lille.dl` with the `ddlog` compiler. The generated crate is written
   to Cargo's `OUT_DIR` to keep the project root clean. The download client uses
   the system's root certificates to verify TLS connections.
-- A placeholder `DdlogHandle` resource is inserted during startup.
+- A `DdlogHandle` resource is inserted during startup to manage transactions.
 - `DefaultPlugins` are loaded with `LogPlugin` disabled, so the custom logger
   from `logging.rs` controls output.
-- The grid-based visualization system from the original code remains, but will
-  be ported to Bevy in later phases.
-- The Piston version renders threats in a more intense shade of red.
+- The grid-based visualization system from the original code remains and will be
+  ported fully to Bevy in later phases.
 
 ## Technical Architecture
 
 ### Core Dependencies
 
-- `piston_window` (0.131): Window creation and event loop (legacy)
-- `piston2d-graphics` (0.45): 2D graphics rendering (legacy)
+- `bevy` (0.12): ECS and rendering framework
+- `differential-datalog` (0.53, optional): Runtime library for the DDlog rules
+  when the `ddlog` feature is enabled
 - `hashbrown` (0.14): High-performance HashMap implementation
 - `glam` (0.24): Vector mathematics and linear algebra
 - `clap` (4.4): Command-line argument parsing
-- `bevy` (0.12): ECS and rendering framework introduced in Phase 0
-- `differential-datalog` (0.53): Runtime library for the DDlog rules (generated
-  as `lille_ddlog`)
+- `serde` (1.0) and `color-eyre` (0.6) for data serialization and error
+  reporting
 
 ### Update Cycle
 
-1. The game runs on a fixed tick rate of 500ms
-2. Each tick:
-   - Collects all active threats and their positions
-   - Updates actor positions based on:
-     - Current position
-     - Target position
-     - Threat positions and fear influences
-   - Updates the visual representation
+The Bevy schedule chains the synchronisation systems each frame:
+
+1. `cache_state_for_ddlog_system` copies ECS component data into `DdlogHandle`.
+2. `apply_ddlog_deltas_system` calls `DdlogHandle::step` which executes a DDlog
+   transaction (or a fallback Rust update) and writes the resulting positions
+   back to the ECS.
 
 ### Design Decisions
 
 #### Performance Considerations
 
 - Use of `hashbrown` for high-performance spatial tracking
-- Fixed tick rate for predictable performance
 - Efficient vector calculations using `glam`
 
 #### Extensibility
