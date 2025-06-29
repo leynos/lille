@@ -158,7 +158,7 @@ fn commands_sorted_by_rel_and_entity() {
         (Relations::entity_state_Target as usize, 5),
         (Relations::entity_state_Target as usize, 5),
     ],
-    vec!["delete", "insert", "insert", "delete"],
+    vec!["insert", "delete", "insert", "delete"],
 )]
 #[case(
     "mixed_operations",
