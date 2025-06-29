@@ -90,9 +90,12 @@ impl RelIdentifierExt for differential_datalog::record::RelIdentifier {
     }
 }
 
-/// Trait for typed DDlog records that expose an `entity` field.
+/// Trait for typed DDlog records that expose an `entity` identifier.
+///
+/// Implementers must return this identifier via [`HasEntity::entity`].
 #[cfg(feature = "ddlog")]
 trait HasEntity {
+    /// Returns the entity ID associated with the record.
     fn entity(&self) -> i64;
 }
 
