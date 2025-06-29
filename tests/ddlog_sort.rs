@@ -46,7 +46,11 @@ fn commands_sorted_by_rel_and_entity() {
     let ids: Vec<(usize, i64)> = cmds
         .iter()
         .map(|c| {
-            #[allow(unreachable_patterns)]
+            #[expect(
+                unreachable_patterns,
+                reason = "Support potential future UpdCmd variants"
+            )]
+            #[allow(unfulfilled_lint_expectations)]
             match c {
                 UpdCmd::Insert(r, rec) | UpdCmd::Delete(r, rec) => {
                     (r.as_id(), extract_entity(r, rec))

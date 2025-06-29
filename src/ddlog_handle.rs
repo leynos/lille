@@ -77,13 +77,65 @@ pub trait RelIdentifierExt {
 
 #[cfg(feature = "ddlog")]
 impl RelIdentifierExt for differential_datalog::record::RelIdentifier {
-    #[allow(unreachable_patterns)]
+    #[expect(
+        unreachable_patterns,
+        reason = "Future-proof against additional RelIdentifier variants"
+    )]
+    #[allow(unfulfilled_lint_expectations)]
     fn as_id(&self) -> usize {
         match *self {
             differential_datalog::record::RelIdentifier::RelId(id) => id,
             _ => usize::MAX,
         }
     }
+}
+
+/// Trait for typed DDlog records that expose an `entity` field.
+#[cfg(feature = "ddlog")]
+trait HasEntity {
+    fn entity(&self) -> i64;
+}
+
+#[cfg(feature = "ddlog")]
+impl HasEntity for lille_ddlog::typedefs::entity_state::Position {
+    fn entity(&self) -> i64 {
+        self.entity
+    }
+}
+
+#[cfg(feature = "ddlog")]
+impl HasEntity for lille_ddlog::typedefs::entity_state::Target {
+    fn entity(&self) -> i64 {
+        self.entity
+    }
+}
+
+#[cfg(feature = "ddlog")]
+impl HasEntity for lille_ddlog::typedefs::entity_state::Fraidiness {
+    fn entity(&self) -> i64 {
+        self.entity
+    }
+}
+
+#[cfg(feature = "ddlog")]
+impl HasEntity for lille_ddlog::typedefs::entity_state::Meanness {
+    fn entity(&self) -> i64 {
+        self.entity
+    }
+}
+
+/// Helper to extract the entity from a record for a given relation.
+#[cfg(feature = "ddlog")]
+fn extract_entity_for_relation<
+    T: differential_datalog::ddval::DDValConvert + HasEntity + 'static,
+>(
+    relation: lille_ddlog::Relations,
+    rec: &differential_datalog::record::Record,
+) -> Option<i64> {
+    lille_ddlog::relval_from_record(relation, rec)
+        .ok()
+        .and_then(T::try_from_ddvalue)
+        .map(|val| val.entity())
 }
 
 /// Extracts the `entity` field from a DDlog record.
@@ -96,42 +148,24 @@ pub fn extract_entity(
     rel: &differential_datalog::record::RelIdentifier,
     rec: &differential_datalog::record::Record,
 ) -> i64 {
-    use differential_datalog::ddval::DDValConvert;
-    use lille_ddlog::{relval_from_record, typedefs::entity_state as es, Relations};
+    use lille_ddlog::{typedefs::entity_state as es, Relations};
 
-    let rel_id = rel.as_id();
-    #[allow(unreachable_patterns)]
-    match rel_id {
+    match rel.as_id() {
         id if id == Relations::entity_state_Position as usize => {
-            relval_from_record(Relations::entity_state_Position, rec)
-                .ok()
-                .and_then(<es::Position as DDValConvert>::try_from_ddvalue)
-                .map(|p| p.entity)
-                .unwrap_or(i64::MAX)
+            extract_entity_for_relation::<es::Position>(Relations::entity_state_Position, rec)
         }
         id if id == Relations::entity_state_Target as usize => {
-            relval_from_record(Relations::entity_state_Target, rec)
-                .ok()
-                .and_then(<es::Target as DDValConvert>::try_from_ddvalue)
-                .map(|t| t.entity)
-                .unwrap_or(i64::MAX)
+            extract_entity_for_relation::<es::Target>(Relations::entity_state_Target, rec)
         }
         id if id == Relations::entity_state_Fraidiness as usize => {
-            relval_from_record(Relations::entity_state_Fraidiness, rec)
-                .ok()
-                .and_then(<es::Fraidiness as DDValConvert>::try_from_ddvalue)
-                .map(|f| f.entity)
-                .unwrap_or(i64::MAX)
+            extract_entity_for_relation::<es::Fraidiness>(Relations::entity_state_Fraidiness, rec)
         }
         id if id == Relations::entity_state_Meanness as usize => {
-            relval_from_record(Relations::entity_state_Meanness, rec)
-                .ok()
-                .and_then(<es::Meanness as DDValConvert>::try_from_ddvalue)
-                .map(|m| m.entity)
-                .unwrap_or(i64::MAX)
+            extract_entity_for_relation::<es::Meanness>(Relations::entity_state_Meanness, rec)
         }
-        _ => i64::MAX,
+        _ => None,
     }
+    .unwrap_or(i64::MAX)
 }
 
 /// Sorts DDlog update commands by relation and entity identifiers.
@@ -140,7 +174,11 @@ pub fn extract_entity(
 #[cfg(feature = "ddlog")]
 pub fn sort_cmds(cmds: &mut [differential_datalog::record::UpdCmd]) {
     use differential_datalog::record::UpdCmd;
-    #[allow(unreachable_patterns)]
+    #[expect(
+        unreachable_patterns,
+        reason = "Support potential future UpdCmd variants"
+    )]
+    #[allow(unfulfilled_lint_expectations)]
     cmds.sort_by_key(|cmd| match cmd {
         UpdCmd::Insert(rel, rec) | UpdCmd::Delete(rel, rec) => {
             (rel.as_id(), extract_entity(rel, rec))
