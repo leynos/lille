@@ -178,7 +178,10 @@ pub mod record {
     #[derive(Clone, Debug)]
     pub enum UpdCmd {
         Insert(RelIdentifier, Record),
+        InsertOrUpdate(RelIdentifier, Record),
         Delete(RelIdentifier, Record),
+        DeleteKey(RelIdentifier, Record),
+        Modify(RelIdentifier, Record, Record),
     }
 
     impl From<Record> for DDValue {
