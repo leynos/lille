@@ -86,6 +86,54 @@ impl RelIdentifierExt for differential_datalog::record::RelIdentifier {
     }
 }
 
+/// Extracts the `entity` field from a DDlog record.
+///
+/// For each known relation, this converts the [`Record`] to a typed struct and
+/// returns the entity identifier. Unknown relations or conversion failures yield
+/// [`i64::MAX`].
+#[cfg(feature = "ddlog")]
+pub fn extract_entity(
+    rel: &differential_datalog::record::RelIdentifier,
+    rec: &differential_datalog::record::Record,
+) -> i64 {
+    use differential_datalog::ddval::DDValConvert;
+    use lille_ddlog::{relval_from_record, typedefs::entity_state as es, Relations};
+
+    let rel_id = rel.as_id();
+    #[allow(unreachable_patterns)]
+    match rel_id {
+        id if id == Relations::entity_state_Position as usize => {
+            relval_from_record(Relations::entity_state_Position, rec)
+                .ok()
+                .and_then(<es::Position as DDValConvert>::try_from_ddvalue)
+                .map(|p| p.entity)
+                .unwrap_or(i64::MAX)
+        }
+        id if id == Relations::entity_state_Target as usize => {
+            relval_from_record(Relations::entity_state_Target, rec)
+                .ok()
+                .and_then(<es::Target as DDValConvert>::try_from_ddvalue)
+                .map(|t| t.entity)
+                .unwrap_or(i64::MAX)
+        }
+        id if id == Relations::entity_state_Fraidiness as usize => {
+            relval_from_record(Relations::entity_state_Fraidiness, rec)
+                .ok()
+                .and_then(<es::Fraidiness as DDValConvert>::try_from_ddvalue)
+                .map(|f| f.entity)
+                .unwrap_or(i64::MAX)
+        }
+        id if id == Relations::entity_state_Meanness as usize => {
+            relval_from_record(Relations::entity_state_Meanness, rec)
+                .ok()
+                .and_then(<es::Meanness as DDValConvert>::try_from_ddvalue)
+                .map(|m| m.entity)
+                .unwrap_or(i64::MAX)
+        }
+        _ => i64::MAX,
+    }
+}
+
 /// Sorts DDlog update commands by relation and entity identifiers.
 ///
 /// This ensures deterministic ordering when sending commands to the runtime.
@@ -94,7 +142,9 @@ pub fn sort_cmds(cmds: &mut [differential_datalog::record::UpdCmd]) {
     use differential_datalog::record::UpdCmd;
     #[allow(unreachable_patterns)]
     cmds.sort_by_key(|cmd| match cmd {
-        UpdCmd::Insert(rel, rec) | UpdCmd::Delete(rel, rec) => (rel.as_id(), rec.entity),
+        UpdCmd::Insert(rel, rec) | UpdCmd::Delete(rel, rec) => {
+            (rel.as_id(), extract_entity(rel, rec))
+        }
         _ => (usize::MAX, i64::MAX),
     });
 }
