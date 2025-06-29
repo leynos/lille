@@ -117,6 +117,27 @@ sequenceDiagram
     deactivate DdlogHandle
 ```
 
+### Data relationships
+
+The following entity–relationship diagram summarises how records and update
+commands interact in the DDlog interface.
+
+```mermaid
+erDiagram
+    RECORD {
+        int entity
+    }
+    RELIDENTIFIER {
+        int id
+    }
+    UPDCMD {
+        Insert
+        Delete
+    }
+    UPDCMD ||--o{ RECORD : contains
+    UPDCMD ||--o{ RELIDENTIFIER : references
+```
+
 ## Future Considerations
 
 The architecture supports several potential extensions:
