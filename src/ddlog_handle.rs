@@ -68,30 +68,34 @@ use std::sync::atomic::Ordering;
 /// Uses sequentially consistent ordering for all operations.
 pub static STOP_CALLS: AtomicUsize = AtomicUsize::new(0);
 
+/// Extension trait for extracting relation identifiers.
 #[cfg(feature = "ddlog")]
 pub trait RelIdentifierExt {
+    /// Returns the relation identifier as a `usize`.
     fn as_id(&self) -> usize;
 }
 
 #[cfg(feature = "ddlog")]
 impl RelIdentifierExt for differential_datalog::record::RelIdentifier {
+    #[allow(unreachable_patterns)]
     fn as_id(&self) -> usize {
         match *self {
             differential_datalog::record::RelIdentifier::RelId(id) => id,
+            _ => usize::MAX,
         }
     }
 }
 
-#[cfg(feature = "ddlog")]
-pub fn extract_entity(rec: &differential_datalog::record::Record) -> i64 {
-    rec.entity
-}
-
+/// Sorts DDlog update commands by relation and entity identifiers.
+///
+/// This ensures deterministic ordering when sending commands to the runtime.
 #[cfg(feature = "ddlog")]
 pub fn sort_cmds(cmds: &mut [differential_datalog::record::UpdCmd]) {
     use differential_datalog::record::UpdCmd;
+    #[allow(unreachable_patterns)]
     cmds.sort_by_key(|cmd| match cmd {
-        UpdCmd::Insert(rel, rec) | UpdCmd::Delete(rel, rec) => (rel.as_id(), extract_entity(rec)),
+        UpdCmd::Insert(rel, rec) | UpdCmd::Delete(rel, rec) => (rel.as_id(), rec.entity),
+        _ => (usize::MAX, i64::MAX),
     });
 }
 

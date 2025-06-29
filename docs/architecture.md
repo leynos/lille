@@ -119,7 +119,7 @@ sequenceDiagram
 
 ### Data relationships
 
-The following entity–relationship diagram summarises how records and update
+The following entity–relationship diagram summarizes how records and update
 commands interact in the DDlog interface.
 
 ```mermaid
