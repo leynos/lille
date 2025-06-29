@@ -1,3 +1,8 @@
+//! Tests for DDlog command sorting functionality.
+//!
+//! This module contains tests that verify the correct sorting behaviour of DDlog commands,
+//! ensuring that commands are properly ordered by relation and entity identifiers.
+
 #[cfg(feature = "ddlog")]
 use differential_datalog::record::{IntoRecord, RelIdentifier, UpdCmd};
 #[cfg(feature = "ddlog")]
