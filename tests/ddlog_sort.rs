@@ -11,6 +11,44 @@ use lille::ddlog_handle::{self, extract_entity, RelIdentifierExt};
 use lille_ddlog::{typedefs::entity_state as es, Relations};
 #[cfg(feature = "ddlog")]
 use ordered_float::OrderedFloat;
+#[cfg(feature = "ddlog")]
+use rstest::rstest;
+
+#[cfg(feature = "ddlog")]
+fn extract_ids(cmds: &[UpdCmd]) -> Vec<(usize, i64)> {
+    cmds.iter()
+        .map(|c| {
+            #[expect(
+                unreachable_patterns,
+                reason = "Support potential future UpdCmd variants"
+            )]
+            match c {
+                UpdCmd::Insert(r, rec) | UpdCmd::Delete(r, rec) => {
+                    (r.as_id(), extract_entity(r, rec))
+                }
+                _ => (usize::MAX, i64::MAX),
+            }
+        })
+        .collect()
+}
+
+#[cfg(feature = "ddlog")]
+fn extract_ops(cmds: &[UpdCmd]) -> Vec<&'static str> {
+    cmds.iter()
+        .map(|c| {
+            #[expect(
+                unreachable_patterns,
+                reason = "Support potential future UpdCmd variants",
+            )]
+            #[allow(unfulfilled_lint_expectations)]
+            match c {
+                UpdCmd::Insert(_, _) => "insert",
+                UpdCmd::Delete(_, _) => "delete",
+                _ => "other",
+            }
+        })
+        .collect()
+}
 
 #[cfg(feature = "ddlog")]
 #[test]
@@ -67,22 +105,7 @@ fn commands_sorted_by_rel_and_entity() {
     ];
 
     ddlog_handle::sort_cmds(cmds.as_mut_slice());
-    let ids: Vec<(usize, i64)> = cmds
-        .iter()
-        .map(|c| {
-            #[expect(
-                unreachable_patterns,
-                reason = "Support potential future UpdCmd variants"
-            )]
-            #[allow(unfulfilled_lint_expectations)]
-            match c {
-                UpdCmd::Insert(r, rec) | UpdCmd::Delete(r, rec) => {
-                    (r.as_id(), extract_entity(r, rec))
-                }
-                _ => (usize::MAX, i64::MAX),
-            }
-        })
-        .collect();
+    let ids = extract_ids(&cmds);
     assert_eq!(
         ids,
         vec![
@@ -96,9 +119,10 @@ fn commands_sorted_by_rel_and_entity() {
 }
 
 #[cfg(feature = "ddlog")]
-#[test]
-fn commands_sorted_with_same_rel_and_entity() {
-    let mut cmds = vec![
+#[rstest]
+#[case(
+    "same_rel_and_entity",
+    vec![
         UpdCmd::Insert(
             RelIdentifier::RelId(Relations::entity_state_Target as usize),
             es::Target {
@@ -137,32 +161,85 @@ fn commands_sorted_with_same_rel_and_entity() {
             }
             .into_record(),
         ),
-    ];
-
+    ],
+    vec![
+        (Relations::entity_state_Position as usize, 3),
+        (Relations::entity_state_Position as usize, 3),
+        (Relations::entity_state_Target as usize, 5),
+        (Relations::entity_state_Target as usize, 5),
+    ],
+    vec!["delete", "insert", "insert", "delete"],
+)]
+#[case(
+    "mixed_operations",
+    vec![
+        UpdCmd::Delete(
+            RelIdentifier::RelId(Relations::entity_state_Position as usize),
+            es::Position {
+                entity: 7,
+                x: OrderedFloat(0.0),
+                y: OrderedFloat(0.0),
+                z: OrderedFloat(0.0),
+            }
+            .into_record(),
+        ),
+        UpdCmd::Insert(
+            RelIdentifier::RelId(Relations::entity_state_Target as usize),
+            es::Target {
+                entity: 5,
+                tx: OrderedFloat(0.0),
+                ty: OrderedFloat(0.0),
+            }
+            .into_record(),
+        ),
+        UpdCmd::Insert(
+            RelIdentifier::RelId(Relations::entity_state_Position as usize),
+            es::Position {
+                entity: 10,
+                x: OrderedFloat(0.0),
+                y: OrderedFloat(0.0),
+                z: OrderedFloat(0.0),
+            }
+            .into_record(),
+        ),
+        UpdCmd::Insert(
+            RelIdentifier::RelId(Relations::entity_state_Position as usize),
+            es::Position {
+                entity: 3,
+                x: OrderedFloat(0.0),
+                y: OrderedFloat(0.0),
+                z: OrderedFloat(0.0),
+            }
+            .into_record(),
+        ),
+        UpdCmd::Delete(
+            RelIdentifier::RelId(Relations::entity_state_Target as usize),
+            es::Target {
+                entity: 8,
+                tx: OrderedFloat(0.0),
+                ty: OrderedFloat(0.0),
+            }
+            .into_record(),
+        ),
+    ],
+    vec![
+        (Relations::entity_state_Position as usize, 3),
+        (Relations::entity_state_Position as usize, 7),
+        (Relations::entity_state_Position as usize, 10),
+        (Relations::entity_state_Target as usize, 5),
+        (Relations::entity_state_Target as usize, 8),
+    ],
+    vec!["insert", "delete", "insert", "insert", "delete"],
+)]
+fn test_sorting_scenarios(
+    #[case] _name: &str,
+    #[case] mut cmds: Vec<UpdCmd>,
+    #[case] expected_ids: Vec<(usize, i64)>,
+    #[case] expected_ops: Vec<&str>,
+) {
     ddlog_handle::sort_cmds(cmds.as_mut_slice());
-    let ids: Vec<(usize, i64)> = cmds
-        .iter()
-        .map(|c| {
-            #[expect(
-                unreachable_patterns,
-                reason = "Support potential future UpdCmd variants"
-            )]
-            #[allow(unfulfilled_lint_expectations)]
-            match c {
-                UpdCmd::Insert(r, rec) | UpdCmd::Delete(r, rec) => {
-                    (r.as_id(), extract_entity(r, rec))
-                }
-                _ => (usize::MAX, i64::MAX),
-            }
-        })
-        .collect();
-    assert_eq!(
-        ids,
-        vec![
-            (Relations::entity_state_Position as usize, 3),
-            (Relations::entity_state_Position as usize, 3),
-            (Relations::entity_state_Target as usize, 5),
-            (Relations::entity_state_Target as usize, 5),
-        ]
-    );
+    let ids = extract_ids(&cmds);
+    assert_eq!(ids, expected_ids);
+    let ops = extract_ops(&cmds);
+    assert_eq!(ops, expected_ops);
 }
