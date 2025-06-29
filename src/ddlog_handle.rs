@@ -177,12 +177,42 @@ pub fn extract_entity(
 #[cfg(feature = "ddlog")]
 pub fn sort_cmds(cmds: &mut [differential_datalog::record::UpdCmd]) {
     use differential_datalog::record::UpdCmd;
+    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    #[repr(u8)]
+    enum CmdPriority {
+        Insert,
+        InsertOrUpdate,
+        Delete,
+        DeleteKey,
+        Modify,
+    }
+
     cmds.sort_by_key(|cmd| match cmd {
-        UpdCmd::Insert(rel, rec) => (rel.as_id(), extract_entity(rel, rec), 0),
-        UpdCmd::InsertOrUpdate(rel, rec) => (rel.as_id(), extract_entity(rel, rec), 1),
-        UpdCmd::Delete(rel, rec) => (rel.as_id(), extract_entity(rel, rec), 2),
-        UpdCmd::DeleteKey(rel, rec) => (rel.as_id(), extract_entity(rel, rec), 3),
-        UpdCmd::Modify(rel, _, new) => (rel.as_id(), extract_entity(rel, new), 4),
+        UpdCmd::Insert(rel, rec) => (
+            rel.as_id(),
+            extract_entity(rel, rec),
+            CmdPriority::Insert as u8,
+        ),
+        UpdCmd::InsertOrUpdate(rel, rec) => (
+            rel.as_id(),
+            extract_entity(rel, rec),
+            CmdPriority::InsertOrUpdate as u8,
+        ),
+        UpdCmd::Delete(rel, rec) => (
+            rel.as_id(),
+            extract_entity(rel, rec),
+            CmdPriority::Delete as u8,
+        ),
+        UpdCmd::DeleteKey(rel, rec) => (
+            rel.as_id(),
+            extract_entity(rel, rec),
+            CmdPriority::DeleteKey as u8,
+        ),
+        UpdCmd::Modify(rel, _, new) => (
+            rel.as_id(),
+            extract_entity(rel, new),
+            CmdPriority::Modify as u8,
+        ),
     });
 }
 

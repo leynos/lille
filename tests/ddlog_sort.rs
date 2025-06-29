@@ -221,6 +221,54 @@ fn commands_sorted_by_rel_and_entity() {
     ],
     vec!["insert", "delete", "insert", "insert", "delete"],
 )]
+#[case(
+    "modify_ordering",
+    vec![
+        UpdCmd::Modify(
+            RelIdentifier::RelId(Relations::entity_state_Position as usize),
+            es::Position {
+                entity: 1,
+                x: OrderedFloat(0.0),
+                y: OrderedFloat(0.0),
+                z: OrderedFloat(0.0),
+            }
+            .into_record(),
+            es::Position {
+                entity: 1,
+                x: OrderedFloat(1.0),
+                y: OrderedFloat(1.0),
+                z: OrderedFloat(1.0),
+            }
+            .into_record(),
+        ),
+        UpdCmd::Insert(
+            RelIdentifier::RelId(Relations::entity_state_Position as usize),
+            es::Position {
+                entity: 1,
+                x: OrderedFloat(0.0),
+                y: OrderedFloat(0.0),
+                z: OrderedFloat(0.0),
+            }
+            .into_record(),
+        ),
+        UpdCmd::Delete(
+            RelIdentifier::RelId(Relations::entity_state_Position as usize),
+            es::Position {
+                entity: 1,
+                x: OrderedFloat(0.0),
+                y: OrderedFloat(0.0),
+                z: OrderedFloat(0.0),
+            }
+            .into_record(),
+        ),
+    ],
+    vec![
+        (Relations::entity_state_Position as usize, 1),
+        (Relations::entity_state_Position as usize, 1),
+        (Relations::entity_state_Position as usize, 1),
+    ],
+    vec!["insert", "delete", "modify"],
+)]
 fn test_sorting_scenarios(
     #[case] _name: &str,
     #[case] mut cmds: Vec<UpdCmd>,
