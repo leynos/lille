@@ -17,17 +17,12 @@ use rstest::rstest;
 #[cfg(feature = "ddlog")]
 fn extract_ids(cmds: &[UpdCmd]) -> Vec<(usize, i64)> {
     cmds.iter()
-        .map(|c| {
-            #[expect(
-                unreachable_patterns,
-                reason = "Support potential future UpdCmd variants"
-            )]
-            match c {
-                UpdCmd::Insert(r, rec) | UpdCmd::Delete(r, rec) => {
-                    (r.as_id(), extract_entity(r, rec))
-                }
-                _ => (usize::MAX, i64::MAX),
-            }
+        .map(|c| match c {
+            UpdCmd::Insert(r, rec)
+            | UpdCmd::InsertOrUpdate(r, rec)
+            | UpdCmd::Delete(r, rec)
+            | UpdCmd::DeleteKey(r, rec) => (r.as_id(), extract_entity(r, rec)),
+            UpdCmd::Modify(r, _, new) => (r.as_id(), extract_entity(r, new)),
         })
         .collect()
 }
@@ -35,17 +30,12 @@ fn extract_ids(cmds: &[UpdCmd]) -> Vec<(usize, i64)> {
 #[cfg(feature = "ddlog")]
 fn extract_ops(cmds: &[UpdCmd]) -> Vec<&'static str> {
     cmds.iter()
-        .map(|c| {
-            #[expect(
-                unreachable_patterns,
-                reason = "Support potential future UpdCmd variants",
-            )]
-            #[allow(unfulfilled_lint_expectations)]
-            match c {
-                UpdCmd::Insert(_, _) => "insert",
-                UpdCmd::Delete(_, _) => "delete",
-                _ => "other",
-            }
+        .map(|c| match c {
+            UpdCmd::Insert(_, _) => "insert",
+            UpdCmd::InsertOrUpdate(_, _) => "insert_or_update",
+            UpdCmd::Delete(_, _) => "delete",
+            UpdCmd::DeleteKey(_, _) => "delete_key",
+            UpdCmd::Modify(_, _, _) => "modify",
         })
         .collect()
 }
