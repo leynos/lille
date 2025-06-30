@@ -180,11 +180,11 @@ pub fn sort_cmds(cmds: &mut [differential_datalog::record::UpdCmd]) {
     #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
     #[repr(u8)]
     enum CmdPriority {
+        DeleteKey,
+        Delete,
+        Modify,
         Insert,
         InsertOrUpdate,
-        Delete,
-        DeleteKey,
-        Modify,
     }
 
     cmds.sort_by_key(|cmd| match cmd {
