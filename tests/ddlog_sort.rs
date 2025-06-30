@@ -1,7 +1,9 @@
 //! Tests for DDlog command sorting functionality.
 //!
-//! This module contains tests that verify the correct sorting behaviour of DDlog commands,
-//! ensuring that commands are properly ordered by relation and entity identifiers.
+//! Tests for DDlog command sorting functionality.
+//!
+//! These tests ensure commands are ordered by relation and the full record value
+//! with a stable tie-breaker using command priority.
 
 #[cfg(feature = "ddlog")]
 use differential_datalog::record::{IntoRecord, RelIdentifier, UpdCmd};
@@ -158,7 +160,7 @@ fn commands_sorted_by_rel_and_entity() {
         (Relations::entity_state_Target as usize, 5),
         (Relations::entity_state_Target as usize, 5),
     ],
-    vec!["insert", "delete", "insert", "delete"],
+    vec!["delete", "insert", "delete", "insert"],
 )]
 #[case(
     "mixed_operations",
@@ -267,7 +269,7 @@ fn commands_sorted_by_rel_and_entity() {
         (Relations::entity_state_Position as usize, 1),
         (Relations::entity_state_Position as usize, 1),
     ],
-    vec!["insert", "delete", "modify"],
+    vec!["delete", "insert", "modify"],
 )]
 fn test_sorting_scenarios(
     #[case] _name: &str,

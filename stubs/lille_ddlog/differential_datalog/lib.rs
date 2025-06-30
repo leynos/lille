@@ -157,7 +157,7 @@ pub mod record {
     #[derive(Clone, Debug, Default, Serialize, Deserialize)]
     pub struct DDValue(serde_json::Value);
 
-    #[derive(Clone, Debug)]
+    #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
     pub struct Record;
 
     #[derive(Clone, Debug)]

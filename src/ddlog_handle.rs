@@ -171,46 +171,66 @@ pub fn extract_entity(
     .unwrap_or(i64::MAX)
 }
 
-/// Sorts DDlog update commands by relation and entity identifiers.
+/// Sorts DDlog update commands by relation and record value.
 ///
-/// This ensures deterministic ordering when sending commands to the runtime.
+/// This ensures deterministic ordering when sending commands to the runtime and
+/// maintains the preconditions required by Differential Dataflow's merging
+/// logic. The `Record` type from `differential_datalog` lacks an `Ord`
+/// implementation in the stub runtime, so ordering falls back to its debug
+/// representation.
 #[cfg(feature = "ddlog")]
 pub fn sort_cmds(cmds: &mut [differential_datalog::record::UpdCmd]) {
-    use differential_datalog::record::UpdCmd;
+    use differential_datalog::record::{Record, UpdCmd};
+
+    #[derive(Clone)]
+    struct RecKey(Record);
+
+    impl PartialEq for RecKey {
+        fn eq(&self, other: &Self) -> bool {
+            format!("{:?}", self.0) == format!("{:?}", other.0)
+        }
+    }
+    impl Eq for RecKey {}
+    impl PartialOrd for RecKey {
+        fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+            Some(self.cmp(other))
+        }
+    }
+    impl Ord for RecKey {
+        fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+            format!("{:?}", self.0).cmp(&format!("{:?}", other.0))
+        }
+    }
     #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
     #[repr(u8)]
     enum CmdPriority {
+        // Stable ordering for identical commands.
+        DeleteKey,
+        Delete,
+        Modify,
         Insert,
         InsertOrUpdate,
-        Delete,
-        DeleteKey,
-        Modify,
     }
 
+    // We sort by (relation, record value, command priority). `Record` does not
+    // implement `Ord` in the stub runtime, so we compare via its debug
+    // representation.
     cmds.sort_by_key(|cmd| match cmd {
-        UpdCmd::Insert(rel, rec) => (
-            rel.as_id(),
-            extract_entity(rel, rec),
-            CmdPriority::Insert as u8,
-        ),
+        UpdCmd::Insert(rel, rec) => (rel.as_id(), RecKey(rec.clone()), CmdPriority::Insert as u8),
         UpdCmd::InsertOrUpdate(rel, rec) => (
             rel.as_id(),
-            extract_entity(rel, rec),
+            RecKey(rec.clone()),
             CmdPriority::InsertOrUpdate as u8,
         ),
-        UpdCmd::Delete(rel, rec) => (
-            rel.as_id(),
-            extract_entity(rel, rec),
-            CmdPriority::Delete as u8,
-        ),
+        UpdCmd::Delete(rel, rec) => (rel.as_id(), RecKey(rec.clone()), CmdPriority::Delete as u8),
         UpdCmd::DeleteKey(rel, rec) => (
             rel.as_id(),
-            extract_entity(rel, rec),
+            RecKey(rec.clone()),
             CmdPriority::DeleteKey as u8,
         ),
-        UpdCmd::Modify(rel, _, new) => (
+        UpdCmd::Modify(rel, _, new_rec) => (
             rel.as_id(),
-            extract_entity(rel, new),
+            RecKey(new_rec.clone()),
             CmdPriority::Modify as u8,
         ),
     });
