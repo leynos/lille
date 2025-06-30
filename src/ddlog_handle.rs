@@ -176,18 +176,27 @@ pub fn extract_entity(
 /// This ensures deterministic ordering when sending commands to the runtime and
 /// maintains the preconditions required by Differential Dataflow's merging
 /// logic. The `Record` type from `differential_datalog` lacks an `Ord`
-/// implementation in the stub runtime, so ordering falls back to its debug
-/// representation.
+/// implementation in the stub runtime. We therefore compare records using their
+/// debug representation, caching it in `RecKey` to reduce formatting overhead.
 #[cfg(feature = "ddlog")]
 pub fn sort_cmds(cmds: &mut [differential_datalog::record::UpdCmd]) {
     use differential_datalog::record::{Record, UpdCmd};
 
     #[derive(Clone)]
-    struct RecKey(Record);
+    struct RecKey {
+        debug_repr: String,
+    }
+
+    impl RecKey {
+        fn new(record: Record) -> Self {
+            let debug_repr = format!("{record:?}");
+            Self { debug_repr }
+        }
+    }
 
     impl PartialEq for RecKey {
         fn eq(&self, other: &Self) -> bool {
-            format!("{:?}", self.0) == format!("{:?}", other.0)
+            self.debug_repr == other.debug_repr
         }
     }
     impl Eq for RecKey {}
@@ -198,7 +207,7 @@ pub fn sort_cmds(cmds: &mut [differential_datalog::record::UpdCmd]) {
     }
     impl Ord for RecKey {
         fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-            format!("{:?}", self.0).cmp(&format!("{:?}", other.0))
+            self.debug_repr.cmp(&other.debug_repr)
         }
     }
     #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -212,25 +221,32 @@ pub fn sort_cmds(cmds: &mut [differential_datalog::record::UpdCmd]) {
         InsertOrUpdate,
     }
 
-    // We sort by (relation, record value, command priority). `Record` does not
-    // implement `Ord` in the stub runtime, so we compare via its debug
-    // representation.
+    // Sort by (relation id, record value, command priority). `Record` lacks
+    // `Ord` in the stub runtime, so comparison uses a cached debug string.
     cmds.sort_by_key(|cmd| match cmd {
-        UpdCmd::Insert(rel, rec) => (rel.as_id(), RecKey(rec.clone()), CmdPriority::Insert as u8),
+        UpdCmd::Insert(rel, rec) => (
+            rel.as_id(),
+            RecKey::new(rec.clone()),
+            CmdPriority::Insert as u8,
+        ),
         UpdCmd::InsertOrUpdate(rel, rec) => (
             rel.as_id(),
-            RecKey(rec.clone()),
+            RecKey::new(rec.clone()),
             CmdPriority::InsertOrUpdate as u8,
         ),
-        UpdCmd::Delete(rel, rec) => (rel.as_id(), RecKey(rec.clone()), CmdPriority::Delete as u8),
+        UpdCmd::Delete(rel, rec) => (
+            rel.as_id(),
+            RecKey::new(rec.clone()),
+            CmdPriority::Delete as u8,
+        ),
         UpdCmd::DeleteKey(rel, rec) => (
             rel.as_id(),
-            RecKey(rec.clone()),
+            RecKey::new(rec.clone()),
             CmdPriority::DeleteKey as u8,
         ),
         UpdCmd::Modify(rel, _, new_rec) => (
             rel.as_id(),
-            RecKey(new_rec.clone()),
+            RecKey::new(new_rec.clone()),
             CmdPriority::Modify as u8,
         ),
     });

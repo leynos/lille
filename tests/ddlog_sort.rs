@@ -1,7 +1,5 @@
 //! Tests for DDlog command sorting functionality.
 //!
-//! Tests for DDlog command sorting functionality.
-//!
 //! These tests ensure commands are ordered by relation and the full record value
 //! with a stable tie-breaker using command priority.
 
@@ -270,6 +268,76 @@ fn commands_sorted_by_rel_and_entity() {
         (Relations::entity_state_Position as usize, 1),
     ],
     vec!["delete", "insert", "modify"],
+)]
+#[case(
+    "all_ops_same_record",
+    vec![
+        UpdCmd::Insert(
+            RelIdentifier::RelId(Relations::entity_state_Position as usize),
+            es::Position {
+                entity: 2,
+                x: OrderedFloat(0.0),
+                y: OrderedFloat(0.0),
+                z: OrderedFloat(0.0),
+            }
+            .into_record(),
+        ),
+        UpdCmd::InsertOrUpdate(
+            RelIdentifier::RelId(Relations::entity_state_Position as usize),
+            es::Position {
+                entity: 2,
+                x: OrderedFloat(0.0),
+                y: OrderedFloat(0.0),
+                z: OrderedFloat(0.0),
+            }
+            .into_record(),
+        ),
+        UpdCmd::Delete(
+            RelIdentifier::RelId(Relations::entity_state_Position as usize),
+            es::Position {
+                entity: 2,
+                x: OrderedFloat(0.0),
+                y: OrderedFloat(0.0),
+                z: OrderedFloat(0.0),
+            }
+            .into_record(),
+        ),
+        UpdCmd::DeleteKey(
+            RelIdentifier::RelId(Relations::entity_state_Position as usize),
+            es::Position {
+                entity: 2,
+                x: OrderedFloat(0.0),
+                y: OrderedFloat(0.0),
+                z: OrderedFloat(0.0),
+            }
+            .into_record(),
+        ),
+        UpdCmd::Modify(
+            RelIdentifier::RelId(Relations::entity_state_Position as usize),
+            es::Position {
+                entity: 2,
+                x: OrderedFloat(0.0),
+                y: OrderedFloat(0.0),
+                z: OrderedFloat(0.0),
+            }
+            .into_record(),
+            es::Position {
+                entity: 2,
+                x: OrderedFloat(1.0),
+                y: OrderedFloat(1.0),
+                z: OrderedFloat(1.0),
+            }
+            .into_record(),
+        ),
+    ],
+    vec![
+        (Relations::entity_state_Position as usize, 2),
+        (Relations::entity_state_Position as usize, 2),
+        (Relations::entity_state_Position as usize, 2),
+        (Relations::entity_state_Position as usize, 2),
+        (Relations::entity_state_Position as usize, 2),
+    ],
+    vec!["delete_key", "delete", "modify", "insert", "insert_or_update"],
 )]
 fn test_sorting_scenarios(
     #[case] _name: &str,
