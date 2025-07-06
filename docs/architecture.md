@@ -1,148 +1,129 @@
-# Lille Architecture Documentation
+# Lille Architecture
 
-## Overview
+## 1. Architectural Philosophy
 
-Lille is a real-time strategy game built in Rust. The original prototype used a
-tick-based loop with the Piston engine. The project has since moved to Bevy and
-DDlog. Phase 1 of the migration spawns a small demo world using Bevy's ECS and
-synchronises that state into DDlog each frame.
+The architecture of Lille is founded upon a strict **separation of concerns**
+between the *state* of the simulation and the *logic* that governs it. This
+principle manifests in the choice of our two core technologies:
 
-## Core Components
+1. **The Bevy Engine**: Serves as the application framework and the **state
+   container**. Its primary responsibilities are rendering, user input, asset
+   management, and acting as the definitive source of truth for all world data
+   via its Entity-Component-System (ECS).
 
-### Bevy ECS
+2. **The DBSP Dataflow Circuit**: Serves as the declarative **logic engine**. It
+   contains the complete set of rules for physics, geometry, and agent
+   behaviour, expressed as a pure-Rust, incremental dataflow graph.
 
-The game state is held entirely in Bevy's entity-component system. Key
-components include:
+This bifurcation allows us to manage complexity effectively. The imperative,
+event-driven world of Bevy is kept clean and focused on presentation and
+orchestration, while the complex, relational rules of the simulation are
+isolated within a maintainable, testable, and highly performant declarative
+model.
 
-- `DdlogId`: Unique identifier shared with the DDlog program.
-- `Health`: Current hit points.
-- `UnitType`: Enum describing civilians and baddies.
-- `Target`: Optional goal position for units.
-- `Block` and `BlockSlope`: Terrain data used by the physics stub.
+## 2. Core Components and Data Flow
 
-The `spawn_world_system` populates the world with a landmark, a single civilian
-unit, a hostile baddie and a camera.
+The engine operates in a continuous, unidirectional data-flow loop that executes
+on every simulation tick.
 
-### Movement and Behavior System
-
-#### Actor Behavior
-
-Actor movement is computed by DDlog when the `ddlog` feature is enabled. The
-rules mirror the original Rust implementation which balanced:
-
-- Goal-seeking behavior towards target positions
-- Threat avoidance using fear vectors
-- Dynamic weighting between target pursuit and threat avoidance
-- Perpendicular movement for natural-looking threat avoidance
-
-The calculation considers fear radius based on threat meanness and actor
-"fraidiness", distance scaling and a combination of target direction with threat
-avoidance.
-
-### Graphics and Rendering
-
-- Rendering is handled entirely by Bevy. Simple sprites are spawned for each
-  entity and a 2D camera shows the scene.
-- The `build.rs` script downloads the Fira Sans font if needed and compiles
-  `src/ddlog/lille.dl` with the `ddlog` compiler. The generated crate is written
-  to Cargo's `OUT_DIR` to keep the project root clean. The download client uses
-  the system's root certificates to verify TLS connections.
-- A `DdlogHandle` resource is inserted during startup to manage transactions.
-- The handle automatically stops the DDlog program when removed or when the
-  application exits.
-- `DefaultPlugins` are loaded with `LogPlugin` disabled, so the custom logger
-  from `logging.rs` controls output.
-- The grid-based visualization system from the original code remains and will be
-  ported fully to Bevy in later phases.
-
-## Technical Architecture
-
-### Core Dependencies
-
-- `bevy` (0.12): ECS and rendering framework
-- `differential-datalog` (0.53, optional): Runtime library for the DDlog rules
-  when the `ddlog` feature is enabled
-- `hashbrown` (0.14): High-performance HashMap implementation
-- `glam` (0.24): Vector mathematics and linear algebra
-- `clap` (4.4): Command-line argument parsing
-- `serde` (1.0) and `color-eyre` (0.6) for data serialization and error
-  reporting
-
-### Update Cycle
-
-The Bevy schedule chains the synchronisation systems each frame:
-
-1. `cache_state_for_ddlog_system` copies ECS component data into `DdlogHandle`.
-2. `apply_ddlog_deltas_system` calls `DdlogHandle::step` which executes a DDlog
-   transaction (or a fallback Rust update) and writes the resulting positions
-   back to the ECS.
-
-### Design Decisions
-
-#### Performance Considerations
-
-- Use of `hashbrown` for high-performance spatial tracking
-- Efficient vector calculations using `glam`
-
-#### Extensibility
-
-- Trait-based system for threats (`CausesFear` trait)
-- Component-based entity system for easy addition of new entity types
-- Modular separation of graphics from game logic
-
-#### Debug Support
-
-- Integrated logging system with verbose mode
-- Command-line argument parsing for configuration
-- Visual debugging through density-based rendering
-
-### DDlog transaction flow
-
-The following sequence diagram illustrates how the game loop interacts with the
-DDlog system through the `DdlogHandle` during each simulation step:
-
-```mermaid
-sequenceDiagram
-    participant GameLoop
-    participant DdlogHandle
-    participant DDlogProgram
-
-    GameLoop->>DdlogHandle: step()
-    activate DdlogHandle
-    DdlogHandle->>DDlogProgram: transaction_start()
-    DdlogHandle->>DDlogProgram: stream cached state
-    DdlogHandle->>DDlogProgram: commit transaction
-    DDlogProgram-->>DdlogHandle: return deltas
-    DdlogHandle-->>GameLoop: apply deltas
-    deactivate DdlogHandle
+```text
++--------------------------------+      +----------------------------------+
+|        Bevy ECS World          |      |         DBSP Circuit             |
+| (Source of Truth for State)    |      | (Source of Truth for Logic)      |
+|                                |      |                                  |
+|  [ Components: Transform,    ] |----->| [ Input Streams: Position,     ] |
+|  [   Velocity, Target, etc.  ] | 1.   | [   Block, Velocity, etc.      ] |
+|                                |      |                                  |
+|                                |      |         (circuit.step())         |
+|                                |      |                |                 |
+|                                |      |                v                 |
+|                                |      |                                  |
+|  [ Components are updated   ]  |<-----| [ Output Streams: NewPosition, ] |
+|  [   from circuit outputs.  ]  | 3.   | [   NewVelocity, etc.          ] |
++--------------------------------+      +----------------------------------+
 ```
 
-### Data relationships
+### The Tick Cycle:
 
-The following entity–relationship diagram summarizes how records and update
-commands interact in the DDlog interface.
+1. **Data Extraction (ECS → DBSP)**: A set of dedicated Bevy "input systems" run
+   at the beginning of the frame. They query the ECS for all components relevant
+   to the simulation logic (e.g., `Transform`, `Velocity`, `Block`, `Target`).
+   This data is collected and fed as a batch of updates into the corresponding
+   `InputHandle`s of the DBSP circuit.
 
-```mermaid
-erDiagram
-    RECORD {
-        int entity
-    }
-    RELIDENTIFIER {
-        int id
-    }
-    UPDCMD {
-        Insert
-        Delete
-    }
-    UPDCMD ||--o{ RECORD : contains
-    UPDCMD ||--o{ RELIDENTIFIER : references
-```
+2. **Declarative Computation (DBSP)**: A central system calls `circuit.step()`
+   exactly once. This single function call triggers DBSP to process the entire
+   batch of input changes. The engine incrementally propagates these changes
+   through the dataflow graph, re-computing only what is necessary. This step is
+   where all physics calculations, geometry checks, and AI decisions occur,
+   resulting in a new set of output streams.
 
-## Future Considerations
+3. **State Synchronisation (DBSP → ECS)**: A final set of Bevy "output systems"
+   run. They read the records from the circuit's output handles (e.g.,
+   `NewPosition`, `NewVelocity`). For each output record, the system finds the
+   corresponding entity in the ECS and updates its components with the new,
+   authoritative values calculated by the circuit.
 
-The architecture supports several potential extensions:
+After this cycle, the Bevy ECS holds the new, consistent state of the world,
+ready for the next frame's rendering and the start of the next simulation tick.
 
-- Additional entity types through the component system
-- New behavior patterns through trait implementation
-- Enhanced graphics and visual effects
-- Multiplayer support through the tick-based system
+## 3. Logic Placement and Boundaries
+
+The separation of concerns dictates clear boundaries for where different types
+of logic should be implemented.
+
+### Logic within the DBSP Circuit:
+
+The DBSP circuit is the ideal place for any logic that is **relational** and
+**data-centric**. It excels at transforming collections of data.
+
+- **Physics and Geometry**: Collision detection (via floor height calculation),
+  gravity, friction, and force application.
+
+- **Simple, Reactive AI**: Agent behaviours that can be expressed as direct
+  reactions to the current state, such as fleeing from a source of fear, seeking
+  a target, or responding to damage.
+
+- **Game Rules**: Any rule that can be modelled as a data transformation, such
+  as "if an entity is standing on a 'lava' block, create a `Damage` event".
+
+### Logic within Bevy Systems (Imperative Rust):
+
+Bevy systems handle everything else. This code is typically imperative and
+event-driven.
+
+- **Orchestration**: The systems that manage the data flow to and from the DBSP
+  circuit.
+
+- **Rendering and I/O**: All interaction with the user, graphics card, file
+  system, and network.
+
+- **Complex, Stateful Algorithms**: Logic that does not fit the relational
+  dataflow model. The canonical example is **A\* pathfinding**, which requires
+  maintaining stateful data structures (open/closed sets, priority queues) and
+  performing iterative, heuristic searches. Such algorithms are implemented in
+  standard Rust, and their *results* (e.g., the next waypoint on a path) are fed
+  into the DBSP circuit as just another input stream.
+
+## 4. Advantages of this Architecture
+
+This design represents a significant evolution from the previous DDlog-based
+architecture.
+
+- **Simplified Toolchain**: The entire engine is a standard Cargo project. There
+  is no need for external compilers, `build.rs` code generation, or FFI
+  bindings.
+
+- **End-to-End Type Safety**: Data flows between Bevy and DBSP using native Rust
+  types, eliminating a major class of potential integration errors.
+
+- **Enhanced Testability**: The logic circuit can be tested in isolation (unit
+  tests) and the entire data pipeline can be tested via headless Bevy apps (BDD
+  tests), as detailed in `docs/testing-declarative-game-logic-in-dbsp.md`.
+
+- **Performance and Clarity**: We retain the high performance of incremental
+  computation while expressing complex rules in a clear, declarative style, as
+  outlined in `docs/lille-physics-engine-design.md`.
+
+This architecture provides a robust and scalable foundation for building the
+complex, emergent world of Lille.
