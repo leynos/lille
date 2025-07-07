@@ -38,19 +38,19 @@ pub struct NewPosition {
 }
 
 #[derive(Resource, Default)]
-pub struct DdlogHandle {
+pub struct WorldHandle {
     pub blocks: Vec<Block>,
     pub slopes: HashMap<i64, BlockSlope>,
     pub entities: HashMap<i64, DdlogEntity>,
     pub deltas: Vec<NewPosition>,
 }
 
-pub fn init_ddlog_system(mut commands: Commands) {
-    commands.insert_resource(DdlogHandle::default());
+pub fn init_world_handle_system(mut commands: Commands) {
+    commands.insert_resource(WorldHandle::default());
     info!("World handle created");
 }
 
-impl DdlogHandle {
+impl WorldHandle {
     fn highest_block_at(&self, x: i32, y: i32) -> Option<&Block> {
         self.blocks
             .iter()
@@ -72,7 +72,7 @@ impl DdlogHandle {
         let y_grid = y.floor() as i32;
         if let Some(block) = self.highest_block_at(x_grid, y_grid) {
             let slope = self.slopes.get(&block.id);
-            DdlogHandle::floor_height_at(block, slope, x, y)
+            WorldHandle::floor_height_at(block, slope, x, y)
         } else {
             0.0
         }
