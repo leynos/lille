@@ -1,19 +1,19 @@
-//! Systems for synchronizing ECS state with `DDlog`.
+//! Systems for synchronizing ECS state with the world handle.
 //! Pushes component data to the database and applies deltas back to the world.
 use bevy::prelude::*;
 use hashbrown::HashMap;
 
 use crate::components::{Block, BlockSlope, DdlogId, Health, Target, UnitType};
-use crate::ddlog_handle::{DdlogEntity, DdlogHandle};
+use crate::world_handle::{DdlogEntity, WorldHandle};
 
-/// Caches the current ECS state on [`DdlogHandle`].
+/// Caches the current ECS state on [`WorldHandle`].
 ///
-/// This system no longer interacts with the DDlog runtime directly. It merely
-/// mirrors relevant component data into the [`DdlogHandle`] resource so that
-/// [`DdlogHandle::step`](crate::ddlog_handle::DdlogHandle::step) can process it
+/// This system no longer interacts with the runtime directly. It merely
+/// mirrors relevant component data into the [`WorldHandle`] resource so that
+/// [`WorldHandle::step`](crate::world_handle::WorldHandle::step) can process it
 /// later.
 pub fn cache_state_for_ddlog_system(
-    mut ddlog: ResMut<DdlogHandle>,
+    mut ddlog: ResMut<WorldHandle>,
     entity_query: Query<(&DdlogId, &Transform, &Health, &UnitType, Option<&Target>)>,
     block_query: Query<(&Block, Option<&BlockSlope>)>,
 ) {
@@ -55,9 +55,9 @@ pub fn cache_state_for_ddlog_system(
     ddlog.slopes = slopes;
 }
 
-/// Applies the inferred movement deltas from the DDlog stub.
+/// Applies the inferred movement deltas from the runtime stub.
 pub fn apply_ddlog_deltas_system(
-    mut ddlog: ResMut<DdlogHandle>,
+    mut ddlog: ResMut<WorldHandle>,
     mut query: Query<(&DdlogId, &mut Transform)>,
 ) {
     ddlog.step();

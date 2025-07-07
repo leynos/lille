@@ -16,24 +16,16 @@ jobs:
       CODESCENE_CLI_SHA256: ${{ vars.CODESCENE_CLI_SHA256 || '' }}
     steps:
       - uses: actions/checkout@v4
-      - name: Generate placeholder crate
-        run: make ddlog-stubs
       - name: Setup Rust
         uses: leynos/shared-actions/.github/actions/setup-rust@v1.1.0
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
-      - name: Setup DDlog
-        uses: ./.github/actions/setup-ddlog
-      - name: Build ddlog inferencer
-        run: make generated/lille_ddlog/src/lib.rs
       - name: Format
         run: make fmt-check
       - name: Lint
         run: cargo clippy --all-targets --all-features -- -D warnings
       - name: Test
         run: cargo test
-      - name: Test with DDlog
-        run: make test-ddlog
       - name: Install cargo-llvm-cov
         run: cargo install cargo-llvm-cov
       - name: Run coverage

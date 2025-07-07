@@ -129,7 +129,7 @@ results, all without the overhead of rendering or user input.
    has decreased, or that a standing entity's position now matches the
    calculated floor height.
 
-**Example: BDD test for gravity**
+### Example: BDD test for gravity
 
 ```rust
 use rstest::rstest;

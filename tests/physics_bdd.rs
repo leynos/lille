@@ -1,20 +1,19 @@
 //! Behaviour-driven tests for physics-related systems.
 //! Uses `rstest` to script scenarios covering entity transitions.
-#![cfg(not(feature = "ddlog"))]
 use bevy::prelude::*;
 use insta::assert_ron_snapshot;
 use lille::{
     apply_ddlog_deltas_system, cache_state_for_ddlog_system,
     components::{Block, BlockSlope, DdlogId, Health, UnitType},
-    ddlog_handle::DdlogHandle,
-    init_ddlog_system,
+    init_world_handle_system,
+    world_handle::WorldHandle,
 };
 use rstest::rstest;
 
 fn setup_app() -> App {
     let mut app = App::new();
     app.add_plugins(MinimalPlugins);
-    app.add_systems(Startup, init_ddlog_system);
+    app.add_systems(Startup, init_world_handle_system);
     app
 }
 
@@ -50,7 +49,7 @@ fn entity_transitions_between_standing_and_falling() {
 
     app.update(); // initial sync
     {
-        let ddlog = app.world.resource::<DdlogHandle>();
+        let ddlog = app.world.resource::<WorldHandle>();
         assert!(ddlog.deltas.is_empty());
     }
 
@@ -64,7 +63,7 @@ fn entity_transitions_between_standing_and_falling() {
     app.update();
 
     // THEN the entity should have fallen
-    let ddlog = app.world.resource::<DdlogHandle>();
+    let ddlog = app.world.resource::<WorldHandle>();
     assert!(ddlog.deltas[0].z < 1.0);
     assert_ron_snapshot!("falling_delta", &ddlog.deltas);
 }
