@@ -113,7 +113,10 @@ pub fn download_font_with(
 ) -> Result<PathBuf> {
     let manifest_dir = manifest_dir.as_ref();
     let assets_dir = manifest_dir.join("assets");
-    fs::create_dir_all(&assets_dir)?;
+    if let Err(e) = fs::create_dir_all(&assets_dir) {
+        println!("cargo:warning=Failed to create assets directory: {e}");
+        return Ok(fallback_font_path());
+    }
     let font_path = assets_dir.join("FiraSans-Regular.ttf");
 
     if font_path.exists() {
