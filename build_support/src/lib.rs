@@ -1,6 +1,6 @@
 //! Build support utilities used by the project's build script.
-//! Coordinates constants generation and font downloads.
-pub mod constants;
+//! Handles asset downloads for font resources.
+
 pub mod font;
 
 use color_eyre::eyre::Result;
@@ -14,8 +14,8 @@ use std::path::PathBuf;
 #[allow(unfulfilled_lint_expectations)]
 /// Execute all build steps required by `build.rs`.
 ///
-/// This function generates constants and downloads the Fira Sans font.
-/// Environment variables such as `CARGO_MANIFEST_DIR` and `OUT_DIR` must be set
+/// This function downloads the Fira Sans font.
+/// Environment variables such as `CARGO_MANIFEST_DIR` must be set
 /// by Cargo before this function is called.
 ///
 /// # Examples
@@ -37,9 +37,8 @@ pub fn build() -> Result<()> {
     dotenvy::dotenv_override().ok();
     set_rerun_triggers();
 
-    let (manifest_dir, out_dir) = manifest_and_out_dir()?;
+    let manifest_dir = manifest_dir()?;
 
-    constants::generate_constants(&manifest_dir, &out_dir)?;
     let font_path = font::download_font(&manifest_dir)?;
 
     println!("cargo:rustc-env=FONT_PATH={}", font_path.display());
@@ -53,14 +52,12 @@ pub fn build_with_options() -> Result<()> {
     build()
 }
 
-fn manifest_and_out_dir() -> Result<(PathBuf, PathBuf)> {
+fn manifest_dir() -> Result<PathBuf> {
     let manifest = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR")?);
-    let out = PathBuf::from(std::env::var("OUT_DIR")?);
-    Ok((manifest, out))
+    Ok(manifest)
 }
 
 fn set_rerun_triggers() {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=assets");
-    println!("cargo:rerun-if-changed=constants.toml");
 }

@@ -4,4 +4,3 @@ Cargo.lock
 *.ttf
 assets/
 .env
-constants.rs

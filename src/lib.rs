@@ -2,13 +2,14 @@
 //! Re-exports common components and systems for the main application and tests.
 pub mod actor;
 pub mod components;
+pub mod constants;
 pub mod ddlog_sync;
 pub mod entity;
 pub mod logging;
 pub mod spawn_world;
 pub mod vector_math;
 pub mod world_handle;
-include!(concat!(env!("OUT_DIR"), "/constants.rs"));
+pub use constants::*;
 
 // Re-export commonly used items
 pub use actor::Actor;

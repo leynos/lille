@@ -37,8 +37,7 @@ can take them — and keep them.
 ## Build script
 
 The `build.rs` entry point delegates to the `build_support` crate. This helper
-crate generates constants from `constants.toml`, validates them against
-`constants.schema.json`, and downloads the project font.
+crate downloads the project font during compilation.
 
 The font download uses the operating system's certificate store for TLS
 verification. Ensure your environment has a valid set of root certificates so
@@ -54,9 +53,6 @@ script:
 ```
 
 The script compiles the helper binary and executes it directly so
-`CARGO_MANIFEST_DIR` points to the repository root while running. It sets
-`OUT_DIR` so the helper binary behaves like a build script.
+`CARGO_MANIFEST_DIR` points to the repository root while running.
 
-This performs the same steps as `build.rs`, generating constants and downloading
-the font. The helper does not output "No such file or directory" errors when
-locating `constants.toml`.
+This performs the same steps as `build.rs`, downloading the font asset.
