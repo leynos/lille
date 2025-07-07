@@ -43,7 +43,7 @@ on every simulation tick.
 +--------------------------------+      +----------------------------------+
 ```
 
-### The Tick Cycle:
+### The Tick Cycle
 
 1. **Data Extraction (ECS → DBSP)**: A set of dedicated Bevy "input systems" run
    at the beginning of the frame. They query the ECS for all components relevant
@@ -72,7 +72,7 @@ ready for the next frame's rendering and the start of the next simulation tick.
 The separation of concerns dictates clear boundaries for where different types
 of logic should be implemented.
 
-### Logic within the DBSP Circuit:
+### Logic within the DBSP Circuit
 
 The DBSP circuit is the ideal place for any logic that is **relational** and
 **data-centric**. It excels at transforming collections of data.
@@ -87,7 +87,7 @@ The DBSP circuit is the ideal place for any logic that is **relational** and
 - **Game Rules**: Any rule that can be modelled as a data transformation, such
   as "if an entity is standing on a 'lava' block, create a `Damage` event".
 
-### Logic within Bevy Systems (Imperative Rust):
+### Logic within Bevy Systems (Imperative Rust)
 
 Bevy systems handle everything else. This code is typically imperative and
 event-driven.

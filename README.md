@@ -34,7 +34,6 @@ starting a war you cannot finish.
 Control is an illusion. Ownership is temporary. The streets belong to those who
 can take them — and keep them.
 
-
 ## Build script
 
 The `build.rs` entry point delegates to the `build_support` crate. This helper
@@ -58,7 +57,6 @@ The script compiles the helper binary and executes it directly so
 `CARGO_MANIFEST_DIR` points to the repository root while running. It sets
 `OUT_DIR` so the helper binary behaves like a build script.
 
-This performs the same steps as `build.rs`, generating constants and
-downloading the font. The helper does not output "No such file or directory"
-errors when locating `constants.toml`.
-
+This performs the same steps as `build.rs`, generating constants and downloading
+the font. The helper does not output "No such file or directory" errors when
+locating `constants.toml`.

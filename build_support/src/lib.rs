@@ -4,7 +4,6 @@ pub mod constants;
 pub mod font;
 
 use color_eyre::eyre::Result;
-use std::fs;
 use std::path::PathBuf;
 
 #[expect(
