@@ -4,6 +4,4 @@ Cargo.lock
 *.ttf
 assets/
 .env
-src/ddlog/constants.dl
 constants.rs
-generated/lille_ddlog/
