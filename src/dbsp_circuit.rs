@@ -39,27 +39,7 @@ pub struct Position {
     pub z: OrderedFloat<f64>,
 }
 
-#[derive(
-    Archive,
-    Serialize,
-    Deserialize,
-    Clone,
-    Debug,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    Default,
-    SizeOf,
-)]
-#[archive_attr(derive(Ord, PartialOrd, Eq, PartialEq, Hash))]
-pub struct NewPosition {
-    pub entity: i64,
-    pub x: OrderedFloat<f64>,
-    pub y: OrderedFloat<f64>,
-    pub z: OrderedFloat<f64>,
-}
+pub type NewPosition = Position;
 
 #[derive(
     Archive,
@@ -107,7 +87,7 @@ impl DbspCircuit {
                             z: *z,
                         });
 
-                let new_pos = positions.map(|p| NewPosition {
+                let new_pos = positions.map(|p| Position {
                     entity: p.entity,
                     x: p.x,
                     y: p.y,
