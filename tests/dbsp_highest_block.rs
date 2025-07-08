@@ -7,7 +7,7 @@ use lille::{
 fn test_highest_block_aggregation() {
     let mut circuit = DbspCircuit::new().unwrap();
 
-    circuit.block_in.push(
+    circuit.block_in().push(
         Block {
             id: 0,
             x: 10,
@@ -16,7 +16,7 @@ fn test_highest_block_aggregation() {
         },
         1,
     );
-    circuit.block_in.push(
+    circuit.block_in().push(
         Block {
             id: 1,
             x: 10,
@@ -25,7 +25,7 @@ fn test_highest_block_aggregation() {
         },
         1,
     );
-    circuit.block_in.push(
+    circuit.block_in().push(
         Block {
             id: 2,
             x: 15,
@@ -37,7 +37,7 @@ fn test_highest_block_aggregation() {
 
     circuit.step().unwrap();
 
-    let output = circuit.highest_block_out.consolidate();
+    let output = circuit.highest_block_out().consolidate();
     let mut vals: Vec<HighestBlockAt> = output.iter().map(|(hb, _, _)| hb.clone()).collect();
     vals.sort_by_key(|h| (h.x, h.y));
     assert_eq!(vals.len(), 2);

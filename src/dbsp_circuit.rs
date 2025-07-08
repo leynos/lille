@@ -1,3 +1,11 @@
+//! Declarative DBSP circuit implementing simple physics rules.
+//!
+//! This module houses the core dataflow logic that infers game state from
+//! declarative inputs.  The circuit exposes handles for inserting `Position`
+//! and `Block` records and yields streams such as `NewPosition` and
+//! `HighestBlockAt`.  Each input is incremental; callers should clear the
+//! handles between steps to avoid stale data accumulating in the circuit.
+
 use dbsp::{
     operator::Max, typed_batch::OrdZSet, CircuitHandle, OutputHandle, RootCircuit, ZSetHandle,
 };
@@ -76,10 +84,10 @@ pub struct HighestBlockAt {
 
 pub struct DbspCircuit {
     circuit: CircuitHandle,
-    pub position_in: ZSetHandle<Position>,
-    pub block_in: ZSetHandle<Block>,
-    pub new_position_out: OutputHandle<OrdZSet<NewPosition>>,
-    pub highest_block_out: OutputHandle<OrdZSet<HighestBlockAt>>,
+    position_in: ZSetHandle<Position>,
+    block_in: ZSetHandle<Block>,
+    new_position_out: OutputHandle<OrdZSet<NewPosition>>,
+    highest_block_out: OutputHandle<OrdZSet<HighestBlockAt>>,
 }
 
 impl DbspCircuit {
@@ -120,5 +128,31 @@ impl DbspCircuit {
 
     pub fn step(&mut self) -> Result<(), dbsp::Error> {
         self.circuit.step()
+    }
+
+    /// Returns the handle used to feed position records into the circuit.
+    pub fn position_in(&self) -> &ZSetHandle<Position> {
+        &self.position_in
+    }
+
+    /// Returns the handle used to feed block records into the circuit.
+    pub fn block_in(&self) -> &ZSetHandle<Block> {
+        &self.block_in
+    }
+
+    /// Returns the output handle containing newly computed positions.
+    pub fn new_position_out(&self) -> &OutputHandle<OrdZSet<NewPosition>> {
+        &self.new_position_out
+    }
+
+    /// Returns the output handle of the highest block aggregation.
+    pub fn highest_block_out(&self) -> &OutputHandle<OrdZSet<HighestBlockAt>> {
+        &self.highest_block_out
+    }
+
+    /// Clear all input collections to avoid stale data between steps.
+    pub fn clear_inputs(&self) {
+        self.position_in.clear_input();
+        self.block_in.clear_input();
     }
 }
