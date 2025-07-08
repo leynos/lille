@@ -18,7 +18,26 @@ pub enum UnitType {
 #[derive(Component, Debug, Deref, DerefMut, Serialize)]
 pub struct Target(pub Vec2);
 
-#[derive(Component, Debug, Clone, Serialize)]
+use rkyv::{Archive, Deserialize, Serialize as RkyvSerialize};
+use size_of::SizeOf;
+
+#[derive(
+    Archive,
+    RkyvSerialize,
+    Deserialize,
+    Component,
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    Serialize,
+    Default,
+    SizeOf,
+)]
+#[archive_attr(derive(Ord, PartialOrd, Eq, PartialEq, Hash))]
 pub struct Block {
     pub id: i64,
     pub x: i32,
