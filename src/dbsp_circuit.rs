@@ -136,7 +136,7 @@ impl DbspCircuit {
     /// Input ZSets accumulate records across [`DbspCircuit::step`] calls.
     /// Call this method after each frame, once outputs have been processed,
     /// to prevent stale data from affecting subsequent computations.
-    pub fn clear_inputs(&self) {
+    pub fn clear_inputs(&mut self) {
         self.position_in.clear_input();
         self.block_in.clear_input();
     }
