@@ -1,69 +1,30 @@
-//! Behaviour-driven tests for physics-related systems.
-//! Uses `rstest` to script scenarios covering entity transitions.
-use bevy::prelude::*;
-use insta::assert_ron_snapshot;
-use lille::{
-    apply_ddlog_deltas_system, cache_state_for_ddlog_system,
-    components::{Block, BlockSlope, DdlogId, Health, UnitType},
-    init_world_handle_system,
-    world_handle::WorldHandle,
-};
-use rstest::rstest;
+//! Physics behaviour-driven development tests using the DBSP circuit.
+//!
+//! This module tests physics rules such as gravity effects on entity positions
+//! through the declarative dataflow circuit.
 
-fn setup_app() -> App {
-    let mut app = App::new();
-    app.add_plugins(MinimalPlugins);
-    app.add_systems(Startup, init_world_handle_system);
-    app
-}
+use approx::assert_relative_eq;
+use lille::dbsp_circuit::{NewPosition, Position};
+mod common;
 
-#[rstest]
-fn entity_transitions_between_standing_and_falling() {
-    // GIVEN a block at z=0 and an entity standing on it
-    let mut app = setup_app();
-    app.add_systems(
-        Update,
-        (cache_state_for_ddlog_system, apply_ddlog_deltas_system).chain(),
+#[test]
+fn entity_falls_due_to_gravity() {
+    let mut circuit = common::new_circuit();
+
+    circuit.position_in().push(
+        Position {
+            entity: 1,
+            x: 0.0.into(),
+            y: 0.0.into(),
+            z: 1.0.into(),
+        },
+        1,
     );
-    let block_entity = app
-        .world
-        .spawn_empty()
-        .insert(Block {
-            id: 1,
-            x: 0,
-            y: 0,
-            z: 0,
-        })
-        .id();
-    app.world.entity_mut(block_entity).insert(BlockSlope {
-        block_id: 1,
-        grad_x: 0.0,
-        grad_y: 0.0,
-    });
-    app.world.spawn((
-        DdlogId(1),
-        Health(100),
-        UnitType::Civvy { fraidiness: 0.0 },
-        Transform::from_xyz(0.5, 0.5, 1.0),
-    ));
+    circuit.step().expect("Failed to step DBSP circuit");
 
-    app.update(); // initial sync
-    {
-        let ddlog = app.world.resource::<WorldHandle>();
-        assert!(ddlog.deltas.is_empty());
-    }
-
-    // WHEN the block is lowered so the entity is above the floor
-    app.world.entity_mut(block_entity).insert(Block {
-        id: 1,
-        x: 0,
-        y: 0,
-        z: -1,
-    });
-    app.update();
-
-    // THEN the entity should have fallen
-    let ddlog = app.world.resource::<WorldHandle>();
-    assert!(ddlog.deltas[0].z < 1.0);
-    assert_ron_snapshot!("falling_delta", &ddlog.deltas);
+    let output = circuit.new_position_out().consolidate();
+    let results: Vec<NewPosition> = output.iter().map(|(p, _, _)| p.clone()).collect();
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].entity, 1);
+    assert_relative_eq!(results[0].z.into_inner(), 1.0 + lille::GRAVITY_PULL);
 }
