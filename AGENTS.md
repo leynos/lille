@@ -6,8 +6,7 @@ project:
 
 01. **Run `make fmt`, `make markdownlint`, and `make lint`** before committing
     to ensure consistent code style and catch common mistakes. After formatting
-    and linting, execute **`make test`** and **`make test-ddlog`** to validate
-    both standard and DDlog-enabled builds.
+    and linting, execute **`make test`** to validate the build.
 02. **Write unit tests** for new functionality. Run `make test` in the root
     crate to ensure all tests pass.
 03. **Document public APIs** using Rustdoc comments (`///`) so documentation can
