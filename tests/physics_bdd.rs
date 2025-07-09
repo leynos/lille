@@ -3,11 +3,13 @@
 //! This module tests physics rules such as gravity effects on entity positions
 //! through the declarative dataflow circuit.
 
-use lille::dbsp_circuit::{DbspCircuit, NewPosition, Position};
+use approx::assert_relative_eq;
+use lille::dbsp_circuit::{NewPosition, Position};
+mod common;
 
 #[test]
 fn entity_falls_due_to_gravity() {
-    let mut circuit = DbspCircuit::new().expect("Failed to create DBSP circuit");
+    let mut circuit = common::new_circuit();
 
     circuit.position_in().push(
         Position {
@@ -24,5 +26,5 @@ fn entity_falls_due_to_gravity() {
     let results: Vec<NewPosition> = output.iter().map(|(p, _, _)| p.clone()).collect();
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].entity, 1);
-    assert_eq!(results[0].z.into_inner(), 1.0 + lille::GRAVITY_PULL);
+    assert_relative_eq!(results[0].z.into_inner(), 1.0 + lille::GRAVITY_PULL);
 }

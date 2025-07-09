@@ -3,10 +3,8 @@
 //! This module validates that the circuit correctly computes the highest block
 //! at each `(x, y)` coordinate pair from multiple input blocks.
 
-use lille::{
-    components::Block,
-    dbsp_circuit::{DbspCircuit, HighestBlockAt},
-};
+use lille::{components::Block, dbsp_circuit::HighestBlockAt};
+mod common;
 use rstest::rstest;
 
 fn b(id: i64, x: i32, y: i32, z: i32) -> Block {
@@ -19,7 +17,7 @@ fn hb(x: i32, y: i32, z: i32) -> HighestBlockAt {
 
 #[test]
 fn test_highest_block_aggregation() {
-    let mut circuit = DbspCircuit::new().expect("Failed to create DBSP circuit");
+    let mut circuit = common::new_circuit();
 
     circuit.block_in().push(
         Block {
@@ -65,7 +63,7 @@ fn test_highest_block_aggregation() {
 #[case::duplicate_same_height(vec![b(1,1,1,5), b(2,1,1,5)], vec![hb(1,1,5)])]
 #[case::mixed(vec![b(1,0,0,3), b(2,0,0,1), b(3,0,1,4)], vec![hb(0,0,3), hb(0,1,4)])]
 fn highest_block_cases(#[case] blocks: Vec<Block>, #[case] expected: Vec<HighestBlockAt>) {
-    let mut circuit = DbspCircuit::new().expect("Failed to create DBSP circuit");
+    let mut circuit = common::new_circuit();
     for blk in blocks {
         circuit.block_in().push(blk, 1);
     }

@@ -1,10 +1,11 @@
-//! Declarative DBSP circuit implementing simple physics rules.
+//! DBSP-based world inference engine.
 //!
-//! This module houses the core dataflow logic that infers game state from
-//! declarative inputs.  The circuit exposes handles for inserting `Position`
-//! and `Block` records and yields streams such as `NewPosition` and
-//! `HighestBlockAt`.  Each input is incremental; callers should clear the
-//! handles between steps to avoid stale data accumulating in the circuit.
+//! This module defines [`DbspCircuit`], the authoritative dataflow program for
+//! Lille's game world. Callers feed [`Position`] and [`Block`] records into the
+//! circuit, call [`DbspCircuit::step`], then read [`NewPosition`] and
+//! [`HighestBlockAt`] outputs. Input collections persist across steps—invoke
+//! [`DbspCircuit::clear_inputs`] after each frame to prevent stale data from
+//! affecting subsequent computations.
 
 use dbsp::{
     operator::Max, typed_batch::OrdZSet, CircuitHandle, OutputHandle, RootCircuit, ZSetHandle,
@@ -130,7 +131,11 @@ impl DbspCircuit {
         &self.highest_block_out
     }
 
-    /// Clear all input collections to avoid stale data between steps.
+    /// Clears all input collections.
+    ///
+    /// Input ZSets accumulate records across [`DbspCircuit::step`] calls.
+    /// Call this method after each frame, once outputs have been processed,
+    /// to prevent stale data from affecting subsequent computations.
     pub fn clear_inputs(&self) {
         self.position_in.clear_input();
         self.block_in.clear_input();
