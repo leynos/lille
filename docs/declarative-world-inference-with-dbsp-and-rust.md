@@ -206,6 +206,7 @@ the data flow each tick.
 
 The following sequence diagram summarizes how the application constructs and
 drives the circuit each tick.
+
 ```mermaid
 sequenceDiagram
     participant App
