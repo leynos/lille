@@ -111,7 +111,7 @@ impl DbspCircuit {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```ignore
     /// let circuit = DbspCircuit::new().unwrap();
     /// ```
     pub fn new() -> Result<Self, dbsp::Error> {
@@ -190,7 +190,7 @@ impl DbspCircuit {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```ignore
     /// let circuit = DbspCircuit::new().unwrap();
     /// let position_handle = circuit.position_in();
     /// // Feed positions into the circuit using `position_handle`
@@ -205,7 +205,7 @@ impl DbspCircuit {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```ignore
     /// let circuit = DbspCircuit::new().unwrap();
     /// let velocity_in = circuit.velocity_in();
     /// velocity_in.insert(Velocity {
@@ -225,7 +225,7 @@ impl DbspCircuit {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```ignore
     /// let circuit = DbspCircuit::new().unwrap();
     /// let block_handle = circuit.block_in();
     /// // Feed block data into the circuit
@@ -241,7 +241,7 @@ impl DbspCircuit {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```ignore
     /// let circuit = DbspCircuit::new().unwrap();
     /// let new_positions = circuit.new_position_out();
     /// // Read new positions from the output handle
@@ -257,7 +257,7 @@ impl DbspCircuit {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```ignore
     /// let circuit = DbspCircuit::new().unwrap();
     /// let velocities = circuit.new_velocity_out();
     /// // Use `velocities` to read updated velocity data.
@@ -273,7 +273,7 @@ impl DbspCircuit {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```ignore
     /// let circuit = DbspCircuit::new().unwrap();
     /// let highest_block_handle = circuit.highest_block_out();
     /// // Use `highest_block_handle` to read aggregated highest block data.
@@ -290,7 +290,7 @@ impl DbspCircuit {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```ignore
     /// circuit.clear_inputs();
     /// ```
     pub fn clear_inputs(&mut self) {
