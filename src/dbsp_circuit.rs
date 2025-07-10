@@ -6,6 +6,14 @@
 //! [`HighestBlockAt`] outputs. Input collections persist across steps—invoke
 //! [`DbspCircuit::clear_inputs`] after each frame to prevent stale data from
 //! affecting subsequent computations.
+//!
+//! # Doctest prelude
+//!
+//! Examples in this module use the following imports:
+//!
+//! ```rust,no_run
+//! use lille::prelude::*;
+//! ```
 
 use dbsp::{
     operator::Max, typed_batch::OrdZSet, CircuitHandle, OutputHandle, RootCircuit, ZSetHandle,
@@ -111,9 +119,9 @@ impl DbspCircuit {
     ///
     /// # Examples
     ///
-    /// ```no_run
-    /// use lille::DbspCircuit;
-    /// let circuit = DbspCircuit::new().unwrap();
+    /// ```rust,no_run
+    /// # use lille::prelude::*;
+    /// let circuit = DbspCircuit::new().expect("circuit construction failed");
     /// ```
     pub fn new() -> Result<Self, dbsp::Error> {
         let (
@@ -191,9 +199,9 @@ impl DbspCircuit {
     ///
     /// # Examples
     ///
-    /// ```no_run
-    /// use lille::DbspCircuit;
-    /// let circuit = DbspCircuit::new().unwrap();
+    /// ```rust,no_run
+    /// # use lille::prelude::*;
+    /// let circuit = DbspCircuit::new().expect("circuit construction failed");
     /// let position_handle = circuit.position_in();
     /// // Feed positions into the circuit using `position_handle`
     /// ```
@@ -207,11 +215,19 @@ impl DbspCircuit {
     ///
     /// # Examples
     ///
-    /// ```no_run
-    /// use lille::DbspCircuit;
-    /// let circuit = DbspCircuit::new().unwrap();
+    /// ```rust,no_run
+    /// # use lille::prelude::*;
+    /// let circuit = DbspCircuit::new().expect("circuit construction failed");
     /// let velocity_in = circuit.velocity_in();
-    /// // Feed velocity data via `velocity_in`
+    /// velocity_in.push(
+    ///     Velocity {
+    ///         entity: 1,
+    ///         vx: OrderedFloat(0.0),
+    ///         vy: OrderedFloat(0.0),
+    ///         vz: OrderedFloat(0.0),
+    ///     },
+    ///     1,
+    /// );
     /// ```
     pub fn velocity_in(&self) -> &ZSetHandle<Velocity> {
         &self.velocity_in
@@ -223,10 +239,9 @@ impl DbspCircuit {
     ///
     /// # Examples
     ///
-    /// ```no_run
-    /// use lille::DbspCircuit;
-    /// use lille::components::Block;
-    /// let circuit = DbspCircuit::new().unwrap();
+    /// ```rust,no_run
+    /// # use lille::prelude::*;
+    /// let circuit = DbspCircuit::new().expect("circuit construction failed");
     /// let block_handle = circuit.block_in();
     /// // Feed block data into the circuit using `block_handle`
     /// ```
@@ -240,9 +255,9 @@ impl DbspCircuit {
     ///
     /// # Examples
     ///
-    /// ```no_run
-    /// use lille::DbspCircuit;
-    /// let circuit = DbspCircuit::new().unwrap();
+    /// ```rust,no_run
+    /// # use lille::prelude::*;
+    /// let circuit = DbspCircuit::new().expect("circuit construction failed");
     /// let new_positions = circuit.new_position_out();
     /// // Read new positions from the output handle
     /// ```
@@ -257,9 +272,9 @@ impl DbspCircuit {
     ///
     /// # Examples
     ///
-    /// ```no_run
-    /// use lille::DbspCircuit;
-    /// let circuit = DbspCircuit::new().unwrap();
+    /// ```rust,no_run
+    /// # use lille::prelude::*;
+    /// let circuit = DbspCircuit::new().expect("circuit construction failed");
     /// let velocities = circuit.new_velocity_out();
     /// // Use `velocities` to read updated velocity data.
     /// ```
@@ -274,9 +289,9 @@ impl DbspCircuit {
     ///
     /// # Examples
     ///
-    /// ```no_run
-    /// use lille::DbspCircuit;
-    /// let circuit = DbspCircuit::new().unwrap();
+    /// ```rust,no_run
+    /// # use lille::prelude::*;
+    /// let circuit = DbspCircuit::new().expect("circuit construction failed");
     /// let highest_block_handle = circuit.highest_block_out();
     /// // Use `highest_block_handle` to read aggregated highest block data.
     /// ```
@@ -292,9 +307,9 @@ impl DbspCircuit {
     ///
     /// # Examples
     ///
-    /// ```no_run
-    /// use lille::DbspCircuit;
-    /// let mut circuit = DbspCircuit::new().unwrap();
+    /// ```rust,no_run
+    /// # use lille::prelude::*;
+    /// let mut circuit = DbspCircuit::new().expect("circuit construction failed");
     /// circuit.clear_inputs();
     /// ```
     pub fn clear_inputs(&mut self) {
