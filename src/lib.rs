@@ -23,3 +23,16 @@ pub use logging::init as init_logging;
 pub use spawn_world::spawn_world_system;
 pub use vector_math::{vec_mag, vec_normalize};
 pub use world_handle::{init_world_handle_system, WorldHandle};
+
+pub mod prelude {
+    //! Prelude exports used in documentation examples.
+    //!
+    //! ```rust,no_run
+    //! use lille::prelude::*;
+    //! ```
+
+    pub use crate::components::Block;
+    pub use crate::DbspCircuit;
+    pub use crate::Velocity;
+    pub use ordered_float::OrderedFloat;
+}
