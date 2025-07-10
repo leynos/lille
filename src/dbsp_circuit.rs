@@ -131,11 +131,10 @@ impl DbspCircuit {
                 vz: OrderedFloat(v.vz.into_inner() + GRAVITY_PULL),
             });
 
-                let joined = positions
-                    .map_index(|p| (p.entity, p.clone()))
-                    .join(&new_vel.map_index(|v| (v.entity, v.clone())), |_, pos, vel| {
-                        (pos.clone(), vel.clone())
-                    });
+            let joined = positions.map_index(|p| (p.entity, p.clone())).join(
+                &new_vel.map_index(|v| (v.entity, v.clone())),
+                |_, pos, vel| (pos.clone(), vel.clone()),
+            );
 
             let new_pos = joined.map(|(p, v)| Position {
                 entity: p.entity,
