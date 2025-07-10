@@ -112,6 +112,7 @@ impl DbspCircuit {
     /// # Examples
     ///
     /// ```no_run
+    /// use lille::DbspCircuit;
     /// let circuit = DbspCircuit::new().unwrap();
     /// ```
     pub fn new() -> Result<Self, dbsp::Error> {
@@ -191,6 +192,7 @@ impl DbspCircuit {
     /// # Examples
     ///
     /// ```no_run
+    /// use lille::DbspCircuit;
     /// let circuit = DbspCircuit::new().unwrap();
     /// let position_handle = circuit.position_in();
     /// // Feed positions into the circuit using `position_handle`
@@ -206,14 +208,10 @@ impl DbspCircuit {
     /// # Examples
     ///
     /// ```no_run
+    /// use lille::DbspCircuit;
     /// let circuit = DbspCircuit::new().unwrap();
     /// let velocity_in = circuit.velocity_in();
-    /// velocity_in.insert(Velocity {
-    ///     entity: 1,
-    ///     vx: OrderedFloat(0.0),
-    ///     vy: OrderedFloat(0.0),
-    ///     vz: OrderedFloat(0.0),
-    /// });
+    /// // Feed velocity data via `velocity_in`
     /// ```
     pub fn velocity_in(&self) -> &ZSetHandle<Velocity> {
         &self.velocity_in
@@ -226,10 +224,11 @@ impl DbspCircuit {
     /// # Examples
     ///
     /// ```no_run
+    /// use lille::DbspCircuit;
+    /// use lille::components::Block;
     /// let circuit = DbspCircuit::new().unwrap();
     /// let block_handle = circuit.block_in();
-    /// // Feed block data into the circuit
-    /// block_handle.insert(Block { x: 1, y: 2, z: 3 });
+    /// // Feed block data into the circuit using `block_handle`
     /// ```
     pub fn block_in(&self) -> &ZSetHandle<Block> {
         &self.block_in
@@ -242,6 +241,7 @@ impl DbspCircuit {
     /// # Examples
     ///
     /// ```no_run
+    /// use lille::DbspCircuit;
     /// let circuit = DbspCircuit::new().unwrap();
     /// let new_positions = circuit.new_position_out();
     /// // Read new positions from the output handle
@@ -258,6 +258,7 @@ impl DbspCircuit {
     /// # Examples
     ///
     /// ```no_run
+    /// use lille::DbspCircuit;
     /// let circuit = DbspCircuit::new().unwrap();
     /// let velocities = circuit.new_velocity_out();
     /// // Use `velocities` to read updated velocity data.
@@ -274,6 +275,7 @@ impl DbspCircuit {
     /// # Examples
     ///
     /// ```no_run
+    /// use lille::DbspCircuit;
     /// let circuit = DbspCircuit::new().unwrap();
     /// let highest_block_handle = circuit.highest_block_out();
     /// // Use `highest_block_handle` to read aggregated highest block data.
@@ -291,6 +293,8 @@ impl DbspCircuit {
     /// # Examples
     ///
     /// ```no_run
+    /// use lille::DbspCircuit;
+    /// let mut circuit = DbspCircuit::new().unwrap();
     /// circuit.clear_inputs();
     /// ```
     pub fn clear_inputs(&mut self) {
