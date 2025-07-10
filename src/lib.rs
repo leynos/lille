@@ -16,6 +16,7 @@ pub use constants::*;
 pub use actor::Actor;
 pub use components::{DdlogId, Health, Target, UnitType};
 pub use dbsp_circuit::{DbspCircuit, HighestBlockAt, NewPosition, Position};
+pub use dbsp_circuit::{NewVelocity, Velocity};
 pub use ddlog_sync::{apply_ddlog_deltas_system, cache_state_for_ddlog_system};
 pub use entity::{BadGuy, Entity};
 pub use logging::init as init_logging;
