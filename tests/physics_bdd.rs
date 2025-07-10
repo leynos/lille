@@ -98,6 +98,12 @@ fn vel(entity: i64, vx: f64, vy: f64, vz: f64) -> Velocity {
     vec![],
     vec![],
 )]
+#[case::velocity_without_position(
+    vec![],
+    vec![vel(3, 1.0, 2.0, 3.0)],
+    vec![],
+    vec![vel(3, 1.0, 2.0, 3.0 + lille::GRAVITY_PULL)],
+)]
 fn gravity_cases(
     #[case] positions: Vec<Position>,
     #[case] velocities: Vec<Velocity>,
