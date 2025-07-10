@@ -204,7 +204,7 @@ the data flow each tick.
    the `NewPosition` output stream and updates the `Transform` component of the
    corresponding entities in the ECS.
 
-The following sequence diagram summarises how the application constructs and
+The following sequence diagram summarizes how the application constructs and
 drives the circuit each tick.
 
 ```mermaid
