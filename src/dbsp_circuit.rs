@@ -98,6 +98,22 @@ pub struct DbspCircuit {
 }
 
 impl DbspCircuit {
+    /// Constructs a new `DbspCircuit` for simulating game world physics and environment state.
+    ///
+    /// Sets up a DBSP dataflow circuit with input handles for entity positions, velocities, and blocks.
+    /// The circuit computes updated velocities by applying gravity, joins them with positions to
+    /// produce new positions, and aggregates block data to determine the highest block at each
+    /// `(x, y)` coordinate. Returns input and output handles for external interaction.
+    ///
+    /// # Returns
+    ///
+    /// A new `DbspCircuit` instance on success, or a DBSP error if circuit construction fails.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// let circuit = DbspCircuit::new().unwrap();
+    /// ```
     pub fn new() -> Result<Self, dbsp::Error> {
         let (
             circuit,
@@ -169,41 +185,115 @@ impl DbspCircuit {
         self.circuit.step()
     }
 
-    /// Returns the handle used to feed position records into the circuit.
+    /// Returns a reference to the input handle for feeding position records into the circuit.
+    ///
+    /// Use this handle to provide entity position data for processing by the dataflow circuit.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// let circuit = DbspCircuit::new().unwrap();
+    /// let position_handle = circuit.position_in();
+    /// // Feed positions into the circuit using `position_handle`
+    /// ```
     pub fn position_in(&self) -> &ZSetHandle<Position> {
         &self.position_in
     }
 
-    /// Returns the handle used to feed velocity records into the circuit.
+    /// Returns a reference to the input handle for feeding velocity records into the circuit.
+    ///
+    /// Use this handle to provide entity velocity data for each simulation step.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// let circuit = DbspCircuit::new().unwrap();
+    /// let velocity_in = circuit.velocity_in();
+    /// velocity_in.insert(Velocity {
+    ///     entity: 1,
+    ///     vx: OrderedFloat(0.0),
+    ///     vy: OrderedFloat(0.0),
+    ///     vz: OrderedFloat(0.0),
+    /// });
+    /// ```
     pub fn velocity_in(&self) -> &ZSetHandle<Velocity> {
         &self.velocity_in
     }
 
-    /// Returns the handle used to feed block records into the circuit.
+    /// Returns a reference to the input handle for feeding block records into the circuit.
+    ///
+    /// Use this handle to provide block data as input for each computation step.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// let circuit = DbspCircuit::new().unwrap();
+    /// let block_handle = circuit.block_in();
+    /// // Feed block data into the circuit
+    /// block_handle.insert(Block { x: 1, y: 2, z: 3 });
+    /// ```
     pub fn block_in(&self) -> &ZSetHandle<Block> {
         &self.block_in
     }
 
-    /// Returns the output handle containing newly computed positions.
+    /// Returns a reference to the output handle for newly computed entity positions.
+    ///
+    /// The output handle provides access to the set of updated positions after each circuit step.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// let circuit = DbspCircuit::new().unwrap();
+    /// let new_positions = circuit.new_position_out();
+    /// // Read new positions from the output handle
+    /// ```
     pub fn new_position_out(&self) -> &OutputHandle<OrdZSet<NewPosition>> {
         &self.new_position_out
     }
 
-    /// Returns the output handle containing newly computed velocities.
+    /// Returns a reference to the output handle for newly computed velocities.
+    ///
+    /// The output contains updated velocity records for all entities after applying
+    /// the circuit's physics computations, such as gravity.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// let circuit = DbspCircuit::new().unwrap();
+    /// let velocities = circuit.new_velocity_out();
+    /// // Use `velocities` to read updated velocity data.
+    /// ```
     pub fn new_velocity_out(&self) -> &OutputHandle<OrdZSet<NewVelocity>> {
         &self.new_velocity_out
     }
 
-    /// Returns the output handle of the highest block aggregation.
+    /// Returns a reference to the output handle for the highest block at each (x, y) coordinate.
+    ///
+    /// The output contains `HighestBlockAt` records representing the maximum `z` value for each `(x, y)`
+    /// position in the input block data.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// let circuit = DbspCircuit::new().unwrap();
+    /// let highest_block_handle = circuit.highest_block_out();
+    /// // Use `highest_block_handle` to read aggregated highest block data.
+    /// ```
     pub fn highest_block_out(&self) -> &OutputHandle<OrdZSet<HighestBlockAt>> {
         &self.highest_block_out
     }
 
-    /// Clears all input collections.
+    /// Clears all input collections to remove accumulated records.
     ///
-    /// Input ZSets accumulate records across [`DbspCircuit::step`] calls.
-    /// Call this method after each frame, once outputs have been processed,
-    /// to prevent stale data from affecting subsequent computations.
+    /// Input ZSets retain data across [`DbspCircuit::step`] calls. Invoke this method after
+    /// processing outputs each frame to ensure that stale input data does not affect future
+    /// computations.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// circuit.clear_inputs();
+    /// ```
     pub fn clear_inputs(&mut self) {
         self.position_in.clear_input();
         self.velocity_in.clear_input();

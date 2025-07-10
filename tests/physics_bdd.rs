@@ -7,6 +7,16 @@ use approx::assert_relative_eq;
 use lille::dbsp_circuit::{NewPosition, NewVelocity, Position, Velocity};
 mod common;
 
+/// Tests that an entity's position and velocity are updated correctly under gravity in the physics circuit.
+///
+/// This test initialises an entity at a given position with zero velocity, steps the DBSP circuit,
+/// and asserts that the entity's new position and velocity reflect the effect of gravity.
+///
+/// # Examples
+///
+/// ```no_run
+/// entity_falls_due_to_gravity();
+/// ```
 #[test]
 fn entity_falls_due_to_gravity() {
     let mut circuit = common::new_circuit();
