@@ -204,6 +204,25 @@ the data flow each tick.
    the `NewPosition` output stream and updates the `Transform` component of the
    corresponding entities in the ECS.
 
+The following sequence diagram summarizes how the application constructs and
+drives the circuit each tick.
+
+```mermaid
+sequenceDiagram
+    participant App
+    participant DbspCircuit
+    participant DBSP_Engine as "DBSP Engine"
+    App->>DbspCircuit: new()
+    DbspCircuit->>DBSP_Engine: build circuit (add inputs/outputs)
+    DBSP_Engine-->>DbspCircuit: circuit handles
+    App->>DbspCircuit: position_in.push(Position)
+    App->>DbspCircuit: block_in.push(Block)
+    App->>DbspCircuit: step()
+    DbspCircuit->>DBSP_Engine: step()
+    DBSP_Engine-->>DbspCircuit: process streams
+    DbspCircuit-->>App: new_position_out, highest_block_out
+```
+
 ## Advantages and Limitations
 
 - **Advantages**: This pure-Rust approach provides a **simplified toolchain**,
