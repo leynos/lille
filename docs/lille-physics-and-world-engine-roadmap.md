@@ -37,26 +37,26 @@ parity.
 
 1. **Dependency Removal**:
 
-   - [ ] Remove the `ddlog` crate and all related FFI code (`lille_ddlog` stub).
+   - [x] Remove the `ddlog` crate and all related FFI code (`lille_ddlog` stub).
 
-   - [ ] Delete the `build.rs` elements script responsible for DDlog
+   - [x] Delete the `build.rs` elements script responsible for DDlog
      compilation.
 
-   - [ ] Remove all `.dl` rule files from the repository.
+   - [x] Remove all `.dl` rule files from the repository.
 
-   - [ ] Purge DDlog-specific CI steps, targets and build scripts.
+   - [x] Purge DDlog-specific CI steps, targets and build scripts.
 
 2. **Initial DBSP Circuit Implementation**:
 
-   - [ ] Create a new `dbsp_circuit` module to house the dataflow logic.
+   - [x] Create a new `dbsp_circuit` module to house the dataflow logic.
 
-   - [ ] Define the initial input streams (`Position`, `Block`) and output
+   - [x] Define the initial input streams (`Position`, `Block`) and output
      stream (`NewPosition`).
 
-   - [ ] Implement the most basic geometry rule: `HighestBlockAt` using
+   - [x] Implement the most basic geometry rule: `HighestBlockAt` using
      `group_by` and `aggregate`.
 
-   - [ ] Implement the simplest physics rule: apply `GRAVITY_PULL` to all
+   - [x] Implement the simplest physics rule: apply `GRAVITY_PULL` to all
      entities, ignoring floor support for this initial step.
 
 3. **Bevy Integration**:
@@ -71,7 +71,7 @@ parity.
    - [ ] Write the first BDD tests to verify that the headless Bevy app
      correctly applies the simple gravity rule from the DBSP circuit.
 
-   - [ ] Write the first unit tests for the `HighestBlockAt` operator in
+   - [x] Write the first unit tests for the `HighestBlockAt` operator in
      isolation.
 
 **Acceptance Criteria**:
