@@ -12,7 +12,7 @@
 //! Examples in this module use the following imports:
 //!
 //! ```rust,no_run
-//! use lille::prelude::*;
+//! # use lille::prelude::*;
 //! ```
 
 use dbsp::{
