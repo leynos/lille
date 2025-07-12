@@ -4,6 +4,7 @@ pub mod actor;
 pub mod components;
 pub mod constants;
 pub mod dbsp_circuit;
+pub mod dbsp_sync;
 pub mod ddlog_sync;
 pub mod entity;
 pub mod logging;
@@ -14,9 +15,10 @@ pub use constants::*;
 
 // Re-export commonly used items
 pub use actor::Actor;
-pub use components::{DdlogId, Health, Target, UnitType};
+pub use components::{DdlogId, Health, Target, UnitType, Velocity as VelocityComp};
 pub use dbsp_circuit::{DbspCircuit, HighestBlockAt, NewPosition, Position};
 pub use dbsp_circuit::{NewVelocity, Velocity};
+pub use dbsp_sync::{apply_dbsp_outputs_system, cache_state_for_dbsp_system, init_dbsp_system};
 pub use ddlog_sync::{apply_ddlog_deltas_system, cache_state_for_ddlog_system};
 pub use entity::{BadGuy, Entity};
 pub use logging::init as init_logging;
