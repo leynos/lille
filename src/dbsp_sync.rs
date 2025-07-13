@@ -1,43 +1,63 @@
 //! Synchronization systems for integrating DBSP circuits with Bevy ECS.
 //!
-//! This module provides Bevy systems that feed ECS component state into the
-//! [`DbspCircuit`], step the circuit, and apply the resulting updates back to
-//! entities. Use [`init_dbsp_system`] once during startup, then run
-//! [`cache_state_for_dbsp_system`] and [`apply_dbsp_outputs_system`] each tick.
+//! This module provides a [`DbspPlugin`] that synchronises Bevy ECS state with
+//! the [`DbspCircuit`]. The plugin inserts a [`DbspState`] resource, feeds
+//! component data into the circuit each frame, steps the circuit, and applies
+//! the results back to entities. The underlying systems are also exposed for
+//! tests.
 
 use std::collections::HashMap;
 
 use bevy::prelude::*;
 use log::error;
 
-use crate::components::{Block, DdlogId, Velocity as VelocityComp};
+use crate::components::{Block, DdlogId, VelocityComp};
 use crate::dbsp_circuit::{DbspCircuit, Position, Velocity};
+
+/// Bevy plugin that wires the DBSP circuit into the app.
+///
+/// Adding this plugin will insert [`DbspState`] as a non-send resource and
+/// register the systems necessary to synchronise entity state with the DBSP
+/// circuit on every frame.
+#[derive(Default)]
+pub struct DbspPlugin;
+
+impl Plugin for DbspPlugin {
+    fn build(&self, app: &mut App) {
+        if let Err(e) = init_dbsp_system(&mut app.world) {
+            error!("failed to init DBSP: {e}");
+            return;
+        }
+
+        app.add_systems(
+            Update,
+            (cache_state_for_dbsp_system, apply_dbsp_outputs_system).chain(),
+        );
+    }
+}
 
 /// Non-send resource wrapping the [`DbspCircuit`].
 ///
-/// This resource owns the circuit instance that performs all physics and game
-/// logic computations. It must live outside the ECS so that the DBSP runtime can
-/// maintain internal state across frames.
+/// [`DbspState`] owns the circuit instance that performs all physics and game
+/// logic computations. It is inserted by [`DbspPlugin`] and persists outside the
+/// ECS so the DBSP runtime can maintain state across frames. Systems use this
+/// resource to push inputs and read outputs each tick.
 pub struct DbspState {
     circuit: DbspCircuit,
-}
-
-impl Default for DbspState {
-    fn default() -> Self {
-        Self::new()
-    }
+    /// Cached mapping from DBSP entity IDs to Bevy `Entity` values.
+    ///
+    /// Rebuilding this map every frame can be costly, so it is updated when
+    /// [`cache_state_for_dbsp_system`] runs.
+    id_map: HashMap<i64, Entity>,
 }
 
 impl DbspState {
     /// Creates a new [`DbspState`] with an initialized circuit.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the DBSP circuit cannot be constructed.
-    pub fn new() -> Self {
-        Self {
-            circuit: DbspCircuit::new().expect("failed to build DBSP circuit"),
-        }
+    pub fn new() -> Result<Self, dbsp::Error> {
+        Ok(Self {
+            circuit: DbspCircuit::new()?,
+            id_map: HashMap::new(),
+        })
     }
 }
 
@@ -45,8 +65,10 @@ impl DbspState {
 ///
 /// Call this once during Bevy startup before running any DBSP synchronization
 /// systems.
-pub fn init_dbsp_system(world: &mut World) {
-    world.insert_non_send_resource(DbspState::default());
+pub fn init_dbsp_system(world: &mut World) -> Result<(), dbsp::Error> {
+    let state = DbspState::new()?;
+    world.insert_non_send_resource(state);
+    Ok(())
 }
 
 /// Caches current ECS state into the DBSP circuit inputs.
@@ -54,15 +76,17 @@ pub fn init_dbsp_system(world: &mut World) {
 /// This system gathers `Transform`, optional `Velocity`, and `Block` components
 /// and pushes them into the circuit's input handles.
 pub fn cache_state_for_dbsp_system(
-    state: NonSendMut<DbspState>,
-    entity_query: Query<(&DdlogId, &Transform, Option<&VelocityComp>)>,
+    mut state: NonSendMut<DbspState>,
+    entity_query: Query<(Entity, &DdlogId, &Transform, Option<&VelocityComp>)>,
     block_query: Query<&Block>,
 ) {
     for block in &block_query {
         state.circuit.block_in().push(block.clone(), 1);
     }
 
-    for (id, transform, vel) in &entity_query {
+    state.id_map.clear();
+    for (entity, id, transform, vel) in &entity_query {
+        state.id_map.insert(id.0, entity);
         state.circuit.position_in().push(
             Position {
                 entity: id.0,
@@ -93,19 +117,13 @@ pub fn cache_state_for_dbsp_system(
 /// reapplying stale data.
 pub fn apply_dbsp_outputs_system(
     mut state: NonSendMut<DbspState>,
-    id_query: Query<(Entity, &DdlogId)>,
     mut write_query: Query<(Entity, &mut Transform, Option<&mut VelocityComp>), With<DdlogId>>,
 ) {
-    if let Err(e) = state.circuit.step() {
-        error!("DBSP step failed: {e}");
-        return;
-    }
-
-    let id_map: HashMap<i64, Entity> = id_query.iter().map(|(e, id)| (id.0, e)).collect();
+    state.circuit.step().expect("DBSP step failed");
 
     let positions = state.circuit.new_position_out().consolidate();
     for (pos, _, _) in positions.iter() {
-        if let Some(&entity) = id_map.get(&pos.entity) {
+        if let Some(&entity) = state.id_map.get(&pos.entity) {
             if let Ok((_, mut transform, _)) = write_query.get_mut(entity) {
                 transform.translation.x = pos.x.into_inner() as f32;
                 transform.translation.y = pos.y.into_inner() as f32;
@@ -116,7 +134,7 @@ pub fn apply_dbsp_outputs_system(
 
     let velocities = state.circuit.new_velocity_out().consolidate();
     for (vel, _, _) in velocities.iter() {
-        if let Some(&entity) = id_map.get(&vel.entity) {
+        if let Some(&entity) = state.id_map.get(&vel.entity) {
             if let Ok((_, _, Some(mut v))) = write_query.get_mut(entity) {
                 v.vx = vel.vx.into_inner() as f32;
                 v.vy = vel.vy.into_inner() as f32;
