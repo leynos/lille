@@ -4,6 +4,9 @@ use lille::{
     VelocityComp as Velocity, GRAVITY_PULL,
 };
 
+/// Verifies that the ECS-DBSP round trip applies gravity to entity position and
+/// velocity.
+
 #[test]
 fn ecs_dbsp_round_trip_applies_gravity() {
     let mut app = App::new();
