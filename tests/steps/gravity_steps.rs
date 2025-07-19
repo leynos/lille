@@ -1,3 +1,9 @@
+//! Cucumber step definitions for gravity physics simulation tests.
+//!
+//! This module provides BDD steps that verify the correct application of
+//! gravity to entities within a headless Bevy application using the
+//! `DbspPlugin`.
+
 use bevy::prelude::*;
 use cucumber::{given, then, when};
 use lille::{DbspPlugin, DdlogId, VelocityComp, GRAVITY_PULL};
@@ -9,7 +15,7 @@ pub struct PhysicsWorld {
 }
 
 #[given("a headless app with a single unsupported entity")]
-fn given_headless_app(world: &mut PhysicsWorld) {
+async fn given_headless_app(world: &mut PhysicsWorld) {
     world.app = App::new();
     world
         .app
@@ -29,20 +35,28 @@ fn given_headless_app(world: &mut PhysicsWorld) {
 }
 
 #[when("the simulation ticks once")]
-fn when_tick(world: &mut PhysicsWorld) {
+async fn when_tick(world: &mut PhysicsWorld) {
     world.app.update();
 }
 
 #[then(expr = "the entity's z position should be {float}")]
-fn then_check_z(world: &mut PhysicsWorld, expected_z: f32) {
+async fn then_check_z(world: &mut PhysicsWorld, expected_z: f32) {
     let entity = world.entity.expect("entity not spawned");
-    let transform = world.app.world.get::<Transform>(entity).unwrap();
+    let transform = world
+        .app
+        .world
+        .get::<Transform>(entity)
+        .expect("entity should have Transform component");
     let actual_z = transform.translation.z;
     assert!(
         (actual_z - expected_z).abs() < f32::EPSILON,
         "expected z {expected_z}, got {actual_z}"
     );
     // Ensure velocity was updated by gravity as well
-    let vel = world.app.world.get::<VelocityComp>(entity).unwrap();
+    let vel = world
+        .app
+        .world
+        .get::<VelocityComp>(entity)
+        .expect("entity should have VelocityComp component");
     assert!((vel.vz - GRAVITY_PULL as f32).abs() < f32::EPSILON);
 }
