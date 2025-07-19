@@ -1100,8 +1100,9 @@ aligned with what is needed.
 
 [^18]: *Quickstart* — Cucumber Rust Book, accessed on 14 July 2025,
     <https://cucumber-rs.github.io/cucumber/current/quickstart.html>
-    *A Beginner’s Guide to Cucumber in Rust* — Florian Reinhard, accessed on
-    14 July 2025,
+
+[^19]: *A Beginner’s Guide to Cucumber in Rust* — Florian Reinhard, accessed
+    on 14 July 2025,
     <https://www.florianreinhard.de/cucumber-in-rust-beginners-tutorial/>
 
 [^20]: Quickstart - Cucumber Rust Book, accessed on 14 July 2025,
