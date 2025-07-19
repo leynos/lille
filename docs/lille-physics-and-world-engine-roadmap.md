@@ -7,8 +7,8 @@ world-interaction engine. The strategy is to build a highly performant,
 maintainable, and extensible simulation core by leveraging a declarative,
 pure-Rust dataflow architecture powered by the DBSP library.
 
-This roadmap supersedes all previous plans based on DDlog. The migration to DBSP
-is a strategic decision to simplify the toolchain, improve type safety and
+This roadmap supersedes all previous plans based on DDlog. The migration to
+DBSP is a strategic decision to simplify the toolchain, improve type safety and
 performance, and enable a more robust testing strategy. The core design is
 predicated on the principles of incremental dataflow, with a clean separation
 between the game's state (managed by Bevy ECS) and its logic (executed within a
@@ -61,14 +61,14 @@ parity.
 
 3. **Bevy Integration**:
 
-   - [ ] Implement the Bevy systems responsible for marshalling data to and from
+   - [x] Implement the Bevy systems responsible for marshalling data to and from
      the new DBSP circuit.
 
-   - [ ] Ensure the `ECS -> DBSP -> ECS` loop runs correctly each tick.
+   - [x] Ensure the `ECS -> DBSP -> ECS` loop runs correctly each tick.
 
 4. **Testing Foundation**:
 
-   - [ ] Write the first BDD tests to verify that the headless Bevy app
+   - [x] Write the first BDD tests to verify that the headless Bevy app
      correctly applies the simple gravity rule from the DBSP circuit.
 
    - [x] Write the first unit tests for the `HighestBlockAt` operator in
