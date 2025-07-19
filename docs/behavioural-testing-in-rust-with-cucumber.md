@@ -1097,7 +1097,6 @@ aligned with what is needed.
 
 [^16]: cucumber - Rust - [Docs.rs](http://Docs.rs), accessed on 14 July 2025,
     <https://docs.rs/cucumber>
-
     accessed on July 14, 2025, <https://crates.io/crates/cucumber>
 
 [^18]: *Quickstart* — Cucumber Rust Book, accessed on 14 July 2025,
@@ -1126,8 +1125,8 @@ aligned with what is needed.
     KailashPathak - Medium, accessed on 14 July 2025,
     <https://kailash-pathak.medium.com/cucumber-best-practices-to-follow-for-efficient-bdd-testing-b3eb1c7e9757>
 
-[^27]: Rust Solutions - WireMock, accessed on July 14, 2025, <https://
-    wiremock.org/> docs/solutions/rust/>
+[^27]: Rust Solutions - WireMock, accessed on 14 July 2025,
+    <https://wiremock.org/docs/solutions/rust/>
 
 [^30]: Common Challenges in Cucumber Testing and How to Overcome Them - Medium,
     accessed on July 14, 2025,
@@ -1139,8 +1138,8 @@ aligned with what is needed.
 [^32]: CLI (command-line interface) - Cucumber Rust Book, accessed on
     14 July 2025, <https://cucumber-rs.github.io/cucumber/main/cli.html>
 
-[^33]: Continuous Integration - Cucumber, accessed on 14 July 2025, <https://
-    cucumber.io/docs/guides/continuous-integration>
+[^33]: Continuous Integration - Cucumber, accessed on 14 July 2025,
+    <https://cucumber.io/docs/guides/continuous-integration>
 
 [^35]: Setting up effective CI/CD for Rust projects - a short primer -
     [shuttle.dev](http://shuttle.dev), accessed on 14 July 2025,
