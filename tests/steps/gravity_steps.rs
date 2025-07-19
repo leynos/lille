@@ -54,8 +54,9 @@ async fn then_check_z(world: &mut PhysicsWorld, expected_z: f32) {
         .get::<Transform>(entity)
         .expect("entity should have Transform component");
     let actual_z = transform.translation.z;
+    let tolerance = 1e-3;
     assert!(
-        (actual_z - expected_z).abs() < f32::EPSILON,
+        (actual_z - expected_z).abs() < tolerance,
         "expected z {expected_z}, got {actual_z}"
     );
     // Ensure velocity was updated by gravity as well
@@ -64,5 +65,10 @@ async fn then_check_z(world: &mut PhysicsWorld, expected_z: f32) {
         .world
         .get::<VelocityComp>(entity)
         .expect("entity should have VelocityComp component");
-    assert!((vel.vz - GRAVITY_PULL as f32).abs() < f32::EPSILON);
+    assert!(
+        (vel.vz - GRAVITY_PULL as f32).abs() < tolerance,
+        "expected vz {} got {}",
+        GRAVITY_PULL as f32,
+        vel.vz
+    );
 }

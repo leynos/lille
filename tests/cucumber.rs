@@ -10,5 +10,7 @@ mod steps;
 
 #[tokio::main]
 async fn main() {
-    PhysicsWorld::run("tests/features").await;
+    let features = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/features");
+    let features = features.to_str().expect("valid features path");
+    PhysicsWorld::run(features).await;
 }
