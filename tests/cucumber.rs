@@ -6,9 +6,7 @@
 use cucumber::World;
 use steps::gravity_steps::PhysicsWorld;
 
-mod steps {
-    pub mod gravity_steps;
-}
+mod steps;
 
 #[tokio::main]
 async fn main() {
