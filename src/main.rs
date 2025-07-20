@@ -4,10 +4,7 @@ use bevy::log::LogPlugin;
 use bevy::prelude::*;
 use clap::Parser;
 use color_eyre::eyre::Result;
-use lille::{
-    apply_ddlog_deltas_system, cache_state_for_ddlog_system, init_logging,
-    init_world_handle_system, spawn_world_system,
-};
+use lille::{init_logging, spawn_world_system, DbspPlugin};
 
 /// A realtime strategy game
 #[derive(Parser)]
@@ -28,16 +25,8 @@ fn main() -> Result<()> {
 
     App::new()
         .add_plugins(DefaultPlugins.build().disable::<LogPlugin>())
-        .add_systems(Startup, init_world_handle_system)
-        .add_systems(Startup, spawn_world_system.after(init_world_handle_system))
-        .add_systems(
-            Startup,
-            cache_state_for_ddlog_system.after(spawn_world_system),
-        )
-        .add_systems(
-            Update,
-            (cache_state_for_ddlog_system, apply_ddlog_deltas_system).chain(),
-        )
+        .add_plugins(DbspPlugin)
+        .add_systems(Startup, spawn_world_system)
         .run();
     Ok(())
 }
