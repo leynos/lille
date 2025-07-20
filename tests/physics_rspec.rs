@@ -33,6 +33,9 @@ impl Default for PhysicsWorld {
 
 impl PhysicsWorld {
     fn setup(&mut self) {
+        if self.entity.is_some() {
+            return; // Already set up
+        }
         let mut app = self.app.lock().expect("app lock");
         app.add_plugins(MinimalPlugins).add_plugins(DbspPlugin);
         let id = app
@@ -51,6 +54,8 @@ impl PhysicsWorld {
         app.update();
     }
 
+    /// Asserts the entity's z-position matches `expected_z` and its vertical
+    /// velocity equals `GRAVITY_PULL` (indicating gravity effect).
     fn assert_z_and_velocity(&self, expected_z: f32) {
         let app = self.app.lock().expect("app lock");
         let entity = self.entity.expect("entity not spawned");

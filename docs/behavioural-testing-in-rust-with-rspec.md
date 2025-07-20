@@ -1,8 +1,8 @@
 # Behavioural testing in Rust with rust-rspec
 
-A short overview of the `rspec` crate for behaviour-driven tests is presented
-here. The framework offers a simple `given`/`when`/`then` syntax that clarifies
-test intent.
+A short overview of the `rspec` crate for behaviour-driven tests is provided.
+The framework offers a simple `given`/`when`/`then` syntax that clarifies test
+intent.
 
 ## Adding the dependency
 
