@@ -1,8 +1,7 @@
 # Behavioural testing in Rust with rust-rspec
 
-A short overview of the `rspec` crate for behaviour-driven tests is provided.
-The framework offers a simple `given`/`when`/`then` syntax that clarifies test
-intent.
+The `rspec` crate enables behaviour-driven tests in Rust. The framework offers
+a simple `given`/`when`/`then` syntax that clarifies test intent.
 
 ## Adding the dependency
 
@@ -19,7 +18,12 @@ A minimal suite uses an environment struct to share mutable state between
 steps. The `before_all` and `before_each` hooks prepare that state before
 expectations are run.
 
+The following example demonstrates a basic RSpec test with shared state. It
+shows how `before_each` hooks initialise and mutate that state during each
+phase.
+
 ```rust
+use rspec;
 #[derive(Clone, Default, Debug)]
 struct Env {
     counter: i32,
@@ -37,4 +41,4 @@ fn example() {
 }
 ```
 
-Behavioural tests under `tests/` demonstrate real-world usage.
+The behavioural tests under `tests/` show real-world usage examples.

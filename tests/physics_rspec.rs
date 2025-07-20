@@ -1,7 +1,8 @@
 //! Behaviour-driven tests using rust-rspec.
 //!
-//! These tests verify that unsupported entities fall under gravity in a
-//! headless Bevy application.
+//! These tests verify physics behaviour in a headless Bevy application.
+//! The tests use the rspec framework to provide BDD-style test structure for
+//! physics simulation scenarios, particularly gravity effects on entities.
 
 use bevy::prelude::*;
 use lille::{DbspPlugin, DdlogId, VelocityComp, GRAVITY_PULL};
@@ -55,7 +56,7 @@ impl PhysicsWorld {
     }
 
     /// Asserts the entity's z-position matches `expected_z` and its vertical
-    /// velocity equals `GRAVITY_PULL` (indicating gravity effect).
+    /// velocity equals the expected gravity-induced value.
     fn assert_z_and_velocity(&self, expected_z: f32) {
         let app = self.app.lock().expect("app lock");
         let entity = self.entity.expect("entity not spawned");
@@ -73,10 +74,11 @@ impl PhysicsWorld {
             .world
             .get::<VelocityComp>(entity)
             .expect("entity should have VelocityComp component");
+        let expected_vz = GRAVITY_PULL as f32; // start velocity is 0.0
         assert!(
-            (vel.vz - GRAVITY_PULL as f32).abs() < tolerance,
+            (vel.vz - expected_vz).abs() < tolerance,
             "expected vz {} got {}",
-            GRAVITY_PULL as f32,
+            expected_vz,
             vel.vz
         );
     }
