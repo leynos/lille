@@ -51,7 +51,7 @@ impl PhysicsWorld {
         app.update();
     }
 
-    fn assert_z(&self, expected_z: f32) {
+    fn assert_z_and_velocity(&self, expected_z: f32) {
         let app = self.app.lock().expect("app lock");
         let entity = self.entity.expect("entity not spawned");
         let transform = app
@@ -87,7 +87,7 @@ fn unsupported_entity_falls() {
             ctx.when("the simulation ticks once", |ctx| {
                 ctx.before_each(|world| world.tick());
                 ctx.then("the entity's z position should be 0.0", |world| {
-                    world.assert_z(0.0);
+                    world.assert_z_and_velocity(0.0);
                 });
             });
         },
