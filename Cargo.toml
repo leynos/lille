@@ -41,8 +41,5 @@ ordered-float = { workspace = true }
 serial_test = "3.2"
 mockall = "0.13.1"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
-cucumber = "0.20"
+rspec = "1.0"
 
-[[test]]
-name = "cucumber"
-harness = false
