@@ -42,13 +42,11 @@ async fn when_tick(world: &mut PhysicsWorld) {
     // DBSP spawns its own Tokio runtime and panics if `block_on` is called
     // within an existing runtime. Running Bevy's update on a dedicated thread
     // sidesteps this restriction without requiring additional async juggling.
-    let mut app = std::mem::replace(&mut world.app, App::new());
-    world.app = std::thread::spawn(move || {
-        app.update();
-        app
-    })
-    .join()
-    .expect("update thread panicked");
+    // Temporarily leave the async context so DBSP can spawn its own Tokio
+    // runtime without causing nested runtime panics.
+    tokio::task::block_in_place(|| {
+        world.app.update();
+    });
 }
 
 #[then(expr = "the entity's z position should be {float}")]
