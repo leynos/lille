@@ -7,7 +7,6 @@
 use bevy::prelude::*;
 use cucumber::{given, then, when};
 use lille::{DbspPlugin, DdlogId, VelocityComp, GRAVITY_PULL};
-use tokio::task;
 
 #[derive(Debug, Default, cucumber::World)]
 pub struct PhysicsWorld {
@@ -40,9 +39,16 @@ async fn when_tick(world: &mut PhysicsWorld) {
     // DBSP uses its own Tokio runtime internally. Running `update` directly
     // inside the async context would nest runtimes and panic. `block_in_place`
     // executes the update on a dedicated thread, avoiding the conflict.
-    task::block_in_place(|| {
-        world.app.update();
-    });
+    // DBSP spawns its own Tokio runtime and panics if `block_on` is called
+    // within an existing runtime. Running Bevy's update on a dedicated thread
+    // sidesteps this restriction without requiring additional async juggling.
+    let mut app = std::mem::replace(&mut world.app, App::new());
+    world.app = std::thread::spawn(move || {
+        app.update();
+        app
+    })
+    .join()
+    .expect("update thread panicked");
 }
 
 #[then(expr = "the entity's z position should be {float}")]
