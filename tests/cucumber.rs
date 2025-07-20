@@ -8,7 +8,9 @@ use steps::gravity_steps::PhysicsWorld;
 
 mod steps;
 
-#[tokio::main(flavor = "current_thread")]
+// The DBSP circuit spawns its own Tokio runtime. To allow `block_in_place`
+// within step definitions, use the default multi-threaded runtime here.
+#[tokio::main]
 async fn main() {
     let features = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/features");
     let features = features.to_str().expect("valid features path");
