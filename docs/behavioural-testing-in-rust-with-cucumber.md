@@ -251,6 +251,19 @@ async fn main() {
 }
 ```
 
+Frameworks such as Bevy use a single-threaded event loop. To avoid nested Tokio
+runtimes during integration tests, annotate the `main` function with
+`#[tokio::main(flavor = "current_thread")]` and run Cucumber explicitly:
+
+```rust
+#[tokio::main(flavor = "current_thread")]
+async fn main() {
+    MyWorld::cucumber()
+        .filter_run_and_exit("tests/features", |_, _, sc| sc.tags.contains("serial"))
+        .await;
+}
+```
+
 At this point, there is a complete, albeit empty, test suite. Running
 `cargo test --test cucumber` will compile the runner, which will then discover
 `.feature` files in `tests/features`, find no matching steps, and report them
@@ -1133,7 +1146,8 @@ aligned with what is needed.
     <https://medium.com/@realtalkdev/common-challenges-in-cucumber-testing-and-how-to-overcome-them-dc95fffb43c8>
 
 [^31]: Cucumber in cucumber - Rust - [Docs.rs](http://Docs.rs), accessed on
-    14 July 2025, <https://docs.rs/cucumber/latest/cucumber/struct.Cucumber.html>
+    14 July 2025,
+    <https://docs.rs/cucumber/latest/cucumber/struct.Cucumber.html>
 
 [^32]: CLI (command-line interface) - Cucumber Rust Book, accessed on
     14 July 2025, <https://cucumber-rs.github.io/cucumber/main/cli.html>
