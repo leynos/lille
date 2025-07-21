@@ -74,7 +74,9 @@ impl PhysicsWorld {
             .world
             .get::<VelocityComp>(entity)
             .expect("entity should have VelocityComp component");
-        let expected_vz = GRAVITY_PULL as f32; // start velocity is 0.0
+        // VelocityComp::default() yields zero initial velocity. The expected
+        // value after one tick equals that baseline plus the gravity pull.
+        let expected_vz = VelocityComp::default().vz + GRAVITY_PULL as f32;
         assert!(
             (vel.vz - expected_vz).abs() < tolerance,
             "expected vz {} got {}",
