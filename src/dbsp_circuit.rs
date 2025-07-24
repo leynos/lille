@@ -192,8 +192,8 @@ impl DbspCircuit {
                             z: OrderedFloat(
                                 z as f64
                                     + 1.0
-                                    + BLOCK_CENTRE_OFFSET * grad_x.into_inner() as f64
-                                    + BLOCK_CENTRE_OFFSET * grad_y.into_inner() as f64,
+                                    + BLOCK_CENTRE_OFFSET * grad_x.into_inner()
+                                    + BLOCK_CENTRE_OFFSET * grad_y.into_inner(),
                             ),
                         })
                     },

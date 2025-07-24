@@ -9,7 +9,7 @@ fn blk(id: i64, x: i32, y: i32, z: i32) -> Block {
     Block { id, x, y, z }
 }
 
-fn slope(block_id: i64, gx: f32, gy: f32) -> BlockSlope {
+fn slope(block_id: i64, gx: f64, gy: f64) -> BlockSlope {
     BlockSlope {
         block_id,
         grad_x: gx.into(),
@@ -24,6 +24,9 @@ fn fh(x: i32, y: i32, z: f64) -> FloorHeightAt {
 #[rstest]
 #[case(vec![blk(1,0,0,0)], vec![], vec![fh(0,0,1.0)])]
 #[case(vec![blk(1,0,0,0)], vec![slope(1,1.0,0.0)], vec![fh(0,0,1.5)])]
+#[case(vec![blk(1,0,0,0), blk(2,0,0,1)], vec![], vec![fh(0,0,2.0)])] // highest block wins
+#[case(vec![blk(1,0,0,0)], vec![slope(1,-1.0,0.0)], vec![fh(0,0,0.5)])] // negative slope
+#[case(vec![blk(1,0,0,0)], vec![slope(1,0.0,0.0)], vec![fh(0,0,1.0)])] // zero slope
 fn floor_height_cases(
     #[case] blocks: Vec<Block>,
     #[case] slopes: Vec<BlockSlope>,

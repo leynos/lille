@@ -61,8 +61,8 @@ impl WorldHandle {
     pub fn floor_height_at(block: &Block, slope: Option<&BlockSlope>, x: f32, y: f32) -> f32 {
         let base = block.z as f32 + 1.0;
         if let Some(s) = slope {
-            base + (x - block.x as f32) * s.grad_x.into_inner()
-                + (y - block.y as f32) * s.grad_y.into_inner()
+            base + (x - block.x as f32) * s.grad_x.into_inner() as f32
+                + (y - block.y as f32) * s.grad_y.into_inner() as f32
         } else {
             base
         }

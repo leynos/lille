@@ -31,7 +31,7 @@ impl Default for Env {
 
 impl Env {
     fn push(&self, block: Block, slope: Option<BlockSlope>) {
-        let c = &mut *self.circuit.lock().unwrap();
+        let c = &mut *self.circuit.lock().expect("mutex poisoned");
         c.block_in().push(block, 1);
         if let Some(s) = slope {
             c.block_slope_in().push(s, 1);
@@ -39,11 +39,15 @@ impl Env {
     }
 
     fn step(&self) {
-        self.circuit.lock().unwrap().step().unwrap();
+        self.circuit
+            .lock()
+            .expect("mutex poisoned")
+            .step()
+            .expect("step failed");
     }
 
     fn output(&self) -> Vec<FloorHeightAt> {
-        let mut c = self.circuit.lock().unwrap();
+        let mut c = self.circuit.lock().expect("mutex poisoned");
         let vals: Vec<_> = c
             .floor_height_out()
             .consolidate()
@@ -71,8 +75,8 @@ fn slope_block_outputs_height() {
                     },
                     Some(BlockSlope {
                         block_id: 1,
-                        grad_x: 1.0f32.into(),
-                        grad_y: 0.0f32.into(),
+                        grad_x: 1.0.into(),
+                        grad_y: 0.0.into(),
                     }),
                 );
                 env.step();
