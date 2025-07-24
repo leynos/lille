@@ -21,7 +21,7 @@ use dbsp::{
 use ordered_float::OrderedFloat;
 use size_of::SizeOf;
 
-use crate::components::Block;
+use crate::components::{Block, BlockSlope};
 use crate::GRAVITY_PULL;
 
 use rkyv::{Archive, Deserialize, Serialize};
@@ -95,14 +95,37 @@ pub struct HighestBlockAt {
     pub z: i32,
 }
 
+#[derive(
+    Archive,
+    Serialize,
+    Deserialize,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    Default,
+    SizeOf,
+)]
+#[archive_attr(derive(Ord, PartialOrd, Eq, PartialEq, Hash))]
+pub struct FloorHeightAt {
+    pub x: i32,
+    pub y: i32,
+    pub z: OrderedFloat<f64>,
+}
+
 pub struct DbspCircuit {
     circuit: CircuitHandle,
     position_in: ZSetHandle<Position>,
     velocity_in: ZSetHandle<Velocity>,
     block_in: ZSetHandle<Block>,
+    block_slope_in: ZSetHandle<BlockSlope>,
     new_position_out: OutputHandle<OrdZSet<NewPosition>>,
     new_velocity_out: OutputHandle<OrdZSet<NewVelocity>>,
     highest_block_out: OutputHandle<OrdZSet<HighestBlockAt>>,
+    floor_height_out: OutputHandle<OrdZSet<FloorHeightAt>>,
 }
 
 impl DbspCircuit {
@@ -130,24 +153,63 @@ impl DbspCircuit {
                 position_in,
                 velocity_in,
                 block_in,
+                block_slope_in,
                 new_position_out,
                 new_velocity_out,
                 highest_block_out,
+                floor_height_out,
             ),
         ) = RootCircuit::build(|circuit| {
             let (positions, position_in) = circuit.add_input_zset::<Position>();
             let (velocities, velocity_in) = circuit.add_input_zset::<Velocity>();
             let (blocks, block_in) = circuit.add_input_zset::<Block>();
+            let (slopes, block_slope_in) = circuit.add_input_zset::<BlockSlope>();
 
-            let highest =
-                blocks
-                    .map_index(|b| ((b.x, b.y), b.z))
-                    .aggregate(Max)
-                    .map(|((x, y), z)| HighestBlockAt {
-                        x: *x,
-                        y: *y,
-                        z: *z,
-                    });
+            let highest_pair = blocks
+                .map_index(|b| ((b.x, b.y), (b.z, b.id)))
+                .aggregate(Max)
+                .map(|((x, y), (z, id))| {
+                    (
+                        HighestBlockAt {
+                            x: *x,
+                            y: *y,
+                            z: *z,
+                        },
+                        *id,
+                    )
+                });
+
+            let highest = highest_pair.map(|(hb, _id)| hb.clone());
+
+            let with_slope = highest_pair
+                .map_index(|(hb, id)| (*id, (hb.x, hb.y, hb.z)))
+                .join(
+                    &slopes.map_index(|bs| (bs.block_id, (bs.grad_x, bs.grad_y))),
+                    |_, &(x, y, z), &(grad_x, grad_y)| {
+                        let base = z as f64 + 1.0;
+                        let x_in_block = 0.5f64;
+                        let y_in_block = 0.5f64;
+                        FloorHeightAt {
+                            x,
+                            y,
+                            z: OrderedFloat(
+                                base + x_in_block * grad_x.into_inner()
+                                    + y_in_block * grad_y.into_inner(),
+                            ),
+                        }
+                    },
+                );
+
+            let without_slope = highest_pair
+                .map_index(|(hb, id)| (*id, (hb.x, hb.y, hb.z)))
+                .antijoin(&slopes.map_index(|bs| (bs.block_id, ())))
+                .map(|(_id, &(x, y, z))| FloorHeightAt {
+                    x,
+                    y,
+                    z: OrderedFloat(z as f64 + 1.0),
+                });
+
+            let floor_height = with_slope.sum(&[without_slope]);
 
             let new_vel = velocities.map(|v| Velocity {
                 entity: v.entity,
@@ -172,9 +234,11 @@ impl DbspCircuit {
                 position_in,
                 velocity_in,
                 block_in,
+                block_slope_in,
                 new_pos.output(),
                 new_vel.output(),
                 highest.output(),
+                floor_height.output(),
             ))
         })?;
 
@@ -183,9 +247,11 @@ impl DbspCircuit {
             position_in,
             velocity_in,
             block_in,
+            block_slope_in,
             new_position_out,
             new_velocity_out,
             highest_block_out,
+            floor_height_out,
         })
     }
 
@@ -249,6 +315,11 @@ impl DbspCircuit {
         &self.block_in
     }
 
+    /// Returns a reference to the input handle for block slope records.
+    pub fn block_slope_in(&self) -> &ZSetHandle<BlockSlope> {
+        &self.block_slope_in
+    }
+
     /// Returns a reference to the output handle for newly computed entity positions.
     ///
     /// The output handle provides access to the set of updated positions after each circuit step.
@@ -299,6 +370,11 @@ impl DbspCircuit {
         &self.highest_block_out
     }
 
+    /// Returns a reference to the output handle for calculated floor heights.
+    pub fn floor_height_out(&self) -> &OutputHandle<OrdZSet<FloorHeightAt>> {
+        &self.floor_height_out
+    }
+
     /// Clears all input collections to remove accumulated records.
     ///
     /// Input ZSets retain data across [`DbspCircuit::step`] calls. Invoke this method after
@@ -316,5 +392,6 @@ impl DbspCircuit {
         self.position_in.clear_input();
         self.velocity_in.clear_input();
         self.block_in.clear_input();
+        self.block_slope_in.clear_input();
     }
 }

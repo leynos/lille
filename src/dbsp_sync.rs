@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use bevy::prelude::*;
 use log::error;
 
-use crate::components::{Block, DdlogId, VelocityComp};
+use crate::components::{Block, BlockSlope, DdlogId, VelocityComp};
 use crate::dbsp_circuit::{DbspCircuit, Position, Velocity};
 
 /// Bevy plugin that wires the DBSP circuit into the app.
@@ -78,10 +78,13 @@ pub fn init_dbsp_system(world: &mut World) -> Result<(), dbsp::Error> {
 pub fn cache_state_for_dbsp_system(
     mut state: NonSendMut<DbspState>,
     entity_query: Query<(Entity, &DdlogId, &Transform, Option<&VelocityComp>)>,
-    block_query: Query<&Block>,
+    block_query: Query<(&Block, Option<&BlockSlope>)>,
 ) {
-    for block in &block_query {
+    for (block, slope) in &block_query {
         state.circuit.block_in().push(block.clone(), 1);
+        if let Some(s) = slope {
+            state.circuit.block_slope_in().push(s.clone(), 1);
+        }
     }
 
     state.id_map.clear();

@@ -29,8 +29,8 @@ source of truth for the state of the world.
 
 ## 2. Architectural Overview
 
-The architecture creates a clean separation between the *state* of the world (in
-Bevy) and the *logic* that governs it (in DBSP).
+The architecture creates a clean separation between the *state* of the world
+(in Bevy) and the *logic* that governs it (in DBSP).
 
 The data flows in a continuous loop each simulation tick:
 
@@ -43,8 +43,9 @@ The data flows in a continuous loop each simulation tick:
    `circuit`.
 
 3. **Incremental Computation**: The `circuit.step()` method is called. DBSP
-   propagates the input changes through the entire dataflow graph, incrementally
-   re-calculating all derived facts and producing new output streams.
+   propagates the input changes through the entire dataflow graph,
+   incrementally re-calculating all derived facts and producing new output
+   streams.
 
 4. **ECS State Write**: Bevy systems read the records from the circuit's output
    streams (e.g., `NewPosition`, `NewVelocity`) and apply these changes back to
@@ -77,8 +78,10 @@ The dataflow is as follows:
 
 2. **Floor Height Calculation**: The resulting `HighestBlockAt` stream is joined
    with `BlockSlope` data. A `map` operator then calculates the precise
-   `z_floor` coordinate. If a slope is present, it uses the plane equation;
-   otherwise, it assumes a flat surface one unit above the block.
+   `z_floor` coordinate. Slopes are joined using the block `id` and, for now,
+   the height is evaluated at the centre of the block (`0.5, 0.5`) because the
+   entity-specific offset is not yet available. If no slope exists the floor is
+   flat one unit above the block.
 
 ### 3.2. Entity State: Standing vs. Unsupported
 
@@ -120,8 +123,8 @@ declarative dataflow model.
   entity.
 
 - **State-driven Decisions**: More complex logic can be built by composing
-  operators. For example, to make an agent flee when its health is low, we would
-  `join` entities with their `Health` component, `filter` for those where
+  operators. For example, to make an agent flee when its health is low, we
+  would `join` entities with their `Health` component, `filter` for those where
   `health < threshold`, and then `join` the result with the fleeing-behaviour
   sub-graph.
 
