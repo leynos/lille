@@ -79,9 +79,9 @@ The dataflow is as follows:
 2. **Floor Height Calculation**: The resulting `HighestBlockAt` stream is joined
    with `BlockSlope` data. A `map` operator then calculates the precise
    `z_floor` coordinate. Slopes are joined using the block `id` and, for now,
-   the height is evaluated at the centre of the block (`0.5, 0.5`) because the
-   entity-specific offset is not yet available. If no slope exists the floor is
-   flat one unit above the block.
+   the height is evaluated at the constant `BLOCK_CENTRE_OFFSET` (currently
+   `0.5`) because the entity-specific offset is not yet available. If no slope
+   exists the floor is flat one unit above the block.
 
 ### 3.2. Entity State: Standing vs. Unsupported
 

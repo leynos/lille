@@ -22,7 +22,7 @@ use ordered_float::OrderedFloat;
 use size_of::SizeOf;
 
 use crate::components::{Block, BlockSlope};
-use crate::GRAVITY_PULL;
+use crate::{BLOCK_CENTRE_OFFSET, GRAVITY_PULL};
 
 use rkyv::{Archive, Deserialize, Serialize};
 
@@ -181,35 +181,33 @@ impl DbspCircuit {
 
             let highest = highest_pair.map(|(hb, _id)| hb.clone());
 
-            let with_slope = highest_pair
+            let floor_height = highest_pair
                 .map_index(|(hb, id)| (*id, (hb.x, hb.y, hb.z)))
-                .join(
+                .outer_join(
                     &slopes.map_index(|bs| (bs.block_id, (bs.grad_x, bs.grad_y))),
                     |_, &(x, y, z), &(grad_x, grad_y)| {
-                        let base = z as f64 + 1.0;
-                        let x_in_block = 0.5f64;
-                        let y_in_block = 0.5f64;
-                        FloorHeightAt {
+                        Some(FloorHeightAt {
                             x,
                             y,
                             z: OrderedFloat(
-                                base + x_in_block * grad_x.into_inner()
-                                    + y_in_block * grad_y.into_inner(),
+                                z as f64
+                                    + 1.0
+                                    + BLOCK_CENTRE_OFFSET * grad_x.into_inner() as f64
+                                    + BLOCK_CENTRE_OFFSET * grad_y.into_inner() as f64,
                             ),
-                        }
+                        })
                     },
-                );
-
-            let without_slope = highest_pair
-                .map_index(|(hb, id)| (*id, (hb.x, hb.y, hb.z)))
-                .antijoin(&slopes.map_index(|bs| (bs.block_id, ())))
-                .map(|(_id, &(x, y, z))| FloorHeightAt {
-                    x,
-                    y,
-                    z: OrderedFloat(z as f64 + 1.0),
-                });
-
-            let floor_height = with_slope.sum(&[without_slope]);
+                    |_, &(x, y, z)| {
+                        Some(FloorHeightAt {
+                            x,
+                            y,
+                            z: OrderedFloat(z as f64 + 1.0),
+                        })
+                    },
+                    |_, _| None,
+                )
+                .filter(|fh| fh.is_some())
+                .map(|fh| fh.clone().unwrap());
 
             let new_vel = velocities.map(|v| Velocity {
                 entity: v.entity,

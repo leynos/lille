@@ -12,8 +12,8 @@ fn blk(id: i64, x: i32, y: i32, z: i32) -> Block {
 fn slope(block_id: i64, gx: f32, gy: f32) -> BlockSlope {
     BlockSlope {
         block_id,
-        grad_x: (gx as f64).into(),
-        grad_y: (gy as f64).into(),
+        grad_x: gx.into(),
+        grad_y: gy.into(),
     }
 }
 

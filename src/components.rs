@@ -65,8 +65,8 @@ pub struct Block {
 #[archive_attr(derive(Ord, PartialOrd, Eq, PartialEq, Hash))]
 pub struct BlockSlope {
     pub block_id: i64,
-    pub grad_x: OrderedFloat<f64>,
-    pub grad_y: OrderedFloat<f64>,
+    pub grad_x: OrderedFloat<f32>,
+    pub grad_y: OrderedFloat<f32>,
 }
 #[derive(Component, Debug, Clone, Default, Serialize)]
 pub struct VelocityComp {

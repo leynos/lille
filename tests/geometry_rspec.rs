@@ -71,8 +71,8 @@ fn slope_block_outputs_height() {
                     },
                     Some(BlockSlope {
                         block_id: 1,
-                        grad_x: 1.0f64.into(),
-                        grad_y: 0.0f64.into(),
+                        grad_x: 1.0f32.into(),
+                        grad_y: 0.0f32.into(),
                     }),
                 );
                 env.step();
