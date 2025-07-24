@@ -12,6 +12,10 @@ struct Env {
     circuit: Arc<Mutex<DbspCircuit>>,
 }
 
+// SAFETY: The tests execute in a single-threaded context but rspec requires
+// `Send + Sync` bounds for the environment. `DbspCircuit` itself is not
+// thread-safe, so we guard access with a `Mutex` and only use it on one thread.
+// This guarantees safety despite the manual `Send`/`Sync` implementations.
 unsafe impl Send for Env {}
 unsafe impl Sync for Env {}
 
@@ -31,7 +35,7 @@ impl Default for Env {
 
 impl Env {
     fn push(&self, block: Block, slope: Option<BlockSlope>) {
-        let c = &mut *self.circuit.lock().expect("mutex poisoned");
+        let c = self.circuit.lock().expect("mutex poisoned");
         c.block_in().push(block, 1);
         if let Some(s) = slope {
             c.block_slope_in().push(s, 1);

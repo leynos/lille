@@ -27,6 +27,9 @@ fn fh(x: i32, y: i32, z: f64) -> FloorHeightAt {
 #[case(vec![blk(1,0,0,0), blk(2,0,0,1)], vec![], vec![fh(0,0,2.0)])] // highest block wins
 #[case(vec![blk(1,0,0,0)], vec![slope(1,-1.0,0.0)], vec![fh(0,0,0.5)])] // negative slope
 #[case(vec![blk(1,0,0,0)], vec![slope(1,0.0,0.0)], vec![fh(0,0,1.0)])] // zero slope
+#[case(vec![blk(1,-1,-1,0)], vec![slope(1,1.0,1.0)], vec![fh(-1,-1,2.0)])] // negative coordinates
+#[case(vec![blk(1,0,0,0)], vec![slope(1,100.0,100.0)], vec![fh(0,0,101.0)])] // large gradients
+#[case(vec![blk(1,0,0,0), blk(2,0,0,1)], vec![slope(1,1.0,0.0), slope(2,0.0,1.0)], vec![fh(0,0,2.5)])] // multiple slopes, highest wins
 fn floor_height_cases(
     #[case] blocks: Vec<Block>,
     #[case] slopes: Vec<BlockSlope>,

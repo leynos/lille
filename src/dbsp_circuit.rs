@@ -313,7 +313,19 @@ impl DbspCircuit {
         &self.block_in
     }
 
-    /// Returns a reference to the input handle for block slope records.
+    /// Returns a reference to the input handle for feeding block slope records into the circuit.
+    ///
+    /// Use this handle to supply slope gradient data for blocks, enabling
+    /// slope-aware floor height calculations.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # use lille::prelude::*;
+    /// let circuit = DbspCircuit::new().expect("circuit construction failed");
+    /// let slope_handle = circuit.block_slope_in();
+    /// // Feed block slope data into the circuit using `slope_handle`
+    /// ```
     pub fn block_slope_in(&self) -> &ZSetHandle<BlockSlope> {
         &self.block_slope_in
     }
@@ -369,6 +381,19 @@ impl DbspCircuit {
     }
 
     /// Returns a reference to the output handle for calculated floor heights.
+    ///
+    /// The output contains `FloorHeightAt` records representing the computed
+    /// floor height at each `(x, y)` position, incorporating block heights and
+    /// optional slope gradients.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # use lille::prelude::*;
+    /// let circuit = DbspCircuit::new().expect("circuit construction failed");
+    /// let floor_heights = circuit.floor_height_out();
+    /// // Read computed floor heights from the output handle
+    /// ```
     pub fn floor_height_out(&self) -> &OutputHandle<OrdZSet<FloorHeightAt>> {
         &self.floor_height_out
     }
