@@ -28,7 +28,9 @@ impl fmt::Debug for Env {
 impl Default for Env {
     fn default() -> Self {
         #[allow(clippy::arc_with_non_send_sync)]
-        let circuit = Arc::new(Mutex::new(DbspCircuit::new().expect("c")));
+        let circuit = Arc::new(Mutex::new(
+            DbspCircuit::new().expect("Failed to create DbspCircuit"),
+        ));
         Self { circuit }
     }
 }
