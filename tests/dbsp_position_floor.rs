@@ -1,3 +1,8 @@
+//! Unit tests for joining continuous positions with the floor grid.
+//!
+//! The helper functions build small DBSP circuits to ensure that
+//! `position_floor_stream` associates entities with the correct
+//! floor height across a range of scenarios.
 use lille::{
     components::{Block, BlockSlope},
     dbsp_circuit::{Position, PositionFloor},
@@ -5,10 +10,12 @@ use lille::{
 mod common;
 use rstest::rstest;
 
+/// Creates a [`Block`] positioned at integer grid coordinates.
 fn blk(id: i64, x: i32, y: i32, z: i32) -> Block {
     Block { id, x, y, z }
 }
 
+/// Constructs a [`BlockSlope`] for use in test cases.
 fn slope(block_id: i64, gx: f64, gy: f64) -> BlockSlope {
     BlockSlope {
         block_id,
@@ -17,6 +24,7 @@ fn slope(block_id: i64, gx: f64, gy: f64) -> BlockSlope {
     }
 }
 
+/// Convenience constructor for [`Position`] records.
 fn pos(entity: i64, x: f64, y: f64, z: f64) -> Position {
     Position {
         entity,
@@ -26,6 +34,7 @@ fn pos(entity: i64, x: f64, y: f64, z: f64) -> Position {
     }
 }
 
+/// Helper to create expected [`PositionFloor`] outputs.
 fn pf(position: Position, z_floor: f64) -> PositionFloor {
     PositionFloor {
         position,
@@ -52,6 +61,7 @@ fn pf(position: Position, z_floor: f64) -> PositionFloor {
     vec![pos(2,-0.8,-0.2,3.0)],
     vec![pf(pos(2,-0.8,-0.2,3.0),1.5)],
 )]
+/// Asserts that the position-floor join yields the expected records.
 fn position_floor_cases(
     #[case] blocks: Vec<Block>,
     #[case] slopes: Vec<BlockSlope>,

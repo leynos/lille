@@ -70,6 +70,7 @@ fn pos(entity: i64, x: f64, y: f64, z: f64) -> Position {
     }
 }
 
+/// Runs a behavioural test that verifies positions are joined with floor height.
 #[test]
 fn join_position_with_floor() {
     rspec::run(&rspec::given(
