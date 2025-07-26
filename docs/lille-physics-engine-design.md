@@ -89,7 +89,9 @@ An entity's physical state is derived by comparing its position to the
 calculated floor height.
 
 1. The `Position` stream is joined with the `FloorHeightAt` stream based on the
-   entity's `(x, y)` coordinates.
+   entity's `(x, y)` coordinates. The continuous `x` and `y` values are floored
+   to determine the grid cell. The join emits a `PositionFloor` record pairing
+   the original position with the matched `z_floor` height.
 
 2. A `filter` operator then partitions entities into two streams:
 
