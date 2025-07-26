@@ -24,7 +24,7 @@ use ordered_float::OrderedFloat;
 use size_of::SizeOf;
 
 use crate::components::{Block, BlockSlope};
-use crate::{BLOCK_CENTRE_OFFSET, GRAVITY_PULL};
+use crate::{BLOCK_CENTRE_OFFSET, BLOCK_TOP_OFFSET, GRAVITY_PULL};
 
 use rkyv::{Archive, Deserialize, Serialize};
 
@@ -236,6 +236,10 @@ impl DbspCircuit {
             })
     }
 
+    fn block_top(z: i32) -> f64 {
+        z as f64 + BLOCK_TOP_OFFSET
+    }
+
     fn floor_height_stream(
         highest_pair: &Stream<RootCircuit, OrdZSet<(HighestBlockAt, i64)>>,
         slopes: &Stream<RootCircuit, OrdZSet<BlockSlope>>,
@@ -245,22 +249,23 @@ impl DbspCircuit {
             .outer_join(
                 &slopes.map_index(|bs| (bs.block_id, (bs.grad_x, bs.grad_y))),
                 |_, &(x, y, z), &(grad_x, grad_y)| {
-                    let base = z as f64 + 1.0;
+                    let block_top = Self::block_top(z);
                     Some(FloorHeightAt {
                         x,
                         y,
                         z: OrderedFloat(
-                            base + BLOCK_CENTRE_OFFSET * grad_x.into_inner()
+                            block_top
+                                + BLOCK_CENTRE_OFFSET * grad_x.into_inner()
                                 + BLOCK_CENTRE_OFFSET * grad_y.into_inner(),
                         ),
                     })
                 },
                 |_, &(x, y, z)| {
-                    let base = z as f64 + 1.0;
+                    let block_top = Self::block_top(z);
                     Some(FloorHeightAt {
                         x,
                         y,
-                        z: OrderedFloat(base),
+                        z: OrderedFloat(block_top),
                     })
                 },
                 |_, _| None,
