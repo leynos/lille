@@ -1,8 +1,8 @@
 # Map Data Format
 
-This document describes the JSON/MessagePack structure used to represent maps in
-the Lille engine. The layout is identical whether serialized as human‑readable
-JSON or as a binary MessagePack payload.
+This document describes the JSON/MessagePack structure used to represent maps
+in the Lille engine. The layout is identical whether serialized as
+human‑readable JSON or as a binary MessagePack payload.
 
 ## 1. Top-level object
 
@@ -66,8 +66,8 @@ erDiagram
 
 ## 2. `block_types` entries
 
-Each entry in `"block_types"` describes the physical and navigational properties
-of one kind of block.
+Each entry in `"block_types"` describes the physical and navigational
+properties of one kind of block.
 
 ```json
 "block_types": {
@@ -87,10 +87,10 @@ of one kind of block.
 
 ## 3. `entity_defs` entries
 
-Each entry in `"entity_defs"` defines a reusable template for spawning entities.
-Templates may inherit from another template using an optional `"extends"` field
-and can override or add arbitrary properties. If a property is absent, the
-engine falls back to the defaults for that entity archetype.
+Each entry in `"entity_defs"` defines a reusable template for spawning
+entities. Templates may inherit from another template using an optional
+`"extends"` field and can override or add arbitrary properties. If a property
+is absent, the engine falls back to the defaults for that entity archetype.
 
 ```jsonc
 "entity_defs": {
@@ -138,9 +138,9 @@ through to the engine.
 ]
 ```
 
-Each entry spawns one entity. `type` refers to a template ID from `entity_defs`.
-Properties listed here override both the template and the archetype defaults.
-Position is a mandatory `[x,y,z]` triple.
+Each entry spawns one entity. `type` refers to a template ID from
+`entity_defs`. Properties listed here override both the template and the
+archetype defaults. Position is a mandatory `[x,y,z]` triple.
 
 ## 6. Serialization
 
@@ -251,6 +251,6 @@ streaming. The recommended layout is:
 2. **Sparse tensor** for `map`, storing only cells that contain a block token
    and leaving empty cells implicit.
 
-When serialized via the Arrow IPC or Feather format, this representation remains
-interoperable with the JSON/MessagePack structure while leveraging Arrow's
-columnar compression and sparse data handling.
+When serialized via the Arrow IPC or Feather format, this representation
+remains interoperable with the JSON/MessagePack structure while leveraging
+Arrow's columnar compression and sparse data handling.

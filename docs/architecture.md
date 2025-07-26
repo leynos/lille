@@ -23,8 +23,8 @@ model.
 
 ## 2. Core Components and Data Flow
 
-The engine operates in a continuous, unidirectional data-flow loop that executes
-on every simulation tick.
+The engine operates in a continuous, unidirectional data-flow loop that
+executes on every simulation tick.
 
 ```text
 +--------------------------------+      +----------------------------------+
@@ -46,16 +46,16 @@ on every simulation tick.
 ### The Tick Cycle
 
 1. **Data Extraction (ECS → DBSP)**: A set of dedicated Bevy "input systems" run
-   at the beginning of the frame. They query the ECS for all components relevant
-   to the simulation logic (e.g., `Transform`, `Velocity`, `Block`, `Target`).
-   This data is collected and fed as a batch of updates into the corresponding
-   `InputHandle`s of the DBSP circuit.
+   at the beginning of the frame. They query the ECS for all components
+   relevant to the simulation logic (e.g., `Transform`, `Velocity`, `Block`,
+   `Target`). This data is collected and fed as a batch of updates into the
+   corresponding `InputHandle`s of the DBSP circuit.
 
 2. **Declarative Computation (DBSP)**: A central system calls `circuit.step()`
    exactly once. This single function call triggers DBSP to process the entire
    batch of input changes. The engine incrementally propagates these changes
-   through the dataflow graph, re-computing only what is necessary. This step is
-   where all physics calculations, geometry checks, and AI decisions occur,
+   through the dataflow graph, re-computing only what is necessary. This step
+   is where all physics calculations, geometry checks, and AI decisions occur,
    resulting in a new set of output streams.
 
 3. **State Synchronisation (DBSP → ECS)**: A final set of Bevy "output systems"
@@ -81,8 +81,8 @@ The DBSP circuit is the ideal place for any logic that is **relational** and
   gravity, friction, and force application.
 
 - **Simple, Reactive AI**: Agent behaviours that can be expressed as direct
-  reactions to the current state, such as fleeing from a source of fear, seeking
-  a target, or responding to damage.
+  reactions to the current state, such as fleeing from a source of fear,
+  seeking a target, or responding to damage.
 
 - **Game Rules**: Any rule that can be modelled as a data transformation, such
   as "if an entity is standing on a 'lava' block, create a `Damage` event".
@@ -102,8 +102,8 @@ event-driven.
   dataflow model. The canonical example is **A\* pathfinding**, which requires
   maintaining stateful data structures (open/closed sets, priority queues) and
   performing iterative, heuristic searches. Such algorithms are implemented in
-  standard Rust, and their *results* (e.g., the next waypoint on a path) are fed
-  into the DBSP circuit as just another input stream.
+  standard Rust, and their *results* (e.g., the next waypoint on a path) are
+  fed into the DBSP circuit as just another input stream.
 
 ## 4. Advantages of this Architecture
 

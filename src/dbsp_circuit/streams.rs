@@ -47,6 +47,24 @@ fn block_top(z: i32) -> f64 {
     z as f64 + BLOCK_TOP_OFFSET
 }
 
+/// Calculates the world-space `z` coordinate for a block's floor height.
+///
+/// If a slope gradient is provided, it adjusts the block's top height by the
+/// gradient scaled by [`BLOCK_CENTRE_OFFSET`]. This helper keeps the
+/// slope-adjustment logic out of the stream closures so that they remain
+/// concise.
+fn compute_floor_height_at(x: i32, y: i32, z: i32, grad: Option<(f64, f64)>) -> FloorHeightAt {
+    let base = block_top(z);
+    let extra = grad
+        .map(|(gx, gy)| BLOCK_CENTRE_OFFSET * (gx + gy))
+        .unwrap_or(0.0);
+    FloorHeightAt {
+        x,
+        y,
+        z: OrderedFloat(base + extra),
+    }
+}
+
 /// Derives the floor height for each block, optionally applying slopes.
 ///
 /// The stream joins the highest block id at a grid cell with any matching
@@ -57,33 +75,23 @@ pub(super) fn floor_height_stream(
     highest_pair: &Stream<RootCircuit, OrdZSet<(HighestBlockAt, i64)>>,
     slopes: &Stream<RootCircuit, OrdZSet<BlockSlope>>,
 ) -> Stream<RootCircuit, OrdZSet<FloorHeightAt>> {
+    let slope_idx = slopes.map_index(|bs| (bs.block_id, (bs.grad_x, bs.grad_y)));
     highest_pair
         .map_index(|(hb, id)| (*id, (hb.x, hb.y, hb.z)))
         .outer_join(
-            &slopes.map_index(|bs| (bs.block_id, (bs.grad_x, bs.grad_y))),
-            |_, &(x, y, z), &(grad_x, grad_y)| {
-                let block_top = block_top(z);
-                Some(FloorHeightAt {
+            &slope_idx,
+            |_, &(x, y, z), &(gx, gy)| {
+                Some(compute_floor_height_at(
                     x,
                     y,
-                    z: OrderedFloat(
-                        block_top
-                            + BLOCK_CENTRE_OFFSET * grad_x.into_inner()
-                            + BLOCK_CENTRE_OFFSET * grad_y.into_inner(),
-                    ),
-                })
+                    z,
+                    Some((gx.into_inner(), gy.into_inner())),
+                ))
             },
-            |_, &(x, y, z)| {
-                let block_top = block_top(z);
-                Some(FloorHeightAt {
-                    x,
-                    y,
-                    z: OrderedFloat(block_top),
-                })
-            },
+            |_, &(x, y, z)| Some(compute_floor_height_at(x, y, z, None)),
             |_, _| None,
         )
-        .flat_map(|fh| fh.clone().into_iter())
+        .flat_map(|fh| fh.clone())
 }
 
 /// Applies gravity to each velocity record.
@@ -112,17 +120,17 @@ pub(super) fn new_position_stream(
     positions: &Stream<RootCircuit, OrdZSet<Position>>,
     new_vel: &Stream<RootCircuit, OrdZSet<Velocity>>,
 ) -> Stream<RootCircuit, OrdZSet<Position>> {
-    let joined = positions.map_index(|p| (p.entity, p.clone())).join(
-        &new_vel.map_index(|v| (v.entity, v.clone())),
-        |_, pos, vel| (pos.clone(), vel.clone()),
-    );
-
-    joined.map(|(p, v)| Position {
-        entity: p.entity,
-        x: OrderedFloat(p.x.into_inner() + v.vx.into_inner()),
-        y: OrderedFloat(p.y.into_inner() + v.vy.into_inner()),
-        z: OrderedFloat(p.z.into_inner() + v.vz.into_inner()),
-    })
+    positions
+        .map_index(|p| (p.entity, p.clone()))
+        .join(&new_vel.map_index(|v| (v.entity, v.clone())), |_, p, v| {
+            (p.clone(), v.clone())
+        })
+        .map(|(p, v)| Position {
+            entity: p.entity,
+            x: OrderedFloat(p.x.into_inner() + v.vx.into_inner()),
+            y: OrderedFloat(p.y.into_inner() + v.vy.into_inner()),
+            z: OrderedFloat(p.z.into_inner() + v.vz.into_inner()),
+        })
 }
 
 #[derive(
@@ -166,9 +174,10 @@ pub(super) fn position_floor_stream(
         })
         .join(
             &floor_height.map_index(|fh| ((fh.x, fh.y), fh.z)),
-            |_, pos, z| PositionFloor {
-                position: pos.clone(),
-                z_floor: *z,
-            },
+            |_, pos, z_floor| (pos.clone(), *z_floor),
         )
+        .map(|(pos, z_floor)| PositionFloor {
+            position: pos.clone(),
+            z_floor: *z_floor,
+        })
 }
