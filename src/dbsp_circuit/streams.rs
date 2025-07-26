@@ -120,17 +120,15 @@ pub(super) fn new_position_stream(
     positions: &Stream<RootCircuit, OrdZSet<Position>>,
     new_vel: &Stream<RootCircuit, OrdZSet<Velocity>>,
 ) -> Stream<RootCircuit, OrdZSet<Position>> {
-    positions
-        .map_index(|p| (p.entity, p.clone()))
-        .join(&new_vel.map_index(|v| (v.entity, v.clone())), |_, p, v| {
-            (p.clone(), v.clone())
-        })
-        .map(|(p, v)| Position {
+    positions.map_index(|p| (p.entity, p.clone())).join(
+        &new_vel.map_index(|v| (v.entity, v.clone())),
+        |_, p, v| Position {
             entity: p.entity,
             x: OrderedFloat(p.x.into_inner() + v.vx.into_inner()),
             y: OrderedFloat(p.y.into_inner() + v.vy.into_inner()),
             z: OrderedFloat(p.z.into_inner() + v.vz.into_inner()),
-        })
+        },
+    )
 }
 
 #[derive(
@@ -174,10 +172,9 @@ pub(super) fn position_floor_stream(
         })
         .join(
             &floor_height.map_index(|fh| ((fh.x, fh.y), fh.z)),
-            |_, pos, z_floor| (pos.clone(), *z_floor),
+            |_idx, pos, &z_floor| PositionFloor {
+                position: pos.clone(),
+                z_floor,
+            },
         )
-        .map(|(pos, z_floor)| PositionFloor {
-            position: pos.clone(),
-            z_floor: *z_floor,
-        })
 }
