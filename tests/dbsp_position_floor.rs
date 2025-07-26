@@ -8,6 +8,7 @@ use lille::{
     dbsp_circuit::{Position, PositionFloor},
 };
 mod common;
+use common::pos;
 use rstest::rstest;
 
 /// Creates a [`Block`] positioned at integer grid coordinates.
@@ -21,16 +22,6 @@ fn slope(block_id: i64, gx: f64, gy: f64) -> BlockSlope {
         block_id,
         grad_x: gx.into(),
         grad_y: gy.into(),
-    }
-}
-
-/// Convenience constructor for [`Position`] records.
-fn pos(entity: i64, x: f64, y: f64, z: f64) -> Position {
-    Position {
-        entity,
-        x: x.into(),
-        y: y.into(),
-        z: z.into(),
     }
 }
 

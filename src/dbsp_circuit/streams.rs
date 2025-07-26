@@ -1,4 +1,16 @@
-//! Helper functions for constructing DBSP dataflow streams.
+//! DBSP dataflow stream construction for spatial simulation.
+//!
+//! This module defines helper functions for building the dataflow streams used
+//! by `DbspCircuit` to process the game world. These streams implement:
+//!
+//! - Block aggregation to track the highest block at each grid cell
+//! - Floor height calculation with optional slopes
+//! - Velocity updates applying gravity
+//! - Position integration based on velocities
+//! - Joining positions with floor height for collision queries
+//!
+//! Each function returns a new [`Stream`] that can be composed into the overall
+//! circuit.
 
 use dbsp::{operator::Max, typed_batch::OrdZSet, RootCircuit, Stream};
 use ordered_float::OrderedFloat;
@@ -146,6 +158,15 @@ pub(super) fn new_position_stream(
     size_of::SizeOf,
 )]
 #[archive_attr(derive(Ord, PartialOrd, Eq, PartialEq, Hash))]
+/// Pairs an entity's position with the floor height at its grid location.
+///
+/// This struct is the result of joining the continuous [`Position`] stream with
+/// the discrete [`FloorHeightAt`] grid. It is primarily consumed by higher-level
+/// physics logic for tasks such as collision detection or standing vs. falling
+/// checks.
+///
+/// * `position` - The entity's current position in world coordinates
+/// * `z_floor` - The computed floor height at the position's grid cell
 pub struct PositionFloor {
     pub position: Position,
     pub z_floor: OrderedFloat<f64>,

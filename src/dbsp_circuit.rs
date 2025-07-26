@@ -369,7 +369,22 @@ impl DbspCircuit {
         &self.floor_height_out
     }
 
-    /// Returns a reference to the output handle for entity positions joined with floor height.
+    /// Returns a reference to the output handle for entity positions joined with
+    /// floor height.
+    ///
+    /// The output contains [`PositionFloor`] records that pair each entity's
+    /// [`Position`] with the discrete [`FloorHeightAt`] value at its grid cell.
+    /// Use this handle to read the results of the position-to-floor join after
+    /// each call to [`DbspCircuit::step`].
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # use lille::prelude::*;
+    /// let mut circuit = DbspCircuit::new().expect("circuit construction failed");
+    /// let joined = circuit.position_floor_out();
+    /// // Read joined records from `joined`
+    /// ```
     pub fn position_floor_out(&self) -> &OutputHandle<OrdZSet<PositionFloor>> {
         &self.position_floor_out
     }
