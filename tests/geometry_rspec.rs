@@ -1,3 +1,7 @@
+//! Behavioural tests validating slope-aware floor height calculations.
+//!
+//! These rspec-style tests build a single-threaded DBSP circuit and verify
+//! that block slopes modify the computed ground height as expected.
 use lille::{
     components::{Block, BlockSlope},
     dbsp_circuit::FloorHeightAt,

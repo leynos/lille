@@ -265,8 +265,7 @@ impl DbspCircuit {
                 },
                 |_, _| None,
             )
-            .filter(|fh| fh.is_some())
-            .map(|fh| fh.clone().unwrap())
+            .flat_map(|fh| fh.clone().into_iter())
     }
 
     fn new_velocity_stream(
