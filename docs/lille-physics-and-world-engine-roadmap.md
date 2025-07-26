@@ -95,7 +95,7 @@ DDlog-based version.
 
 1. **Full Geometry Model**:
 
-   - [ ] Implement the `FloorHeightAt` calculation, including the `left_join`
+   - [x] Implement the `FloorHeightAt` calculation, including the `left_join`
      with `BlockSlope` data to handle sloped surfaces correctly.
 
    - [ ] Implement the logic to join an entity's continuous `Position` with the

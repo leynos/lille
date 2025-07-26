@@ -11,3 +11,9 @@ pub const DELTA_TIME: f64 = 1.0;
 pub const DEFAULT_MASS: f64 = 70.0;
 pub const FEAR_RADIUS_MULTIPLIER: f64 = 2.0;
 pub const FEAR_THRESHOLD: f64 = 0.2;
+/// The normalised offset used to sample slopes within a block.
+///
+/// The `FloorHeightAt` calculation currently evaluates the slope at the
+/// centre of each block because entity-specific offsets are not yet
+/// available.
+pub const BLOCK_CENTRE_OFFSET: f64 = 0.5;

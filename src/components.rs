@@ -1,6 +1,7 @@
 //! ECS component types used by the game.
 //! Includes identifiers, health, target positions, and unit descriptors shared between systems.
 use bevy::prelude::*;
+use ordered_float::OrderedFloat;
 use serde::Serialize;
 
 #[derive(Component, Debug, Serialize)]
@@ -45,11 +46,27 @@ pub struct Block {
     pub z: i32,
 }
 
-#[derive(Component, Debug, Clone, Serialize)]
+#[derive(
+    Archive,
+    RkyvSerialize,
+    Deserialize,
+    Component,
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    Serialize,
+    Default,
+    SizeOf,
+)]
+#[archive_attr(derive(Ord, PartialOrd, Eq, PartialEq, Hash))]
 pub struct BlockSlope {
     pub block_id: i64,
-    pub grad_x: f32,
-    pub grad_y: f32,
+    pub grad_x: OrderedFloat<f64>,
+    pub grad_y: OrderedFloat<f64>,
 }
 #[derive(Component, Debug, Clone, Default, Serialize)]
 pub struct VelocityComp {
