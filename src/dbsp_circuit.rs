@@ -236,6 +236,7 @@ impl DbspCircuit {
             })
     }
 
+    #[inline]
     fn block_top(z: i32) -> f64 {
         z as f64 + BLOCK_TOP_OFFSET
     }
