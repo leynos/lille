@@ -17,3 +17,5 @@ pub const FEAR_THRESHOLD: f64 = 0.2;
 /// centre of each block because entity-specific offsets are not yet
 /// available.
 pub const BLOCK_CENTRE_OFFSET: f64 = 0.5;
+/// Offset from a block's base to its top face.
+pub const BLOCK_TOP_OFFSET: f64 = 1.0;
