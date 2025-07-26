@@ -245,22 +245,22 @@ impl DbspCircuit {
             .outer_join(
                 &slopes.map_index(|bs| (bs.block_id, (bs.grad_x, bs.grad_y))),
                 |_, &(x, y, z), &(grad_x, grad_y)| {
+                    let base = z as f64 + 1.0;
                     Some(FloorHeightAt {
                         x,
                         y,
                         z: OrderedFloat(
-                            z as f64
-                                + 1.0
-                                + BLOCK_CENTRE_OFFSET * grad_x.into_inner()
+                            base + BLOCK_CENTRE_OFFSET * grad_x.into_inner()
                                 + BLOCK_CENTRE_OFFSET * grad_y.into_inner(),
                         ),
                     })
                 },
                 |_, &(x, y, z)| {
+                    let base = z as f64 + 1.0;
                     Some(FloorHeightAt {
                         x,
                         y,
-                        z: OrderedFloat(z as f64 + 1.0),
+                        z: OrderedFloat(base),
                     })
                 },
                 |_, _| None,
