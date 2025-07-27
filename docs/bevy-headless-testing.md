@@ -261,7 +261,7 @@ is active.
   despawned when the application exits the specified state. This greatly
   simplifies cleanup logic in tests. For example:
   `commands.spawn((Name::new("TestPlayer"), StateScoped(GameState::InGame), PlayerComponent));`
-  .
+   .
 
 - **Programmatic State Transitions:** Tests can trigger state changes by
   modifying the `NextState<MyTestState>` resource:
@@ -768,7 +768,7 @@ testing ecosystem 13 and their potential applications in Bevy testing:
 The applicability of these general-purpose Rust testing crates to Bevy projects
 underscores the strength of Rust's ecosystem and Bevy's successful integration
 within it. Developers are not confined to the testing utilities provided
-directly by Bevy but can draw upon a rich set of mature, widely-used tools.
+directly by Bevy but can draw upon a rich set of mature, widely used tools.
 This allows for the construction of more sophisticated, robust, and
 maintainable test suites, tailored to the specific needs of the Bevy
 application being developed. For example, `proptest` can be invaluable for

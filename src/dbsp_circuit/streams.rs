@@ -106,11 +106,24 @@ pub(super) fn floor_height_stream(
         .flat_map(|fh| fh.clone())
 }
 
-/// Applies gravity to each velocity record.
+/// Updates velocities by applying gravitational acceleration.
 ///
-/// This helper keeps the velocity update logic separate from entity position
-/// updates. It adds [`GRAVITY_PULL`] to the incoming `vz` component and passes
-/// through the remaining fields unchanged.
+/// The stream adds [`GRAVITY_PULL`] to each entity's vertical velocity
+/// component while leaving the horizontal components unchanged. This helper
+/// keeps the gravity logic separate from position integration.
+///
+/// # Examples
+///
+/// ```rust,ignore
+/// # use lille::prelude::*;
+/// # use lille::dbsp_circuit::{self, Velocity};
+/// # use dbsp::{RootCircuit, typed_batch::OrdZSet};
+/// let (circuit, (vel_stream, _)) = RootCircuit::build(|c| {
+///     Ok(c.add_input_zset::<Velocity>())
+/// })?;
+/// let _updated = new_velocity_stream(&vel_stream);
+/// # Ok::<(), dbsp::Error>(())
+/// ```
 pub(super) fn new_velocity_stream(
     velocities: &Stream<RootCircuit, OrdZSet<Velocity>>,
 ) -> Stream<RootCircuit, OrdZSet<Velocity>> {

@@ -7,6 +7,7 @@ use approx::assert_relative_eq;
 use lille::dbsp_circuit::{NewPosition, NewVelocity, Position, Velocity};
 use rstest::rstest;
 mod common;
+use common::pos;
 
 /// Tests that an entity's position and velocity are updated correctly under gravity in the physics circuit.
 ///
@@ -53,15 +54,6 @@ fn entity_falls_due_to_gravity() {
     assert_eq!(vresults.len(), 1);
     assert_eq!(vresults[0].entity, 1);
     assert_relative_eq!(vresults[0].vz.into_inner(), lille::GRAVITY_PULL);
-}
-
-fn pos(entity: i64, x: f64, y: f64, z: f64) -> Position {
-    Position {
-        entity,
-        x: x.into(),
-        y: y.into(),
-        z: z.into(),
-    }
 }
 
 fn vel(entity: i64, vx: f64, vy: f64, vz: f64) -> Velocity {

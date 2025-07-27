@@ -763,7 +763,7 @@ different aspects of this challenge, with Cognitive Complexity offering a more
 nuanced view of human understandability. The Bumpy Road antipattern serves as a
 clear indicator of localized, excessive complexity, often stemming from
 violations of the Single Responsibility Principle and a lack of timely
-refactoring.
+refactorings.
 
 The journey towards a more maintainable codebase involves recognizing such
 antipatterns and understanding their connection to fundamental principles like

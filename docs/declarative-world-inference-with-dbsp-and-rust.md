@@ -184,7 +184,7 @@ let gravity_applied = unsupported_entities.map(|(pos, _z_floor)| {
 
 The DBSP circuit operates as a self-contained computational engine driven by
 the Bevy ECS. The interaction is orchestrated by a set of Bevy systems that
-manage the data flow each tick.
+manage the data flow on each tick.
 
 1. **Data Extraction (Rust → DBSP)**: A Bevy system queries the ECS for all
    relevant components (e.g., `Transform`, `Velocity`). This data is collected
