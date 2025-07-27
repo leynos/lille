@@ -357,7 +357,7 @@ states.1
 Consider testing a state machine's transition logic based on current state and
 an incoming event:
 
-````rust
+```rust
 use rstest::rstest;
 
 #
@@ -1332,4 +1332,4 @@ markdownlint-disable MD013 -->
 By mastering `rstest`, Rust developers can significantly elevate the quality
 and efficiency of their testing practices, leading to more reliable and
 maintainable software.
-````
+```

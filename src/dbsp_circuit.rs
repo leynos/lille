@@ -16,15 +16,17 @@
 //! ```
 
 use anyhow::Error as AnyError;
-use dbsp::{
-    operator::Max, typed_batch::OrdZSet, CircuitHandle, OutputHandle, RootCircuit, Stream,
-    ZSetHandle,
-};
+use dbsp::{typed_batch::OrdZSet, CircuitHandle, OutputHandle, RootCircuit, ZSetHandle};
 use ordered_float::OrderedFloat;
 use size_of::SizeOf;
 
 use crate::components::{Block, BlockSlope};
-use crate::{BLOCK_CENTRE_OFFSET, BLOCK_TOP_OFFSET, GRAVITY_PULL};
+
+mod streams;
+use streams::{
+    floor_height_stream, new_position_stream, new_velocity_stream, position_floor_stream,
+};
+pub use streams::{highest_block_pair, PositionFloor};
 
 use rkyv::{Archive, Deserialize, Serialize};
 
@@ -128,6 +130,19 @@ pub struct DbspCircuit {
     new_velocity_out: OutputHandle<OrdZSet<NewVelocity>>,
     highest_block_out: OutputHandle<OrdZSet<HighestBlockAt>>,
     floor_height_out: OutputHandle<OrdZSet<FloorHeightAt>>,
+    position_floor_out: OutputHandle<OrdZSet<PositionFloor>>,
+}
+
+struct BuildHandles {
+    position_in: ZSetHandle<Position>,
+    velocity_in: ZSetHandle<Velocity>,
+    block_in: ZSetHandle<Block>,
+    block_slope_in: ZSetHandle<BlockSlope>,
+    new_position_out: OutputHandle<OrdZSet<NewPosition>>,
+    new_velocity_out: OutputHandle<OrdZSet<NewVelocity>>,
+    highest_block_out: OutputHandle<OrdZSet<HighestBlockAt>>,
+    floor_height_out: OutputHandle<OrdZSet<FloorHeightAt>>,
+    position_floor_out: OutputHandle<OrdZSet<PositionFloor>>,
 }
 
 impl DbspCircuit {
@@ -150,27 +165,18 @@ impl DbspCircuit {
     /// ```
     pub fn new() -> Result<Self, dbsp::Error> {
         let (circuit, handles) = RootCircuit::build(Self::build_streams)?;
-        let (
-            position_in,
-            velocity_in,
-            block_in,
-            block_slope_in,
-            new_position_out,
-            new_velocity_out,
-            highest_block_out,
-            floor_height_out,
-        ) = handles;
 
         Ok(Self {
             circuit,
-            position_in,
-            velocity_in,
-            block_in,
-            block_slope_in,
-            new_position_out,
-            new_velocity_out,
-            highest_block_out,
-            floor_height_out,
+            position_in: handles.position_in,
+            velocity_in: handles.velocity_in,
+            block_in: handles.block_in,
+            block_slope_in: handles.block_slope_in,
+            new_position_out: handles.new_position_out,
+            new_velocity_out: handles.new_velocity_out,
+            highest_block_out: handles.highest_block_out,
+            floor_height_out: handles.floor_height_out,
+            position_floor_out: handles.position_floor_out,
         })
     }
 
@@ -178,128 +184,31 @@ impl DbspCircuit {
         self.circuit.step()
     }
 
-    #[allow(clippy::type_complexity)]
-    fn build_streams(
-        circuit: &mut RootCircuit,
-    ) -> Result<
-        (
-            ZSetHandle<Position>,
-            ZSetHandle<Velocity>,
-            ZSetHandle<Block>,
-            ZSetHandle<BlockSlope>,
-            OutputHandle<OrdZSet<NewPosition>>,
-            OutputHandle<OrdZSet<NewVelocity>>,
-            OutputHandle<OrdZSet<HighestBlockAt>>,
-            OutputHandle<OrdZSet<FloorHeightAt>>,
-        ),
-        AnyError,
-    > {
+    fn build_streams(circuit: &mut RootCircuit) -> Result<BuildHandles, AnyError> {
         let (positions, position_in) = circuit.add_input_zset::<Position>();
         let (velocities, velocity_in) = circuit.add_input_zset::<Velocity>();
         let (blocks, block_in) = circuit.add_input_zset::<Block>();
         let (slopes, block_slope_in) = circuit.add_input_zset::<BlockSlope>();
 
-        let highest_pair = Self::highest_block_pair(&blocks);
+        let highest_pair = highest_block_pair(&blocks);
         let highest = highest_pair.map(|(hb, _)| hb.clone());
-        let floor_height = Self::floor_height_stream(&highest_pair, &slopes);
+        let floor_height = floor_height_stream(&highest_pair, &slopes);
 
-        let new_vel = Self::new_velocity_stream(&velocities);
-        let new_pos = Self::new_position_stream(&positions, &new_vel);
+        let pos_floor = position_floor_stream(&positions, &floor_height);
 
-        Ok((
+        let new_vel = new_velocity_stream(&velocities);
+        let new_pos = new_position_stream(&positions, &new_vel);
+
+        Ok(BuildHandles {
             position_in,
             velocity_in,
             block_in,
             block_slope_in,
-            new_pos.output(),
-            new_vel.output(),
-            highest.output(),
-            floor_height.output(),
-        ))
-    }
-
-    fn highest_block_pair(
-        blocks: &Stream<RootCircuit, OrdZSet<Block>>,
-    ) -> Stream<RootCircuit, OrdZSet<(HighestBlockAt, i64)>> {
-        blocks
-            .map_index(|b| ((b.x, b.y), (b.z, b.id)))
-            .aggregate(Max)
-            .map(|((x, y), (z, id))| {
-                (
-                    HighestBlockAt {
-                        x: *x,
-                        y: *y,
-                        z: *z,
-                    },
-                    *id,
-                )
-            })
-    }
-
-    /// Returns the world height at the top face of a block.
-    #[inline]
-    fn block_top(z: i32) -> f64 {
-        z as f64 + BLOCK_TOP_OFFSET
-    }
-
-    fn floor_height_stream(
-        highest_pair: &Stream<RootCircuit, OrdZSet<(HighestBlockAt, i64)>>,
-        slopes: &Stream<RootCircuit, OrdZSet<BlockSlope>>,
-    ) -> Stream<RootCircuit, OrdZSet<FloorHeightAt>> {
-        highest_pair
-            .map_index(|(hb, id)| (*id, (hb.x, hb.y, hb.z)))
-            .outer_join(
-                &slopes.map_index(|bs| (bs.block_id, (bs.grad_x, bs.grad_y))),
-                |_, &(x, y, z), &(grad_x, grad_y)| {
-                    let block_top = Self::block_top(z);
-                    Some(FloorHeightAt {
-                        x,
-                        y,
-                        z: OrderedFloat(
-                            block_top
-                                + BLOCK_CENTRE_OFFSET * grad_x.into_inner()
-                                + BLOCK_CENTRE_OFFSET * grad_y.into_inner(),
-                        ),
-                    })
-                },
-                |_, &(x, y, z)| {
-                    let block_top = Self::block_top(z);
-                    Some(FloorHeightAt {
-                        x,
-                        y,
-                        z: OrderedFloat(block_top),
-                    })
-                },
-                |_, _| None,
-            )
-            .flat_map(|fh| fh.clone().into_iter())
-    }
-
-    fn new_velocity_stream(
-        velocities: &Stream<RootCircuit, OrdZSet<Velocity>>,
-    ) -> Stream<RootCircuit, OrdZSet<Velocity>> {
-        velocities.map(|v| Velocity {
-            entity: v.entity,
-            vx: v.vx,
-            vy: v.vy,
-            vz: OrderedFloat(v.vz.into_inner() + GRAVITY_PULL),
-        })
-    }
-
-    fn new_position_stream(
-        positions: &Stream<RootCircuit, OrdZSet<Position>>,
-        new_vel: &Stream<RootCircuit, OrdZSet<Velocity>>,
-    ) -> Stream<RootCircuit, OrdZSet<Position>> {
-        let joined = positions.map_index(|p| (p.entity, p.clone())).join(
-            &new_vel.map_index(|v| (v.entity, v.clone())),
-            |_, pos, vel| (pos.clone(), vel.clone()),
-        );
-
-        joined.map(|(p, v)| Position {
-            entity: p.entity,
-            x: OrderedFloat(p.x.into_inner() + v.vx.into_inner()),
-            y: OrderedFloat(p.y.into_inner() + v.vy.into_inner()),
-            z: OrderedFloat(p.z.into_inner() + v.vz.into_inner()),
+            new_position_out: new_pos.output(),
+            new_velocity_out: new_vel.output(),
+            highest_block_out: highest.output(),
+            floor_height_out: floor_height.output(),
+            position_floor_out: pos_floor.output(),
         })
     }
 
@@ -442,6 +351,26 @@ impl DbspCircuit {
     /// ```
     pub fn floor_height_out(&self) -> &OutputHandle<OrdZSet<FloorHeightAt>> {
         &self.floor_height_out
+    }
+
+    /// Returns a reference to the output handle for entity positions joined with
+    /// floor height.
+    ///
+    /// The output contains [`PositionFloor`] records that pair each entity's
+    /// [`Position`] with the discrete [`FloorHeightAt`] value at its grid cell.
+    /// Use this handle to read the results of the position-to-floor join after
+    /// each call to [`DbspCircuit::step`].
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # use lille::prelude::*;
+    /// let mut circuit = DbspCircuit::new().expect("circuit construction failed");
+    /// let joined = circuit.position_floor_out();
+    /// // Read joined records from `joined`
+    /// ```
+    pub fn position_floor_out(&self) -> &OutputHandle<OrdZSet<PositionFloor>> {
+        &self.position_floor_out
     }
 
     /// Clears all input collections to remove accumulated records.

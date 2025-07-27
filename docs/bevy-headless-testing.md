@@ -6,23 +6,24 @@ The Bevy Engine, a refreshingly simple data-driven game engine built in Rust,
 leverages an Entity Component System (ECS) architecture to facilitate modular
 and performant game development.1 In modern software development, particularly
 within the context of game development where complexity can escalate rapidly,
-automated testing is an indispensable practice. Integrating automated tests into
-Continuous Integration/Continuous Deployment (CI/CD) pipelines ensures that new
-changes do not introduce regressions and that the codebase remains robust and
-maintainable over time.3
+automated testing is an indispensable practice. Integrating automated tests
+into Continuous Integration/Continuous Deployment (CI/CD) pipelines ensures
+that new changes do not introduce regressions and that the codebase remains
+robust and maintainable over time.3
 
 Testing game logic, however, often presents unique challenges, especially when
 graphical output or windowing systems are involved. Running tests in a headless
 environment—that is, without a visible window or direct GPU rendering
-output—offers a way to circumvent these challenges, allowing for focused testing
-of game systems and logic in automated CI environments. This report provides a
-comprehensive guide to implementing various testing strategies for Bevy
-applications in Rust, with a specific focus on leveraging headless mode within a
-CI framework. It will cover the foundational setup for headless testing, core
-techniques for testing systems and components, methods for crafting effective
-test scenarios by manipulating states, inputs, and time, advanced strategies
-such as snapshot testing and Test-Driven Development (TDD), and best practices
-for integrating these tests into CI pipelines like GitHub Actions.
+output—offers a way to circumvent these challenges, allowing for focused
+testing of game systems and logic in automated CI environments. This report
+provides a comprehensive guide to implementing various testing strategies for
+Bevy applications in Rust, with a specific focus on leveraging headless mode
+within a CI framework. It will cover the foundational setup for headless
+testing, core techniques for testing systems and components, methods for
+crafting effective test scenarios by manipulating states, inputs, and time,
+advanced strategies such as snapshot testing and Test-Driven Development (TDD),
+and best practices for integrating these tests into CI pipelines like GitHub
+Actions.
 
 ## 2. Setting Up Bevy for Headless Testing in CI
 
@@ -31,16 +32,16 @@ testing in CI environments where graphical output is typically unavailable or
 undesirable. Headless mode allows the Bevy application to run its core logic,
 update systems, and manage its ECS world without attempting to create a window
 or render to a screen.4 This is particularly useful for integration tests that
-simulate application behavior without the overhead and flakiness associated with
-UI rendering.
+simulate application behavior without the overhead and flakiness associated
+with UI rendering.
 
 To configure a Bevy application for headless operation, modifications to the
 `RenderPlugin` are necessary. The key is to instruct Bevy's rendering backend,
-which relies on WGPU, to not initialize any specific presentation backends. This
-is achieved by setting the `backends` field within `WgpuSettings` to `None`.
-Additionally, ensuring synchronous pipeline compilation can make test execution
-more deterministic. The following code illustrates the setup within a Bevy
-`App`:
+which relies on WGPU, to not initialize any specific presentation backends.
+This is achieved by setting the `backends` field within `WgpuSettings` to
+`None`. Additionally, ensuring synchronous pipeline compilation can make test
+execution more deterministic. The following code illustrates the setup within a
+Bevy `App`:
 
 ```rust
 use bevy::prelude::*;
@@ -75,9 +76,9 @@ distinction is important: headless tests configured this way are excellent for
 verifying game logic and system interactions that may depend on render-related
 data structures being present, but they may not capture issues related to
 specific GPU vendor quirks or driver bugs that only manifest during actual
-rendering and presentation to a display. For projects where high visual fidelity
-and rendering correctness are paramount, these headless tests should be
-complemented by some form of on-target visual testing, even if executed less
+rendering and presentation to a display. For projects where high visual
+fidelity and rendering correctness are paramount, these headless tests should
+be complemented by some form of on-target visual testing, even if executed less
 frequently. The community project `bevy_geppetto`, for instance, has noted a
 long-term interest in capturing and comparing visual output, which aligns with
 this need for broader testing coverage.5
@@ -86,9 +87,9 @@ The setting `synchronous_pipeline_compilation: true` is also beneficial for CI
 environments.4 In a typical game loop, asynchronous shader compilation can
 improve performance by not blocking the main thread. However, for tests,
 determinism is paramount. Synchronous compilation ensures that all shader
-processing is completed before the application proceeds, eliminating a potential
-source of variability in test execution times or states, especially if tests
-depend on render state being fully established.
+processing is completed before the application proceeds, eliminating a
+potential source of variability in test execution times or states, especially
+if tests depend on render state being fully established.
 
 When choosing which plugins to include, `DefaultPlugins` (modified as shown)
 provides an environment closer to the actual game, including essential
@@ -103,8 +104,8 @@ initialization. However, for most integration-style tests, the modified
 
 The core of testing Bevy applications lies in verifying the behavior of its
 systems and the state of its components within the ECS framework. Bevy's
-architecture lends itself well to a structured testing approach where individual
-pieces of logic can be instantiated and examined with relative ease.
+architecture lends itself well to a structured testing approach where
+individual pieces of logic can be instantiated and examined with relative ease.
 
 The fundamental workflow for testing systems or component interactions begins
 with creating an instance of `App`: `let mut app = App::new();`.6 This `App`
@@ -131,9 +132,9 @@ App's World.
 
 Entity and Component Setup:
 
-Tests often require specific entities with particular components to exist in the
-world. These are spawned using app.world_mut(): let entity_id =
-app.world_mut().spawn(MyComponent { /\*... \*/ }).id();.6 For more complex or
+Tests often require specific entities with particular components to exist in
+the world. These are spawned using app.world_mut(): let entity_id =
+app.world_mut().spawn(MyComponent { /\*… \*/ }).id();.6 For more complex or
 common entity configurations, Bevy's Bundle trait can be used to group
 components, simplifying setup.2
 
@@ -208,31 +209,31 @@ fn test_movement() {
 }
 ```
 
-This common pattern of `App::new() -> setup -> app.update() -> assert` 2 creates
-a highly controlled "micro-loop" for testing game logic. This capability is a
-direct consequence of Bevy's architectural design, where the `App` and `World`
-are central, programmatically manipulable constructs. The explicit
-`app.update()` call drives registered systems through their schedules, allowing
-tests to precisely control the execution flow and make assertions on a
+This common pattern of `App::new() -> setup -> app.update() -> assert` 2
+creates a highly controlled "micro-loop" for testing game logic. This
+capability is a direct consequence of Bevy's architectural design, where the
+`App` and `World` are central, programmatically manipulable constructs. The
+explicit `app.update()` call drives registered systems through their schedules,
+allowing tests to precisely control the execution flow and make assertions on a
 well-defined world state after a specific number of "game ticks." This
-fine-grained control contrasts with testing in some other game engines where the
-main loop might be more opaque, or systems could be tightly coupled to engine
-singletons, necessitating more complex mocking.
+fine-grained control contrasts with testing in some other game engines where
+the main loop might be more opaque, or systems could be tightly coupled to
+engine singletons, necessitating more complex mocking.
 
 Consequently, developers can write very focused tests for individual systems or
 small groups of interacting systems with minimal boilerplate code. This
 encourages a testing approach akin to unit testing for game logic, which can
-significantly improve code quality and reduce the likelihood of regressions. The
-inherent modularity of Bevy's ECS, which allows for the easy addition and
+significantly improve code quality and reduce the likelihood of regressions.
+The inherent modularity of Bevy's ECS, which allows for the easy addition and
 removal of systems, resources, and entities on a per-test basis 2, is
 fundamental to achieving this level of test isolation and control.
 
 ## 4. Crafting Effective Test Scenarios
 
-Beyond testing individual systems in isolation, effective testing often requires
-simulating more complex scenarios involving state changes, user inputs, and the
-passage of time. Bevy provides mechanisms to control these aspects
-programmatically, enabling robust scenario-based testing.
+Beyond testing individual systems in isolation, effective testing often
+requires simulating more complex scenarios involving state changes, user
+inputs, and the passage of time. Bevy provides mechanisms to control these
+aspects programmatically, enabling robust scenario-based testing.
 
 ### 4.1. Leveraging Bevy States for Test Isolation
 
@@ -259,7 +260,8 @@ is active.
   components.10 Entities spawned with such a component are automatically
   despawned when the application exits the specified state. This greatly
   simplifies cleanup logic in tests. For example:
-  `commands.spawn((Name::new("TestPlayer"), StateScoped(GameState::InGame), PlayerComponent));`.
+  `commands.spawn((Name::new("TestPlayer"), StateScoped(GameState::InGame), PlayerComponent));`
+  .
 
 - **Programmatic State Transitions:** Tests can trigger state changes by
   modifying the `NextState<MyTestState>` resource:
@@ -331,10 +333,10 @@ for several frames, release), one would modify the input resource and call
 `app.update()` iteratively.
 
 The resource-based nature of Bevy's input system is a significant advantage for
-testability. Systems consuming input data do not need to be aware of whether the
-`ButtonInput` resource was populated by actual hardware events or by test code;
-they only interact with its current state. This design avoids the need for
-complex mocking of hardware event loops or platform-specific input APIs.
+testability. Systems consuming input data do not need to be aware of whether
+the `ButtonInput` resource was populated by actual hardware events or by test
+code; they only interact with its current state. This design avoids the need
+for complex mocking of hardware event loops or platform-specific input APIs.
 Consequently, testing game controls, UI interactions, and any logic contingent
 on discrete or continuous input states is greatly simplified, facilitating the
 achievement of high test coverage for player-facing mechanics.
@@ -374,13 +376,13 @@ The abstraction provided by `Time<Virtual>` is fundamental for creating
 deterministic and efficient tests for time-sensitive game logic, such as
 animations, cooldowns, or physics updates. It allows the test environment to
 dictate the passage of "game time," irrespective of the actual execution speed
-of the test machine or CI runner. This means gameplay mechanics that unfold over
-several seconds or minutes in real gameplay, like a 10-second ability cooldown,
-can be tested in milliseconds by controlling how `Time<Virtual>` is advanced or
-by iterating `app.update()` an appropriate number of times. Understanding the
-relationship between `Time<Virtual>`, `Time<Fixed>`, and the `app.update()`
-mechanism is key to accurately simulating time for systems operating in
-different Bevy schedules.
+of the test machine or CI runner. This means gameplay mechanics that unfold
+over several seconds or minutes in real gameplay, like a 10-second ability
+cooldown, can be tested in milliseconds by controlling how `Time<Virtual>` is
+advanced or by iterating `app.update()` an appropriate number of times.
+Understanding the relationship between `Time<Virtual>`, `Time<Fixed>`, and the
+`app.update()` mechanism is key to accurately simulating time for systems
+operating in different Bevy schedules.
 
 ## 5. Advanced Testing Strategies for Bevy
 
@@ -398,20 +400,20 @@ against this baseline. Deviations from the snapshot signal potential
 regressions.
 
 - **Data Snapshotting:** For Bevy, this typically means serializing relevant
-  components, resources, or even entire entity hierarchies into a human-readable
-  format like RON (Rusty Object Notation) or JSON. Crates like `insta` 13 are
-  excellent for managing these snapshot files, automatically storing them and
-  providing easy workflows for updating them when changes are intentional. A
-  test might query for entities with specific components, collect their data,
-  serialize it, and then assert its consistency using
+  components, resources, or even entire entity hierarchies into a
+  human-readable format like RON (Rusty Object Notation) or JSON. Crates like
+  `insta` 13 are excellent for managing these snapshot files, automatically
+  storing them and providing easy workflows for updating them when changes are
+  intentional. A test might query for entities with specific components,
+  collect their data, serialize it, and then assert its consistency using
   `insta::assert_ron_snapshot!`.
 - `bevy_geppetto`**:** This proof-of-concept crate offers a specialized form of
   snapshot testing for Bevy, drawing inspiration from ideas discussed by Chad
-  Nauseam.2 Its current focus is on capturing sequences of input events during a
-  test run and serializing them (as RON files in a `snapshots/inputs`
-  directory). These recorded inputs can then be replayed in subsequent test runs
-  (`cargo test --test $TEST_NAME -- -r`) to ensure consistent behavior. It also
-  supports capturing inputs at a specified frame rate
+  Nauseam.2 Its current focus is on capturing sequences of input events during
+  a test run and serializing them (as RON files in a `snapshots/inputs`
+  directory). These recorded inputs can then be replayed in subsequent test
+  runs (`cargo test --test $TEST_NAME -- -r`) to ensure consistent behavior. It
+  also supports capturing inputs at a specified frame rate
   (`cargo test --test $TEST_NAME -- -c $FRAMES_PER_SEC`). A notable
   characteristic of `bevy_geppetto` is its requirement to run tests on the main
   thread, often due to dependencies like `winit` that have main-thread
@@ -429,17 +431,18 @@ regressions.
   different hardware or driver versions, and the complexity of managing updates.
 
 The emergence of tools like `bevy_geppetto` 5 and the expressed interest in
-visual snapshotting reflect a maturing testing ecosystem around Bevy. Developers
-are seeking more comprehensive methods for regression testing that go beyond
-simple value assertions, aiming for techniques common in other domains like web
-development (e.g., Jest's snapshot testing, visual diffing tools). Input
-recording and replaying, as facilitated by `bevy_geppetto`, is a step towards
-testing emergent behaviors that arise from complex interactions over simulated
-time. While powerful, snapshot tests, particularly visual ones, demand careful
-management regarding the updating of snapshots and handling minor, acceptable
-differences. Data snapshots are generally more robust and easier to integrate
-into CI workflows. The main-thread requirement noted for `bevy_geppetto` 5 is a
-practical constraint that CI configurations must accommodate.
+visual snapshotting reflect a maturing testing ecosystem around Bevy.
+Developers are seeking more comprehensive methods for regression testing that
+go beyond simple value assertions, aiming for techniques common in other
+domains like web development (e.g., Jest's snapshot testing, visual diffing
+tools). Input recording and replaying, as facilitated by `bevy_geppetto`, is a
+step towards testing emergent behaviors that arise from complex interactions
+over simulated time. While powerful, snapshot tests, particularly visual ones,
+demand careful management regarding the updating of snapshots and handling
+minor, acceptable differences. Data snapshots are generally more robust and
+easier to integrate into CI workflows. The main-thread requirement noted for
+`bevy_geppetto` 5 is a practical constraint that CI configurations must
+accommodate.
 
 ### 5.2. Integration Testing Complex Interactions
 
@@ -463,8 +466,8 @@ Designing effective integration tests involves:
 For example, testing a complete combat interaction might involve a
 `PlayerAttackSystem` generating a `DamageEvent`, which is then processed by a
 `HealthSystem` on an enemy entity. This could lead to the enemy's health
-dropping, potentially triggering a `DeathEvent` if health reaches zero, which in
-turn might be handled by a `LootDropSystem` and an `EnemyCleanupSystem`. The
+dropping, potentially triggering a `DeathEvent` if health reaches zero, which
+in turn might be handled by a `LootDropSystem` and an `EnemyCleanupSystem`. The
 integration test would set up the player and enemy entities, simulate the
 attack, and then verify the enemy's health reduction, the correct emission of
 death and loot events, and the eventual despawning of the enemy entity. Bevy's
@@ -493,8 +496,8 @@ are written *before* the actual application code is implemented.16 The typical
 TDD cycle is "Red-Green-Refactor":
 
 1. **Red:** Write a test that defines a desired improvement or new function.
-   This test will initially fail because the code doesn't exist or isn't correct
-   yet.
+   This test will initially fail because the code doesn't exist or isn't
+   correct yet.
 2. **Green:** Write the minimal amount of code necessary to make the test pass.
 3. **Refactor:** Clean up the newly written code (and the test code itself) for
    clarity, efficiency, and good design, ensuring all tests still pass.
@@ -520,16 +523,16 @@ that a newly spawned character entity defaults to an "idle" animation state
 after the animation system runs for the first time.16
 
 Adopting TDD in a Bevy context encourages developers to think critically about
-system interactions and data transformations from the perspective of testability
-and desired behavior *before* writing any implementation code. This process
-naturally leads to clearer, more decoupled designs because, to write a test for
-a system, its inputs (queries, resources, events) and expected outputs
+system interactions and data transformations from the perspective of
+testability and desired behavior *before* writing any implementation code. This
+process naturally leads to clearer, more decoupled designs because, to write a
+test for a system, its inputs (queries, resources, events) and expected outputs
 (component changes, new events) must be precisely defined. This forced clarity
 on a system's responsibilities and its API often results in more focused and
 less coupled code. While TDD can sometimes feel slower during rapid prototyping
-phases, which are common in game development, its benefits in terms of long-term
-maintainability and stability, especially for core game systems, can be
-substantial. The idea of "playing your tests," as mentioned in relation to
+phases, which are common in game development, its benefits in terms of
+long-term maintainability and stability, especially for core game systems, can
+be substantial. The idea of "playing your tests," as mentioned in relation to
 creating interactive test scenes 2, can be seen as a game development-friendly
 adaptation of the TDD feedback loop, allowing for both automated verification
 and interactive debugging of the feature under development.
@@ -559,20 +562,20 @@ When incorporating headless Bevy tests into this workflow, a few additional
 considerations arise:
 
 - **System Dependencies:** The CI runner environment must have any necessary
-  libraries for headless operation. While the `backends: None` WGPU setting aims
-  to minimize external graphics dependencies, if WGPU (or underlying graphics
-  drivers) still attempts to initialize certain low-level graphics components, a
-  minimal set of graphics libraries (e.g., Vulkan SDK components or X server
-  libraries like Xvfb on Linux for a virtual display) might be needed. Bevy's
-  own CI often uses `ubuntu-latest` runners, which generally have good support
-  for these.18
+  libraries for headless operation. While the `backends: None` WGPU setting
+  aims to minimize external graphics dependencies, if WGPU (or underlying
+  graphics drivers) still attempts to initialize certain low-level graphics
+  components, a minimal set of graphics libraries (e.g., Vulkan SDK components
+  or X server libraries like Xvfb on Linux for a virtual display) might be
+  needed. Bevy's own CI often uses `ubuntu-latest` runners, which generally
+  have good support for these.18
 
 - **Main Thread Requirement:** If tests utilize crates like `bevy_geppetto` 5 or
   otherwise have components (often related to `winit` or event loops) that
   require execution on the main thread, the standard `cargo test` invocation
   might not suffice. Such tests often need to be structured as separate
-  integration test binaries defined in `Cargo.toml` using the `[[test]]` syntax,
-  for example:
+  integration test binaries defined in `Cargo.toml` using the `[[test]]`
+  syntax, for example:
 
   ```toml
   [[test]]
@@ -596,17 +599,17 @@ configurations observed in such workflows include:
     reproducible builds, though it can increase build times compared to local
     incremental builds.
   - `CARGO_PROFILE_TEST_DEBUG: 0`, `CARGO_PROFILE_DEV_DEBUG: 0`: To control the
-    inclusion of debug information in test and development profiles, potentially
-    reducing binary sizes and compile times for CI artifacts.
+    inclusion of debug information in test and development profiles,
+    potentially reducing binary sizes and compile times for CI artifacts.
   - Specialized flags like `RUSTFLAGS` and `MIRIFLAGS` for enabling tools like
     Miri.
 - **Jobs:** A comprehensive CI setup often includes multiple jobs:
   - Basic compilation checks (`check-compiles`).
   - Extensive test runs across a matrix of configurations
     (`test-various-configs`), covering different feature flag combinations,
-    operating systems (e.g., `windows-latest`, `macos-latest`, `ubuntu-latest`),
-    and Rust toolchain versions (stable, beta, nightly). This matrix testing is
-    a best practice for ensuring broad compatibility.
+    operating systems (e.g., `windows-latest`, `macos-latest`,
+    `ubuntu-latest`), and Rust toolchain versions (stable, beta, nightly). This
+    matrix testing is a best practice for ensuring broad compatibility.
   - Execution with Miri (`miri`) to detect undefined behavior.
   - Static analysis and linting (`clippy`).
   - Code formatting checks (`rustfmt`).
@@ -615,15 +618,15 @@ configurations observed in such workflows include:
   fine-tuned, specifying paths such as `~/.cargo/bin/`,
   `~/.cargo/registry/index/`, `~/.cargo/registry/cache/`, `~/.cargo/git/db/`,
   and the project-local `target/` directory. The cache key is usually composed
-  of the operating system, Rust toolchain version, the hash of `Cargo.lock`, and
-  potentially other custom strings to ensure cache validity.18
+  of the operating system, Rust toolchain version, the hash of `Cargo.lock`,
+  and potentially other custom strings to ensure cache validity.18
 
 Bevy's own CI configuration 18 provides a battle-tested template that
 demonstrates mature practices for testing a complex Rust project. Its use of
 matrix builds to cover diverse environments, integration of Miri for memory
 safety checks, and sophisticated caching strategies are indicative of a serious
-approach to maintaining code quality and build efficiency. Developers setting up
-CI for their own Bevy projects can save significant time and avoid common
+approach to maintaining code quality and build efficiency. Developers setting
+up CI for their own Bevy projects can save significant time and avoid common
 pitfalls by referencing this existing configuration. The choice of
 `CARGO_INCREMENTAL: 0` is a common CI trade-off: it ensures more consistent
 builds at the cost of speed; projects experiencing very long CI times might
@@ -635,9 +638,9 @@ realities that the CI testing strategy must accommodate.
 ## 7. Best Practices for Writing Testable Bevy Code
 
 The ease and effectiveness of testing a Bevy application are significantly
-influenced by how the application code itself is structured. Adhering to certain
-design principles not only leads to better overall code quality but also makes
-writing unit, integration, and headless tests considerably simpler.
+influenced by how the application code itself is structured. Adhering to
+certain design principles not only leads to better overall code quality but
+also makes writing unit, integration, and headless tests considerably simpler.
 
 - **Designing Clear and Focused Components:** Components are the fundamental
   data containers in Bevy's ECS. They should ideally be plain Rust structs or
@@ -645,14 +648,14 @@ writing unit, integration, and headless tests considerably simpler.
 
   - **Granularity:** Keep components small and focused on a single, cohesive
     piece of data or concern. As a guideline, "all of the data on a component
-    should generally be accessed at once".19 This avoids overly large components
-    where only a fraction of the data is relevant to most systems, improving
-    clarity and potentially performance.
+    should generally be accessed at once".19 This avoids overly large
+    components where only a fraction of the data is relevant to most systems,
+    improving clarity and potentially performance.
   - **Behavior vs. Data:** Components should primarily hold data. Logic
-    operating on this data resides in systems. Avoid writing "anemic tests" that
-    merely check simple getters or setters on components if those components
-    encapsulate no inherent logic 20; instead, test the behavior of systems that
-    interact with these components.
+    operating on this data resides in systems. Avoid writing "anemic tests"
+    that merely check simple getters or setters on components if those
+    components encapsulate no inherent logic 20; instead, test the behavior of
+    systems that interact with these components.
   - **Specialized Components:** Utilize marker components (empty structs
     deriving `Component`) for tagging entities or filtering queries
     effectively.8 Newtype wrappers around simple types (e.g.,
@@ -660,8 +663,8 @@ writing unit, integration, and headless tests considerably simpler.
     ambiguity and enhancing type safety.8
 
 - **Effective Use of Events for Decoupled Communication:** Bevy's event system
-  is a powerful tool for enabling communication between systems without creating
-  tight coupling.10
+  is a powerful tool for enabling communication between systems without
+  creating tight coupling.10
 
   - **Decoupling:** Prefer events for signaling occurrences or passing data that
     may affect multiple, disparate parts of the game. Systems can subscribe to
@@ -685,29 +688,29 @@ writing unit, integration, and headless tests considerably simpler.
     Resources, consumed Events) and its outputs (changes to Components or
     Resources, sent Events via Commands or EventWriters) should be well-defined.
   - **Isolation:** When testing, aim to test systems in isolation or in small,
-    controlled groups. As suggested, one can "create a standalone stage with the
-    systems you want to run, and manually run it on the World".7 This aligns
-    with the idea that "ideally every test just adds the bare-minimum components
-    it needs... This is the anti-spaghetti property that makes me really love
-    ECS".2
+    controlled groups. As suggested, one can "create a standalone stage with
+    the systems you want to run, and manually run it on the World".7 This
+    aligns with the idea that "ideally every test just adds the bare-minimum
+    components it needs… This is the anti-spaghetti property that makes me
+    really love ECS".2
 
 - **Managing Entity Lifecycles and IDs:** Proper management of entity lifecycles
   is crucial for both game correctness and test hygiene.10
 
   - **Naming Entities:** Spawning top-level or significant entities with a
-    `Name` component (e.g., `Name::new("Player")`) greatly aids in debugging, as
-    it allows for easier identification of entities in logs or inspectors.
+    `Name` component (e.g., `Name::new("Player")`) greatly aids in debugging,
+    as it allows for easier identification of entities in logs or inspectors.
   - **Automated Cleanup with** `StateScoped`**:** The preferred method for
     ensuring entities are cleaned up when they are no longer relevant (e.g.,
     when exiting a game state or a test scenario) is to spawn them with a
     `StateScoped(MyState::Variant)` component. This automatically despawns the
-    entity when the application transitions out of `MyState::Variant`. This is a
-    significant improvement for test hygiene, preventing state leakage between
-    tests.
+    entity when the application transitions out of `MyState::Variant`. This is
+    a significant improvement for test hygiene, preventing state leakage
+    between tests.
   - **Strong IDs:** For entities that need to persist across game sessions
-    (e.g., through saving and loading) or be reliably referenced over a network,
-    do not rely solely on Bevy's `Entity` ID, which is ephemeral and can be
-    reused. Instead, implement custom "strong ID" types (e.g., a
+    (e.g., through saving and loading) or be reliably referenced over a
+    network, do not rely solely on Bevy's `Entity` ID, which is ephemeral and
+    can be reused. Instead, implement custom "strong ID" types (e.g., a
     `struct QuestId(u32);`) that provide stable, unique identification.
 
 - **Co-locating** `OnEnter`**/**`OnExit` **Systems for State Transitions:** When
@@ -733,8 +736,8 @@ cleanup. Similarly, the use of strong IDs enables more reliable testing of
 persistence and networking logic. Therefore, designing for testability from the
 outset by adopting these practices makes the process of writing comprehensive
 tests significantly easier and the tests themselves more robust and
-maintainable. Ignoring these principles can lead to tightly coupled code that is
-difficult to test effectively, especially in automated CI environments.2 The
+maintainable. Ignoring these principles can lead to tightly coupled code that
+is difficult to test effectively, especially in automated CI environments.2 The
 evolution of Bevy, including features like `StateScoped` entities 10,
 demonstrates a trend towards providing engine-level support for patterns that
 enhance both application structure and testability.
@@ -765,43 +768,43 @@ testing ecosystem 13 and their potential applications in Bevy testing:
 The applicability of these general-purpose Rust testing crates to Bevy projects
 underscores the strength of Rust's ecosystem and Bevy's successful integration
 within it. Developers are not confined to the testing utilities provided
-directly by Bevy but can draw upon a rich set of mature, widely-used tools. This
-allows for the construction of more sophisticated, robust, and maintainable test
-suites, tailored to the specific needs of the Bevy application being developed.
-For example, `proptest` can be invaluable for uncovering subtle bugs in complex
-game logic by exploring a wide input space, while `insta` can simplify the
-verification of intricate game states that would otherwise require numerous
-individual assertions.
+directly by Bevy but can draw upon a rich set of mature, widely-used tools.
+This allows for the construction of more sophisticated, robust, and
+maintainable test suites, tailored to the specific needs of the Bevy
+application being developed. For example, `proptest` can be invaluable for
+uncovering subtle bugs in complex game logic by exploring a wide input space,
+while `insta` can simplify the verification of intricate game states that would
+otherwise require numerous individual assertions.
 
 ## 9. Conclusion: Building Quality Bevy Applications with Confidence
 
 This guide has detailed a comprehensive array of strategies for testing Bevy
-applications in Rust, with a particular emphasis on leveraging headless mode for
-effective automation within Continuous Integration environments. Key approaches
-include the foundational setup for headless execution, techniques for testing
-individual systems and components by manipulating the `App` and `World`, methods
-for crafting effective test scenarios through the control of Bevy `States`,
-simulated inputs, and virtual time, and advanced strategies such as data-driven
-snapshot testing and the application of Test-Driven Development principles.
-Furthermore, the integration of these tests into CI pipelines, drawing from
-Bevy's own robust CI practices, and adherence to best practices for writing
-testable Bevy code have been explored.
+applications in Rust, with a particular emphasis on leveraging headless mode
+for effective automation within Continuous Integration environments. Key
+approaches include the foundational setup for headless execution, techniques
+for testing individual systems and components by manipulating the `App` and
+`World`, methods for crafting effective test scenarios through the control of
+Bevy `States`, simulated inputs, and virtual time, and advanced strategies such
+as data-driven snapshot testing and the application of Test-Driven Development
+principles. Furthermore, the integration of these tests into CI pipelines,
+drawing from Bevy's own robust CI practices, and adherence to best practices
+for writing testable Bevy code have been explored.
 
 The core message is that a disciplined and comprehensive approach to testing,
 one that fully utilizes the strengths of Bevy's Entity Component System and its
-capability for headless operation, is not merely an adjunct to development but a
-critical component for building high-quality, maintainable, and robust Bevy
+capability for headless operation, is not merely an adjunct to development but
+a critical component for building high-quality, maintainable, and robust Bevy
 applications. The modularity inherent in ECS, combined with Bevy's programmatic
-control over its execution loop, resources, and state, provides a fertile ground
-for a wide spectrum of testing methodologies.
+control over its execution loop, resources, and state, provides a fertile
+ground for a wide spectrum of testing methodologies.
 
 Automated testing, especially when integrated into CI, should be viewed as an
-enabler rather than a chore. It facilitates faster iteration cycles by providing
-rapid feedback on changes, allows for safer refactoring by guarding against
-regressions, and ultimately instills greater confidence in the development
-process. The patterns and tools discussed—from `StateScoped` entities
-simplifying test cleanup to the `Time<Virtual>` resource enabling deterministic
-testing of time-dependent logic—are available to Bevy developers.
+enabler rather than a chore. It facilitates faster iteration cycles by
+providing rapid feedback on changes, allows for safer refactoring by guarding
+against regressions, and ultimately instills greater confidence in the
+development process. The patterns and tools discussed—from `StateScoped`
+entities simplifying test cleanup to the `Time<Virtual>` resource enabling
+deterministic testing of time-dependent logic—are available to Bevy developers.
 
 The comprehensive nature of the testing strategies applicable to Bevy, ranging
 from low-level unit tests of systems to sophisticated CI automation workflows,
@@ -810,6 +813,6 @@ projects where reliability and maintainability are paramount. As the Bevy
 community continues to expand and more complex applications are developed, the
 widespread knowledge and adoption of these testing strategies will be a key
 determinant in the overall quality and success of projects within the Bevy
-ecosystem. Encouraging a "testing culture," where testing is an integral part of
-the development lifecycle, will empower developers to build with Bevy more
+ecosystem. Encouraging a "testing culture," where testing is an integral part
+of the development lifecycle, will empower developers to build with Bevy more
 confidently and effectively.

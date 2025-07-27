@@ -16,7 +16,9 @@ pub use constants::*;
 // Re-export commonly used items
 pub use actor::Actor;
 pub use components::{DdlogId, Health, Target, UnitType, VelocityComp};
-pub use dbsp_circuit::{DbspCircuit, FloorHeightAt, HighestBlockAt, NewPosition, Position};
+pub use dbsp_circuit::{
+    DbspCircuit, FloorHeightAt, HighestBlockAt, NewPosition, Position, PositionFloor,
+};
 pub use dbsp_circuit::{NewVelocity, Velocity};
 pub use dbsp_sync::{
     apply_dbsp_outputs_system, cache_state_for_dbsp_system, init_dbsp_system, DbspPlugin,
@@ -39,6 +41,7 @@ pub mod prelude {
     pub use crate::DbspCircuit;
     pub use crate::DbspPlugin;
     pub use crate::FloorHeightAt;
+    pub use crate::PositionFloor;
     pub use crate::Velocity;
     pub use ordered_float::OrderedFloat;
 }

@@ -4,8 +4,8 @@ The migration of our core physics and geometry logic from DDlog to a pure-Rust
 DBSP circuit has profound, positive implications for our testing strategy.
 Because the dataflow logic is now standard Rust code, we can leverage the full
 power of Rust's native testing ecosystem, from fine-grained unit tests to
-high-level behavioural scenarios. This eliminates the indirection and complexity
-of testing a foreign language module via an FFI boundary.
+high-level behavioural scenarios. This eliminates the indirection and
+complexity of testing a foreign language module via an FFI boundary.
 
 This document outlines our two-tiered approach to ensuring the correctness and
 robustness of the DBSP-based world inference engine.
@@ -13,10 +13,11 @@ robustness of the DBSP-based world inference engine.
 ## 1. Unit Testing: Verifying Individual Dataflow Operators
 
 At the lowest level, we must verify that each logical step in our dataflow
-circuit behaves as expected. A "unit" in this context is a small, self-contained
-part of the circuit—typically a single operator (`map`, `join`, `filter`,
-`aggregate`) or a small chain of them. The goal is to test the operator's logic
-in isolation, providing it with controlled inputs and asserting on its outputs.
+circuit behaves as expected. A "unit" in this context is a small,
+self-contained part of the circuit—typically a single operator (`map`, `join`,
+`filter`, `aggregate`) or a small chain of them. The goal is to test the
+operator's logic in isolation, providing it with controlled inputs and
+asserting on its outputs.
 
 The move to DBSP makes this remarkably straightforward. A test for a dataflow
 operator is simply a standard Rust test function marked with `#[test]`.
@@ -124,10 +125,10 @@ results, all without the overhead of rendering or user input.
    back to the ECS components.
 
 3. **Then (State Assertion)**: After the update, we query the `World` again to
-   verify the outcome. We check if components have been updated as expected. For
-   example, we might assert that a falling entity's `Transform.translation.z`
-   has decreased, or that a standing entity's position now matches the
-   calculated floor height.
+   verify the outcome. We check if components have been updated as expected.
+   For example, we might assert that a falling entity's
+   `Transform.translation.z` has decreased, or that a standing entity's
+   position now matches the calculated floor height.
 
 ### Example: BDD test for gravity
 
