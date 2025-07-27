@@ -91,9 +91,11 @@ pub(super) fn floor_height_stream(
             },
             |_, _| None,
         )
-        // Flatten `Option<FloorHeightAt>` from the outer join, discarding
+        // Convert `Option<FloorHeightAt>` from the outer join, discarding
         // unmatched slope records.
-        .flat_map(|fh| fh.clone())
+        .map(|fh| fh.clone())
+        .filter(|fh| fh.is_some())
+        .map(|fh| fh.clone().unwrap())
 }
 
 /// Applies gravity to each velocity record.
@@ -105,10 +107,8 @@ pub(super) fn new_velocity_stream(
     velocities: &Stream<RootCircuit, OrdZSet<Velocity>>,
 ) -> Stream<RootCircuit, OrdZSet<Velocity>> {
     velocities.map(|v| Velocity {
-        entity: v.entity,
-        vx: v.vx,
-        vy: v.vy,
         vz: OrderedFloat(v.vz.into_inner() + GRAVITY_PULL),
+        ..v.clone()
     })
 }
 
@@ -125,10 +125,10 @@ pub(super) fn new_position_stream(
     positions.map_index(|p| (p.entity, p.clone())).join(
         &new_vel.map_index(|v| (v.entity, v.clone())),
         |_, p, v| Position {
-            entity: p.entity,
             x: OrderedFloat(p.x.into_inner() + v.vx.into_inner()),
             y: OrderedFloat(p.y.into_inner() + v.vy.into_inner()),
             z: OrderedFloat(p.z.into_inner() + v.vz.into_inner()),
+            ..p.clone()
         },
     )
 }
