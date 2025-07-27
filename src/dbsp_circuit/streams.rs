@@ -59,29 +59,6 @@ pub fn highest_block_pair(
         })
 }
 
-/// Calculates the world-space `z` coordinate of a block's upper surface.
-fn block_top(z: i32) -> f64 {
-    z as f64 + BLOCK_TOP_OFFSET
-}
-
-/// Calculates the world-space `z` coordinate for a block's floor height.
-///
-/// If a slope gradient is provided, it adjusts the block's top height by the
-/// gradient scaled by [`BLOCK_CENTRE_OFFSET`]. This helper keeps the
-/// slope-adjustment logic out of the stream closures so that they remain
-/// concise.
-fn compute_floor_height_at(x: i32, y: i32, z: i32, grad: Option<(f64, f64)>) -> FloorHeightAt {
-    let base = block_top(z);
-    let extra = grad
-        .map(|(gx, gy)| BLOCK_CENTRE_OFFSET * (gx + gy))
-        .unwrap_or(0.0);
-    FloorHeightAt {
-        x,
-        y,
-        z: OrderedFloat(base + extra),
-    }
-}
-
 /// Derives the floor height for each block, optionally applying slopes.
 ///
 /// The stream joins the highest block id at a grid cell with any matching
@@ -92,20 +69,26 @@ pub(super) fn floor_height_stream(
     highest_pair: &Stream<RootCircuit, OrdZSet<(HighestBlockAt, i64)>>,
     slopes: &Stream<RootCircuit, OrdZSet<BlockSlope>>,
 ) -> Stream<RootCircuit, OrdZSet<FloorHeightAt>> {
-    let slope_idx = slopes.map_index(|bs| (bs.block_id, (bs.grad_x, bs.grad_y)));
     highest_pair
         .map_index(|(hb, id)| (*id, (hb.x, hb.y, hb.z)))
         .outer_join(
-            &slope_idx,
+            &slopes.map_index(|bs| (bs.block_id, (bs.grad_x, bs.grad_y))),
             |_, &(x, y, z), &(gx, gy)| {
-                Some(compute_floor_height_at(
+                let base = z as f64 + BLOCK_TOP_OFFSET;
+                let gradient = BLOCK_CENTRE_OFFSET * (gx.into_inner() + gy.into_inner());
+                Some(FloorHeightAt {
                     x,
                     y,
-                    z,
-                    Some((gx.into_inner(), gy.into_inner())),
-                ))
+                    z: OrderedFloat(base + gradient),
+                })
             },
-            |_, &(x, y, z)| Some(compute_floor_height_at(x, y, z, None)),
+            |_, &(x, y, z)| {
+                Some(FloorHeightAt {
+                    x,
+                    y,
+                    z: OrderedFloat(z as f64 + BLOCK_TOP_OFFSET),
+                })
+            },
             |_, _| None,
         )
         .flat_map(|fh| fh.clone())

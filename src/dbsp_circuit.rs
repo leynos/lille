@@ -133,6 +133,18 @@ pub struct DbspCircuit {
     position_floor_out: OutputHandle<OrdZSet<PositionFloor>>,
 }
 
+struct BuildHandles {
+    position_in: ZSetHandle<Position>,
+    velocity_in: ZSetHandle<Velocity>,
+    block_in: ZSetHandle<Block>,
+    block_slope_in: ZSetHandle<BlockSlope>,
+    new_position_out: OutputHandle<OrdZSet<NewPosition>>,
+    new_velocity_out: OutputHandle<OrdZSet<NewVelocity>>,
+    highest_block_out: OutputHandle<OrdZSet<HighestBlockAt>>,
+    floor_height_out: OutputHandle<OrdZSet<FloorHeightAt>>,
+    position_floor_out: OutputHandle<OrdZSet<PositionFloor>>,
+}
+
 impl DbspCircuit {
     /// Constructs a new `DbspCircuit` for simulating game world physics and environment state.
     ///
@@ -153,29 +165,18 @@ impl DbspCircuit {
     /// ```
     pub fn new() -> Result<Self, dbsp::Error> {
         let (circuit, handles) = RootCircuit::build(Self::build_streams)?;
-        let (
-            position_in,
-            velocity_in,
-            block_in,
-            block_slope_in,
-            new_position_out,
-            new_velocity_out,
-            highest_block_out,
-            floor_height_out,
-            position_floor_out,
-        ) = handles;
 
         Ok(Self {
             circuit,
-            position_in,
-            velocity_in,
-            block_in,
-            block_slope_in,
-            new_position_out,
-            new_velocity_out,
-            highest_block_out,
-            floor_height_out,
-            position_floor_out,
+            position_in: handles.position_in,
+            velocity_in: handles.velocity_in,
+            block_in: handles.block_in,
+            block_slope_in: handles.block_slope_in,
+            new_position_out: handles.new_position_out,
+            new_velocity_out: handles.new_velocity_out,
+            highest_block_out: handles.highest_block_out,
+            floor_height_out: handles.floor_height_out,
+            position_floor_out: handles.position_floor_out,
         })
     }
 
@@ -183,23 +184,7 @@ impl DbspCircuit {
         self.circuit.step()
     }
 
-    #[allow(clippy::type_complexity)]
-    fn build_streams(
-        circuit: &mut RootCircuit,
-    ) -> Result<
-        (
-            ZSetHandle<Position>,
-            ZSetHandle<Velocity>,
-            ZSetHandle<Block>,
-            ZSetHandle<BlockSlope>,
-            OutputHandle<OrdZSet<NewPosition>>,
-            OutputHandle<OrdZSet<NewVelocity>>,
-            OutputHandle<OrdZSet<HighestBlockAt>>,
-            OutputHandle<OrdZSet<FloorHeightAt>>,
-            OutputHandle<OrdZSet<PositionFloor>>,
-        ),
-        AnyError,
-    > {
+    fn build_streams(circuit: &mut RootCircuit) -> Result<BuildHandles, AnyError> {
         let (positions, position_in) = circuit.add_input_zset::<Position>();
         let (velocities, velocity_in) = circuit.add_input_zset::<Velocity>();
         let (blocks, block_in) = circuit.add_input_zset::<Block>();
@@ -214,17 +199,17 @@ impl DbspCircuit {
         let new_vel = new_velocity_stream(&velocities);
         let new_pos = new_position_stream(&positions, &new_vel);
 
-        Ok((
+        Ok(BuildHandles {
             position_in,
             velocity_in,
             block_in,
             block_slope_in,
-            new_pos.output(),
-            new_vel.output(),
-            highest.output(),
-            floor_height.output(),
-            pos_floor.output(),
-        ))
+            new_position_out: new_pos.output(),
+            new_velocity_out: new_vel.output(),
+            highest_block_out: highest.output(),
+            floor_height_out: floor_height.output(),
+            position_floor_out: pos_floor.output(),
+        })
     }
 
     /// Returns a reference to the input handle for feeding position records into the circuit.

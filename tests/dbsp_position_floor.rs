@@ -81,3 +81,30 @@ fn position_floor_cases(
     exp.sort_by_key(|pf| pf.position.entity);
     assert_eq!(vals, exp);
 }
+
+/// Ensures multiple entities in the same grid cell each receive a
+/// corresponding [`PositionFloor`] record.
+#[test]
+fn multiple_positions_same_grid_cell() {
+    let mut circuit = common::new_circuit();
+    circuit.block_in().push(blk(1, 0, 0, 0), 1);
+    circuit.position_in().push(pos(1, 0.1, 0.1, 2.0), 1);
+    circuit.position_in().push(pos(2, 0.8, 0.4, 3.0), 1);
+    circuit.step().expect("step");
+
+    let mut vals: Vec<PositionFloor> = circuit
+        .position_floor_out()
+        .consolidate()
+        .iter()
+        .map(|(pf, _, _)| pf.clone())
+        .collect();
+    vals.sort_by_key(|pf| pf.position.entity);
+
+    let mut exp = vec![
+        pf(pos(1, 0.1, 0.1, 2.0), 1.0),
+        pf(pos(2, 0.8, 0.4, 3.0), 1.0),
+    ];
+    exp.sort_by_key(|pf| pf.position.entity);
+
+    assert_eq!(vals, exp);
+}
