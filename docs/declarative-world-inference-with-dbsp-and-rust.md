@@ -8,9 +8,9 @@ performance of incremental computation with the clarity of a declarative
 programming model.
 
 This architecture replaces a previous implementation that used DDlog. By
-migrating to DBSP, we have eliminated the need for a separate language toolchain
-and a foreign function interface (FFI) boundary, resulting in a more robust,
-type-safe, and maintainable pure-Rust codebase.
+migrating to DBSP, we have eliminated the need for a separate language
+toolchain and a foreign function interface (FFI) boundary, resulting in a more
+robust, type-safe, and maintainable pure-Rust codebase.
 
 ## The DBSP Circuit & Dataflow Model
 
@@ -84,16 +84,16 @@ DBSP operators.
 
 #### Geometry Dataflow: Calculating Floor Height
 
-The first stage of the circuit calculates the height of the "floor" at any given
-`(x, y)` coordinate.
+The first stage of the circuit calculates the height of the "floor" at any
+given `(x, y)` coordinate.
 
 1. **Find Highest Block**: The `Block` input stream is grouped by its `(x, y)`
    coordinates, and we find the maximum `z` for each group.
 
 2. **Calculate Floor Height**: This `HighestBlockAt` stream is then joined with
    the `BlockSlope` stream. A `map` operator calculates the final
-   `FloorHeightAt(x, y, z_floor)`, using a plane equation for sloped blocks or a
-   flat offset for others.
+   `FloorHeightAt(x, y, z_floor)`, using a plane equation for sloped blocks or
+   a flat offset for others.
 
 Here is how that dataflow is constructed in Rust:
 
@@ -143,8 +143,8 @@ unsupported entities and applying gravity.
    calculated `FloorHeightAt` stream.
 
 2. **Filter for Unsupported**: A `filter` operator selects only those entities
-   whose `z` position is greater than their calculated floor height plus a small
-   grace distance.
+   whose `z` position is greater than their calculated floor height plus a
+   small grace distance.
 
 3. **Apply Gravity**: A final `map` operator takes the unsupported entities and
    calculates their new position by subtracting `GRAVITY_PULL` from their `z`
@@ -182,9 +182,9 @@ let gravity_applied = unsupported_entities.map(|(pos, _z_floor)| {
 
 ## Data Synchronisation with Bevy ECS
 
-The DBSP circuit operates as a self-contained computational engine driven by the
-Bevy ECS. The interaction is orchestrated by a set of Bevy systems that manage
-the data flow each tick.
+The DBSP circuit operates as a self-contained computational engine driven by
+the Bevy ECS. The interaction is orchestrated by a set of Bevy systems that
+manage the data flow each tick.
 
 1. **Data Extraction (Rust → DBSP)**: A Bevy system queries the ECS for all
    relevant components (e.g., `Transform`, `Velocity`). This data is collected
@@ -200,9 +200,9 @@ the data flow each tick.
    incrementally propagate the changes through the entire dataflow graph.
 
 4. **Applying Results (DBSP → Rust)**: A final system reads the computed results
-   from the circuit's output streams. For instance, it consumes all records from
-   the `NewPosition` output stream and updates the `Transform` component of the
-   corresponding entities in the ECS.
+   from the circuit's output streams. For instance, it consumes all records
+   from the `NewPosition` output stream and updates the `Transform` component
+   of the corresponding entities in the ECS.
 
 The following sequence diagram summarizes how the application constructs and
 drives the circuit each tick.

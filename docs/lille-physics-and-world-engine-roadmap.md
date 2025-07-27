@@ -98,7 +98,7 @@ DDlog-based version.
    - [x] Implement the `FloorHeightAt` calculation, including the `left_join`
      with `BlockSlope` data to handle sloped surfaces correctly.
 
-   - [ ] Implement the logic to join an entity's continuous `Position` with the
+   - [x] Implement the logic to join an entity's continuous `Position` with the
      discrete `FloorHeightAt` grid.
 
 2. **Complete Motion Logic**:
