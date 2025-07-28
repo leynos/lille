@@ -91,9 +91,9 @@ pub(super) fn floor_height_stream(
             },
             |_, _| None,
         )
-        // Flatten `Option<FloorHeightAt>` from the outer join, discarding
+        // Convert `Option<FloorHeightAt>` from the outer join, discarding
         // unmatched slope records.
-        .flat_map(|fh| fh.clone())
+        .flat_map(|fh| fh.as_ref().cloned())
 }
 
 /// Applies gravity to each velocity record.
