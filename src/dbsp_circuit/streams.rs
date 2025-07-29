@@ -92,8 +92,9 @@ pub(super) fn floor_height_stream(
             |_, _| None,
         )
         // Convert `Option<FloorHeightAt>` from the outer join, discarding
-        // unmatched slope records. `flat_map` consumes the cloned `Option`
-        // directly, yielding a record when `fh` is `Some`.
+        // unmatched slope records. `flat_map` passes each item by reference,
+        // so cloning is required to produce an owned `Option` for the
+        // iterator.
         .flat_map(|fh| fh.clone())
 }
 
