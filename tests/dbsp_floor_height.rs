@@ -54,3 +54,38 @@ fn floor_height_cases(
     exp.sort_by_key(|h| (h.x, h.y));
     assert_eq!(vals, exp);
 }
+
+#[test]
+fn unmatched_slope_is_ignored() {
+    let mut circuit = common::new_circuit();
+    circuit.block_in().push(blk(1, 0, 0, 0), 1);
+    circuit.block_slope_in().push(slope(2, 1.0, 0.0), 1);
+
+    circuit.step().expect("step");
+
+    let vals: Vec<FloorHeightAt> = circuit
+        .floor_height_out()
+        .consolidate()
+        .iter()
+        .map(|(fh, _, _)| fh.clone())
+        .collect();
+
+    assert_eq!(vals, vec![fh(0, 0, 1.0)]);
+}
+
+#[test]
+fn slope_without_block_yields_no_height() {
+    let mut circuit = common::new_circuit();
+    circuit.block_slope_in().push(slope(1, 1.0, 0.0), 1);
+
+    circuit.step().expect("step");
+
+    let vals: Vec<FloorHeightAt> = circuit
+        .floor_height_out()
+        .consolidate()
+        .iter()
+        .map(|(fh, _, _)| fh.clone())
+        .collect();
+
+    assert!(vals.is_empty());
+}
