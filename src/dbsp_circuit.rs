@@ -21,10 +21,12 @@ use ordered_float::OrderedFloat;
 use size_of::SizeOf;
 
 use crate::components::{Block, BlockSlope};
+use crate::GRACE_DISTANCE;
 
 mod streams;
 use streams::{
     floor_height_stream, new_position_stream, new_velocity_stream, position_floor_stream,
+    standing_motion_stream,
 };
 pub use streams::{highest_block_pair, PositionFloor};
 
@@ -35,6 +37,7 @@ use rkyv::{Archive, Deserialize, Serialize};
     Serialize,
     Deserialize,
     Clone,
+    Copy,
     Debug,
     PartialEq,
     Eq,
@@ -59,6 +62,7 @@ pub type NewPosition = Position;
     Serialize,
     Deserialize,
     Clone,
+    Copy,
     Debug,
     PartialEq,
     Eq,
@@ -196,8 +200,24 @@ impl DbspCircuit {
 
         let pos_floor = position_floor_stream(&positions, &floor_height);
 
-        let new_vel = new_velocity_stream(&velocities);
-        let new_pos = new_position_stream(&positions, &new_vel);
+        let unsupported = pos_floor
+            .filter(|pf| pf.position.z.into_inner() > pf.z_floor.into_inner() + GRACE_DISTANCE);
+        let standing = pos_floor
+            .filter(|pf| pf.position.z.into_inner() <= pf.z_floor.into_inner() + GRACE_DISTANCE);
+
+        let unsupported_positions = unsupported.map(|pf| pf.position);
+        let unsupported_velocities = velocities.map_index(|v| (v.entity, *v)).join(
+            &unsupported.map_index(|pf| (pf.position.entity, ())),
+            |_, vel, _| *vel,
+        );
+        let new_vel_unsupported = new_velocity_stream(&unsupported_velocities);
+        let new_pos_unsupported = new_position_stream(&unsupported_positions, &new_vel_unsupported);
+
+        let (new_pos_standing, new_vel_standing) =
+            standing_motion_stream(&standing, &floor_height, &velocities);
+
+        let new_pos = new_pos_unsupported.plus(&new_pos_standing);
+        let new_vel = new_vel_unsupported.plus(&new_vel_standing);
 
         Ok(BuildHandles {
             position_in,
@@ -391,5 +411,49 @@ impl DbspCircuit {
         self.velocity_in.clear_input();
         self.block_in.clear_input();
         self.block_slope_in.clear_input();
+    }
+}
+
+// --- TESTS FOR GRACE_DISTANCE BEHAVIOUR ---
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_pf(z: f64, z_floor: f64) -> PositionFloor {
+        PositionFloor {
+            position: Position {
+                entity: 1,
+                x: 0.0.into(),
+                y: 0.0.into(),
+                z: z.into(),
+            },
+            z_floor: z_floor.into(),
+        }
+    }
+
+    #[test]
+    fn test_grace_distance_on_flat_surface() {
+        let pf = make_pf(10.0, 10.0);
+        assert!(pf.position.z.into_inner() <= pf.z_floor.into_inner() + GRACE_DISTANCE);
+    }
+
+    #[test]
+    fn test_grace_distance_on_slope() {
+        let pf = make_pf(10.1, 10.0);
+        assert!(pf.position.z.into_inner() <= pf.z_floor.into_inner() + GRACE_DISTANCE);
+    }
+
+    #[test]
+    fn test_grace_distance_fast_moving_entity() {
+        let pf = make_pf(10.5, 10.0);
+        let within_grace = pf.position.z.into_inner() <= pf.z_floor.into_inner() + GRACE_DISTANCE;
+        assert_eq!(within_grace, 10.5 <= 10.0 + GRACE_DISTANCE);
+    }
+
+    #[test]
+    fn test_grace_distance_unsupported() {
+        let pf = make_pf(11.0, 10.0);
+        assert!(pf.position.z.into_inner() > pf.z_floor.into_inner() + GRACE_DISTANCE);
     }
 }

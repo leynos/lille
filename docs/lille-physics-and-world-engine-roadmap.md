@@ -103,9 +103,9 @@ DDlog-based version.
 
 2. **Complete Motion Logic**:
 
-   - [ ] Implement the `Standing` vs. `Unsupported` filter based on `z_floor`.
+   - [x] Implement the `Standing` vs. `Unsupported` filter based on `z_floor`.
 
-   - [ ] Implement the two branches of motion:
+   - [x] Implement the two branches of motion:
 
      - Apply gravity to `Unsupported` entities.
 

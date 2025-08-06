@@ -124,8 +124,8 @@ pub(super) fn new_position_stream(
     positions: &Stream<RootCircuit, OrdZSet<Position>>,
     new_vel: &Stream<RootCircuit, OrdZSet<Velocity>>,
 ) -> Stream<RootCircuit, OrdZSet<Position>> {
-    positions.map_index(|p| (p.entity, p.clone())).join(
-        &new_vel.map_index(|v| (v.entity, v.clone())),
+    positions.map_index(|p| (p.entity, *p)).join(
+        &new_vel.map_index(|v| (v.entity, *v)),
         |_, p, v| Position {
             entity: p.entity,
             x: OrderedFloat(p.x.into_inner() + v.vx.into_inner()),
@@ -180,14 +180,96 @@ pub(super) fn position_floor_stream(
                     p.x.into_inner().floor() as i32,
                     p.y.into_inner().floor() as i32,
                 ),
-                p.clone(),
+                *p,
             )
         })
         .join(
             &floor_height.map_index(|fh| ((fh.x, fh.y), fh.z)),
             |_idx, pos, &z_floor| PositionFloor {
-                position: pos.clone(),
+                position: *pos,
                 z_floor,
             },
         )
+}
+
+/// Computes new positions and velocities for entities standing on the ground.
+///
+/// Standing entities move according to their horizontal velocity components and
+/// snap to the floor height at their new `(x, y)` coordinates. The vertical
+/// velocity is reset to zero to keep entities grounded.
+///
+/// # Parameters
+///
+/// - `standing` - Entities currently deemed to be on the floor with their
+///   positions.
+/// - `floor_height` - Discrete floor heights indexed by grid coordinates.
+/// - `velocities` - Current velocity vectors for each entity.
+///
+/// # Returns
+///
+/// A tuple containing the updated position and velocity streams for all
+/// standing entities.
+///
+/// # Examples
+///
+/// ```ignore
+/// # use dbsp::{typed_batch::OrdZSet, RootCircuit};
+/// # use lille::dbsp_circuit::{standing_motion_stream, PositionFloor, FloorHeightAt, Velocity};
+/// RootCircuit::build(|circuit| {
+///     let (standing, _sh) = circuit.add_input_zset::<PositionFloor>();
+///     let (floor, _fh) = circuit.add_input_zset::<FloorHeightAt>();
+///     let (vel, _vh) = circuit.add_input_zset::<Velocity>();
+///     let (_pos, _vel) = standing_motion_stream(&standing, &floor, &vel);
+///     Ok(())
+/// })?;
+/// # Ok::<(), dbsp::Error>(())
+/// ```
+pub(super) fn standing_motion_stream(
+    standing: &Stream<RootCircuit, OrdZSet<PositionFloor>>,
+    floor_height: &Stream<RootCircuit, OrdZSet<FloorHeightAt>>,
+    velocities: &Stream<RootCircuit, OrdZSet<Velocity>>,
+) -> (
+    Stream<RootCircuit, OrdZSet<Position>>,
+    Stream<RootCircuit, OrdZSet<Velocity>>,
+) {
+    // `dbsp` 0.98 lacks a `join_map` combinator. We explicitly compose
+    // `map_index` and `join` operators to achieve equivalent behaviour.
+    let moved = standing
+        .map_index(|pf| (pf.position.entity, pf.position))
+        .join(&velocities.map_index(|v| (v.entity, *v)), |_, pos, vel| {
+            let new_x = OrderedFloat(pos.x.into_inner() + vel.vx.into_inner());
+            let new_y = OrderedFloat(pos.y.into_inner() + vel.vy.into_inner());
+            (new_x, new_y, pos.entity, vel.vx, vel.vy)
+        });
+
+    let indexed = moved.map_index(|(x, y, entity, vx, vy)| {
+        (
+            (x.into_inner().floor() as i32, y.into_inner().floor() as i32),
+            (*entity, *x, *y, *vx, *vy),
+        )
+    });
+
+    let with_floor = indexed.join(
+        &floor_height.map_index(|fh| ((fh.x, fh.y), fh.z)),
+        |_idx, &(entity, x, y, vx, vy), &z_floor| {
+            (
+                Position {
+                    entity,
+                    x,
+                    y,
+                    z: z_floor,
+                },
+                Velocity {
+                    entity,
+                    vx,
+                    vy,
+                    vz: OrderedFloat(0.0),
+                },
+            )
+        },
+    );
+
+    let new_pos = with_floor.map(|(p, _)| *p);
+    let new_vel = with_floor.map(|(_, v)| *v);
+    (new_pos, new_vel)
 }
