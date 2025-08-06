@@ -191,3 +191,61 @@ pub(super) fn position_floor_stream(
             },
         )
 }
+
+/// Computes new positions and velocities for entities standing on the ground.
+///
+/// Standing entities move according to their horizontal velocity components and
+/// snap to the floor height at their new `(x, y)` coordinates. The vertical
+/// velocity is reset to zero to keep entities grounded.
+pub(super) fn standing_motion_stream(
+    standing: &Stream<RootCircuit, OrdZSet<PositionFloor>>,
+    floor_height: &Stream<RootCircuit, OrdZSet<FloorHeightAt>>,
+    velocities: &Stream<RootCircuit, OrdZSet<Velocity>>,
+) -> (
+    Stream<RootCircuit, OrdZSet<Position>>,
+    Stream<RootCircuit, OrdZSet<Velocity>>,
+) {
+    let joined = standing
+        .map_index(|pf| (pf.position.entity, pf.position.clone()))
+        .join(
+            &velocities.map_index(|v| (v.entity, v.clone())),
+            |_, pos, vel| (pos.clone(), vel.clone()),
+        );
+
+    let moved = joined.map(|(p, v)| {
+        let new_x = OrderedFloat(p.x.into_inner() + v.vx.into_inner());
+        let new_y = OrderedFloat(p.y.into_inner() + v.vy.into_inner());
+        (new_x, new_y, p.entity, v.vx, v.vy)
+    });
+
+    let indexed = moved.map_index(|(x, y, entity, vx, vy)| {
+        (
+            (x.into_inner().floor() as i32, y.into_inner().floor() as i32),
+            (*entity, *x, *y, *vx, *vy),
+        )
+    });
+
+    let with_floor = indexed.join(
+        &floor_height.map_index(|fh| ((fh.x, fh.y), fh.z)),
+        |_idx, &(entity, x, y, vx, vy), &z_floor| {
+            (
+                Position {
+                    entity,
+                    x,
+                    y,
+                    z: z_floor,
+                },
+                Velocity {
+                    entity,
+                    vx,
+                    vy,
+                    vz: OrderedFloat(0.0),
+                },
+            )
+        },
+    );
+
+    let new_pos = with_floor.map(|(p, _)| p.clone());
+    let new_vel = with_floor.map(|(_, v)| v.clone());
+    (new_pos, new_vel)
+}

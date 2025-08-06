@@ -112,7 +112,10 @@ their new position.
   data (see below) to determine a desired movement vector `(dx, dy)`. The
   proposed new location `(x+dx, y+dy)` is then fed back into the
   floor-height-calculation sub-graph to find the correct `z` for the new
-  position, ensuring entities stick to the ground as they move.
+  position, ensuring entities stick to the ground as they move. Horizontal
+  velocities double as AI intent; the circuit resets vertical velocity to zero
+  and snaps the entity to the floor height at the new cell. Entities whose `z`
+  coordinate is within `GRACE_DISTANCE` of the floor are treated as `Standing`.
 
 ## 4. Agent Behaviour (AI)
 

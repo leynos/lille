@@ -21,10 +21,12 @@ use ordered_float::OrderedFloat;
 use size_of::SizeOf;
 
 use crate::components::{Block, BlockSlope};
+use crate::GRACE_DISTANCE;
 
 mod streams;
 use streams::{
     floor_height_stream, new_position_stream, new_velocity_stream, position_floor_stream,
+    standing_motion_stream,
 };
 pub use streams::{highest_block_pair, PositionFloor};
 
@@ -196,8 +198,24 @@ impl DbspCircuit {
 
         let pos_floor = position_floor_stream(&positions, &floor_height);
 
-        let new_vel = new_velocity_stream(&velocities);
-        let new_pos = new_position_stream(&positions, &new_vel);
+        let unsupported = pos_floor
+            .filter(|pf| pf.position.z.into_inner() > pf.z_floor.into_inner() + GRACE_DISTANCE);
+        let standing = pos_floor
+            .filter(|pf| pf.position.z.into_inner() <= pf.z_floor.into_inner() + GRACE_DISTANCE);
+
+        let unsupported_positions = unsupported.map(|pf| pf.position.clone());
+        let unsupported_velocities = velocities.map_index(|v| (v.entity, v.clone())).join(
+            &unsupported.map_index(|pf| (pf.position.entity, ())),
+            |_, vel, _| vel.clone(),
+        );
+        let new_vel_unsupported = new_velocity_stream(&unsupported_velocities);
+        let new_pos_unsupported = new_position_stream(&unsupported_positions, &new_vel_unsupported);
+
+        let (new_pos_standing, new_vel_standing) =
+            standing_motion_stream(&standing, &floor_height, &velocities);
+
+        let new_pos = new_pos_unsupported.plus(&new_pos_standing);
+        let new_vel = new_vel_unsupported.plus(&new_vel_standing);
 
         Ok(BuildHandles {
             position_in,
