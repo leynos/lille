@@ -117,6 +117,94 @@ their new position.
   and snaps the entity to the floor height at the new cell. Entities whose `z`
   coordinate is within `GRACE_DISTANCE` of the floor are treated as `Standing`.
 
+### 3.4. Motion Dataflow Diagrams
+
+```mermaid
+flowchart TD
+    A[positions] --> B[position_floor_stream]
+    B --> C1{z > z_floor + GRACE_DISTANCE?}
+    C1 -- Yes --> D[unsupported]
+    C1 -- No --> E[standing]
+    D --> F[unsupported_positions]
+    F --> G[new_velocity_stream]
+    G --> H[new_position_stream]
+    E --> I[standing_motion_stream]
+    I --> J[new_pos_standing]
+    I --> K[new_vel_standing]
+    H --> L[new_pos_unsupported]
+    G --> M[new_vel_unsupported]
+    L --> N[plus]
+    J --> N
+    M --> O[plus]
+    K --> O
+    N --> P[new_pos]
+    O --> Q[new_vel]
+    P & Q --> R[Output]
+```
+
+```mermaid
+classDiagram
+    class Position {
+        +entity: EntityId
+        +x: OrderedFloat
+        +y: OrderedFloat
+        +z: OrderedFloat
+    }
+    class Velocity {
+        +entity: EntityId
+        +vx: OrderedFloat
+        +vy: OrderedFloat
+        +vz: OrderedFloat
+    }
+    class PositionFloor {
+        +position: Position
+        +z_floor: OrderedFloat
+    }
+    class FloorHeightAt {
+        +x: i32
+        +y: i32
+        +z: OrderedFloat
+    }
+    class DbspCircuit {
+        +build()
+    }
+    class standing_motion_stream {
+        +standing: Stream<PositionFloor>
+        +floor_height: Stream<FloorHeightAt>
+        +velocities: Stream<Velocity>
+        +returns: (Stream<Position>, Stream<Velocity>)
+    }
+    DbspCircuit ..> standing_motion_stream : uses
+    standing_motion_stream ..> PositionFloor
+    standing_motion_stream ..> FloorHeightAt
+    standing_motion_stream ..> Velocity
+    standing_motion_stream ..> Position
+    standing_motion_stream ..> Velocity
+```
+
+```mermaid
+erDiagram
+    Position {
+        int entity PK
+        float x
+        float y
+        float z
+    }
+    Velocity {
+        int entity PK
+        float vx
+        float vy
+        float vz
+    }
+    FloorHeightAt {
+        int x
+        int y
+        float z
+    }
+    Position ||--o{ Velocity : has
+    Position }o--|| FloorHeightAt : at
+```
+
 ## 4. Agent Behaviour (AI)
 
 Simple, reactive agent behaviours can be expressed elegantly within the same

@@ -205,6 +205,8 @@ pub(super) fn standing_motion_stream(
     Stream<RootCircuit, OrdZSet<Position>>,
     Stream<RootCircuit, OrdZSet<Velocity>>,
 ) {
+    // `dbsp` 0.98 lacks a `join_map` combinator. We explicitly compose
+    // `map_index` and `join` operators to achieve equivalent behaviour.
     let moved = standing
         .map_index(|pf| (pf.position.entity, pf.position.clone()))
         .join(
