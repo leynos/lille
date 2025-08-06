@@ -205,22 +205,20 @@ pub(super) fn standing_motion_stream(
     Stream<RootCircuit, OrdZSet<Position>>,
     Stream<RootCircuit, OrdZSet<Velocity>>,
 ) {
-    let joined = standing
+    let moved = standing
         .map_index(|pf| (pf.position.entity, pf.position.clone()))
         .join(
             &velocities.map_index(|v| (v.entity, v.clone())),
-            |_, pos, vel| (pos.clone(), vel.clone()),
+            |_, pos, vel| {
+                let new_x = OrderedFloat(pos.x.into_inner() + vel.vx.into_inner());
+                let new_y = OrderedFloat(pos.y.into_inner() + vel.vy.into_inner());
+                (new_x, new_y, pos.entity, vel.vx, vel.vy)
+            },
         );
-
-    let moved = joined.map(|(p, v)| {
-        let new_x = OrderedFloat(p.x.into_inner() + v.vx.into_inner());
-        let new_y = OrderedFloat(p.y.into_inner() + v.vy.into_inner());
-        (new_x, new_y, p.entity, v.vx, v.vy)
-    });
 
     let indexed = moved.map_index(|(x, y, entity, vx, vy)| {
         (
-            (x.into_inner().floor() as i32, y.into_inner().floor() as i32),
+            (x.into_inner().trunc() as i32, y.into_inner().trunc() as i32),
             (*entity, *x, *y, *vx, *vy),
         )
     });

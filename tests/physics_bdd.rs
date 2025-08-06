@@ -4,6 +4,7 @@
 //! through the declarative dataflow circuit.
 
 use approx::assert_relative_eq;
+use lille::components::Block;
 use lille::dbsp_circuit::{NewPosition, NewVelocity, Position, Velocity};
 use rstest::rstest;
 mod common;
@@ -22,6 +23,16 @@ use common::pos;
 #[test]
 fn entity_falls_due_to_gravity() {
     let mut circuit = common::new_circuit();
+
+    circuit.block_in().push(
+        Block {
+            id: 1,
+            x: 0,
+            y: 0,
+            z: -10,
+        },
+        1,
+    );
 
     circuit.position_in().push(
         Position {
@@ -94,7 +105,7 @@ fn vel(entity: i64, vx: f64, vy: f64, vz: f64) -> Velocity {
     vec![],
     vec![vel(3, 1.0, 2.0, 3.0)],
     vec![],
-    vec![vel(3, 1.0, 2.0, 3.0 + lille::GRAVITY_PULL)],
+    vec![],
 )]
 fn gravity_cases(
     #[case] positions: Vec<Position>,
@@ -106,6 +117,15 @@ fn gravity_cases(
 
     for p in &positions {
         circuit.position_in().push(p.clone(), 1);
+        circuit.block_in().push(
+            Block {
+                id: p.entity,
+                x: p.x.into_inner().trunc() as i32,
+                y: p.y.into_inner().trunc() as i32,
+                z: -10,
+            },
+            1,
+        );
     }
     for v in &velocities {
         circuit.velocity_in().push(v.clone(), 1);

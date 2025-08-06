@@ -5,7 +5,7 @@
 //! physics simulation scenarios, particularly gravity effects on entities.
 
 use bevy::prelude::*;
-use lille::{DbspPlugin, DdlogId, VelocityComp, GRAVITY_PULL};
+use lille::{components::Block, DbspPlugin, DdlogId, VelocityComp, GRAVITY_PULL};
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
@@ -39,11 +39,17 @@ impl PhysicsWorld {
         }
         let mut app = self.app.lock().expect("app lock");
         app.add_plugins(MinimalPlugins).add_plugins(DbspPlugin);
+        app.world.spawn(Block {
+            id: 1,
+            x: 0,
+            y: 0,
+            z: -10,
+        });
         let id = app
             .world
             .spawn((
                 DdlogId(1),
-                Transform::from_xyz(0.0, 0.0, 1.0),
+                Transform::from_xyz(0.0, 0.0, 2.0),
                 VelocityComp::default(),
             ))
             .id();
@@ -95,8 +101,8 @@ fn unsupported_entity_falls() {
             ctx.before_each(|world| world.setup());
             ctx.when("the simulation ticks once", |ctx| {
                 ctx.before_each(|world| world.tick());
-                ctx.then("the entity's z position should be 0.0", |world| {
-                    world.assert_z_and_velocity(0.0);
+                ctx.then("the entity's z position should be 1.0", |world| {
+                    world.assert_z_and_velocity(1.0);
                 });
             });
         },

@@ -82,6 +82,27 @@ impl GroundWorld {
         assert!((transform.translation.y - y).abs() < tolerance);
         assert!((transform.translation.z - z).abs() < tolerance);
     }
+
+    fn set_entity_vertical_velocity(&mut self, vz: f32) {
+        let mut app = self.app.lock().expect("app lock");
+        let entity = self.entity.expect("entity not spawned");
+        let mut vel = app
+            .world
+            .get_mut::<VelocityComp>(entity)
+            .expect("missing VelocityComp");
+        vel.vz = vz;
+    }
+
+    fn assert_entity_vertical_velocity(&self, expected: f32) {
+        let app = self.app.lock().expect("app lock");
+        let entity = self.entity.expect("entity not spawned");
+        let vel = app
+            .world
+            .get::<VelocityComp>(entity)
+            .expect("missing VelocityComp");
+        let tolerance = 1e-3;
+        assert!((vel.vz - expected).abs() < tolerance);
+    }
 }
 
 #[test]
@@ -99,6 +120,26 @@ fn standing_entity_moves_and_snaps() {
                         world.assert_position(1.0, 0.0, 2.0);
                     },
                 );
+            });
+        },
+    ));
+}
+
+#[test]
+fn standing_entity_with_vertical_velocity_resets_velocity() {
+    rspec::run(&rspec::given(
+        "a world with a standing entity with vertical velocity",
+        GroundWorld::default(),
+        |ctx| {
+            ctx.before_each(|world| {
+                world.setup();
+                world.set_entity_vertical_velocity(5.0);
+            });
+            ctx.when("the simulation ticks once", |ctx| {
+                ctx.before_each(|world| world.tick());
+                ctx.then("the entity's vertical velocity is reset to zero", |world| {
+                    world.assert_entity_vertical_velocity(0.0);
+                });
             });
         },
     ));
