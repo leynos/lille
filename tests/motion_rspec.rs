@@ -83,25 +83,30 @@ impl GroundWorld {
         assert!((transform.translation.z - z).abs() < tolerance);
     }
 
-    fn set_entity_vertical_velocity(&mut self, vz: f32) {
+    fn with_velocity_component<F, R>(&self, mut f: F) -> R
+    where
+        F: FnMut(&mut VelocityComp) -> R,
+    {
         let mut app = self.app.lock().expect("app lock");
         let entity = self.entity.expect("entity not spawned");
         let mut vel = app
             .world
             .get_mut::<VelocityComp>(entity)
             .expect("missing VelocityComp");
-        vel.vz = vz;
+        f(&mut vel)
+    }
+
+    fn set_entity_vertical_velocity(&mut self, vz: f32) {
+        self.with_velocity_component(|vel| {
+            vel.vz = vz;
+        });
     }
 
     fn assert_entity_vertical_velocity(&self, expected: f32) {
-        let app = self.app.lock().expect("app lock");
-        let entity = self.entity.expect("entity not spawned");
-        let vel = app
-            .world
-            .get::<VelocityComp>(entity)
-            .expect("missing VelocityComp");
-        let tolerance = 1e-3;
-        assert!((vel.vz - expected).abs() < tolerance);
+        self.with_velocity_component(|vel| {
+            let tolerance = 1e-3;
+            assert!((vel.vz - expected).abs() < tolerance);
+        });
     }
 }
 
