@@ -5,11 +5,8 @@
 
 use lille::{components::Block, dbsp_circuit::HighestBlockAt};
 mod common;
+use common::block;
 use rstest::rstest;
-
-fn b(id: i64, x: i32, y: i32, z: i32) -> Block {
-    Block { id, x, y, z }
-}
 
 fn hb(x: i32, y: i32, z: i32) -> HighestBlockAt {
     HighestBlockAt { x, y, z }
@@ -59,9 +56,9 @@ fn test_highest_block_aggregation() {
 
 #[rstest]
 #[case::empty(vec![], vec![])]
-#[case::single(vec![b(1, 0, 0, 2)], vec![hb(0, 0, 2)])]
-#[case::duplicate_same_height(vec![b(1,1,1,5), b(2,1,1,5)], vec![hb(1,1,5)])]
-#[case::mixed(vec![b(1,0,0,3), b(2,0,0,1), b(3,0,1,4)], vec![hb(0,0,3), hb(0,1,4)])]
+#[case::single(vec![block(1, 0, 0, 2)], vec![hb(0, 0, 2)])]
+#[case::duplicate_same_height(vec![block(1,1,1,5), block(2,1,1,5)], vec![hb(1,1,5)])]
+#[case::mixed(vec![block(1,0,0,3), block(2,0,0,1), block(3,0,1,4)], vec![hb(0,0,3), hb(0,1,4)])]
 fn highest_block_cases(#[case] blocks: Vec<Block>, #[case] expected: Vec<HighestBlockAt>) {
     let mut circuit = common::new_circuit();
     for blk in blocks {

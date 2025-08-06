@@ -10,20 +10,7 @@ use lille::GRAVITY_PULL;
 use rstest::rstest;
 
 mod common;
-use common::new_circuit;
-
-fn vel(entity: i64, vx: f64, vy: f64, vz: f64) -> Velocity {
-    Velocity {
-        entity,
-        vx: vx.into(),
-        vy: vy.into(),
-        vz: vz.into(),
-    }
-}
-
-fn block(id: i64, x: i32, y: i32, z: i32) -> Block {
-    Block { id, x, y, z }
-}
+use common::{block, new_circuit, vel};
 
 #[rstest]
 #[case::standing_moves(

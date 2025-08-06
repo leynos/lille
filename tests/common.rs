@@ -1,4 +1,5 @@
-use lille::dbsp_circuit::DbspCircuit;
+use lille::components::Block;
+use lille::dbsp_circuit::{DbspCircuit, Position, Velocity};
 
 /// Create a new `DbspCircuit` for tests.
 ///
@@ -10,11 +11,28 @@ pub fn new_circuit() -> DbspCircuit {
 
 /// Convenience constructor for [`Position`] records used in tests.
 #[allow(dead_code)]
-pub fn pos(entity: i64, x: f64, y: f64, z: f64) -> lille::dbsp_circuit::Position {
-    lille::dbsp_circuit::Position {
+pub fn pos(entity: i64, x: f64, y: f64, z: f64) -> Position {
+    Position {
         entity,
         x: x.into(),
         y: y.into(),
         z: z.into(),
     }
+}
+
+/// Convenience constructor for [`Velocity`] records used in tests.
+#[allow(dead_code)]
+pub fn vel(entity: i64, vx: f64, vy: f64, vz: f64) -> Velocity {
+    Velocity {
+        entity,
+        vx: vx.into(),
+        vy: vy.into(),
+        vz: vz.into(),
+    }
+}
+
+/// Convenience constructor for [`Block`] records used in tests.
+#[allow(dead_code)]
+pub fn block(id: i64, x: i32, y: i32, z: i32) -> Block {
+    Block { id, x, y, z }
 }
