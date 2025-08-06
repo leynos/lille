@@ -108,7 +108,7 @@ their new position.
   through a simple `map` operator that subtracts the `GRAVITY_PULL` constant
   from the entity's `z` coordinate.
 
-- **Movement for Standing Entities**: The `Standing` stream is joined with AI
+  - **Movement for Standing Entities**: The `Standing` stream is joined with AI
   data (see below) to determine a desired movement vector `(dx, dy)`. The
   proposed new location `(x+dx, y+dy)` is then fed back into the
   floor-height-calculation sub-graph to find the correct `z` for the new
@@ -116,6 +116,13 @@ their new position.
   velocities double as AI intent; the circuit resets vertical velocity to zero
   and snaps the entity to the floor height at the new cell. Entities whose `z`
   coordinate is within `GRACE_DISTANCE` of the floor are treated as `Standing`.
+
+This design cements the DBSP circuit as the authoritative source for motion
+inference. Bevy systems simply marshal inputs and apply the circuit's outputs;
+no secondary motion logic exists outside the circuit. Behavioural tests verify
+falling entities, stationary entities on flat or sloped blocks, and movement
+between blocks of differing heights, ensuring the circuit governs all inferred
+behaviour.
 
 ### 3.4. Motion Dataflow Diagrams
 

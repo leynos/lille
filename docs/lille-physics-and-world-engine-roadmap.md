@@ -114,7 +114,7 @@ DDlog-based version.
 
 3. **Comprehensive Testing**:
 
-   - [ ] Port all existing BDD test cases (`physics_bdd.rs`) to verify the DBSP
+   - [x] Port all existing BDD test cases (`physics_bdd.rs`) to verify the DBSP
      implementation. Scenarios must include:
 
      - Entity falling in empty space.
@@ -125,7 +125,7 @@ DDlog-based version.
 
      - Entity moving between blocks of different heights.
 
-   - [ ] Add unit tests for every key operator and sub-flow in the circuit
+   - [x] Add unit tests for every key operator and sub-flow in the circuit
      (e.g., slope calculation, standing/unsupported filter).
 
 **Acceptance Criteria**:

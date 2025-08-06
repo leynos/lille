@@ -1,160 +1,218 @@
-//! Physics behaviour-driven development tests using the DBSP circuit.
+//! Behaviour-driven tests for physics and motion rules.
 //!
-//! This module tests physics rules such as gravity effects on entity positions
-//! through the declarative dataflow circuit.
+//! These scenarios exercise the DBSP circuit via a headless Bevy app and use
+//! `rust-rspec` to express expectations declaratively. The DBSP circuit is the
+//! sole source of truth for inferred motion; Bevy merely applies its outputs.
 
-use approx::assert_relative_eq;
-use lille::components::Block;
-use lille::dbsp_circuit::{NewPosition, NewVelocity, Position, Velocity};
-use rstest::rstest;
-mod common;
-use common::{pos, vel};
+use bevy::prelude::*;
+use lille::{
+    components::{Block, BlockSlope},
+    DbspPlugin, DdlogId, VelocityComp, GRAVITY_PULL,
+};
+use std::fmt;
+use std::sync::{Arc, Mutex};
 
-/// Tests that an entity's position and velocity are updated correctly under gravity in the physics circuit.
-///
-/// This test initialises an entity at a given position with zero velocity, steps the DBSP circuit,
-/// and asserts that the entity's new position and velocity reflect the effect of gravity.
-///
-/// # Examples
-///
-/// ```no_run
-/// entity_falls_due_to_gravity();
-/// ```
-#[test]
-fn entity_falls_due_to_gravity() {
-    let mut circuit = common::new_circuit();
-
-    circuit.block_in().push(
-        Block {
-            id: 1,
-            x: 0,
-            y: 0,
-            z: -2,
-        },
-        1,
-    );
-
-    circuit.position_in().push(
-        Position {
-            entity: 1,
-            x: 0.0.into(),
-            y: 0.0.into(),
-            z: 1.0.into(),
-        },
-        1,
-    );
-    circuit.velocity_in().push(
-        Velocity {
-            entity: 1,
-            vx: 0.0.into(),
-            vy: 0.0.into(),
-            vz: 0.0.into(),
-        },
-        1,
-    );
-    circuit.step().expect("Failed to step DBSP circuit");
-
-    let output = circuit.new_position_out().consolidate();
-    let results: Vec<NewPosition> = output.iter().map(|t| t.0).collect();
-    assert_eq!(results.len(), 1);
-    assert_eq!(results[0].entity, 1);
-    assert_relative_eq!(results[0].z.into_inner(), 1.0 + lille::GRAVITY_PULL);
-
-    let vout = circuit.new_velocity_out().consolidate();
-    let vresults: Vec<NewVelocity> = vout.iter().map(|t| t.0).collect();
-    assert_eq!(vresults.len(), 1);
-    assert_eq!(vresults[0].entity, 1);
-    assert_relative_eq!(vresults[0].vz.into_inner(), lille::GRAVITY_PULL);
+#[derive(Clone)]
+struct TestWorld {
+    /// Shared Bevy app; `rspec` fixtures must implement `Clone + Send + Sync`.
+    app: Arc<Mutex<App>>,
+    entity: Option<Entity>,
 }
 
-#[rstest]
-#[case::non_zero_initial_velocity(
-    vec![pos(1, 0.0, 0.0, 10.0)],
-    vec![vel(1, 1.0, 0.0, 2.0)],
-    vec![pos(1, 1.0, 0.0, 10.0 + 2.0 + lille::GRAVITY_PULL)],
-    vec![vel(1, 1.0, 0.0, 2.0 + lille::GRAVITY_PULL)],
-)]
-#[case::multiple_entities(
-    vec![pos(1, 0.0, 0.0, 0.0), pos(2, 1.0, 1.0, 1.0)],
-    vec![vel(1, 0.0, 0.0, 0.0), vel(2, 0.5, -0.5, -0.5)],
-    vec![
-        pos(1, 0.0, 0.0, 0.0 + 0.0 + lille::GRAVITY_PULL),
-        pos(2, 1.5, 0.5, 1.0 - 0.5 + lille::GRAVITY_PULL),
-    ],
-    vec![
-        vel(1, 0.0, 0.0, 0.0 + lille::GRAVITY_PULL),
-        vel(2, 0.5, -0.5, -0.5 + lille::GRAVITY_PULL),
-    ],
-)]
-#[case::position_without_velocity(
-    vec![pos(1, 0.0, 0.0, 5.0)],
-    vec![],
-    vec![],
-    vec![],
-)]
-#[case::velocity_without_position(
-    vec![],
-    vec![vel(3, 1.0, 2.0, 3.0)],
-    vec![],
-    vec![],
-)]
-fn gravity_cases(
-    #[case] positions: Vec<Position>,
-    #[case] velocities: Vec<Velocity>,
-    #[case] expected_positions: Vec<NewPosition>,
-    #[case] expected_velocities: Vec<NewVelocity>,
-) {
-    let mut circuit = common::new_circuit();
-
-    for p in &positions {
-        circuit.position_in().push(*p, 1);
-        circuit.block_in().push(
-            Block {
-                id: p.entity,
-                x: p.x.into_inner().floor() as i32,
-                y: p.y.into_inner().floor() as i32,
-                z: -2,
-            },
-            1,
-        );
+impl fmt::Debug for TestWorld {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TestWorld")
+            .field("entity", &self.entity)
+            .finish()
     }
-    for v in &velocities {
-        circuit.velocity_in().push(*v, 1);
+}
+
+impl Default for TestWorld {
+    fn default() -> Self {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins).add_plugins(DbspPlugin);
+        Self {
+            app: Arc::new(Mutex::new(app)),
+            entity: None,
+        }
+    }
+}
+
+impl TestWorld {
+    /// Spawns a block into the world.
+    fn spawn_block(&mut self, block: Block) {
+        let mut app = self.app.lock().expect("app lock");
+        app.world.spawn(block);
     }
 
-    circuit.step().expect("Failed to step DBSP circuit");
-
-    let mut pos_results: Vec<NewPosition> = circuit
-        .new_position_out()
-        .consolidate()
-        .iter()
-        .map(|t| t.0)
-        .collect();
-    pos_results.sort_by_key(|p| p.entity);
-    let mut expected_pos = expected_positions;
-    expected_pos.sort_by_key(|p| p.entity);
-    assert_eq!(pos_results.len(), expected_pos.len());
-    for (res, exp) in pos_results.iter().zip(expected_pos.iter()) {
-        assert_eq!(res.entity, exp.entity);
-        assert_relative_eq!(res.x.into_inner(), exp.x.into_inner());
-        assert_relative_eq!(res.y.into_inner(), exp.y.into_inner());
-        assert_relative_eq!(res.z.into_inner(), exp.z.into_inner());
+    /// Spawns a block together with its slope on the same entity.
+    fn spawn_sloped_block(&mut self, block: Block, slope: BlockSlope) {
+        let mut app = self.app.lock().expect("app lock");
+        app.world.spawn((block, slope));
     }
 
-    let mut vel_results: Vec<NewVelocity> = circuit
-        .new_velocity_out()
-        .consolidate()
-        .iter()
-        .map(|t| t.0)
-        .collect();
-    vel_results.sort_by_key(|v| v.entity);
-    let mut expected_vel = expected_velocities;
-    expected_vel.sort_by_key(|v| v.entity);
-    assert_eq!(vel_results.len(), expected_vel.len());
-    for (res, exp) in vel_results.iter().zip(expected_vel.iter()) {
-        assert_eq!(res.entity, exp.entity);
-        assert_relative_eq!(res.vx.into_inner(), exp.vx.into_inner());
-        assert_relative_eq!(res.vy.into_inner(), exp.vy.into_inner());
-        assert_relative_eq!(res.vz.into_inner(), exp.vz.into_inner());
+    /// Spawns an entity at `transform` with the supplied velocity.
+    fn spawn_entity(&mut self, transform: Transform, vel: VelocityComp) {
+        let mut app = self.app.lock().expect("app lock");
+        let id = app.world.spawn((DdlogId(1), transform, vel)).id();
+        self.entity = Some(id);
     }
+
+    /// Advances the simulation by one tick.
+    fn tick(&mut self) {
+        let mut app = self.app.lock().expect("app lock");
+        app.update();
+    }
+
+    /// Asserts the entity's transform equals the expected coordinates.
+    fn assert_position(&self, x: f32, y: f32, z: f32) {
+        let app = self.app.lock().expect("app lock");
+        let entity = self.entity.expect("entity not spawned");
+        let transform = app
+            .world
+            .get::<Transform>(entity)
+            .expect("missing Transform");
+        let tolerance = 1e-3;
+        assert!((transform.translation.x - x).abs() < tolerance);
+        assert!((transform.translation.y - y).abs() < tolerance);
+        assert!((transform.translation.z - z).abs() < tolerance);
+    }
+
+    /// Asserts the entity's velocity matches the expected vector.
+    fn assert_velocity(&self, vx: f32, vy: f32, vz: f32) {
+        let app = self.app.lock().expect("app lock");
+        let entity = self.entity.expect("entity not spawned");
+        let vel = app
+            .world
+            .get::<VelocityComp>(entity)
+            .expect("missing VelocityComp");
+        let tolerance = 1e-3;
+        assert!((vel.vx - vx).abs() < tolerance);
+        assert!((vel.vy - vy).abs() < tolerance);
+        assert!((vel.vz - vz).abs() < tolerance);
+    }
+}
+
+#[test]
+fn entity_falls_in_empty_space() {
+    rspec::run(&rspec::given(
+        "an unsupported entity",
+        TestWorld::default(),
+        |ctx| {
+            ctx.before_each(|world| {
+                world.spawn_block(Block {
+                    id: 1,
+                    x: 0,
+                    y: 0,
+                    z: -2,
+                });
+                world.spawn_entity(Transform::from_xyz(0.0, 0.0, 2.0), VelocityComp::default());
+            });
+            ctx.when("the simulation ticks once", |ctx| {
+                ctx.before_each(|world| world.tick());
+                ctx.then("the entity descends under gravity", |world| {
+                    world.assert_position(0.0, 0.0, 1.0);
+                    world.assert_velocity(0.0, 0.0, GRAVITY_PULL as f32);
+                });
+            });
+        },
+    ));
+}
+
+#[test]
+fn entity_stands_on_flat_block() {
+    rspec::run(&rspec::given(
+        "an entity on a flat block",
+        TestWorld::default(),
+        |ctx| {
+            ctx.before_each(|world| {
+                world.spawn_block(Block {
+                    id: 1,
+                    x: 0,
+                    y: 0,
+                    z: 0,
+                });
+                world.spawn_entity(Transform::from_xyz(0.0, 0.0, 1.0), VelocityComp::default());
+            });
+            ctx.when("the simulation ticks once", |ctx| {
+                ctx.before_each(|world| world.tick());
+                ctx.then("the entity remains on the block", |world| {
+                    world.assert_position(0.0, 0.0, 1.0);
+                    world.assert_velocity(0.0, 0.0, 0.0);
+                });
+            });
+        },
+    ));
+}
+
+#[test]
+fn entity_stands_on_sloped_block() {
+    rspec::run(&rspec::given(
+        "an entity on a sloped block",
+        TestWorld::default(),
+        |ctx| {
+            ctx.before_each(|world| {
+                world.spawn_sloped_block(
+                    Block {
+                        id: 1,
+                        x: 0,
+                        y: 0,
+                        z: 0,
+                    },
+                    BlockSlope {
+                        block_id: 1,
+                        grad_x: 1.0.into(),
+                        grad_y: 0.0.into(),
+                    },
+                );
+                world.spawn_entity(Transform::from_xyz(0.0, 0.0, 1.5), VelocityComp::default());
+            });
+            ctx.when("the simulation ticks once", |ctx| {
+                ctx.before_each(|world| world.tick());
+                ctx.then("the entity stays aligned with the slope", |world| {
+                    world.assert_position(0.0, 0.0, 1.5);
+                    world.assert_velocity(0.0, 0.0, 0.0);
+                });
+            });
+        },
+    ));
+}
+
+#[test]
+fn entity_moves_between_heights() {
+    rspec::run(&rspec::given(
+        "an entity moving across blocks of different heights",
+        TestWorld::default(),
+        |ctx| {
+            ctx.before_each(|world| {
+                world.spawn_block(Block {
+                    id: 1,
+                    x: 0,
+                    y: 0,
+                    z: 0,
+                });
+                world.spawn_block(Block {
+                    id: 2,
+                    x: 1,
+                    y: 0,
+                    z: 1,
+                });
+                world.spawn_entity(
+                    Transform::from_xyz(0.0, 0.0, 1.0),
+                    VelocityComp {
+                        vx: 1.0,
+                        vy: 0.0,
+                        vz: 0.0,
+                    },
+                );
+            });
+            ctx.when("the simulation ticks once", |ctx| {
+                ctx.before_each(|world| world.tick());
+                ctx.then("the entity snaps to the new floor height", |world| {
+                    world.assert_position(1.0, 0.0, 2.0);
+                    world.assert_velocity(1.0, 0.0, 0.0);
+                });
+            });
+        },
+    ));
 }
