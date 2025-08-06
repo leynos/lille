@@ -11,6 +11,7 @@ use std::sync::{Arc, Mutex};
 
 #[derive(Clone)]
 struct PhysicsWorld {
+    /// Shared Bevy app; `rspec` requires fixtures to be `Clone + Send + Sync`.
     app: Arc<Mutex<App>>,
     entity: Option<Entity>,
 }
@@ -43,7 +44,7 @@ impl PhysicsWorld {
             id: 1,
             x: 0,
             y: 0,
-            z: -10,
+            z: 0,
         });
         let id = app
             .world

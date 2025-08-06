@@ -29,7 +29,7 @@ fn entity_falls_due_to_gravity() {
             id: 1,
             x: 0,
             y: 0,
-            z: -10,
+            z: -2,
         },
         1,
     );
@@ -55,13 +55,13 @@ fn entity_falls_due_to_gravity() {
     circuit.step().expect("Failed to step DBSP circuit");
 
     let output = circuit.new_position_out().consolidate();
-    let results: Vec<NewPosition> = output.iter().map(|(p, _, _)| p.clone()).collect();
+    let results: Vec<NewPosition> = output.iter().map(|t| t.0).collect();
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].entity, 1);
     assert_relative_eq!(results[0].z.into_inner(), 1.0 + lille::GRAVITY_PULL);
 
     let vout = circuit.new_velocity_out().consolidate();
-    let vresults: Vec<NewVelocity> = vout.iter().map(|(v, _, _)| v.clone()).collect();
+    let vresults: Vec<NewVelocity> = vout.iter().map(|t| t.0).collect();
     assert_eq!(vresults.len(), 1);
     assert_eq!(vresults[0].entity, 1);
     assert_relative_eq!(vresults[0].vz.into_inner(), lille::GRAVITY_PULL);
@@ -116,19 +116,19 @@ fn gravity_cases(
     let mut circuit = common::new_circuit();
 
     for p in &positions {
-        circuit.position_in().push(p.clone(), 1);
+        circuit.position_in().push(*p, 1);
         circuit.block_in().push(
             Block {
                 id: p.entity,
-                x: p.x.into_inner().trunc() as i32,
-                y: p.y.into_inner().trunc() as i32,
-                z: -10,
+                x: p.x.into_inner().floor() as i32,
+                y: p.y.into_inner().floor() as i32,
+                z: -2,
             },
             1,
         );
     }
     for v in &velocities {
-        circuit.velocity_in().push(v.clone(), 1);
+        circuit.velocity_in().push(*v, 1);
     }
 
     circuit.step().expect("Failed to step DBSP circuit");
@@ -137,7 +137,7 @@ fn gravity_cases(
         .new_position_out()
         .consolidate()
         .iter()
-        .map(|(p, _, _)| p.clone())
+        .map(|t| t.0)
         .collect();
     pos_results.sort_by_key(|p| p.entity);
     let mut expected_pos = expected_positions;
@@ -154,7 +154,7 @@ fn gravity_cases(
         .new_velocity_out()
         .consolidate()
         .iter()
-        .map(|(v, _, _)| v.clone())
+        .map(|t| t.0)
         .collect();
     vel_results.sort_by_key(|v| v.entity);
     let mut expected_vel = expected_velocities;

@@ -67,7 +67,7 @@ fn position_floor_cases(
         circuit.block_slope_in().push(s.clone(), 1);
     }
     for p in &positions {
-        circuit.position_in().push(p.clone(), 1);
+        circuit.position_in().push(*p, 1);
     }
     circuit.step().expect("step");
     let mut vals: Vec<PositionFloor> = circuit

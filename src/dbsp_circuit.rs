@@ -37,6 +37,7 @@ use rkyv::{Archive, Deserialize, Serialize};
     Serialize,
     Deserialize,
     Clone,
+    Copy,
     Debug,
     PartialEq,
     Eq,
@@ -61,6 +62,7 @@ pub type NewPosition = Position;
     Serialize,
     Deserialize,
     Clone,
+    Copy,
     Debug,
     PartialEq,
     Eq,
@@ -203,10 +205,10 @@ impl DbspCircuit {
         let standing = pos_floor
             .filter(|pf| pf.position.z.into_inner() <= pf.z_floor.into_inner() + GRACE_DISTANCE);
 
-        let unsupported_positions = unsupported.map(|pf| pf.position.clone());
-        let unsupported_velocities = velocities.map_index(|v| (v.entity, v.clone())).join(
+        let unsupported_positions = unsupported.map(|pf| pf.position);
+        let unsupported_velocities = velocities.map_index(|v| (v.entity, *v)).join(
             &unsupported.map_index(|pf| (pf.position.entity, ())),
-            |_, vel, _| vel.clone(),
+            |_, vel, _| *vel,
         );
         let new_vel_unsupported = new_velocity_stream(&unsupported_velocities);
         let new_pos_unsupported = new_position_stream(&unsupported_positions, &new_vel_unsupported);

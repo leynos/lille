@@ -10,6 +10,7 @@ use std::sync::{Arc, Mutex};
 
 #[derive(Clone)]
 struct GroundWorld {
+    /// Shared Bevy app; `rspec` requires fixtures to be `Clone + Send + Sync`.
     app: Arc<Mutex<App>>,
     entity: Option<Entity>,
 }

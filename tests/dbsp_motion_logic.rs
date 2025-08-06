@@ -68,7 +68,7 @@ fn motion_cases(
         .new_position_out()
         .consolidate()
         .iter()
-        .map(|(p, _, _)| p.clone())
+        .map(|t| t.0)
         .collect();
     assert_eq!(pos_out.len(), 1);
     assert_eq!(pos_out[0].entity, expected_pos.entity);
@@ -80,7 +80,7 @@ fn motion_cases(
         .new_velocity_out()
         .consolidate()
         .iter()
-        .map(|(v, _, _)| v.clone())
+        .map(|t| t.0)
         .collect();
     assert_eq!(vel_out.len(), 1);
     assert_eq!(vel_out[0].entity, expected_vel.entity);
