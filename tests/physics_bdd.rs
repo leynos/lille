@@ -9,6 +9,7 @@ use lille::{
     components::{Block, BlockSlope},
     DbspPlugin, DdlogId, VelocityComp, GRAVITY_PULL,
 };
+use rstest::rstest;
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
@@ -64,155 +65,107 @@ impl TestWorld {
         app.update();
     }
 
-    /// Asserts the entity's transform equals the expected coordinates.
-    fn assert_position(&self, x: f32, y: f32, z: f32) {
+    /// Generic assertion helper for components with tolerance checking.
+    fn assert_component_values<T, F>(&self, name: &str, extract: F, expected: &[f32])
+    where
+        T: Component,
+        F: Fn(&T) -> Vec<f32>,
+    {
         let app = self.app.lock().expect("app lock");
         let entity = self.entity.expect("entity not spawned");
-        let transform = app
+        let component = app
             .world
-            .get::<Transform>(entity)
-            .expect("missing Transform");
+            .get::<T>(entity)
+            .unwrap_or_else(|| panic!("missing {name}"));
+
+        let actual = extract(component);
         let tolerance = 1e-3;
-        assert!((transform.translation.x - x).abs() < tolerance);
-        assert!((transform.translation.y - y).abs() < tolerance);
-        assert!((transform.translation.z - z).abs() < tolerance);
+
+        for (a, e) in actual.iter().zip(expected.iter()) {
+            assert!(
+                (a - e).abs() < tolerance,
+                "Component {name} mismatch: expected {e}, got {a}",
+            );
+        }
+    }
+
+    /// Asserts the entity's transform equals the expected coordinates.
+    fn assert_position(&self, x: f32, y: f32, z: f32) {
+        self.assert_component_values::<Transform, _>(
+            "Transform",
+            |t| vec![t.translation.x, t.translation.y, t.translation.z],
+            &[x, y, z],
+        );
     }
 
     /// Asserts the entity's velocity matches the expected vector.
     fn assert_velocity(&self, vx: f32, vy: f32, vz: f32) {
-        let app = self.app.lock().expect("app lock");
-        let entity = self.entity.expect("entity not spawned");
-        let vel = app
-            .world
-            .get::<VelocityComp>(entity)
-            .expect("missing VelocityComp");
-        let tolerance = 1e-3;
-        assert!((vel.vx - vx).abs() < tolerance);
-        assert!((vel.vy - vy).abs() < tolerance);
-        assert!((vel.vz - vz).abs() < tolerance);
+        self.assert_component_values::<VelocityComp, _>(
+            "VelocityComp",
+            |v| vec![v.vx, v.vy, v.vz],
+            &[vx, vy, vz],
+        );
     }
 }
 
-#[test]
-fn entity_falls_in_empty_space() {
-    rspec::run(&rspec::given(
-        "an unsupported entity",
-        TestWorld::default(),
-        |ctx| {
-            ctx.before_each(|world| {
-                world.spawn_block(Block {
-                    id: 1,
-                    x: 0,
-                    y: 0,
-                    z: -2,
-                });
-                world.spawn_entity(Transform::from_xyz(0.0, 0.0, 2.0), VelocityComp::default());
+#[rstest]
+#[case::falling(
+    "an unsupported entity",
+    |world: &mut TestWorld| {
+        world.spawn_block(Block { id: 1, x: 0, y: 0, z: -2 });
+        world.spawn_entity(Transform::from_xyz(0.0, 0.0, 2.0), VelocityComp::default());
+    },
+    (0.0, 0.0, 1.0),
+    (0.0, 0.0, GRAVITY_PULL as f32)
+)]
+#[case::standing_flat(
+    "an entity on a flat block",
+    |world: &mut TestWorld| {
+        world.spawn_block(Block { id: 1, x: 0, y: 0, z: 0 });
+        world.spawn_entity(Transform::from_xyz(0.0, 0.0, 1.0), VelocityComp::default());
+    },
+    (0.0, 0.0, 1.0),
+    (0.0, 0.0, 0.0)
+)]
+#[case::standing_sloped(
+    "an entity on a sloped block",
+    |world: &mut TestWorld| {
+        world.spawn_sloped_block(
+            Block { id: 1, x: 0, y: 0, z: 0 },
+            BlockSlope { block_id: 1, grad_x: 1.0.into(), grad_y: 0.0.into() },
+        );
+        world.spawn_entity(Transform::from_xyz(0.0, 0.0, 1.5), VelocityComp::default());
+    },
+    (0.0, 0.0, 1.5),
+    (0.0, 0.0, 0.0)
+)]
+#[case::move_heights(
+    "an entity moving across blocks of different heights",
+    |world: &mut TestWorld| {
+        world.spawn_block(Block { id: 1, x: 0, y: 0, z: 0 });
+        world.spawn_block(Block { id: 2, x: 1, y: 0, z: 1 });
+        world.spawn_entity(
+            Transform::from_xyz(0.0, 0.0, 1.0),
+            VelocityComp { vx: 1.0, vy: 0.0, vz: 0.0 },
+        );
+    },
+    (1.0, 0.0, 2.0),
+    (1.0, 0.0, 0.0)
+)]
+fn physics_scenarios(
+    #[case] description: &'static str,
+    #[case] setup: fn(&mut TestWorld),
+    #[case] expected_pos: (f32, f32, f32),
+    #[case] expected_vel: (f32, f32, f32),
+) {
+    rspec::run(&rspec::given(description, TestWorld::default(), |ctx| {
+        ctx.before_each(setup);
+        ctx.when("the simulation ticks once", |ctx| {
+            ctx.before_each(|world| world.tick());
+            ctx.then("the expected outcome occurs", move |world| {
+                world.assert_position(expected_pos.0, expected_pos.1, expected_pos.2);
+                world.assert_velocity(expected_vel.0, expected_vel.1, expected_vel.2);
             });
-            ctx.when("the simulation ticks once", |ctx| {
-                ctx.before_each(|world| world.tick());
-                ctx.then("the entity descends under gravity", |world| {
-                    world.assert_position(0.0, 0.0, 1.0);
-                    world.assert_velocity(0.0, 0.0, GRAVITY_PULL as f32);
-                });
-            });
-        },
-    ));
-}
-
-#[test]
-fn entity_stands_on_flat_block() {
-    rspec::run(&rspec::given(
-        "an entity on a flat block",
-        TestWorld::default(),
-        |ctx| {
-            ctx.before_each(|world| {
-                world.spawn_block(Block {
-                    id: 1,
-                    x: 0,
-                    y: 0,
-                    z: 0,
-                });
-                world.spawn_entity(Transform::from_xyz(0.0, 0.0, 1.0), VelocityComp::default());
-            });
-            ctx.when("the simulation ticks once", |ctx| {
-                ctx.before_each(|world| world.tick());
-                ctx.then("the entity remains on the block", |world| {
-                    world.assert_position(0.0, 0.0, 1.0);
-                    world.assert_velocity(0.0, 0.0, 0.0);
-                });
-            });
-        },
-    ));
-}
-
-#[test]
-fn entity_stands_on_sloped_block() {
-    rspec::run(&rspec::given(
-        "an entity on a sloped block",
-        TestWorld::default(),
-        |ctx| {
-            ctx.before_each(|world| {
-                world.spawn_sloped_block(
-                    Block {
-                        id: 1,
-                        x: 0,
-                        y: 0,
-                        z: 0,
-                    },
-                    BlockSlope {
-                        block_id: 1,
-                        grad_x: 1.0.into(),
-                        grad_y: 0.0.into(),
-                    },
-                );
-                world.spawn_entity(Transform::from_xyz(0.0, 0.0, 1.5), VelocityComp::default());
-            });
-            ctx.when("the simulation ticks once", |ctx| {
-                ctx.before_each(|world| world.tick());
-                ctx.then("the entity stays aligned with the slope", |world| {
-                    world.assert_position(0.0, 0.0, 1.5);
-                    world.assert_velocity(0.0, 0.0, 0.0);
-                });
-            });
-        },
-    ));
-}
-
-#[test]
-fn entity_moves_between_heights() {
-    rspec::run(&rspec::given(
-        "an entity moving across blocks of different heights",
-        TestWorld::default(),
-        |ctx| {
-            ctx.before_each(|world| {
-                world.spawn_block(Block {
-                    id: 1,
-                    x: 0,
-                    y: 0,
-                    z: 0,
-                });
-                world.spawn_block(Block {
-                    id: 2,
-                    x: 1,
-                    y: 0,
-                    z: 1,
-                });
-                world.spawn_entity(
-                    Transform::from_xyz(0.0, 0.0, 1.0),
-                    VelocityComp {
-                        vx: 1.0,
-                        vy: 0.0,
-                        vz: 0.0,
-                    },
-                );
-            });
-            ctx.when("the simulation ticks once", |ctx| {
-                ctx.before_each(|world| world.tick());
-                ctx.then("the entity snaps to the new floor height", |world| {
-                    world.assert_position(1.0, 0.0, 2.0);
-                    world.assert_velocity(1.0, 0.0, 0.0);
-                });
-            });
-        },
-    ));
+        });
+    }));
 }
