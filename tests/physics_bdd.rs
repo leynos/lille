@@ -9,7 +9,7 @@ use lille::{
     components::{Block, BlockSlope},
     DbspPlugin, DdlogId, VelocityComp, GRAVITY_PULL,
 };
-use rstest::rstest;
+use rstest::{fixture, rstest};
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
@@ -108,16 +108,22 @@ impl TestWorld {
     }
 }
 
+/// Provides a fresh Bevy world for each scenario.
+#[fixture]
+fn world() -> TestWorld {
+    TestWorld::default()
+}
+
 /// Runs a physics scenario using `rspec` with the provided parameters.
 macro_rules! physics_spec {
-    ($description:expr, $setup:expr, $expected_pos:expr, $expected_vel:expr) => {
-        rspec::run(&rspec::given($description, TestWorld::default(), |ctx| {
+    ($world:expr, $description:expr, $setup:expr, $expected_pos:expr, $expected_vel:expr) => {
+        rspec::run(&rspec::given($description, $world, |ctx| {
             ctx.before_each($setup);
             ctx.when("the simulation ticks once", |ctx| {
                 ctx.before_each(|world| world.tick());
                 ctx.then("the expected outcome occurs", move |world| {
-                    world.assert_position($expected_pos.0, $expected_pos.1, $expected_pos.2);
-                    world.assert_velocity($expected_vel.0, $expected_vel.1, $expected_vel.2);
+                    world.assert_position(($expected_pos).0, ($expected_pos).1, ($expected_pos).2);
+                    world.assert_velocity(($expected_vel).0, ($expected_vel).1, ($expected_vel).2);
                 });
             });
         }));
@@ -169,10 +175,11 @@ macro_rules! physics_spec {
     (1.0, 0.0, 0.0)
 )]
 fn physics_scenarios(
+    world: TestWorld,
     #[case] description: &'static str,
     #[case] setup: fn(&mut TestWorld),
     #[case] expected_pos: (f32, f32, f32),
     #[case] expected_vel: (f32, f32, f32),
 ) {
-    physics_spec!(description, setup, expected_pos, expected_vel);
+    physics_spec!(world, description, setup, expected_pos, expected_vel);
 }
