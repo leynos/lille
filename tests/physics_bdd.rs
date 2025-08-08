@@ -117,7 +117,7 @@ fn world() -> TestWorld {
 /// Runs a physics scenario using `rspec` with the provided parameters.
 macro_rules! physics_spec {
     ($world:expr, $description:expr, $setup:expr, $expected_pos:expr, $expected_vel:expr) => {
-        rspec::run(&rspec::given($description, $world, |ctx| {
+        rspec::run(&rspec::given($description, ($world), |ctx| {
             ctx.before_each($setup);
             ctx.when("the simulation ticks once", |ctx| {
                 ctx.before_each(|world| world.tick());
