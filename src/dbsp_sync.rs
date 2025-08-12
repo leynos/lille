@@ -11,8 +11,8 @@ use std::collections::HashMap;
 use bevy::prelude::*;
 use log::error;
 
-use crate::components::{Block, BlockSlope, DdlogId, VelocityComp};
-use crate::dbsp_circuit::{DbspCircuit, Position, Velocity};
+use crate::components::{Block, BlockSlope, DdlogId, ForceComp, VelocityComp};
+use crate::dbsp_circuit::{DbspCircuit, Force, Position, Velocity};
 
 /// Bevy plugin that wires the DBSP circuit into the app.
 ///
@@ -75,9 +75,16 @@ pub fn init_dbsp_system(world: &mut World) -> Result<(), dbsp::Error> {
 ///
 /// This system gathers `Transform`, optional `Velocity`, and `Block` components
 /// and pushes them into the circuit's input handles.
+#[allow(clippy::type_complexity)]
 pub fn cache_state_for_dbsp_system(
     mut state: NonSendMut<DbspState>,
-    entity_query: Query<(Entity, &DdlogId, &Transform, Option<&VelocityComp>)>,
+    entity_query: Query<(
+        Entity,
+        &DdlogId,
+        &Transform,
+        Option<&VelocityComp>,
+        Option<&ForceComp>,
+    )>,
     block_query: Query<(&Block, Option<&BlockSlope>)>,
 ) {
     for (block, slope) in &block_query {
@@ -88,7 +95,7 @@ pub fn cache_state_for_dbsp_system(
     }
 
     state.id_map.clear();
-    for (entity, id, transform, vel) in &entity_query {
+    for (entity, id, transform, vel, force) in &entity_query {
         state.id_map.insert(id.0, entity);
         state.circuit.position_in().push(
             Position {
@@ -110,6 +117,19 @@ pub fn cache_state_for_dbsp_system(
             },
             1,
         );
+
+        if let Some(f) = force {
+            state.circuit.force_in().push(
+                Force {
+                    entity: id.0,
+                    fx: (f.fx as f64).into(),
+                    fy: (f.fy as f64).into(),
+                    fz: (f.fz as f64).into(),
+                    mass: f.mass.map(|m| (m as f64).into()),
+                },
+                1,
+            );
+        }
     }
 }
 

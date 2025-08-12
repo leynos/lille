@@ -87,6 +87,30 @@ pub type NewVelocity = Velocity;
     Serialize,
     Deserialize,
     Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    Default,
+    SizeOf,
+)]
+#[archive_attr(derive(Ord, PartialOrd, Eq, PartialEq, Hash))]
+pub struct Force {
+    pub entity: i64,
+    pub fx: OrderedFloat<f64>,
+    pub fy: OrderedFloat<f64>,
+    pub fz: OrderedFloat<f64>,
+    pub mass: Option<OrderedFloat<f64>>,
+}
+
+#[derive(
+    Archive,
+    Serialize,
+    Deserialize,
+    Clone,
     Debug,
     PartialEq,
     Eq,
@@ -128,6 +152,7 @@ pub struct DbspCircuit {
     circuit: CircuitHandle,
     position_in: ZSetHandle<Position>,
     velocity_in: ZSetHandle<Velocity>,
+    force_in: ZSetHandle<Force>,
     block_in: ZSetHandle<Block>,
     block_slope_in: ZSetHandle<BlockSlope>,
     new_position_out: OutputHandle<OrdZSet<NewPosition>>,
@@ -140,6 +165,7 @@ pub struct DbspCircuit {
 struct BuildHandles {
     position_in: ZSetHandle<Position>,
     velocity_in: ZSetHandle<Velocity>,
+    force_in: ZSetHandle<Force>,
     block_in: ZSetHandle<Block>,
     block_slope_in: ZSetHandle<BlockSlope>,
     new_position_out: OutputHandle<OrdZSet<NewPosition>>,
@@ -174,6 +200,7 @@ impl DbspCircuit {
             circuit,
             position_in: handles.position_in,
             velocity_in: handles.velocity_in,
+            force_in: handles.force_in,
             block_in: handles.block_in,
             block_slope_in: handles.block_slope_in,
             new_position_out: handles.new_position_out,
@@ -191,6 +218,7 @@ impl DbspCircuit {
     fn build_streams(circuit: &mut RootCircuit) -> Result<BuildHandles, AnyError> {
         let (positions, position_in) = circuit.add_input_zset::<Position>();
         let (velocities, velocity_in) = circuit.add_input_zset::<Velocity>();
+        let (forces, force_in) = circuit.add_input_zset::<Force>();
         let (blocks, block_in) = circuit.add_input_zset::<Block>();
         let (slopes, block_slope_in) = circuit.add_input_zset::<BlockSlope>();
 
@@ -206,24 +234,26 @@ impl DbspCircuit {
             .filter(|pf| pf.position.z.into_inner() <= pf.z_floor.into_inner() + GRACE_DISTANCE);
 
         let unsupported_positions = unsupported.map(|pf| pf.position);
-        let unsupported_velocities = velocities.map_index(|v| (v.entity, *v)).join(
+        let all_new_vel = new_velocity_stream(&velocities, &forces);
+        let unsupported_velocities = all_new_vel.map_index(|v| (v.entity, *v)).join(
             &unsupported.map_index(|pf| (pf.position.entity, ())),
             |_, vel, _| *vel,
         );
-        let new_vel_unsupported = new_velocity_stream(&unsupported_velocities);
-        let new_pos_unsupported = new_position_stream(&unsupported_positions, &new_vel_unsupported);
+        let new_pos_unsupported =
+            new_position_stream(&unsupported_positions, &unsupported_velocities);
 
         let (new_pos_standing, new_vel_standing) =
-            standing_motion_stream(&standing, &floor_height, &velocities);
+            standing_motion_stream(&standing, &floor_height, &all_new_vel);
 
         let new_pos = new_pos_unsupported.plus(&new_pos_standing);
-        let new_vel = new_vel_unsupported.plus(&new_vel_standing);
+        let new_vel = unsupported_velocities.plus(&new_vel_standing);
 
         Ok(BuildHandles {
             position_in,
             velocity_in,
             block_in,
             block_slope_in,
+            force_in,
             new_position_out: new_pos.output(),
             new_velocity_out: new_vel.output(),
             highest_block_out: highest.output(),
@@ -270,6 +300,14 @@ impl DbspCircuit {
     /// ```
     pub fn velocity_in(&self) -> &ZSetHandle<Velocity> {
         &self.velocity_in
+    }
+
+    /// Returns a reference to the input handle for feeding force records into the circuit.
+    ///
+    /// Use this handle to supply external forces acting on entities. If a
+    /// force is omitted for an entity, only gravity is applied.
+    pub fn force_in(&self) -> &ZSetHandle<Force> {
+        &self.force_in
     }
 
     /// Returns a reference to the input handle for feeding block records into the circuit.
@@ -409,6 +447,7 @@ impl DbspCircuit {
     pub fn clear_inputs(&mut self) {
         self.position_in.clear_input();
         self.velocity_in.clear_input();
+        self.force_in.clear_input();
         self.block_in.clear_input();
         self.block_slope_in.clear_input();
     }

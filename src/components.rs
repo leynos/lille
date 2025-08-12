@@ -74,3 +74,11 @@ pub struct VelocityComp {
     pub vy: f32,
     pub vz: f32,
 }
+
+#[derive(Component, Debug, Clone, Default, Serialize)]
+pub struct ForceComp {
+    pub fx: f32,
+    pub fy: f32,
+    pub fz: f32,
+    pub mass: Option<f32>,
+}

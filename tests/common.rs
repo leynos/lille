@@ -1,5 +1,5 @@
 use lille::components::Block;
-use lille::dbsp_circuit::{DbspCircuit, Position, Velocity};
+use lille::dbsp_circuit::{DbspCircuit, Force, Position, Velocity};
 
 /// Create a new `DbspCircuit` for tests.
 ///
@@ -28,6 +28,17 @@ pub fn vel(entity: i64, vx: f64, vy: f64, vz: f64) -> Velocity {
         vx: vx.into(),
         vy: vy.into(),
         vz: vz.into(),
+    }
+}
+
+#[allow(dead_code)]
+pub fn force(entity: i64, fx: f64, fy: f64, fz: f64, mass: Option<f64>) -> Force {
+    Force {
+        entity,
+        fx: fx.into(),
+        fy: fy.into(),
+        fz: fz.into(),
+        mass: mass.map(|m| m.into()),
     }
 }
 

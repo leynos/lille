@@ -5,18 +5,19 @@
 
 use approx::assert_relative_eq;
 use lille::components::Block;
-use lille::dbsp_circuit::{NewPosition, NewVelocity, Position, Velocity};
+use lille::dbsp_circuit::{Force, NewPosition, NewVelocity, Position, Velocity};
 use lille::GRAVITY_PULL;
 use rstest::rstest;
 
 mod common;
-use common::{block, new_circuit, vel};
+use common::{block, force, new_circuit, vel};
 
 #[rstest]
 #[case::standing_moves(
     Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 1.0.into() },
     vel(1, 1.0, 0.0, 0.0),
     vec![block(1, 0, 0, 0), block(2, 1, 0, 1)],
+    None,
     Position { entity: 1, x: 1.0.into(), y: 0.0.into(), z: 2.0.into() },
     vel(1, 1.0, 0.0, 0.0),
 )]
@@ -24,6 +25,7 @@ use common::{block, new_circuit, vel};
     Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 2.1.into() },
     vel(1, 0.0, 0.0, 0.0),
     vec![block(1, 0, 0, 0)],
+    None,
     Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 1.1.into() },
     vel(1, 0.0, 0.0, GRAVITY_PULL),
 )]
@@ -31,13 +33,31 @@ use common::{block, new_circuit, vel};
     Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 1.1.into() },
     vel(1, 0.0, 0.0, 0.0),
     vec![block(1, 0, 0, 0)],
+    None,
     Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 1.0.into() },
     vel(1, 0.0, 0.0, 0.0),
+)]
+#[case::force_accelerates(
+    Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 1.0.into() },
+    vel(1, 0.0, 0.0, 0.0),
+    vec![block(1, 0, 0, 0), block(2, 1, 0, 1)],
+    Some(force(1, 5.0, 0.0, 0.0, Some(5.0))),
+    Position { entity: 1, x: 1.0.into(), y: 0.0.into(), z: 2.0.into() },
+    vel(1, 1.0, 0.0, 0.0),
+)]
+#[case::invalid_mass_ignores_force(
+    Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 2.1.into() },
+    vel(1, 0.0, 0.0, 0.0),
+    vec![block(1, 0, 0, 0)],
+    Some(force(1, 0.0, 0.0, 10.0, Some(0.0))),
+    Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 1.1.into() },
+    vel(1, 0.0, 0.0, GRAVITY_PULL),
 )]
 fn motion_cases(
     #[case] position: Position,
     #[case] velocity: Velocity,
     #[case] blocks: Vec<Block>,
+    #[case] force_rec: Option<Force>,
     #[case] expected_pos: NewPosition,
     #[case] expected_vel: NewVelocity,
 ) {
@@ -48,6 +68,9 @@ fn motion_cases(
     }
     circuit.position_in().push(position, 1);
     circuit.velocity_in().push(velocity, 1);
+    if let Some(f) = force_rec {
+        circuit.force_in().push(f, 1);
+    }
 
     circuit.step().expect("circuit step failed");
 
