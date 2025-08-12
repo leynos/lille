@@ -1,3 +1,6 @@
+//! Shared utilities for constructing common physics records in tests.
+#![allow(unfulfilled_lint_expectations)]
+
 use lille::components::Block;
 use lille::dbsp_circuit::{DbspCircuit, Force, Position, Velocity};
 
@@ -31,14 +34,33 @@ pub fn vel(entity: i64, vx: f64, vy: f64, vz: f64) -> Velocity {
     }
 }
 
-#[allow(dead_code)]
-pub fn force(entity: i64, fx: f64, fy: f64, fz: f64, mass: Option<f64>) -> Force {
+/// Convenience constructor for [`Force`] records without mass used in tests.
+#[expect(
+    dead_code,
+    reason = "Test utility function used across multiple test files"
+)]
+pub fn force(entity: i64, fx: f64, fy: f64, fz: f64) -> Force {
     Force {
         entity,
         fx: fx.into(),
         fy: fy.into(),
         fz: fz.into(),
-        mass: mass.map(|m| m.into()),
+        mass: None,
+    }
+}
+
+/// Convenience constructor for [`Force`] records with an explicit mass used in tests.
+#[expect(
+    dead_code,
+    reason = "Test utility function used across multiple test files"
+)]
+pub fn force_with_mass(entity: i64, fx: f64, fy: f64, fz: f64, mass: f64) -> Force {
+    Force {
+        entity,
+        fx: fx.into(),
+        fy: fy.into(),
+        fz: fz.into(),
+        mass: Some(mass.into()),
     }
 }
 
