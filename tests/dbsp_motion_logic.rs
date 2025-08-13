@@ -39,7 +39,7 @@ use test_utils::{block, force_with_mass, new_circuit, vel};
     Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 1.0.into() },
     vel(1, 0.0, 0.0, 0.0),
     vec![block(1, 0, 0, 0), block(2, 1, 0, 1)],
-    Some(force_with_mass(1, 5.0, 0.0, 0.0, 5.0)),
+    Some(force_with_mass(1, (5.0, 0.0, 0.0), 5.0)),
     Position { entity: 1, x: 1.0.into(), y: 0.0.into(), z: 2.0.into() },
     vel(1, 1.0, 0.0, 0.0),
 )]
@@ -47,7 +47,7 @@ use test_utils::{block, force_with_mass, new_circuit, vel};
     Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 2.1.into() },
     vel(1, 0.0, 0.0, 0.0),
     vec![block(1, 0, 0, 0)],
-    Some(force_with_mass(1, 0.0, 0.0, 10.0, 0.0)),
+    Some(force_with_mass(1, (0.0, 0.0, 10.0), 0.0)),
     Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 1.1.into() },
     vel(1, 0.0, 0.0, GRAVITY_PULL),
 )]
