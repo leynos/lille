@@ -1,5 +1,9 @@
 //! Utility helpers for tests.
-//! Provides assertions for verifying generated code.
+//! Provides assertions for verifying generated code and constructors for
+//! common physics records.
+
+pub mod physics;
+pub use physics::{block, force, force_with_mass, new_circuit, pos, vel};
 
 /// Assert that all strings in `keys` are present in `code`.
 ///

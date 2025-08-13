@@ -8,9 +8,7 @@ use lille::components::Block;
 use lille::dbsp_circuit::{Force, NewPosition, NewVelocity, Position, Velocity};
 use lille::GRAVITY_PULL;
 use rstest::rstest;
-
-mod common;
-use common::{block, force_with_mass, new_circuit, vel};
+use test_utils::{block, force_with_mass, new_circuit, vel};
 
 #[rstest]
 #[case::standing_moves(
