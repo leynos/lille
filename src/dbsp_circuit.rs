@@ -98,6 +98,26 @@ pub type NewVelocity = Velocity;
     SizeOf,
 )]
 #[archive_attr(derive(Ord, PartialOrd, Eq, PartialEq, Hash))]
+/// Force applied to an entity.
+///
+/// Units:
+/// - `fx`, `fy`, `fz` are Newtons (N).
+/// - `mass` is kilograms (kg). When `mass` is `None`, a default mass is used downstream.
+/// - When `mass` is present but non-positive, the force is ignored.
+///
+/// # Examples
+/// ```rust,no_run
+/// # use lille::prelude::*;
+/// use ordered_float::OrderedFloat;
+/// let f = Force {
+///     entity: 42,
+///     fx: OrderedFloat(5.0),
+///     fy: OrderedFloat(0.0),
+///     fz: OrderedFloat(0.0),
+///     mass: Some(OrderedFloat(5.0)),
+/// };
+/// assert_eq!(f.entity, 42);
+/// ```
 pub struct Force {
     pub entity: i64,
     pub fx: OrderedFloat<f64>,
@@ -306,6 +326,25 @@ impl DbspCircuit {
     ///
     /// Use this handle to supply external forces acting on entities. If a
     /// force is omitted for an entity, only gravity is applied.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # use lille::prelude::*;
+    /// # use ordered_float::OrderedFloat;
+    /// let circuit = DbspCircuit::new().expect("circuit construction failed");
+    /// let force_in = circuit.force_in();
+    /// force_in.push(
+    ///     Force {
+    ///         entity: 1,
+    ///         fx: OrderedFloat(5.0),
+    ///         fy: OrderedFloat(0.0),
+    ///         fz: OrderedFloat(0.0),
+    ///         mass: Some(OrderedFloat(5.0)),
+    ///     },
+    ///     1,
+    /// );
+    /// ```
     pub fn force_in(&self) -> &ZSetHandle<Force> {
         &self.force_in
     }

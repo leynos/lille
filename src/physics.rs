@@ -7,11 +7,14 @@
 
 use crate::DEFAULT_MASS;
 
+/// Smallest acceptable mass to avoid numerically unstable accelerations.
+const MIN_MASS: f64 = 1e-12;
+
 /// Computes acceleration from a force vector and optional mass.
 ///
-/// Returns `None` if `mass` is non-positive. When `mass` is `None` the
-/// [`DEFAULT_MASS`] constant is used. The calculation applies `F=ma` for
-/// each component independently.
+/// Returns `None` if `mass` is non-positive or effectively zero (see
+/// [`MIN_MASS`]). When `mass` is `None` the [`DEFAULT_MASS`] constant is
+/// used. The calculation applies `F=ma` for each component independently.
 ///
 /// # Examples
 ///
@@ -24,12 +27,14 @@ use crate::DEFAULT_MASS;
 /// ```
 pub fn applied_acceleration(force: (f64, f64, f64), mass: Option<f64>) -> Option<(f64, f64, f64)> {
     match mass {
-        Some(m) if m > 0.0 => Some((force.0 / m, force.1 / m, force.2 / m)),
+        Some(m) if m > MIN_MASS => {
+            let (fx, fy, fz) = force;
+            Some((fx / m, fy / m, fz / m))
+        }
         Some(_) => None,
-        None => Some((
-            force.0 / DEFAULT_MASS,
-            force.1 / DEFAULT_MASS,
-            force.2 / DEFAULT_MASS,
-        )),
+        None => {
+            let (fx, fy, fz) = force;
+            Some((fx / DEFAULT_MASS, fy / DEFAULT_MASS, fz / DEFAULT_MASS))
+        }
     }
 }

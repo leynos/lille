@@ -73,18 +73,12 @@ pub fn init_dbsp_system(world: &mut World) -> Result<(), dbsp::Error> {
 
 /// Caches current ECS state into the DBSP circuit inputs.
 ///
-/// This system gathers `Transform`, optional `Velocity`, and `Block` components
-/// and pushes them into the circuit's input handles.
-#[allow(clippy::type_complexity)]
+/// This system gathers `Transform`, optional `Velocity`, and `Block`
+/// components and pushes them into the circuit's input handles.
 pub fn cache_state_for_dbsp_system(
     mut state: NonSendMut<DbspState>,
-    entity_query: Query<(
-        Entity,
-        &DdlogId,
-        &Transform,
-        Option<&VelocityComp>,
-        Option<&ForceComp>,
-    )>,
+    entity_query: Query<(Entity, &DdlogId, &Transform, Option<&VelocityComp>)>,
+    force_query: Query<(Entity, &DdlogId, &ForceComp)>,
     block_query: Query<(&Block, Option<&BlockSlope>)>,
 ) {
     for (block, slope) in &block_query {
@@ -95,7 +89,7 @@ pub fn cache_state_for_dbsp_system(
     }
 
     state.id_map.clear();
-    for (entity, id, transform, vel, force) in &entity_query {
+    for (entity, id, transform, vel) in &entity_query {
         state.id_map.insert(id.0, entity);
         state.circuit.position_in().push(
             Position {
@@ -117,8 +111,12 @@ pub fn cache_state_for_dbsp_system(
             },
             1,
         );
+    }
 
-        if let Some(f) = force {
+    for (entity, id, f) in &force_query {
+        // Only push forces for entities that already participated in the position
+        // loop; this avoids introducing stray IDs.
+        if state.id_map.contains_key(&id.0) {
             state.circuit.force_in().push(
                 Force {
                     entity: id.0,
@@ -129,6 +127,8 @@ pub fn cache_state_for_dbsp_system(
                 },
                 1,
             );
+        } else {
+            log::warn!("force component for unknown entity {entity:?} ignored");
         }
     }
 }

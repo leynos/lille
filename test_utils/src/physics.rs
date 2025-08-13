@@ -32,6 +32,14 @@ pub fn vel(entity: i64, vx: f64, vy: f64, vz: f64) -> Velocity {
 }
 
 /// Convenience constructor for [`Force`] records without mass used in tests.
+///
+/// # Examples
+/// ```
+/// use test_utils::physics::force;
+/// let f = force(1, 10.0, 0.0, 0.0);
+/// assert_eq!(f.entity, 1);
+/// assert!(f.mass.is_none());
+/// ```
 pub fn force(entity: i64, fx: f64, fy: f64, fz: f64) -> Force {
     Force {
         entity,
@@ -43,6 +51,14 @@ pub fn force(entity: i64, fx: f64, fy: f64, fz: f64) -> Force {
 }
 
 /// Convenience constructor for [`Force`] records with an explicit mass used in tests.
+///
+/// # Examples
+/// ```
+/// use test_utils::physics::force_with_mass;
+/// let f = force_with_mass(1, 10.0, 0.0, 0.0, 5.0);
+/// assert_eq!(f.entity, 1);
+/// assert_eq!(f.mass.unwrap().into_inner(), 5.0);
+/// ```
 pub fn force_with_mass(entity: i64, fx: f64, fy: f64, fz: f64, mass: f64) -> Force {
     Force {
         entity,

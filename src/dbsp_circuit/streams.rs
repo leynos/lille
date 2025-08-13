@@ -99,11 +99,10 @@ pub(super) fn floor_height_stream(
         .flat_map(|fh| fh.clone())
 }
 
-/// Applies gravity to each velocity record.
+/// Applies gravity and a single external force to each velocity record.
 ///
-/// This helper keeps the velocity update logic separate from entity position
-/// updates. It adds [`GRAVITY_PULL`] to the incoming `vz` component and passes
-/// through the remaining fields unchanged.
+/// Each entity may supply at most one [`Force`] record per tick. Forces with
+/// invalid masses are ignored with a log warning.
 pub(super) fn new_velocity_stream(
     velocities: &Stream<RootCircuit, OrdZSet<Velocity>>,
     forces: &Stream<RootCircuit, OrdZSet<Force>>,
@@ -121,6 +120,12 @@ pub(super) fn new_velocity_stream(
                     ),
                     force.mass.map(|m| m.into_inner()),
                 );
+                if accel.is_none() {
+                    log::warn!(
+                        "force with invalid mass for entity {} ignored",
+                        force.entity
+                    );
+                }
                 let (ax, ay, az) = accel.unwrap_or((0.0, 0.0, 0.0));
                 Some(Velocity {
                     entity: vel.entity,

@@ -9,6 +9,8 @@ use rstest::rstest;
 #[case::default_mass((70.0, 0.0, 0.0), None, Some((1.0, 0.0, 0.0)))]
 #[case::invalid_mass((1.0, 1.0, 1.0), Some(0.0), None)]
 #[case::negative_mass((1.0, 1.0, 1.0), Some(-5.0), None)]
+#[case::near_zero_mass((1.0, 0.0, 0.0), Some(1e-20), None)]
+#[case::extremely_large_mass((1.0, 2.0, 3.0), Some(1e12), Some((1e-12, 2e-12, 3e-12)))]
 fn acceleration_cases(
     #[case] force: (f64, f64, f64),
     #[case] mass: Option<f64>,

@@ -39,7 +39,9 @@ pub mod prelude {
     //! use lille::prelude::*;
     //! ```
 
+    pub use crate::applied_acceleration;
     pub use crate::components::Block;
+    pub use crate::dbsp_circuit::Force;
     pub use crate::DbspCircuit;
     pub use crate::DbspPlugin;
     pub use crate::FloorHeightAt;
