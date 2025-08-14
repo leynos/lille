@@ -120,10 +120,10 @@ pub fn cache_state_for_dbsp_system(
             state.circuit.force_in().push(
                 Force {
                     entity: id.0,
-                    fx: (f.fx as f64).into(),
-                    fy: (f.fy as f64).into(),
-                    fz: (f.fz as f64).into(),
-                    mass: f.mass.map(|m| (m as f64).into()),
+                    fx: f.force_x.into(),
+                    fy: f.force_y.into(),
+                    fz: f.force_z.into(),
+                    mass: f.mass.map(|m| m.into()),
                 },
                 1,
             );

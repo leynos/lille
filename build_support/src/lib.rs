@@ -11,7 +11,7 @@ use std::path::PathBuf;
     non_snake_case,
     reason = "OrthoConfig macro generates names that trigger these lints"
 )]
-#[allow(unfulfilled_lint_expectations)]
+#[allow(unfulfilled_lint_expectations)] // macro output may not hit expected lints
 /// Execute all build steps required by `build.rs`.
 ///
 /// This function downloads the Fira Sans font.

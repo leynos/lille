@@ -2,7 +2,7 @@
 //! Includes identifiers, health, target positions, and unit descriptors shared between systems.
 use bevy::prelude::*;
 use ordered_float::OrderedFloat;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Component, Debug, Serialize)]
 pub struct DdlogId(pub i64);
@@ -19,13 +19,13 @@ pub enum UnitType {
 #[derive(Component, Debug, Deref, DerefMut, Serialize)]
 pub struct Target(pub Vec2);
 
-use rkyv::{Archive, Deserialize, Serialize as RkyvSerialize};
+use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 use size_of::SizeOf;
 
 #[derive(
     Archive,
     RkyvSerialize,
-    Deserialize,
+    RkyvDeserialize,
     Component,
     Debug,
     Clone,
@@ -49,7 +49,7 @@ pub struct Block {
 #[derive(
     Archive,
     RkyvSerialize,
-    Deserialize,
+    RkyvDeserialize,
     Component,
     Debug,
     Clone,
@@ -79,7 +79,8 @@ pub struct VelocityComp {
 /// `F = m·a`.
 ///
 /// Units:
-/// - `fx`, `fy`, `fz` are forces in newtons applied for the current tick.
+/// - `force_x`, `force_y`, `force_z` are forces in newtons applied for the
+///   current tick.
 /// - `mass` is the entity's mass in kilograms. Use `Some(m)` for a known
 ///   mass; use `None` to defer to the default mass.
 ///
@@ -92,13 +93,16 @@ pub struct VelocityComp {
 /// Apply a 10 N upward force with an explicit 2 kg mass:
 /// ```
 /// use lille::components::ForceComp;
-/// let f = ForceComp { fx: 0.0, fy: 0.0, fz: 10.0, mass: Some(2.0) };
+/// let f = ForceComp { force_x: 0.0, force_y: 0.0, force_z: 10.0, mass: Some(2.0) };
 /// assert_eq!(f.mass, Some(2.0));
 /// ```
-#[derive(Component, Debug, Clone, Default, Serialize)]
+#[derive(Component, Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ForceComp {
-    pub fx: f32,
-    pub fy: f32,
-    pub fz: f32,
-    pub mass: Option<f32>,
+    #[serde(alias = "fx")]
+    pub force_x: f64,
+    #[serde(alias = "fy")]
+    pub force_y: f64,
+    #[serde(alias = "fz")]
+    pub force_z: f64,
+    pub mass: Option<f64>,
 }

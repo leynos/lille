@@ -187,7 +187,7 @@ macro_rules! physics_spec {
           world.spawn_entity(
               Transform::from_xyz(0.0, 0.0, 1.0),
               VelocityComp::default(),
-              Some(ForceComp { fx: 5.0, fy: 0.0, fz: 0.0, mass: Some(5.0) }),
+              Some(ForceComp { force_x: 5.0, force_y: 0.0, force_z: 0.0, mass: Some(5.0) }),
           );
       },
     (1.0, 0.0, 2.0),
@@ -200,7 +200,7 @@ macro_rules! physics_spec {
           world.spawn_entity(
               Transform::from_xyz(0.0, 0.0, 2.0),
               VelocityComp::default(),
-              Some(ForceComp { fx: 0.0, fy: 0.0, fz: 10.0, mass: Some(0.0) }),
+              Some(ForceComp { force_x: 0.0, force_y: 0.0, force_z: 10.0, mass: Some(0.0) }),
           );
       },
     (0.0, 0.0, 1.0),
