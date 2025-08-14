@@ -32,7 +32,7 @@ impl Default for Env {
     fn default() -> Self {
         #[expect(
             clippy::arc_with_non_send_sync,
-            reason = "Tests run single-threaded; Arc<Mutex<_>> is safe here",
+            reason = "Tests run single-threaded; Arc<Mutex<_>> is safe here"
         )]
         let circuit = Arc::new(Mutex::new(
             DbspCircuit::new().expect("Failed to create DbspCircuit"),
