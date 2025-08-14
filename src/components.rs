@@ -97,6 +97,7 @@ pub struct VelocityComp {
 /// assert_eq!(f.mass, Some(2.0));
 /// ```
 #[derive(Component, Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
 pub struct ForceComp {
     #[serde(alias = "fx")]
     pub force_x: f64,

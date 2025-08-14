@@ -63,6 +63,11 @@ impl TestWorld {
         self.entity = Some(id);
     }
 
+    /// Spawns an entity without an external force.
+    fn spawn_entity_without_force(&mut self, transform: Transform, vel: VelocityComp) {
+        self.spawn_entity(transform, vel, None);
+    }
+
     /// Advances the simulation by one tick.
     fn tick(&mut self) {
         let mut app = self.app.lock().expect("app lock");
@@ -139,7 +144,7 @@ macro_rules! physics_spec {
     "an unsupported entity",
       |world: &mut TestWorld| {
           world.spawn_block(Block { id: 1, x: 0, y: 0, z: -2 });
-          world.spawn_entity(Transform::from_xyz(0.0, 0.0, 2.0), VelocityComp::default(), None);
+          world.spawn_entity_without_force(Transform::from_xyz(0.0, 0.0, 2.0), VelocityComp::default());
       },
     (0.0, 0.0, 1.0),
     (0.0, 0.0, GRAVITY_PULL as f32)
@@ -148,7 +153,7 @@ macro_rules! physics_spec {
     "an entity on a flat block",
       |world: &mut TestWorld| {
           world.spawn_block(Block { id: 1, x: 0, y: 0, z: 0 });
-          world.spawn_entity(Transform::from_xyz(0.0, 0.0, 1.0), VelocityComp::default(), None);
+          world.spawn_entity_without_force(Transform::from_xyz(0.0, 0.0, 1.0), VelocityComp::default());
       },
     (0.0, 0.0, 1.0),
     (0.0, 0.0, 0.0)
@@ -160,7 +165,7 @@ macro_rules! physics_spec {
               Block { id: 1, x: 0, y: 0, z: 0 },
               BlockSlope { block_id: 1, grad_x: 1.0.into(), grad_y: 0.0.into() },
           );
-          world.spawn_entity(Transform::from_xyz(0.0, 0.0, 1.5), VelocityComp::default(), None);
+          world.spawn_entity_without_force(Transform::from_xyz(0.0, 0.0, 1.5), VelocityComp::default());
       },
     (0.0, 0.0, 1.5),
     (0.0, 0.0, 0.0)
@@ -170,10 +175,9 @@ macro_rules! physics_spec {
       |world: &mut TestWorld| {
           world.spawn_block(Block { id: 1, x: 0, y: 0, z: 0 });
           world.spawn_block(Block { id: 2, x: 1, y: 0, z: 1 });
-          world.spawn_entity(
+          world.spawn_entity_without_force(
               Transform::from_xyz(0.0, 0.0, 1.0),
               VelocityComp { vx: 1.0, vy: 0.0, vz: 0.0 },
-              None,
           );
       },
     (1.0, 0.0, 2.0),

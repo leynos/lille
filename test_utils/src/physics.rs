@@ -7,11 +7,28 @@ use lille::dbsp_circuit::{DbspCircuit, Force, Position, Velocity};
 ///
 /// # Panics
 /// Panics if the circuit cannot be constructed.
+///
+/// # Examples
+/// ```no_run
+/// use test_utils::physics::new_circuit;
+/// let circuit = new_circuit();
+/// drop(circuit);
+/// ```
 pub fn new_circuit() -> DbspCircuit {
     DbspCircuit::new().expect("failed to build DBSP circuit")
 }
 
 /// Convenience constructor for [`Position`] records used in tests.
+///
+/// # Examples
+/// ```
+/// use test_utils::physics::pos;
+/// let p = pos(1, 0.0, 1.0, 2.0);
+/// assert_eq!(p.entity, 1);
+/// assert_eq!(p.x.into_inner(), 0.0);
+/// assert_eq!(p.y.into_inner(), 1.0);
+/// assert_eq!(p.z.into_inner(), 2.0);
+/// ```
 pub fn pos(entity: i64, x: f64, y: f64, z: f64) -> Position {
     Position {
         entity,
@@ -22,6 +39,16 @@ pub fn pos(entity: i64, x: f64, y: f64, z: f64) -> Position {
 }
 
 /// Convenience constructor for [`Velocity`] records used in tests.
+///
+/// # Examples
+/// ```
+/// use test_utils::physics::vel;
+/// let v = vel(1, 0.5, -0.5, 1.0);
+/// assert_eq!(v.entity, 1);
+/// assert_eq!(v.vx.into_inner(), 0.5);
+/// assert_eq!(v.vy.into_inner(), -0.5);
+/// assert_eq!(v.vz.into_inner(), 1.0);
+/// ```
 pub fn vel(entity: i64, vx: f64, vy: f64, vz: f64) -> Velocity {
     Velocity {
         entity,
@@ -40,12 +67,12 @@ pub fn vel(entity: i64, vx: f64, vy: f64, vz: f64) -> Velocity {
 /// assert_eq!(f.entity, 1);
 /// assert!(f.mass.is_none());
 /// ```
-pub fn force(entity: i64, force: (f64, f64, f64)) -> Force {
+pub fn force(entity: i64, (fx, fy, fz): (f64, f64, f64)) -> Force {
     Force {
         entity,
-        fx: force.0.into(),
-        fy: force.1.into(),
-        fz: force.2.into(),
+        fx: fx.into(),
+        fy: fy.into(),
+        fz: fz.into(),
         mass: None,
     }
 }
@@ -60,17 +87,27 @@ pub fn force(entity: i64, force: (f64, f64, f64)) -> Force {
 /// assert_eq!(f.entity, 1);
 /// assert_eq!(f.mass.unwrap().into_inner(), 5.0);
 /// ```
-pub fn force_with_mass(entity: i64, force: (f64, f64, f64), mass: f64) -> Force {
+pub fn force_with_mass(entity: i64, (fx, fy, fz): (f64, f64, f64), mass: f64) -> Force {
     Force {
         entity,
-        fx: force.0.into(),
-        fy: force.1.into(),
-        fz: force.2.into(),
+        fx: fx.into(),
+        fy: fy.into(),
+        fz: fz.into(),
         mass: Some(mass.into()),
     }
 }
 
 /// Convenience constructor for [`Block`] records used in tests.
+///
+/// # Examples
+/// ```
+/// use test_utils::physics::block;
+/// let b = block(1, 0, 0, 0);
+/// assert_eq!(b.id, 1);
+/// assert_eq!(b.x, 0);
+/// assert_eq!(b.y, 0);
+/// assert_eq!(b.z, 0);
+/// ```
 pub fn block(id: i64, x: i32, y: i32, z: i32) -> Block {
     Block { id, x, y, z }
 }
