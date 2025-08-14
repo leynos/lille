@@ -197,6 +197,19 @@ macro_rules! physics_spec {
     (1.0, 0.0, 2.0),
     (1.0, 0.0, 0.0)
 )]
+#[case::force_mass_z(
+    "an unsupported entity accelerates along Z",
+      |world: &mut TestWorld| {
+          world.spawn_block(Block { id: 1, x: 0, y: 0, z: -2 });
+          world.spawn_entity(
+              Transform::from_xyz(0.0, 0.0, 2.0),
+              VelocityComp::default(),
+              Some(ForceComp { force_x: 0.0, force_y: 0.0, force_z: 10.0, mass: Some(5.0) }),
+          );
+      },
+    (0.0, 0.0, 3.0),
+    (0.0, 0.0, 1.0)
+)]
 #[case::invalid_mass(
     "a force with invalid mass is ignored",
       |world: &mut TestWorld| {

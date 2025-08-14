@@ -76,16 +76,18 @@ pub struct VelocityComp {
 }
 
 /// ECS component conveying an external force vector and optional mass for
-/// `F = m·a`.
+/// `F = m·a`. Forces apply for a single tick and are cleared after the DBSP
+/// circuit runs.
 ///
 /// Units:
-/// - `force_x`, `force_y`, `force_z` are forces in newtons applied over the
-///   current simulation tick (one second).
-/// - `mass` is the entity's mass in kilograms. Use `Some(m)` for a known
-///   mass; use `None` to fall back to [`crate::DEFAULT_MASS`].
+/// - `force_x`, `force_y`, `force_z` are forces in newtons (N) applied for the
+///   current tick and cleared after each circuit step.
+/// - `mass` is the entity's mass in kilograms (kg). Use `Some(m)` for a known
+///   mass; use `None` to defer to the engine-defined default mass.
 ///
 /// Invariants:
-/// - `mass`, when provided, must be strictly positive.
+/// - `mass`, when provided, must be strictly positive; non-positive values are
+///   ignored by the physics pipeline.
 /// - Force components should be zero when no external force applies.
 ///
 /// # Examples
