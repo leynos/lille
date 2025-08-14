@@ -99,7 +99,8 @@ pub(super) fn floor_height_stream(
         .flat_map(|fh| fh.clone())
 }
 
-/// Applies gravity and a single external force to each velocity record.
+/// Applies gravity and a single external force to each velocity record
+/// (dt = 1).
 ///
 /// Each entity may supply at most one [`Force`] record per tick. Forces with
 /// invalid masses are ignored with a log warning.
