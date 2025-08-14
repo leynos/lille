@@ -79,10 +79,10 @@ pub struct VelocityComp {
 /// `F = m·a`.
 ///
 /// Units:
-/// - `force_x`, `force_y`, `force_z` are forces in newtons applied for the
-///   current tick.
+/// - `force_x`, `force_y`, `force_z` are forces in newtons applied over the
+///   current simulation tick (one second).
 /// - `mass` is the entity's mass in kilograms. Use `Some(m)` for a known
-///   mass; use `None` to defer to the default mass.
+///   mass; use `None` to fall back to [`crate::DEFAULT_MASS`].
 ///
 /// Invariants:
 /// - `mass`, when provided, must be strictly positive.

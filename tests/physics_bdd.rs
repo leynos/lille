@@ -7,7 +7,7 @@
 use bevy::prelude::*;
 use lille::{
     components::{Block, BlockSlope, ForceComp},
-    DbspPlugin, DdlogId, VelocityComp, GRAVITY_PULL,
+    DbspPlugin, DdlogId, VelocityComp, DEFAULT_MASS, GRAVITY_PULL,
 };
 use rstest::{fixture, rstest};
 use std::fmt;
@@ -209,6 +209,20 @@ macro_rules! physics_spec {
       },
     (0.0, 0.0, 1.0),
     (0.0, 0.0, GRAVITY_PULL as f32)
+)]
+#[case::force_default_mass_y(
+    "an entity accelerates along Y with default mass",
+      |world: &mut TestWorld| {
+          world.spawn_block(Block { id: 1, x: 0, y: 0, z: 0 });
+          world.spawn_block(Block { id: 2, x: 0, y: 1, z: 1 });
+          world.spawn_entity(
+              Transform::from_xyz(0.0, 0.0, 1.0),
+              VelocityComp::default(),
+              Some(ForceComp { force_x: 0.0, force_y: DEFAULT_MASS, force_z: 0.0, mass: None }),
+          );
+      },
+    (0.0, 1.0, 2.0),
+    (0.0, 1.0, 0.0)
 )]
 fn physics_scenarios(
     world: TestWorld,

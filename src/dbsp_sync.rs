@@ -74,7 +74,8 @@ pub fn init_dbsp_system(world: &mut World) -> Result<(), dbsp::Error> {
 /// Caches current ECS state into the DBSP circuit inputs.
 ///
 /// This system gathers `Transform`, optional `Velocity`, `Block`, and optional
-/// `Force` components and pushes them into the circuit's input handles.
+/// `Force` components and pushes them into the circuit's input handles. Forces
+/// for entities not present in the current position pass are ignored.
 pub fn cache_state_for_dbsp_system(
     mut state: NonSendMut<DbspState>,
     entity_query: Query<(Entity, &DdlogId, &Transform, Option<&VelocityComp>)>,

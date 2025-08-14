@@ -67,14 +67,18 @@ pub fn vel(entity: i64, vx: f64, vy: f64, vz: f64) -> Velocity {
 /// assert_eq!(f.entity, 1);
 /// assert!(f.mass.is_none());
 /// ```
-pub fn force(entity: i64, (fx, fy, fz): (f64, f64, f64)) -> Force {
+fn force_inner(entity: i64, (fx, fy, fz): (f64, f64, f64), mass: Option<f64>) -> Force {
     Force {
         entity,
         fx: fx.into(),
         fy: fy.into(),
         fz: fz.into(),
-        mass: None,
+        mass: mass.map(Into::into),
     }
+}
+
+pub fn force(entity: i64, force: (f64, f64, f64)) -> Force {
+    force_inner(entity, force, None)
 }
 
 /// Convenience constructor for [`Force`] records with an explicit mass used in
@@ -87,14 +91,8 @@ pub fn force(entity: i64, (fx, fy, fz): (f64, f64, f64)) -> Force {
 /// assert_eq!(f.entity, 1);
 /// assert_eq!(f.mass.unwrap().into_inner(), 5.0);
 /// ```
-pub fn force_with_mass(entity: i64, (fx, fy, fz): (f64, f64, f64), mass: f64) -> Force {
-    Force {
-        entity,
-        fx: fx.into(),
-        fy: fy.into(),
-        fz: fz.into(),
-        mass: Some(mass.into()),
-    }
+pub fn force_with_mass(entity: i64, force: (f64, f64, f64), mass: f64) -> Force {
+    force_inner(entity, force, Some(mass))
 }
 
 /// Convenience constructor for [`Block`] records used in tests.
