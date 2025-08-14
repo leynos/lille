@@ -10,6 +10,11 @@ use crate::DEFAULT_MASS;
 /// Smallest acceptable mass to avoid numerically unstable accelerations.
 const MIN_MASS: f64 = 1e-12;
 
+const _: () = assert!(
+    DEFAULT_MASS > MIN_MASS,
+    "DEFAULT_MASS must exceed MIN_MASS to avoid unstable defaults"
+);
+
 /// Computes acceleration from a force vector and optional mass.
 ///
 /// Returns `None` if `mass` is non-positive or effectively zero (see

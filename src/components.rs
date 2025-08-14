@@ -75,6 +75,26 @@ pub struct VelocityComp {
     pub vz: f32,
 }
 
+/// ECS component conveying an external force vector and optional mass for
+/// `F = m·a`.
+///
+/// Units:
+/// - `fx`, `fy`, `fz` are forces in newtons applied for the current tick.
+/// - `mass` is the entity's mass in kilograms. Use `Some(m)` for a known
+///   mass; use `None` to defer to the default mass.
+///
+/// Invariants:
+/// - `mass`, when provided, must be strictly positive.
+/// - Force components should be zero when no external force applies.
+///
+/// # Examples
+///
+/// Apply a 10 N upward force with an explicit 2 kg mass:
+/// ```
+/// use lille::components::ForceComp;
+/// let f = ForceComp { fx: 0.0, fy: 0.0, fz: 10.0, mass: Some(2.0) };
+/// assert_eq!(f.mass, Some(2.0));
+/// ```
 #[derive(Component, Debug, Clone, Default, Serialize)]
 pub struct ForceComp {
     pub fx: f32,
