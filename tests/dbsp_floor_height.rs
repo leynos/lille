@@ -2,8 +2,8 @@ use lille::{
     components::{Block, BlockSlope},
     dbsp_circuit::FloorHeightAt,
 };
-mod common;
 use rstest::rstest;
+use test_utils::new_circuit;
 
 fn blk(id: i64, x: i32, y: i32, z: i32) -> Block {
     Block { id, x, y, z }
@@ -35,7 +35,7 @@ fn floor_height_cases(
     #[case] slopes: Vec<BlockSlope>,
     #[case] expected: Vec<FloorHeightAt>,
 ) {
-    let mut circuit = common::new_circuit();
+    let mut circuit = new_circuit();
     for b in &blocks {
         circuit.block_in().push(b.clone(), 1);
     }
@@ -57,7 +57,7 @@ fn floor_height_cases(
 
 #[test]
 fn unmatched_slope_is_ignored() {
-    let mut circuit = common::new_circuit();
+    let mut circuit = new_circuit();
     circuit.block_in().push(blk(1, 0, 0, 0), 1);
     circuit.block_slope_in().push(slope(2, 1.0, 0.0), 1);
 
@@ -75,7 +75,7 @@ fn unmatched_slope_is_ignored() {
 
 #[test]
 fn slope_without_block_yields_no_height() {
-    let mut circuit = common::new_circuit();
+    let mut circuit = new_circuit();
     circuit.block_slope_in().push(slope(1, 1.0, 0.0), 1);
 
     circuit.step().expect("step");

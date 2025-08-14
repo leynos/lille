@@ -2,7 +2,7 @@
 //! Includes identifiers, health, target positions, and unit descriptors shared between systems.
 use bevy::prelude::*;
 use ordered_float::OrderedFloat;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Component, Debug, Serialize)]
 pub struct DdlogId(pub i64);
@@ -19,13 +19,13 @@ pub enum UnitType {
 #[derive(Component, Debug, Deref, DerefMut, Serialize)]
 pub struct Target(pub Vec2);
 
-use rkyv::{Archive, Deserialize, Serialize as RkyvSerialize};
+use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 use size_of::SizeOf;
 
 #[derive(
     Archive,
     RkyvSerialize,
-    Deserialize,
+    RkyvDeserialize,
     Component,
     Debug,
     Clone,
@@ -49,7 +49,7 @@ pub struct Block {
 #[derive(
     Archive,
     RkyvSerialize,
-    Deserialize,
+    RkyvDeserialize,
     Component,
     Debug,
     Clone,
@@ -73,4 +73,39 @@ pub struct VelocityComp {
     pub vx: f32,
     pub vy: f32,
     pub vz: f32,
+}
+
+/// ECS component conveying an external force vector and optional mass for
+/// `F = m·a`. Forces apply for a single tick and are cleared after the DBSP
+/// circuit runs.
+///
+/// Units:
+/// - `force_x`, `force_y`, `force_z` are forces in newtons (N) applied for the
+///   current tick and cleared after each circuit step.
+/// - `mass` is the entity's mass in kilograms (kg). Use `Some(m)` for a known
+///   mass; use `None` to defer to the engine-defined default mass.
+///
+/// Invariants:
+/// - `mass`, when provided, must be strictly positive; non-positive values are
+///   ignored by the physics pipeline.
+/// - Force components should be zero when no external force applies.
+///
+/// # Examples
+///
+/// Apply a 10 N upward force with an explicit 2 kg mass:
+/// ```
+/// use lille::components::ForceComp;
+/// let f = ForceComp { force_x: 0.0, force_y: 0.0, force_z: 10.0, mass: Some(2.0) };
+/// assert_eq!(f.mass, Some(2.0));
+/// ```
+#[derive(Component, Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ForceComp {
+    #[serde(alias = "fx")]
+    pub force_x: f64,
+    #[serde(alias = "fy")]
+    pub force_y: f64,
+    #[serde(alias = "fz")]
+    pub force_z: f64,
+    pub mass: Option<f64>,
 }

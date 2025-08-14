@@ -6,8 +6,8 @@
 
 use bevy::prelude::*;
 use lille::{
-    components::{Block, BlockSlope},
-    DbspPlugin, DdlogId, VelocityComp, GRAVITY_PULL,
+    components::{Block, BlockSlope, ForceComp},
+    DbspPlugin, DdlogId, VelocityComp, DEFAULT_MASS, GRAVITY_PULL,
 };
 use rstest::{fixture, rstest};
 use std::fmt;
@@ -53,10 +53,19 @@ impl TestWorld {
     }
 
     /// Spawns an entity at `transform` with the supplied velocity.
-    fn spawn_entity(&mut self, transform: Transform, vel: VelocityComp) {
+    fn spawn_entity(&mut self, transform: Transform, vel: VelocityComp, force: Option<ForceComp>) {
         let mut app = self.app.lock().expect("app lock");
-        let id = app.world.spawn((DdlogId(1), transform, vel)).id();
+        let mut entity = app.world.spawn((DdlogId(1), transform, vel));
+        if let Some(f) = force {
+            entity.insert(f);
+        }
+        let id = entity.id();
         self.entity = Some(id);
+    }
+
+    /// Spawns an entity without an external force.
+    fn spawn_entity_without_force(&mut self, transform: Transform, vel: VelocityComp) {
+        self.spawn_entity(transform, vel, None);
     }
 
     /// Advances the simulation by one tick.
@@ -133,46 +142,100 @@ macro_rules! physics_spec {
 #[rstest]
 #[case::falling(
     "an unsupported entity",
-    |world: &mut TestWorld| {
-        world.spawn_block(Block { id: 1, x: 0, y: 0, z: -2 });
-        world.spawn_entity(Transform::from_xyz(0.0, 0.0, 2.0), VelocityComp::default());
-    },
+      |world: &mut TestWorld| {
+          world.spawn_block(Block { id: 1, x: 0, y: 0, z: -2 });
+          world.spawn_entity_without_force(Transform::from_xyz(0.0, 0.0, 2.0), VelocityComp::default());
+      },
     (0.0, 0.0, 1.0),
     (0.0, 0.0, GRAVITY_PULL as f32)
 )]
 #[case::standing_flat(
     "an entity on a flat block",
-    |world: &mut TestWorld| {
-        world.spawn_block(Block { id: 1, x: 0, y: 0, z: 0 });
-        world.spawn_entity(Transform::from_xyz(0.0, 0.0, 1.0), VelocityComp::default());
-    },
+      |world: &mut TestWorld| {
+          world.spawn_block(Block { id: 1, x: 0, y: 0, z: 0 });
+          world.spawn_entity_without_force(Transform::from_xyz(0.0, 0.0, 1.0), VelocityComp::default());
+      },
     (0.0, 0.0, 1.0),
     (0.0, 0.0, 0.0)
 )]
 #[case::standing_sloped(
     "an entity on a sloped block",
-    |world: &mut TestWorld| {
-        world.spawn_sloped_block(
-            Block { id: 1, x: 0, y: 0, z: 0 },
-            BlockSlope { block_id: 1, grad_x: 1.0.into(), grad_y: 0.0.into() },
-        );
-        world.spawn_entity(Transform::from_xyz(0.0, 0.0, 1.5), VelocityComp::default());
-    },
+      |world: &mut TestWorld| {
+          world.spawn_sloped_block(
+              Block { id: 1, x: 0, y: 0, z: 0 },
+              BlockSlope { block_id: 1, grad_x: 1.0.into(), grad_y: 0.0.into() },
+          );
+          world.spawn_entity_without_force(Transform::from_xyz(0.0, 0.0, 1.5), VelocityComp::default());
+      },
     (0.0, 0.0, 1.5),
     (0.0, 0.0, 0.0)
 )]
 #[case::move_heights(
     "an entity moving across blocks of different heights",
-    |world: &mut TestWorld| {
-        world.spawn_block(Block { id: 1, x: 0, y: 0, z: 0 });
-        world.spawn_block(Block { id: 2, x: 1, y: 0, z: 1 });
-        world.spawn_entity(
-            Transform::from_xyz(0.0, 0.0, 1.0),
-            VelocityComp { vx: 1.0, vy: 0.0, vz: 0.0 },
-        );
-    },
+      |world: &mut TestWorld| {
+          world.spawn_block(Block { id: 1, x: 0, y: 0, z: 0 });
+          world.spawn_block(Block { id: 2, x: 1, y: 0, z: 1 });
+          world.spawn_entity_without_force(
+              Transform::from_xyz(0.0, 0.0, 1.0),
+              VelocityComp { vx: 1.0, vy: 0.0, vz: 0.0 },
+          );
+      },
     (1.0, 0.0, 2.0),
     (1.0, 0.0, 0.0)
+)]
+#[case::force_acceleration(
+    "an entity accelerates under force",
+      |world: &mut TestWorld| {
+          world.spawn_block(Block { id: 1, x: 0, y: 0, z: 0 });
+          world.spawn_block(Block { id: 2, x: 1, y: 0, z: 1 });
+          world.spawn_entity(
+              Transform::from_xyz(0.0, 0.0, 1.0),
+              VelocityComp::default(),
+              Some(ForceComp { force_x: 5.0, force_y: 0.0, force_z: 0.0, mass: Some(5.0) }),
+          );
+      },
+    (1.0, 0.0, 2.0),
+    (1.0, 0.0, 0.0)
+)]
+#[case::force_mass_z(
+    "an unsupported entity accelerates along Z",
+      |world: &mut TestWorld| {
+          world.spawn_block(Block { id: 1, x: 0, y: 0, z: -2 });
+          world.spawn_entity(
+              Transform::from_xyz(0.0, 0.0, 2.0),
+              VelocityComp::default(),
+              Some(ForceComp { force_x: 0.0, force_y: 0.0, force_z: 10.0, mass: Some(5.0) }),
+          );
+      },
+    (0.0, 0.0, 3.0),
+    (0.0, 0.0, 1.0)
+)]
+#[case::invalid_mass(
+    "a force with invalid mass is ignored",
+      |world: &mut TestWorld| {
+          world.spawn_block(Block { id: 1, x: 0, y: 0, z: -2 });
+          world.spawn_entity(
+              Transform::from_xyz(0.0, 0.0, 2.0),
+              VelocityComp::default(),
+              Some(ForceComp { force_x: 0.0, force_y: 0.0, force_z: 10.0, mass: Some(0.0) }),
+          );
+      },
+    (0.0, 0.0, 1.0),
+    (0.0, 0.0, GRAVITY_PULL as f32)
+)]
+#[case::force_default_mass_y(
+    "an entity accelerates along Y with default mass",
+      |world: &mut TestWorld| {
+          world.spawn_block(Block { id: 1, x: 0, y: 0, z: 0 });
+          world.spawn_block(Block { id: 2, x: 0, y: 1, z: 1 });
+          world.spawn_entity(
+              Transform::from_xyz(0.0, 0.0, 1.0),
+              VelocityComp::default(),
+              Some(ForceComp { force_x: 0.0, force_y: DEFAULT_MASS, force_z: 0.0, mass: None }),
+          );
+      },
+    (0.0, 1.0, 2.0),
+    (0.0, 1.0, 0.0)
 )]
 fn physics_scenarios(
     world: TestWorld,

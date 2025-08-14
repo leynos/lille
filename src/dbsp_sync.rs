@@ -11,8 +11,8 @@ use std::collections::HashMap;
 use bevy::prelude::*;
 use log::error;
 
-use crate::components::{Block, BlockSlope, DdlogId, VelocityComp};
-use crate::dbsp_circuit::{DbspCircuit, Position, Velocity};
+use crate::components::{Block, BlockSlope, DdlogId, ForceComp, VelocityComp};
+use crate::dbsp_circuit::{DbspCircuit, Force, Position, Velocity};
 
 /// Bevy plugin that wires the DBSP circuit into the app.
 ///
@@ -73,11 +73,13 @@ pub fn init_dbsp_system(world: &mut World) -> Result<(), dbsp::Error> {
 
 /// Caches current ECS state into the DBSP circuit inputs.
 ///
-/// This system gathers `Transform`, optional `Velocity`, and `Block` components
-/// and pushes them into the circuit's input handles.
+/// This system gathers `Transform`, optional `Velocity`, `Block`, and optional
+/// `Force` components and pushes them into the circuit's input handles. Forces
+/// for entities not present in the current position pass are ignored.
 pub fn cache_state_for_dbsp_system(
     mut state: NonSendMut<DbspState>,
     entity_query: Query<(Entity, &DdlogId, &Transform, Option<&VelocityComp>)>,
+    force_query: Query<(Entity, &DdlogId, &ForceComp)>,
     block_query: Query<(&Block, Option<&BlockSlope>)>,
 ) {
     for (block, slope) in &block_query {
@@ -110,6 +112,25 @@ pub fn cache_state_for_dbsp_system(
             },
             1,
         );
+    }
+
+    for (entity, id, f) in &force_query {
+        // Only push forces for entities that already participated in the position
+        // loop; this avoids introducing stray IDs.
+        if state.id_map.contains_key(&id.0) {
+            state.circuit.force_in().push(
+                Force {
+                    entity: id.0,
+                    fx: f.force_x.into(),
+                    fy: f.force_y.into(),
+                    fz: f.force_z.into(),
+                    mass: f.mass.map(|m| m.into()),
+                },
+                1,
+            );
+        } else {
+            log::warn!("force component for unknown entity {entity:?} ignored");
+        }
     }
 }
 

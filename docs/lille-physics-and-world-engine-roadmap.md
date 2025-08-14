@@ -146,11 +146,11 @@ physical properties and agent behaviours.
 
 1. **Velocity and Acceleration**:
 
-   - [ ] Add `Velocity` and `Force` as input streams to the DBSP circuit.
+   - [x] Add `Velocity` and `Force` as input streams to the DBSP circuit.
 
-   - [ ] Implement operators to calculate acceleration based on forces (`F=ma`).
+   - [x] Implement operators to calculate acceleration based on forces (`F=ma`).
 
-   - [ ] Integrate velocity into the `NewPosition` calculation
+   - [x] Integrate velocity into the `NewPosition` calculation
      (`p_new = p_old + v*dt`).
 
    - [ ] Implement a `friction` operator that reduces velocity for `Standing`

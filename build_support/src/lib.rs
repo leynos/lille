@@ -6,14 +6,7 @@ pub mod font;
 use color_eyre::eyre::Result;
 use std::path::PathBuf;
 
-#[expect(
-    unexpected_cfgs,
-    non_snake_case,
-    reason = "OrthoConfig macro generates names that trigger these lints"
-)]
-#[allow(unfulfilled_lint_expectations)]
 /// Execute all build steps required by `build.rs`.
-///
 /// This function downloads the Fira Sans font.
 /// Environment variables such as `CARGO_MANIFEST_DIR` must be set
 /// by Cargo before this function is called.

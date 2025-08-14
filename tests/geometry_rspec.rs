@@ -11,7 +11,6 @@ use std::fmt;
 use std::sync::{Arc, Mutex};
 
 #[derive(Clone)]
-#[allow(clippy::arc_with_non_send_sync)]
 struct Env {
     circuit: Arc<Mutex<DbspCircuit>>,
 }
@@ -31,7 +30,10 @@ impl fmt::Debug for Env {
 
 impl Default for Env {
     fn default() -> Self {
-        #[allow(clippy::arc_with_non_send_sync)]
+        #[expect(
+            clippy::arc_with_non_send_sync,
+            reason = "Tests run single-threaded; Arc<Mutex<_>> is safe here"
+        )]
         let circuit = Arc::new(Mutex::new(
             DbspCircuit::new().expect("Failed to create DbspCircuit"),
         ));

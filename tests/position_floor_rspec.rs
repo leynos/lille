@@ -10,10 +10,9 @@ use lille::{
     dbsp_circuit::{Position, PositionFloor},
     DbspCircuit,
 };
-mod common;
-use common::pos;
 use std::fmt;
 use std::sync::{Arc, Mutex};
+use test_utils::pos;
 
 #[derive(Clone)]
 /// Shared test environment wrapping a `DbspCircuit` in a thread-safe container.

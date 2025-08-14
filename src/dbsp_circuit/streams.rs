@@ -18,7 +18,8 @@ use ordered_float::OrderedFloat;
 use crate::components::{Block, BlockSlope};
 use crate::{BLOCK_CENTRE_OFFSET, BLOCK_TOP_OFFSET, GRAVITY_PULL};
 
-use super::{FloorHeightAt, HighestBlockAt, Position, Velocity};
+use super::{FloorHeightAt, Force, HighestBlockAt, Position, Velocity};
+use crate::physics::applied_acceleration;
 
 /// Returns a stream pairing each grid cell with its highest block and id.
 ///
@@ -98,20 +99,53 @@ pub(super) fn floor_height_stream(
         .flat_map(|fh| fh.clone())
 }
 
-/// Applies gravity to each velocity record.
+/// Applies gravity and a single external force to each velocity record
+/// (dt = 1).
 ///
-/// This helper keeps the velocity update logic separate from entity position
-/// updates. It adds [`GRAVITY_PULL`] to the incoming `vz` component and passes
-/// through the remaining fields unchanged.
+/// Each entity may supply at most one [`Force`] record per tick. Forces with
+/// invalid masses are ignored with a log warning.
 pub(super) fn new_velocity_stream(
     velocities: &Stream<RootCircuit, OrdZSet<Velocity>>,
+    forces: &Stream<RootCircuit, OrdZSet<Force>>,
 ) -> Stream<RootCircuit, OrdZSet<Velocity>> {
-    velocities.map(|v| Velocity {
-        entity: v.entity,
-        vx: v.vx,
-        vy: v.vy,
-        vz: OrderedFloat(v.vz.into_inner() + GRAVITY_PULL),
-    })
+    velocities
+        .map_index(|v| (v.entity, *v))
+        .outer_join(
+            &forces.map_index(|f| (f.entity, *f)),
+            |_, vel, force| {
+                let accel = applied_acceleration(
+                    (
+                        force.fx.into_inner(),
+                        force.fy.into_inner(),
+                        force.fz.into_inner(),
+                    ),
+                    force.mass.map(|m| m.into_inner()),
+                );
+                if accel.is_none() {
+                    log::warn!(
+                        "force with invalid mass for entity {} ignored",
+                        force.entity
+                    );
+                }
+                let (ax, ay, az) = accel.unwrap_or((0.0, 0.0, 0.0));
+                Some(Velocity {
+                    entity: vel.entity,
+                    vx: OrderedFloat(vel.vx.into_inner() + ax),
+                    vy: OrderedFloat(vel.vy.into_inner() + ay),
+                    vz: OrderedFloat(vel.vz.into_inner() + az + GRAVITY_PULL),
+                })
+            },
+            |_, vel| {
+                Some(Velocity {
+                    entity: vel.entity,
+                    vx: vel.vx,
+                    vy: vel.vy,
+                    vz: OrderedFloat(vel.vz.into_inner() + GRAVITY_PULL),
+                })
+            },
+            |_, _| None,
+        )
+        .flat_map(|v| *v)
 }
 
 /// Integrates positions with updated velocities.

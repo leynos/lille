@@ -4,9 +4,8 @@
 //! at each `(x, y)` coordinate pair from multiple input blocks.
 
 use lille::{components::Block, dbsp_circuit::HighestBlockAt};
-mod common;
-use common::block;
 use rstest::rstest;
+use test_utils::{block, new_circuit};
 
 fn hb(x: i32, y: i32, z: i32) -> HighestBlockAt {
     HighestBlockAt { x, y, z }
@@ -14,7 +13,7 @@ fn hb(x: i32, y: i32, z: i32) -> HighestBlockAt {
 
 #[test]
 fn test_highest_block_aggregation() {
-    let mut circuit = common::new_circuit();
+    let mut circuit = new_circuit();
 
     circuit.block_in().push(
         Block {
@@ -60,7 +59,7 @@ fn test_highest_block_aggregation() {
 #[case::duplicate_same_height(vec![block(1,1,1,5), block(2,1,1,5)], vec![hb(1,1,5)])]
 #[case::mixed(vec![block(1,0,0,3), block(2,0,0,1), block(3,0,1,4)], vec![hb(0,0,3), hb(0,1,4)])]
 fn highest_block_cases(#[case] blocks: Vec<Block>, #[case] expected: Vec<HighestBlockAt>) {
-    let mut circuit = common::new_circuit();
+    let mut circuit = new_circuit();
     for blk in blocks {
         circuit.block_in().push(blk, 1);
     }

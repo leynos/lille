@@ -108,6 +108,14 @@ their new position.
   through a simple `map` operator that subtracts the `GRAVITY_PULL` constant
   from the entity's `z` coordinate.
 
+- **Forces and Acceleration**: A dedicated `Force` input stream supplies
+  external forces. Each force is converted to acceleration using `F=ma` with an
+  optional per-entity mass (defaulting to `DEFAULT_MASS`). Invalid or
+  non-positive masses are ignored. The resulting acceleration is combined with
+  gravity and integrated into the velocity stream. This velocity is then used
+  to update positions (`p_new = p_old + v*dt`), ensuring the DBSP circuit
+  remains the authoritative source for derived motion.
+
   - **Movement for Standing Entities**: The `Standing` stream is joined with AI
   data (see below) to determine a desired movement vector `(dx, dy)`. The
   proposed new location `(x+dx, y+dy)` is then fed back into the

@@ -7,9 +7,8 @@ use lille::{
     components::{Block, BlockSlope},
     dbsp_circuit::{Position, PositionFloor},
 };
-mod common;
-use common::pos;
 use rstest::rstest;
+use test_utils::{new_circuit, pos};
 
 /// Creates a [`Block`] positioned at integer grid coordinates.
 fn blk(id: i64, x: i32, y: i32, z: i32) -> Block {
@@ -59,7 +58,7 @@ fn position_floor_cases(
     #[case] positions: Vec<Position>,
     #[case] expected: Vec<PositionFloor>,
 ) {
-    let mut circuit = common::new_circuit();
+    let mut circuit = new_circuit();
     for b in &blocks {
         circuit.block_in().push(b.clone(), 1);
     }
@@ -86,7 +85,7 @@ fn position_floor_cases(
 /// corresponding [`PositionFloor`] record.
 #[test]
 fn multiple_positions_same_grid_cell() {
-    let mut circuit = common::new_circuit();
+    let mut circuit = new_circuit();
     circuit.block_in().push(blk(1, 0, 0, 0), 1);
     circuit.position_in().push(pos(1, 0.1, 0.1, 2.0), 1);
     circuit.position_in().push(pos(2, 0.8, 0.4, 3.0), 1);
