@@ -19,9 +19,25 @@ fn make_pf(z: f64, z_floor: f64) -> PositionFloor {
 #[case(10.0, 10.0)]
 #[case(10.05, 10.0)]
 #[case(10.1, 10.0)]
+#[case(0.0, 0.0)]
+#[case(-10.0, -10.0)]
+#[case(-10.05, -10.0)]
+#[case(f64::NAN, 10.0)]
+#[case(10.0, f64::NAN)]
+#[case(f64::NAN, f64::NAN)]
 fn within_grace(#[case] z: f64, #[case] z_floor: f64) {
     let pf = make_pf(z, z_floor);
-    assert!(pf.position.z.into_inner() <= pf.z_floor.into_inner() + GRACE_DISTANCE);
+    if z.is_nan() || z_floor.is_nan() {
+        // OrderedFloat(NaN) compares as unordered.
+        let cmp = pf
+            .position
+            .z
+            .into_inner()
+            .partial_cmp(&(pf.z_floor.into_inner() + GRACE_DISTANCE));
+        assert!(cmp.is_none() || matches!(cmp, Some(std::cmp::Ordering::Greater)));
+    } else {
+        assert!(pf.position.z.into_inner() <= pf.z_floor.into_inner() + GRACE_DISTANCE);
+    }
 }
 
 #[rstest]

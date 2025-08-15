@@ -40,34 +40,48 @@ dbsp_record! {
 /// Newly computed velocity emitted by the circuit in the current step.
 pub type NewVelocity = Velocity;
 
-dbsp_record! {
-    /// Force applied to an entity.
-    ///
-    /// Units:
-    /// - `fx`, `fy`, `fz` are Newtons (N).
-    /// - `mass` is kilograms (kg). When `mass` is `None`, a default mass is used downstream.
-    /// - When `mass` is present but non-positive, the force is ignored.
-    ///
-    /// # Examples
-    /// ```rust,no_run
-    /// # use lille::prelude::*;
-    /// use ordered_float::OrderedFloat;
-    /// let f = Force {
-    ///     entity: 42,
-    ///     fx: OrderedFloat(5.0),
-    ///     fy: OrderedFloat(0.0),
-    ///     fz: OrderedFloat(0.0),
-    ///     mass: Some(OrderedFloat(5.0)),
-    /// };
-    /// assert_eq!(f.entity, 42);
-    /// ```
-    pub struct Force {
-        pub entity: i64,
-        pub fx: OrderedFloat<f64>,
-        pub fy: OrderedFloat<f64>,
-        pub fz: OrderedFloat<f64>,
-        pub mass: Option<OrderedFloat<f64>>,
-    }
+/// Force applied to an entity.
+///
+/// Units:
+/// - `fx`, `fy`, `fz` are Newtons (N).
+/// - `mass` is kilograms (kg). When `mass` is `None`, a default mass is used downstream.
+/// - When `mass` is present but non-positive, the force is ignored.
+///
+/// # Examples
+/// ```rust,no_run
+/// # use lille::prelude::*;
+/// use ordered_float::OrderedFloat;
+/// let f = Force {
+///     entity: 42,
+///     fx: OrderedFloat(5.0),
+///     fy: OrderedFloat(0.0),
+///     fz: OrderedFloat(0.0),
+///     mass: Some(OrderedFloat(5.0)),
+/// };
+/// assert_eq!(f.entity, 42);
+/// ```
+#[derive(
+    ::rkyv::Archive,
+    ::rkyv::Serialize,
+    ::rkyv::Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Default,
+    ::size_of::SizeOf,
+)]
+#[archive_attr(derive(Ord, PartialOrd, Eq, PartialEq, Hash))]
+pub struct Force {
+    pub entity: i64,
+    pub fx: OrderedFloat<f64>,
+    pub fy: OrderedFloat<f64>,
+    pub fz: OrderedFloat<f64>,
+    pub mass: Option<OrderedFloat<f64>>,
 }
 
 dbsp_record! {
