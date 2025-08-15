@@ -1,4 +1,14 @@
-//! Types used by the DBSP circuit.
+//! Public data types used by the DBSP circuit.
+//!
+//! These types:
+//! - Provide a stable total ordering of floating-point values via `OrderedFloat`,
+//!   which DBSP requires for keys, joins, and aggregations.
+//! - Support zero-copy archiving with `rkyv` for efficient interchange across circuit
+//!   boundaries and test fixtures.
+//! - Derive `SizeOf` to aid memory accounting.
+//!
+//! Avoid introducing `NaN` values into these types. While `OrderedFloat` defines a
+//! total order that includes `NaN`, the resulting ordering can be surprising.
 use ordered_float::OrderedFloat;
 use rkyv::{Archive, Deserialize, Serialize};
 use size_of::SizeOf;
@@ -26,6 +36,7 @@ pub struct Position {
     pub z: OrderedFloat<f64>,
 }
 
+/// Newly computed position emitted by the circuit in the current step.
 pub type NewPosition = Position;
 
 #[derive(
@@ -51,6 +62,7 @@ pub struct Velocity {
     pub vz: OrderedFloat<f64>,
 }
 
+/// Newly computed velocity emitted by the circuit in the current step.
 pub type NewVelocity = Velocity;
 
 #[derive(
@@ -102,6 +114,7 @@ pub struct Force {
     Serialize,
     Deserialize,
     Clone,
+    Copy,
     Debug,
     PartialEq,
     Eq,
@@ -123,6 +136,7 @@ pub struct HighestBlockAt {
     Serialize,
     Deserialize,
     Clone,
+    Copy,
     Debug,
     PartialEq,
     Eq,
