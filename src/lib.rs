@@ -8,6 +8,7 @@ pub mod dbsp_sync;
 pub mod ddlog_sync;
 pub mod entity;
 pub mod logging;
+mod macros;
 pub mod physics;
 pub mod spawn_world;
 pub mod vector_math;

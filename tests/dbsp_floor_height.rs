@@ -47,7 +47,7 @@ fn floor_height_cases(
         .floor_height_out()
         .consolidate()
         .iter()
-        .map(|(fh, _, _)| fh.clone())
+        .map(|(fh, _, _)| fh)
         .collect();
     vals.sort_by_key(|h| (h.x, h.y));
     let mut exp = expected;
@@ -67,7 +67,7 @@ fn unmatched_slope_is_ignored() {
         .floor_height_out()
         .consolidate()
         .iter()
-        .map(|(fh, _, _)| fh.clone())
+        .map(|(fh, _, _)| fh)
         .collect();
 
     assert_eq!(vals, vec![fh(0, 0, 1.0)]);
@@ -84,7 +84,7 @@ fn slope_without_block_yields_no_height() {
         .floor_height_out()
         .consolidate()
         .iter()
-        .map(|(fh, _, _)| fh.clone())
+        .map(|(fh, _, _)| fh)
         .collect();
 
     assert!(vals.is_empty());

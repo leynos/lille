@@ -17,156 +17,20 @@
 
 use anyhow::Error as AnyError;
 use dbsp::{typed_batch::OrdZSet, CircuitHandle, OutputHandle, RootCircuit, ZSetHandle};
-use ordered_float::OrderedFloat;
-use size_of::SizeOf;
 
 use crate::components::{Block, BlockSlope};
 use crate::GRACE_DISTANCE;
 
 mod streams;
+mod types;
 use streams::{
     floor_height_stream, new_position_stream, new_velocity_stream, position_floor_stream,
     standing_motion_stream,
 };
 pub use streams::{highest_block_pair, PositionFloor};
-
-use rkyv::{Archive, Deserialize, Serialize};
-
-#[derive(
-    Archive,
-    Serialize,
-    Deserialize,
-    Clone,
-    Copy,
-    Debug,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    Default,
-    SizeOf,
-)]
-#[archive_attr(derive(Ord, PartialOrd, Eq, PartialEq, Hash))]
-pub struct Position {
-    pub entity: i64,
-    pub x: OrderedFloat<f64>,
-    pub y: OrderedFloat<f64>,
-    pub z: OrderedFloat<f64>,
-}
-
-pub type NewPosition = Position;
-
-#[derive(
-    Archive,
-    Serialize,
-    Deserialize,
-    Clone,
-    Copy,
-    Debug,
-    PartialEq,
-    Eq,
-    Hash,
-    PartialOrd,
-    Ord,
-    Default,
-    SizeOf,
-)]
-#[archive_attr(derive(Ord, PartialOrd, Eq, PartialEq, Hash))]
-pub struct Velocity {
-    pub entity: i64,
-    pub vx: OrderedFloat<f64>,
-    pub vy: OrderedFloat<f64>,
-    pub vz: OrderedFloat<f64>,
-}
-
-pub type NewVelocity = Velocity;
-
-#[derive(
-    Archive,
-    Serialize,
-    Deserialize,
-    Clone,
-    Copy,
-    Debug,
-    PartialEq,
-    Eq,
-    Hash,
-    PartialOrd,
-    Ord,
-    Default,
-    SizeOf,
-)]
-#[archive_attr(derive(Ord, PartialOrd, Eq, PartialEq, Hash))]
-/// Force applied to an entity.
-///
-/// Units:
-/// - `fx`, `fy`, `fz` are Newtons (N).
-/// - `mass` is kilograms (kg). When `mass` is `None`, a default mass is used downstream.
-/// - When `mass` is present but non-positive, the force is ignored.
-///
-/// # Examples
-/// ```rust,no_run
-/// # use lille::prelude::*;
-/// use ordered_float::OrderedFloat;
-/// let f = Force {
-///     entity: 42,
-///     fx: OrderedFloat(5.0),
-///     fy: OrderedFloat(0.0),
-///     fz: OrderedFloat(0.0),
-///     mass: Some(OrderedFloat(5.0)),
-/// };
-/// assert_eq!(f.entity, 42);
-/// ```
-pub struct Force {
-    pub entity: i64,
-    pub fx: OrderedFloat<f64>,
-    pub fy: OrderedFloat<f64>,
-    pub fz: OrderedFloat<f64>,
-    pub mass: Option<OrderedFloat<f64>>,
-}
-
-#[derive(
-    Archive,
-    Serialize,
-    Deserialize,
-    Clone,
-    Debug,
-    PartialEq,
-    Eq,
-    Hash,
-    PartialOrd,
-    Ord,
-    Default,
-    SizeOf,
-)]
-#[archive_attr(derive(Ord, PartialOrd, Eq, PartialEq, Hash))]
-pub struct HighestBlockAt {
-    pub x: i32,
-    pub y: i32,
-    pub z: i32,
-}
-
-#[derive(
-    Archive,
-    Serialize,
-    Deserialize,
-    Clone,
-    Debug,
-    PartialEq,
-    Eq,
-    Hash,
-    PartialOrd,
-    Ord,
-    Default,
-    SizeOf,
-)]
-#[archive_attr(derive(Ord, PartialOrd, Eq, PartialEq, Hash))]
-pub struct FloorHeightAt {
-    pub x: i32,
-    pub y: i32,
-    pub z: OrderedFloat<f64>,
-}
+pub use types::{
+    FloorHeightAt, Force, HighestBlockAt, NewPosition, NewVelocity, Position, Velocity,
+};
 
 pub struct DbspCircuit {
     circuit: CircuitHandle,
@@ -243,15 +107,16 @@ impl DbspCircuit {
         let (slopes, block_slope_in) = circuit.add_input_zset::<BlockSlope>();
 
         let highest_pair = highest_block_pair(&blocks);
-        let highest = highest_pair.map(|(hb, _)| hb.clone());
+        let highest = highest_pair.map(|(hb, _)| *hb);
         let floor_height = floor_height_stream(&highest_pair, &slopes);
 
         let pos_floor = position_floor_stream(&positions, &floor_height);
 
-        let unsupported = pos_floor
-            .filter(|pf| pf.position.z.into_inner() > pf.z_floor.into_inner() + GRACE_DISTANCE);
-        let standing = pos_floor
-            .filter(|pf| pf.position.z.into_inner() <= pf.z_floor.into_inner() + GRACE_DISTANCE);
+        fn within_grace(pf: &PositionFloor) -> bool {
+            pf.position.z.into_inner() <= pf.z_floor.into_inner() + GRACE_DISTANCE
+        }
+        let unsupported = pos_floor.filter(|pf| !within_grace(pf));
+        let standing = pos_floor.filter(within_grace);
 
         let unsupported_positions = unsupported.map(|pf| pf.position);
         let all_new_vel = new_velocity_stream(&velocities, &forces);
@@ -492,46 +357,5 @@ impl DbspCircuit {
     }
 }
 
-// --- TESTS FOR GRACE_DISTANCE BEHAVIOUR ---
-
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn make_pf(z: f64, z_floor: f64) -> PositionFloor {
-        PositionFloor {
-            position: Position {
-                entity: 1,
-                x: 0.0.into(),
-                y: 0.0.into(),
-                z: z.into(),
-            },
-            z_floor: z_floor.into(),
-        }
-    }
-
-    #[test]
-    fn test_grace_distance_on_flat_surface() {
-        let pf = make_pf(10.0, 10.0);
-        assert!(pf.position.z.into_inner() <= pf.z_floor.into_inner() + GRACE_DISTANCE);
-    }
-
-    #[test]
-    fn test_grace_distance_on_slope() {
-        let pf = make_pf(10.1, 10.0);
-        assert!(pf.position.z.into_inner() <= pf.z_floor.into_inner() + GRACE_DISTANCE);
-    }
-
-    #[test]
-    fn test_grace_distance_fast_moving_entity() {
-        let pf = make_pf(10.5, 10.0);
-        let within_grace = pf.position.z.into_inner() <= pf.z_floor.into_inner() + GRACE_DISTANCE;
-        assert_eq!(within_grace, 10.5 <= 10.0 + GRACE_DISTANCE);
-    }
-
-    #[test]
-    fn test_grace_distance_unsupported() {
-        let pf = make_pf(11.0, 10.0);
-        assert!(pf.position.z.into_inner() > pf.z_floor.into_inner() + GRACE_DISTANCE);
-    }
-}
+mod tests;
