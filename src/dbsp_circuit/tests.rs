@@ -28,13 +28,9 @@ fn make_pf(z: f64, z_floor: f64) -> PositionFloor {
 fn within_grace(#[case] z: f64, #[case] z_floor: f64) {
     let pf = make_pf(z, z_floor);
     if z.is_nan() || z_floor.is_nan() {
-        // OrderedFloat(NaN) compares as unordered.
-        let cmp = pf
-            .position
-            .z
-            .into_inner()
-            .partial_cmp(&(pf.z_floor.into_inner() + GRACE_DISTANCE));
-        assert!(cmp.is_none() || matches!(cmp, Some(std::cmp::Ordering::Greater)));
+        // Comparisons with NaN are always false -> outside grace.
+        let within = pf.position.z.into_inner() <= pf.z_floor.into_inner() + GRACE_DISTANCE;
+        assert!(!within);
     } else {
         assert!(pf.position.z.into_inner() <= pf.z_floor.into_inner() + GRACE_DISTANCE);
     }
@@ -43,7 +39,7 @@ fn within_grace(#[case] z: f64, #[case] z_floor: f64) {
 #[rstest]
 #[case(11.0, 10.0)]
 #[case(10.0 + GRACE_DISTANCE, 10.0)]
-fn unsupported(#[case] z: f64, #[case] z_floor: f64) {
+fn beyond_grace_or_at_boundary(#[case] z: f64, #[case] z_floor: f64) {
     let pf = make_pf(z, z_floor);
     if pf.position.z.into_inner() == pf.z_floor.into_inner() + GRACE_DISTANCE {
         assert!(pf.position.z.into_inner() <= pf.z_floor.into_inner() + GRACE_DISTANCE);

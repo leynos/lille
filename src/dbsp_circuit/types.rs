@@ -9,6 +9,9 @@
 //!
 //! Avoid introducing `NaN` values into these types. While `OrderedFloat` defines a
 //! total order that includes `NaN`, the resulting ordering can be surprising.
+//!
+//! Grace-distance comparisons in the circuit treat equality as supported (`<=`),
+//! and any `NaN` involved in a comparison yields `false`.
 
 use ordered_float::OrderedFloat;
 
