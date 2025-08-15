@@ -25,7 +25,13 @@ fn within_grace(#[case] z: f64, #[case] z_floor: f64) {
 }
 
 #[rstest]
-fn unsupported() {
-    let pf = make_pf(11.0, 10.0);
-    assert!(pf.position.z.into_inner() > pf.z_floor.into_inner() + GRACE_DISTANCE);
+#[case(11.0, 10.0)]
+#[case(10.0 + GRACE_DISTANCE, 10.0)]
+fn unsupported(#[case] z: f64, #[case] z_floor: f64) {
+    let pf = make_pf(z, z_floor);
+    if pf.position.z.into_inner() == pf.z_floor.into_inner() + GRACE_DISTANCE {
+        assert!(pf.position.z.into_inner() <= pf.z_floor.into_inner() + GRACE_DISTANCE);
+    } else {
+        assert!(pf.position.z.into_inner() > pf.z_floor.into_inner() + GRACE_DISTANCE);
+    }
 }
