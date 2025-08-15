@@ -112,10 +112,11 @@ impl DbspCircuit {
 
         let pos_floor = position_floor_stream(&positions, &floor_height);
 
-        let unsupported = pos_floor
-            .filter(|pf| pf.position.z.into_inner() > pf.z_floor.into_inner() + GRACE_DISTANCE);
-        let standing = pos_floor
-            .filter(|pf| pf.position.z.into_inner() <= pf.z_floor.into_inner() + GRACE_DISTANCE);
+        fn within_grace(pf: &PositionFloor) -> bool {
+            pf.position.z.into_inner() <= pf.z_floor.into_inner() + GRACE_DISTANCE
+        }
+        let unsupported = pos_floor.filter(|pf| !within_grace(pf));
+        let standing = pos_floor.filter(within_grace);
 
         let unsupported_positions = unsupported.map(|pf| pf.position);
         let all_new_vel = new_velocity_stream(&velocities, &forces);
