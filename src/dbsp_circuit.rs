@@ -107,7 +107,7 @@ impl DbspCircuit {
         let (slopes, block_slope_in) = circuit.add_input_zset::<BlockSlope>();
 
         let highest_pair = highest_block_pair(&blocks);
-        let highest = highest_pair.map(|(hb, _)| hb.clone());
+        let highest = highest_pair.map(|(hb, _)| *hb);
         let floor_height = floor_height_stream(&highest_pair, &slopes);
 
         let pos_floor = position_floor_stream(&positions, &floor_height);

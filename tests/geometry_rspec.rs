@@ -64,7 +64,7 @@ impl Env {
             .floor_height_out()
             .consolidate()
             .iter()
-            .map(|(fh, _, _)| fh.clone())
+            .map(|(fh, _, _)| fh)
             .collect();
         c.clear_inputs();
         vals

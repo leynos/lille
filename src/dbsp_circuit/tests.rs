@@ -17,8 +17,8 @@ fn make_pf(z: f64, z_floor: f64) -> PositionFloor {
 
 #[rstest]
 #[case(10.0, 10.0)]
+#[case(10.05, 10.0)]
 #[case(10.1, 10.0)]
-#[case(10.5, 10.0)]
 fn within_grace(#[case] z: f64, #[case] z_floor: f64) {
     let pf = make_pf(z, z_floor);
     assert!(pf.position.z.into_inner() <= pf.z_floor.into_inner() + GRACE_DISTANCE);

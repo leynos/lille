@@ -46,7 +46,7 @@ fn test_highest_block_aggregation() {
     circuit.step().expect("Failed to step DBSP circuit");
 
     let output = circuit.highest_block_out().consolidate();
-    let mut vals: Vec<HighestBlockAt> = output.iter().map(|(hb, _, _)| hb.clone()).collect();
+    let mut vals: Vec<HighestBlockAt> = output.iter().map(|(hb, _, _)| hb).collect();
     vals.sort_by_key(|h| (h.x, h.y));
     assert_eq!(vals.len(), 2);
     assert!(vals.contains(&HighestBlockAt { x: 10, y: 20, z: 8 }));
@@ -69,7 +69,7 @@ fn highest_block_cases(#[case] blocks: Vec<Block>, #[case] expected: Vec<Highest
         .highest_block_out()
         .consolidate()
         .iter()
-        .map(|(hb, _, _)| hb.clone())
+        .map(|(hb, _, _)| hb)
         .collect();
     vals.sort_by_key(|h| (h.x, h.y));
 
