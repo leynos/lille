@@ -46,8 +46,8 @@ pub struct DbspState {
     circuit: DbspCircuit,
     /// Cached mapping from DBSP entity IDs to Bevy `Entity` values.
     ///
-    /// Rebuilding this map every frame can be costly, so it is updated when
-    /// [`cache_state_for_dbsp_system`] runs.
+    /// The map is maintained incrementally by
+    /// [`cache_state_for_dbsp_system`] to avoid rebuilding it every frame.
     id_map: HashMap<i64, Entity>,
 }
 
@@ -58,6 +58,19 @@ impl DbspState {
             circuit: DbspCircuit::new()?,
             id_map: HashMap::new(),
         })
+    }
+
+    /// Looks up the Bevy [`Entity`] for a DBSP identifier.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use lille::dbsp_sync::DbspState;
+    /// let state = DbspState::new().unwrap();
+    /// assert!(state.entity_for_id(42).is_none());
+    /// ```
+    pub fn entity_for_id(&self, id: i64) -> Option<Entity> {
+        self.id_map.get(&id).copied()
     }
 }
 
@@ -75,12 +88,17 @@ pub fn init_dbsp_system(world: &mut World) -> Result<(), dbsp::Error> {
 ///
 /// This system gathers `Transform`, optional `Velocity`, `Block`, and optional
 /// `Force` components and pushes them into the circuit's input handles. Forces
-/// for entities not present in the current position pass are ignored.
+/// for entities not present in the current position pass are ignored. It also
+/// updates the internal mapping from DBSP entity identifiers to Bevy entities,
+/// ensuring the lookup is maintained without rebuilding the map each frame.
 pub fn cache_state_for_dbsp_system(
     mut state: NonSendMut<DbspState>,
     entity_query: Query<(Entity, &DdlogId, &Transform, Option<&VelocityComp>)>,
     force_query: Query<(Entity, &DdlogId, &ForceComp)>,
     block_query: Query<(&Block, Option<&BlockSlope>)>,
+    added_ids: Query<(Entity, &DdlogId), Added<DdlogId>>,
+    changed_ids: Query<(Entity, &DdlogId), Changed<DdlogId>>,
+    mut removed_ids: RemovedComponents<DdlogId>,
 ) {
     for (block, slope) in &block_query {
         state.circuit.block_in().push(block.clone(), 1);
@@ -89,9 +107,25 @@ pub fn cache_state_for_dbsp_system(
         }
     }
 
-    state.id_map.clear();
-    for (entity, id, transform, vel) in &entity_query {
+    // Remove mappings for entities whose `DdlogId` component was removed this
+    // frame. `retain` is used here as the removed event provides only the
+    // `Entity` value.
+    for entity in removed_ids.read() {
+        state.id_map.retain(|_, e| *e != entity);
+    }
+
+    // Replace mappings for entities whose identifier changed.
+    for (entity, id) in &changed_ids {
+        state.id_map.retain(|_, e| *e != entity);
         state.id_map.insert(id.0, entity);
+    }
+
+    // Add mappings for newly spawned entities.
+    for (entity, id) in &added_ids {
+        state.id_map.insert(id.0, entity);
+    }
+
+    for (_, id, transform, vel) in &entity_query {
         state.circuit.position_in().push(
             Position {
                 entity: id.0,
