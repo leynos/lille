@@ -153,7 +153,7 @@ physical properties and agent behaviours.
    - [x] Integrate velocity into the `NewPosition` calculation
      (`p_new = p_old + v*dt`).
 
-   - [ ] Implement a `friction` operator that reduces velocity for `Standing`
+   - [x] Implement a `friction` operator that reduces velocity for `Standing`
      entities.
 
    - [ ] Implement `terminal_velocity` clamping.

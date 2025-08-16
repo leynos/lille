@@ -7,7 +7,7 @@
 use bevy::prelude::*;
 use lille::{
     components::{Block, BlockSlope, ForceComp},
-    DbspPlugin, DdlogId, VelocityComp, DEFAULT_MASS, GRAVITY_PULL,
+    DbspPlugin, DdlogId, VelocityComp, GRAVITY_PULL, GROUND_FRICTION,
 };
 use rstest::{fixture, rstest};
 use std::fmt;
@@ -177,7 +177,7 @@ macro_rules! physics_spec {
           world.spawn_block(Block { id: 2, x: 1, y: 0, z: 1 });
           world.spawn_entity_without_force(
               Transform::from_xyz(0.0, 0.0, 1.0),
-              VelocityComp { vx: 1.0, vy: 0.0, vz: 0.0 },
+              VelocityComp { vx: 1.0 / (1.0 - GROUND_FRICTION as f32), vy: 0.0, vz: 0.0 },
           );
       },
     (1.0, 0.0, 2.0),
@@ -191,7 +191,7 @@ macro_rules! physics_spec {
           world.spawn_entity(
               Transform::from_xyz(0.0, 0.0, 1.0),
               VelocityComp::default(),
-              Some(ForceComp { force_x: 5.0, force_y: 0.0, force_z: 0.0, mass: Some(5.0) }),
+              Some(ForceComp { force_x: 5.0 / (1.0 - GROUND_FRICTION), force_y: 0.0, force_z: 0.0, mass: Some(5.0) }),
           );
       },
     (1.0, 0.0, 2.0),
@@ -223,19 +223,17 @@ macro_rules! physics_spec {
     (0.0, 0.0, 1.0),
     (0.0, 0.0, GRAVITY_PULL as f32)
 )]
-#[case::force_default_mass_y(
-    "an entity accelerates along Y with default mass",
+#[case::standing_friction(
+    "a standing entity slows due to friction",
       |world: &mut TestWorld| {
           world.spawn_block(Block { id: 1, x: 0, y: 0, z: 0 });
-          world.spawn_block(Block { id: 2, x: 0, y: 1, z: 1 });
-          world.spawn_entity(
+          world.spawn_entity_without_force(
               Transform::from_xyz(0.0, 0.0, 1.0),
-              VelocityComp::default(),
-              Some(ForceComp { force_x: 0.0, force_y: DEFAULT_MASS, force_z: 0.0, mass: None }),
+              VelocityComp { vx: 1.0, vy: 0.0, vz: 0.0 },
           );
       },
-    (0.0, 1.0, 2.0),
-    (0.0, 1.0, 0.0)
+    (0.9, 0.0, 1.0),
+    (0.9, 0.0, 0.0)
 )]
 fn physics_scenarios(
     world: TestWorld,
