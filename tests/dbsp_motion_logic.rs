@@ -13,11 +13,11 @@ use test_utils::{block, force, force_with_mass, new_circuit, vel};
 #[rstest]
 #[case::standing_moves(
     Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 1.0.into() },
-    vel(1, 1.0 / (1.0 - lille::GROUND_FRICTION), 0.0, 0.0),
+    vel(1, 1.0, 0.0, 0.0),
     vec![block(1, 0, 0, 0), block(2, 1, 0, 1)],
     None,
-    Some(Position { entity: 1, x: 1.0.into(), y: 0.0.into(), z: 2.0.into() }),
-    Some(vel(1, 1.0, 0.0, 0.0)),
+    Some(Position { entity: 1, x: apply_ground_friction(1.0).into(), y: 0.0.into(), z: 1.0.into() }),
+    Some(vel(1, apply_ground_friction(1.0), 0.0, 0.0)),
 )]
 #[case::unsupported_falls(
     Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 2.1.into() },
