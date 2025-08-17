@@ -40,8 +40,8 @@ use test_utils::{block, force, force_with_mass, new_circuit, vel};
     vel(1, 0.0, 0.0, 0.0),
     vec![block(1, 0, 0, 0), block(2, 1, 0, 1)],
     Some(force_with_mass(1, (5.0, 0.0, 0.0), 5.0)),
-    Some(Position { entity: 1, x: 0.9.into(), y: 0.0.into(), z: 1.0.into() }),
-    Some(vel(1, 0.9, 0.0, 0.0)),
+    Some(Position { entity: 1, x: apply_ground_friction(1.0).into(), y: 0.0.into(), z: 1.0.into() }),
+    Some(vel(1, apply_ground_friction(1.0), 0.0, 0.0)),
 )]
 #[case::invalid_mass_ignores_force(
     Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 2.1.into() },
@@ -56,8 +56,8 @@ use test_utils::{block, force, force_with_mass, new_circuit, vel};
     vel(1, 0.0, 0.0, 0.0),
     vec![block(1, 0, 0, 0)],
     Some(force(1, (lille::DEFAULT_MASS, 0.0, 0.0))),
-    Some(Position { entity: 1, x: 0.9.into(), y: 0.0.into(), z: 1.0.into() }),
-    Some(vel(1, 0.9, 0.0, 0.0)),
+    Some(Position { entity: 1, x: apply_ground_friction(1.0).into(), y: 0.0.into(), z: 1.0.into() }),
+    Some(vel(1, apply_ground_friction(1.0), 0.0, 0.0)),
 )]
 fn motion_cases(
     #[case] position: Position,
@@ -136,6 +136,17 @@ fn standing_friction(#[case] vx: f64) {
     circuit.velocity_in().push(vel(1, vx, 0.0, 0.0), 1);
 
     circuit.step().expect("circuit step failed");
+
+    let pos_out: Vec<NewPosition> = circuit
+        .new_position_out()
+        .consolidate()
+        .iter()
+        .map(|t| t.0)
+        .collect();
+    assert_eq!(pos_out.len(), 1);
+    assert_relative_eq!(pos_out[0].x.into_inner(), apply_ground_friction(vx));
+    assert_relative_eq!(pos_out[0].y.into_inner(), 0.0);
+    assert_relative_eq!(pos_out[0].z.into_inner(), 1.0);
 
     let vel_out: Vec<NewVelocity> = circuit
         .new_velocity_out()
