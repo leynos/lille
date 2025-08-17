@@ -4,8 +4,10 @@
 //! `rust-rspec` to express expectations declaratively. The DBSP circuit is the
 //! sole source of truth for inferred motion; Bevy merely applies its outputs.
 
+use approx::assert_relative_eq;
 use bevy::prelude::*;
 use lille::{
+    apply_ground_friction,
     components::{Block, BlockSlope, ForceComp},
     DbspPlugin, DdlogId, VelocityComp, GRAVITY_PULL, GROUND_FRICTION,
 };
@@ -91,10 +93,7 @@ impl TestWorld {
         let tolerance = 1e-3;
 
         for (a, e) in actual.iter().zip(expected.iter()) {
-            assert!(
-                (a - e).abs() < tolerance,
-                "Component {name} mismatch: expected {e}, got {a}",
-            );
+            assert_relative_eq!(*a, *e, epsilon = tolerance);
         }
     }
 
@@ -180,8 +179,16 @@ macro_rules! physics_spec {
               VelocityComp { vx: 1.0 / (1.0 - GROUND_FRICTION as f32), vy: 0.0, vz: 0.0 },
           );
       },
-    (1.0, 0.0, 2.0),
-    (1.0, 0.0, 0.0)
+    (
+        apply_ground_friction(1.0 / (1.0 - GROUND_FRICTION)) as f32,
+        0.0,
+        2.0,
+    ),
+    (
+        apply_ground_friction(1.0 / (1.0 - GROUND_FRICTION)) as f32,
+        0.0,
+        0.0,
+    )
 )]
 #[case::force_acceleration(
     "an entity accelerates under force",
@@ -194,8 +201,16 @@ macro_rules! physics_spec {
               Some(ForceComp { force_x: 5.0 / (1.0 - GROUND_FRICTION), force_y: 0.0, force_z: 0.0, mass: Some(5.0) }),
           );
       },
-    (1.0, 0.0, 2.0),
-    (1.0, 0.0, 0.0)
+    (
+        apply_ground_friction(1.0 / (1.0 - GROUND_FRICTION)) as f32,
+        0.0,
+        2.0,
+    ),
+    (
+        apply_ground_friction(1.0 / (1.0 - GROUND_FRICTION)) as f32,
+        0.0,
+        0.0,
+    )
 )]
 #[case::force_mass_z(
     "an unsupported entity accelerates along Z",
@@ -232,8 +247,36 @@ macro_rules! physics_spec {
               VelocityComp { vx: 1.0, vy: 0.0, vz: 0.0 },
           );
       },
-    (0.9, 0.0, 1.0),
-    (0.9, 0.0, 0.0)
+    (
+        apply_ground_friction(1.0) as f32,
+        0.0,
+        1.0,
+    ),
+    (
+        apply_ground_friction(1.0) as f32,
+        0.0,
+        0.0,
+    )
+)]
+#[case::diagonal_friction(
+    "a standing entity with diagonal movement slows due to friction",
+      |world: &mut TestWorld| {
+          world.spawn_block(Block { id: 1, x: 0, y: 0, z: 0 });
+          world.spawn_entity_without_force(
+              Transform::from_xyz(0.0, 0.0, 1.0),
+              VelocityComp { vx: 1.0, vy: 1.0, vz: 0.0 },
+          );
+      },
+    (
+        apply_ground_friction(1.0) as f32,
+        apply_ground_friction(1.0) as f32,
+        1.0,
+    ),
+    (
+        apply_ground_friction(1.0) as f32,
+        apply_ground_friction(1.0) as f32,
+        0.0,
+    )
 )]
 fn physics_scenarios(
     world: TestWorld,

@@ -16,7 +16,8 @@ use dbsp::{operator::Max, typed_batch::OrdZSet, RootCircuit, Stream};
 use ordered_float::OrderedFloat;
 
 use crate::components::{Block, BlockSlope};
-use crate::{BLOCK_CENTRE_OFFSET, BLOCK_TOP_OFFSET, GRAVITY_PULL, GROUND_FRICTION};
+use crate::physics::apply_ground_friction;
+use crate::{BLOCK_CENTRE_OFFSET, BLOCK_TOP_OFFSET, GRAVITY_PULL};
 
 use super::{FloorHeightAt, Force, HighestBlockAt, Position, Velocity};
 use crate::physics::applied_acceleration;
@@ -269,12 +270,8 @@ pub(super) fn standing_motion_stream(
     let moved = standing
         .map_index(|pf| (pf.position.entity, pf.position))
         .join(&velocities.map_index(|v| (v.entity, *v)), |_, pos, vel| {
-            let apply_friction = |v: OrderedFloat<f64>| {
-                // Ground friction opposes horizontal motion without reversing direction.
-                OrderedFloat(v.into_inner() * (1.0 - GROUND_FRICTION))
-            };
-            let vx = apply_friction(vel.vx);
-            let vy = apply_friction(vel.vy);
+            let vx = OrderedFloat(apply_ground_friction(vel.vx.into_inner()));
+            let vy = OrderedFloat(apply_ground_friction(vel.vy.into_inner()));
             let new_x = OrderedFloat(pos.x.into_inner() + vx.into_inner());
             let new_y = OrderedFloat(pos.y.into_inner() + vy.into_inner());
             (new_x, new_y, pos.entity, vx, vy)

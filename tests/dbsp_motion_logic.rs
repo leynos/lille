@@ -6,7 +6,7 @@
 use approx::assert_relative_eq;
 use lille::components::Block;
 use lille::dbsp_circuit::{Force, NewPosition, NewVelocity, Position, Velocity};
-use lille::GRAVITY_PULL;
+use lille::{apply_ground_friction, GRAVITY_PULL};
 use rstest::rstest;
 use test_utils::{block, force, force_with_mass, new_circuit, vel};
 
@@ -116,10 +116,10 @@ fn motion_cases(
 }
 
 #[rstest]
-#[case::positive(1.0, 0.9)]
-#[case::negative(-1.0, -0.9)]
-#[case::zero(0.0, 0.0)]
-fn standing_friction(#[case] vx: f64, #[case] expected_vx: f64) {
+#[case::positive(1.0)]
+#[case::negative(-1.0)]
+#[case::zero(0.0)]
+fn standing_friction(#[case] vx: f64) {
     let mut circuit = new_circuit();
 
     circuit.block_in().push(block(1, 0, 0, 0), 1);
@@ -144,7 +144,37 @@ fn standing_friction(#[case] vx: f64, #[case] expected_vx: f64) {
         .map(|t| t.0)
         .collect();
     assert_eq!(vel_out.len(), 1);
-    assert_relative_eq!(vel_out[0].vx.into_inner(), expected_vx);
+    assert_relative_eq!(vel_out[0].vx.into_inner(), apply_ground_friction(vx));
     assert_relative_eq!(vel_out[0].vy.into_inner(), 0.0);
     assert_relative_eq!(vel_out[0].vz.into_inner(), 0.0);
+}
+
+#[test]
+fn airborne_preserves_velocity() {
+    let mut circuit = new_circuit();
+
+    circuit.block_in().push(block(1, 0, 0, 0), 1);
+    circuit.position_in().push(
+        Position {
+            entity: 1,
+            x: 0.0.into(),
+            y: 0.0.into(),
+            z: 2.0.into(),
+        },
+        1,
+    );
+    circuit.velocity_in().push(vel(1, 1.0, 0.0, 0.0), 1);
+
+    circuit.step().expect("circuit step failed");
+
+    let vel_out: Vec<NewVelocity> = circuit
+        .new_velocity_out()
+        .consolidate()
+        .iter()
+        .map(|t| t.0)
+        .collect();
+    assert_eq!(vel_out.len(), 1);
+    assert_relative_eq!(vel_out[0].vx.into_inner(), 1.0);
+    assert_relative_eq!(vel_out[0].vy.into_inner(), 0.0);
+    assert_relative_eq!(vel_out[0].vz.into_inner(), GRAVITY_PULL);
 }

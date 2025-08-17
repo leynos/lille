@@ -121,10 +121,11 @@ their new position.
   proposed new location `(x+dx, y+dy)` is then fed back into the
   floor-height-calculation sub-graph to find the correct `z` for the new
   position, ensuring entities stick to the ground as they move. Horizontal
-  velocities double as AI intent; the circuit scales them by
-  `1 - GROUND_FRICTION` to model ground drag, resets vertical velocity to zero,
-  and snaps the entity to the floor height at the new cell. Entities whose `z`
-  coordinate is within `GRACE_DISTANCE` of the floor are treated as `Standing`.
+  velocities double as AI intent; the circuit applies `apply_ground_friction`,
+  which clamps `GROUND_FRICTION` to `[0, 1]` before scaling the components to
+  model ground drag, resets vertical velocity to zero, and snaps the entity to
+  the floor height at the new cell. Entities whose `z` coordinate is within
+  `GRACE_DISTANCE` of the floor are treated as `Standing`.
 
 This design cements the DBSP circuit as the authoritative source for motion
 inference. Bevy systems simply marshal inputs and apply the circuit's outputs;
