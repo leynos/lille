@@ -6,7 +6,7 @@
 use approx::assert_relative_eq;
 use lille::components::Block;
 use lille::dbsp_circuit::{Force, NewPosition, NewVelocity, Position, Velocity};
-use lille::GRAVITY_PULL;
+use lille::{apply_ground_friction, GRAVITY_PULL};
 use rstest::rstest;
 use test_utils::{block, force, force_with_mass, new_circuit, vel};
 
@@ -16,8 +16,8 @@ use test_utils::{block, force, force_with_mass, new_circuit, vel};
     vel(1, 1.0, 0.0, 0.0),
     vec![block(1, 0, 0, 0), block(2, 1, 0, 1)],
     None,
-    Some(Position { entity: 1, x: 1.0.into(), y: 0.0.into(), z: 2.0.into() }),
-    Some(vel(1, 1.0, 0.0, 0.0)),
+    Some(Position { entity: 1, x: apply_ground_friction(1.0).into(), y: 0.0.into(), z: 1.0.into() }),
+    Some(vel(1, apply_ground_friction(1.0), 0.0, 0.0)),
 )]
 #[case::unsupported_falls(
     Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 2.1.into() },
@@ -40,8 +40,8 @@ use test_utils::{block, force, force_with_mass, new_circuit, vel};
     vel(1, 0.0, 0.0, 0.0),
     vec![block(1, 0, 0, 0), block(2, 1, 0, 1)],
     Some(force_with_mass(1, (5.0, 0.0, 0.0), 5.0)),
-    Some(Position { entity: 1, x: 1.0.into(), y: 0.0.into(), z: 2.0.into() }),
-    Some(vel(1, 1.0, 0.0, 0.0)),
+    Some(Position { entity: 1, x: apply_ground_friction(1.0).into(), y: 0.0.into(), z: 1.0.into() }),
+    Some(vel(1, apply_ground_friction(1.0), 0.0, 0.0)),
 )]
 #[case::invalid_mass_ignores_force(
     Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 2.1.into() },
@@ -56,8 +56,8 @@ use test_utils::{block, force, force_with_mass, new_circuit, vel};
     vel(1, 0.0, 0.0, 0.0),
     vec![block(1, 0, 0, 0)],
     Some(force(1, (lille::DEFAULT_MASS, 0.0, 0.0))),
-    None,
-    None,
+    Some(Position { entity: 1, x: apply_ground_friction(1.0).into(), y: 0.0.into(), z: 1.0.into() }),
+    Some(vel(1, apply_ground_friction(1.0), 0.0, 0.0)),
 )]
 fn motion_cases(
     #[case] position: Position,
@@ -113,4 +113,79 @@ fn motion_cases(
         }
         None => assert!(vel_out.is_empty()),
     }
+}
+
+#[rstest]
+#[case::positive(1.0)]
+#[case::negative(-1.0)]
+#[case::zero(0.0)]
+fn standing_friction(#[case] vx: f64) {
+    let mut circuit = new_circuit();
+
+    circuit.block_in().push(block(1, 0, 0, 0), 1);
+    circuit.block_in().push(block(2, -1, 0, 0), 1);
+    circuit.position_in().push(
+        Position {
+            entity: 1,
+            x: 0.0.into(),
+            y: 0.0.into(),
+            z: 1.0.into(),
+        },
+        1,
+    );
+    circuit.velocity_in().push(vel(1, vx, 0.0, 0.0), 1);
+
+    circuit.step().expect("circuit step failed");
+
+    let pos_out: Vec<NewPosition> = circuit
+        .new_position_out()
+        .consolidate()
+        .iter()
+        .map(|t| t.0)
+        .collect();
+    assert_eq!(pos_out.len(), 1);
+    assert_relative_eq!(pos_out[0].x.into_inner(), apply_ground_friction(vx));
+    assert_relative_eq!(pos_out[0].y.into_inner(), 0.0);
+    assert_relative_eq!(pos_out[0].z.into_inner(), 1.0);
+
+    let vel_out: Vec<NewVelocity> = circuit
+        .new_velocity_out()
+        .consolidate()
+        .iter()
+        .map(|t| t.0)
+        .collect();
+    assert_eq!(vel_out.len(), 1);
+    assert_relative_eq!(vel_out[0].vx.into_inner(), apply_ground_friction(vx));
+    assert_relative_eq!(vel_out[0].vy.into_inner(), 0.0);
+    assert_relative_eq!(vel_out[0].vz.into_inner(), 0.0);
+}
+
+#[test]
+fn airborne_preserves_velocity() {
+    let mut circuit = new_circuit();
+
+    circuit.block_in().push(block(1, 0, 0, 0), 1);
+    circuit.position_in().push(
+        Position {
+            entity: 1,
+            x: 0.0.into(),
+            y: 0.0.into(),
+            z: 2.0.into(),
+        },
+        1,
+    );
+    circuit.velocity_in().push(vel(1, 1.0, 0.0, 0.0), 1);
+
+    circuit.step().expect("circuit step failed");
+
+    let vel_out: Vec<NewVelocity> = circuit
+        .new_velocity_out()
+        .consolidate()
+        .iter()
+        .map(|t| t.0)
+        .collect();
+    assert_eq!(vel_out.len(), 1);
+    assert_relative_eq!(vel_out[0].vx.into_inner(), 1.0);
+    assert_relative_eq!(vel_out[0].vy.into_inner(), 0.0);
+    assert_relative_eq!(vel_out[0].vz.into_inner(), GRAVITY_PULL);
 }

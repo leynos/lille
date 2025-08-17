@@ -4,10 +4,12 @@
 //! `rust-rspec` to express expectations declaratively. The DBSP circuit is the
 //! sole source of truth for inferred motion; Bevy merely applies its outputs.
 
+use approx::assert_relative_eq;
 use bevy::prelude::*;
 use lille::{
+    apply_ground_friction,
     components::{Block, BlockSlope, ForceComp},
-    DbspPlugin, DdlogId, VelocityComp, DEFAULT_MASS, GRAVITY_PULL,
+    DbspPlugin, DdlogId, VelocityComp, GRAVITY_PULL, GROUND_FRICTION,
 };
 use rstest::{fixture, rstest};
 use std::fmt;
@@ -91,10 +93,7 @@ impl TestWorld {
         let tolerance = 1e-3;
 
         for (a, e) in actual.iter().zip(expected.iter()) {
-            assert!(
-                (a - e).abs() < tolerance,
-                "Component {name} mismatch: expected {e}, got {a}",
-            );
+            assert_relative_eq!(*a, *e, epsilon = tolerance);
         }
     }
 
@@ -177,11 +176,19 @@ macro_rules! physics_spec {
           world.spawn_block(Block { id: 2, x: 1, y: 0, z: 1 });
           world.spawn_entity_without_force(
               Transform::from_xyz(0.0, 0.0, 1.0),
-              VelocityComp { vx: 1.0, vy: 0.0, vz: 0.0 },
+              VelocityComp { vx: 1.0 / (1.0 - GROUND_FRICTION as f32), vy: 0.0, vz: 0.0 },
           );
       },
-    (1.0, 0.0, 2.0),
-    (1.0, 0.0, 0.0)
+    (
+        apply_ground_friction(1.0 / (1.0 - GROUND_FRICTION)) as f32,
+        0.0,
+        2.0,
+    ),
+    (
+        apply_ground_friction(1.0 / (1.0 - GROUND_FRICTION)) as f32,
+        0.0,
+        0.0,
+    )
 )]
 #[case::force_acceleration(
     "an entity accelerates under force",
@@ -191,11 +198,19 @@ macro_rules! physics_spec {
           world.spawn_entity(
               Transform::from_xyz(0.0, 0.0, 1.0),
               VelocityComp::default(),
-              Some(ForceComp { force_x: 5.0, force_y: 0.0, force_z: 0.0, mass: Some(5.0) }),
+              Some(ForceComp { force_x: 5.0 / (1.0 - GROUND_FRICTION), force_y: 0.0, force_z: 0.0, mass: Some(5.0) }),
           );
       },
-    (1.0, 0.0, 2.0),
-    (1.0, 0.0, 0.0)
+    (
+        apply_ground_friction(1.0 / (1.0 - GROUND_FRICTION)) as f32,
+        0.0,
+        2.0,
+    ),
+    (
+        apply_ground_friction(1.0 / (1.0 - GROUND_FRICTION)) as f32,
+        0.0,
+        0.0,
+    )
 )]
 #[case::force_mass_z(
     "an unsupported entity accelerates along Z",
@@ -223,19 +238,45 @@ macro_rules! physics_spec {
     (0.0, 0.0, 1.0),
     (0.0, 0.0, GRAVITY_PULL as f32)
 )]
-#[case::force_default_mass_y(
-    "an entity accelerates along Y with default mass",
+#[case::standing_friction(
+    "a standing entity slows due to friction",
       |world: &mut TestWorld| {
           world.spawn_block(Block { id: 1, x: 0, y: 0, z: 0 });
-          world.spawn_block(Block { id: 2, x: 0, y: 1, z: 1 });
-          world.spawn_entity(
+          world.spawn_entity_without_force(
               Transform::from_xyz(0.0, 0.0, 1.0),
-              VelocityComp::default(),
-              Some(ForceComp { force_x: 0.0, force_y: DEFAULT_MASS, force_z: 0.0, mass: None }),
+              VelocityComp { vx: 1.0, vy: 0.0, vz: 0.0 },
           );
       },
-    (0.0, 1.0, 2.0),
-    (0.0, 1.0, 0.0)
+    (
+        apply_ground_friction(1.0) as f32,
+        0.0,
+        1.0,
+    ),
+    (
+        apply_ground_friction(1.0) as f32,
+        0.0,
+        0.0,
+    )
+)]
+#[case::diagonal_friction(
+    "a standing entity with diagonal movement slows due to friction",
+      |world: &mut TestWorld| {
+          world.spawn_block(Block { id: 1, x: 0, y: 0, z: 0 });
+          world.spawn_entity_without_force(
+              Transform::from_xyz(0.0, 0.0, 1.0),
+              VelocityComp { vx: 1.0, vy: 1.0, vz: 0.0 },
+          );
+      },
+    (
+        apply_ground_friction(1.0) as f32,
+        apply_ground_friction(1.0) as f32,
+        1.0,
+    ),
+    (
+        apply_ground_friction(1.0) as f32,
+        apply_ground_friction(1.0) as f32,
+        0.0,
+    )
 )]
 fn physics_scenarios(
     world: TestWorld,
