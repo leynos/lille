@@ -26,7 +26,10 @@ const MIN_MASS: f64 = 1e-12;
 /// assert!((ay + 2.0).abs() < 1e-6);
 /// assert!((az - 3.0).abs() < 1e-6);
 /// ```
-#[allow(clippy::assertions_on_constants)] // debug-time validation of default mass
+#[expect(
+    clippy::assertions_on_constants,
+    reason = "debug-time validation of default mass"
+)]
 pub fn applied_acceleration(force: (f64, f64, f64), mass: Option<f64>) -> Option<(f64, f64, f64)> {
     debug_assert!(
         DEFAULT_MASS > MIN_MASS,
@@ -58,12 +61,15 @@ pub fn applied_acceleration(force: (f64, f64, f64), mass: Option<f64>) -> Option
 /// use lille::apply_ground_friction;
 /// assert_eq!(apply_ground_friction(10.0), 9.0);
 /// ```
-#[allow(clippy::assertions_on_constants)] // debug-time validation of ground friction
+#[expect(
+    clippy::assertions_on_constants,
+    reason = "debug-time validation of ground friction"
+)]
 pub fn apply_ground_friction(v: f64) -> f64 {
     use crate::GROUND_FRICTION;
 
     debug_assert!(
-        (0.0..=1.0).contains(&GROUND_FRICTION),
+        GROUND_FRICTION >= 0.0 && GROUND_FRICTION <= 1.0,
         "GROUND_FRICTION must be within [0,1]",
     );
     let f = GROUND_FRICTION.clamp(0.0, 1.0);
@@ -79,5 +85,12 @@ mod tests {
     fn friction_scales_velocity() {
         assert_relative_eq!(apply_ground_friction(1.0), 0.9);
         assert_relative_eq!(apply_ground_friction(-1.0), -0.9);
+        assert_relative_eq!(apply_ground_friction(0.0), 0.0);
+    }
+
+    #[test]
+    fn friction_handles_extreme_values() {
+        assert_relative_eq!(apply_ground_friction(f64::MAX), f64::MAX * 0.9);
+        assert_relative_eq!(apply_ground_friction(f64::MIN), f64::MIN * 0.9);
     }
 }

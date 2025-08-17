@@ -129,8 +129,8 @@ their new position.
 
 This design cements the DBSP circuit as the authoritative source for motion
 inference. Bevy systems simply marshal inputs and apply the circuit's outputs;
-ground friction and other derived effects are computed inside the circuit so no
-secondary motion logic exists outside it. Behavioural tests verify falling
+ground friction and other derived effects are computed inside the circuit, so
+no secondary motion logic exists outside it. Behavioural tests verify falling
 entities, stationary entities on flat or sloped blocks, and movement between
 blocks of differing heights, ensuring the circuit governs all inferred
 behaviour.

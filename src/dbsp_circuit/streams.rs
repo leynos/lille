@@ -270,11 +270,11 @@ pub(super) fn standing_motion_stream(
     let moved = standing
         .map_index(|pf| (pf.position.entity, pf.position))
         .join(&velocities.map_index(|v| (v.entity, *v)), |_, pos, vel| {
-            let vx = OrderedFloat(apply_ground_friction(vel.vx.into_inner()));
-            let vy = OrderedFloat(apply_ground_friction(vel.vy.into_inner()));
-            let new_x = OrderedFloat(pos.x.into_inner() + vx.into_inner());
-            let new_y = OrderedFloat(pos.y.into_inner() + vy.into_inner());
-            (new_x, new_y, pos.entity, vx, vy)
+            let fx = apply_ground_friction(vel.vx.into_inner());
+            let fy = apply_ground_friction(vel.vy.into_inner());
+            let new_x = OrderedFloat(pos.x.into_inner() + fx);
+            let new_y = OrderedFloat(pos.y.into_inner() + fy);
+            (new_x, new_y, pos.entity, OrderedFloat(fx), OrderedFloat(fy))
         });
 
     let indexed = moved.map_index(|(x, y, entity, vx, vy)| {
