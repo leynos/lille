@@ -123,12 +123,23 @@ pub fn cache_state_for_dbsp_system(
         if let Some(old_id) = state.rev_map.insert(entity, new_id) {
             state.id_map.remove(&old_id);
         }
-        state.id_map.insert(new_id, entity);
+        if let Some(prev_entity) = state.id_map.insert(new_id, entity) {
+            if prev_entity != entity {
+                // Drop stale reverse mapping to maintain a bijection.
+                state.rev_map.remove(&prev_entity);
+                log::warn!("DdlogId {new_id} remapped from {prev_entity:?} to {entity:?}");
+            }
+        }
     }
 
     // Add mappings for newly spawned entities.
     for (entity, &DdlogId(id)) in &added_ids {
-        state.id_map.insert(id, entity);
+        if let Some(prev_entity) = state.id_map.insert(id, entity) {
+            if prev_entity != entity {
+                state.rev_map.remove(&prev_entity);
+                log::warn!("DdlogId {id} remapped from {prev_entity:?} to {entity:?}");
+            }
+        }
         state.rev_map.insert(entity, id);
     }
 
