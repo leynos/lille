@@ -57,9 +57,11 @@ pub fn applied_acceleration(force: (f64, f64, f64), mass: Option<f64>) -> Option
 ///
 /// # Examples
 ///
-/// ```
-/// use lille::apply_ground_friction;
-/// assert_eq!(apply_ground_friction(10.0), 9.0);
+/// ```rust
+/// use lille::{apply_ground_friction, GROUND_FRICTION};
+/// let v = 10.0;
+/// let expected = v * (1.0 - GROUND_FRICTION);
+/// assert!((apply_ground_friction(v) - expected).abs() < 1e-12);
 /// ```
 #[expect(
     clippy::assertions_on_constants,
@@ -79,18 +81,25 @@ pub fn apply_ground_friction(v: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::GROUND_FRICTION;
     use approx::assert_relative_eq;
 
     #[test]
     fn friction_scales_velocity() {
-        assert_relative_eq!(apply_ground_friction(1.0), 0.9);
-        assert_relative_eq!(apply_ground_friction(-1.0), -0.9);
+        assert_relative_eq!(apply_ground_friction(1.0), 1.0 - GROUND_FRICTION,);
+        assert_relative_eq!(apply_ground_friction(-1.0), -(1.0 - GROUND_FRICTION),);
         assert_relative_eq!(apply_ground_friction(0.0), 0.0);
     }
 
     #[test]
     fn friction_handles_extreme_values() {
-        assert_relative_eq!(apply_ground_friction(f64::MAX), f64::MAX * 0.9);
-        assert_relative_eq!(apply_ground_friction(f64::MIN), f64::MIN * 0.9);
+        assert_relative_eq!(
+            apply_ground_friction(f64::MAX),
+            f64::MAX * (1.0 - GROUND_FRICTION),
+        );
+        assert_relative_eq!(
+            apply_ground_friction(f64::MIN),
+            f64::MIN * (1.0 - GROUND_FRICTION),
+        );
     }
 }

@@ -16,11 +16,12 @@ use dbsp::{operator::Max, typed_batch::OrdZSet, RootCircuit, Stream};
 use ordered_float::OrderedFloat;
 
 use crate::components::{Block, BlockSlope};
-use crate::physics::apply_ground_friction;
-use crate::{BLOCK_CENTRE_OFFSET, BLOCK_TOP_OFFSET, GRAVITY_PULL};
+use crate::{
+    applied_acceleration, apply_ground_friction, BLOCK_CENTRE_OFFSET, BLOCK_TOP_OFFSET,
+    GRAVITY_PULL,
+};
 
 use super::{FloorHeightAt, Force, HighestBlockAt, Position, Velocity};
-use crate::physics::applied_acceleration;
 
 /// Returns a stream pairing each grid cell with its highest block and id.
 ///
