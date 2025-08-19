@@ -9,7 +9,7 @@ use bevy::prelude::*;
 use lille::{
     apply_ground_friction,
     components::{Block, BlockSlope, ForceComp},
-    DbspPlugin, DdlogId, VelocityComp, GRAVITY_PULL, GROUND_FRICTION,
+    DbspPlugin, DdlogId, VelocityComp, GRAVITY_PULL, GROUND_FRICTION, TERMINAL_VELOCITY,
 };
 use rstest::{fixture, rstest};
 use std::fmt;
@@ -277,6 +277,31 @@ macro_rules! physics_spec {
         apply_ground_friction(1.0) as f32,
         0.0,
     )
+)]
+#[case::force_respects_terminal_velocity(
+    "a downward force cannot exceed terminal velocity",
+      |world: &mut TestWorld| {
+          world.spawn_block(Block { id: 1, x: 0, y: 0, z: -10 });
+          world.spawn_entity(
+              Transform::from_xyz(0.0, 0.0, 5.0),
+              VelocityComp::default(),
+              Some(ForceComp { force_x: 0.0, force_y: 0.0, force_z: -100.0, mass: Some(5.0) }),
+          );
+      },
+    (0.0, 0.0, 3.0),
+    (0.0, 0.0, -TERMINAL_VELOCITY as f32)
+)]
+#[case::unsupported_velocity_capped(
+    "an unsupported entity's fall speed is capped",
+      |world: &mut TestWorld| {
+          world.spawn_block(Block { id: 1, x: 0, y: 0, z: -10 });
+          world.spawn_entity_without_force(
+              Transform::from_xyz(0.0, 0.0, 5.0),
+              VelocityComp { vx: 0.0, vy: 0.0, vz: -5.0 },
+          );
+      },
+    (0.0, 0.0, 3.0),
+    (0.0, 0.0, -TERMINAL_VELOCITY as f32)
 )]
 fn physics_scenarios(
     world: TestWorld,

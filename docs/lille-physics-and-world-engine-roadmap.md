@@ -156,7 +156,7 @@ physical properties and agent behaviours.
    - [x] Implement a `friction` operator that reduces velocity for `Standing`
      entities.
 
-   - [ ] Implement `terminal_velocity` clamping.
+   - [x] Implement `terminal_velocity` clamping.
 
 2. **Reactive Agent Behaviours**:
 

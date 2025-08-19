@@ -6,7 +6,7 @@
 use approx::assert_relative_eq;
 use lille::components::Block;
 use lille::dbsp_circuit::{Force, NewPosition, NewVelocity, Position, Velocity};
-use lille::{apply_ground_friction, GRAVITY_PULL};
+use lille::{apply_ground_friction, GRAVITY_PULL, TERMINAL_VELOCITY};
 use rstest::rstest;
 use test_utils::{block, force, force_with_mass, new_circuit, vel};
 
@@ -188,4 +188,52 @@ fn airborne_preserves_velocity() {
     assert_relative_eq!(vel_out[0].vx.into_inner(), 1.0);
     assert_relative_eq!(vel_out[0].vy.into_inner(), 0.0);
     assert_relative_eq!(vel_out[0].vz.into_inner(), GRAVITY_PULL);
+}
+
+/// Ensures falling speed never exceeds the configured terminal velocity.
+#[rstest]
+#[case::at_limit(-TERMINAL_VELOCITY, -TERMINAL_VELOCITY)]
+#[case::beyond_limit(-5.0, -TERMINAL_VELOCITY)]
+// Upward velocity at positive terminal velocity
+#[case::upward_limit(TERMINAL_VELOCITY, TERMINAL_VELOCITY + GRAVITY_PULL)]
+// Upward velocity beyond positive terminal velocity
+#[case::upward_beyond_limit(5.0, 5.0 + GRAVITY_PULL)]
+// Edge case: velocity just below zero
+#[case::near_zero_negative(-0.0001, -0.0001 + GRAVITY_PULL)]
+// Edge case: velocity just above zero
+#[case::near_zero_positive(0.0001, 0.0001 + GRAVITY_PULL)]
+fn terminal_velocity_clamping(#[case] start_vz: f64, #[case] expected_vz: f64) {
+    let mut circuit = new_circuit();
+
+    circuit.block_in().push(block(1, 0, 0, -10), 1);
+    circuit.position_in().push(
+        Position {
+            entity: 1,
+            x: 0.0.into(),
+            y: 0.0.into(),
+            z: 5.0.into(),
+        },
+        1,
+    );
+    circuit.velocity_in().push(vel(1, 0.0, 0.0, start_vz), 1);
+
+    circuit.step().expect("circuit step failed");
+
+    let pos_out: Vec<NewPosition> = circuit
+        .new_position_out()
+        .consolidate()
+        .iter()
+        .map(|t| t.0)
+        .collect();
+    assert_eq!(pos_out.len(), 1);
+    assert_relative_eq!(pos_out[0].z.into_inner(), 5.0 + expected_vz);
+
+    let vel_out: Vec<NewVelocity> = circuit
+        .new_velocity_out()
+        .consolidate()
+        .iter()
+        .map(|t| t.0)
+        .collect();
+    assert_eq!(vel_out.len(), 1);
+    assert_relative_eq!(vel_out[0].vz.into_inner(), expected_vz);
 }

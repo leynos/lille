@@ -116,6 +116,11 @@ their new position.
   to update positions (`p_new = p_old + v*dt`), ensuring the DBSP circuit
   remains the authoritative source for derived motion.
 
+- **Terminal Velocity**: Downward speed for unsupported entities is clamped to
+  the constant `TERMINAL_VELOCITY`. The clamp is applied inside the DBSP
+  `new_velocity_stream`, avoiding unbounded acceleration and keeping the
+  circuit, rather than Bevy, as the sole authority on motion limits.
+
   - **Movement for Standing Entities**: The `Standing` stream is joined with AI
   data (see below) to determine a desired movement vector `(dx, dy)`. The
   proposed new location `(x+dx, y+dy)` is then fed back into the
@@ -129,11 +134,11 @@ their new position.
 
 This design cements the DBSP circuit as the authoritative source for motion
 inference. Bevy systems simply marshal inputs and apply the circuit's outputs;
-ground friction and other derived effects are computed inside the circuit, so
-no secondary motion logic exists outside it. Behavioural tests verify falling
-entities, stationary entities on flat or sloped blocks, and movement between
-blocks of differing heights, ensuring the circuit governs all inferred
-behaviour.
+ground friction, terminal velocity, and other derived effects are computed
+inside the circuit, so no secondary motion logic exists outside it. Behavioural
+tests verify falling entities, stationary entities on flat or sloped blocks,
+and movement between blocks of differing heights, ensuring the circuit governs
+all inferred behaviour.
 
 ### 3.4. Motion Dataflow Diagrams
 
