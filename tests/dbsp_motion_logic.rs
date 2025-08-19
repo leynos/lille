@@ -194,6 +194,14 @@ fn airborne_preserves_velocity() {
 #[rstest]
 #[case::at_limit(-TERMINAL_VELOCITY, -TERMINAL_VELOCITY)]
 #[case::beyond_limit(-5.0, -TERMINAL_VELOCITY)]
+// Upward velocity at positive terminal velocity
+#[case::upward_limit(TERMINAL_VELOCITY, TERMINAL_VELOCITY + GRAVITY_PULL)]
+// Upward velocity beyond positive terminal velocity
+#[case::upward_beyond_limit(5.0, 5.0 + GRAVITY_PULL)]
+// Edge case: velocity just below zero
+#[case::near_zero_negative(-0.0001, -0.0001 + GRAVITY_PULL)]
+// Edge case: velocity just above zero
+#[case::near_zero_positive(0.0001, 0.0001 + GRAVITY_PULL)]
 fn terminal_velocity_clamping(#[case] start_vz: f64, #[case] expected_vz: f64) {
     let mut circuit = new_circuit();
 
