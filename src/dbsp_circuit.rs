@@ -32,6 +32,20 @@ pub use types::{
     FloorHeightAt, Force, HighestBlockAt, NewPosition, NewVelocity, Position, Velocity,
 };
 
+/// Authoritative DBSP dataflow for Lille's world simulation.
+///
+/// `DbspCircuit` owns the underlying [`RootCircuit`] and exposes typed
+/// handles for feeding entity state and environment records into the
+/// dataflow. After updating the inputs, advance the circuit with
+/// [`DbspCircuit::step`] to derive new positions, velocities, and terrain
+/// queries.
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// # use lille::prelude::*;
+/// let circuit = DbspCircuit::new().expect("circuit construction failed");
+/// ```
 pub struct DbspCircuit {
     circuit: CircuitHandle,
     position_in: ZSetHandle<Position>,
@@ -95,6 +109,26 @@ impl DbspCircuit {
         })
     }
 
+    /// Advances the DBSP circuit by one tick.
+    ///
+    /// Call this after pushing all input records for the current frame. The
+    /// evaluation propagates changes through the dataflow and refreshes the
+    /// `*_out` handles with derived positions, velocities, and terrain
+    /// queries. Input collections persist across steps; invoke
+    /// [`DbspCircuit::clear_inputs`] once outputs are processed to avoid stale
+    /// state.
+    ///
+    /// # Errors
+    ///
+    /// Propagates any error reported by the underlying DBSP circuit.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # use lille::prelude::*;
+    /// let mut circuit = DbspCircuit::new().expect("circuit construction failed");
+    /// circuit.step().expect("circuit evaluation failed");
+    /// ```
     pub fn step(&mut self) -> Result<(), dbsp::Error> {
         self.circuit.step()
     }
