@@ -8,13 +8,21 @@ use hashbrown::HashMap;
 use serde::Serialize;
 
 use crate::components::{Block, BlockSlope, UnitType};
-use crate::{GRACE_DISTANCE, GRAVITY_PULL};
+use crate::{
+    BLOCK_TOP_OFFSET, FEAR_DISTANCE_EPSILON, FEAR_RADIUS_MULTIPLIER, FEAR_THRESHOLD,
+    GRACE_DISTANCE, GRAVITY_PULL,
+};
 
 #[derive(Clone, Serialize)]
+/// Simplified entity state synchronised with the dataflow engine.
 pub struct DdlogEntity {
+    /// World-space position of the entity.
     pub position: Vec3,
+    /// The unit archetype determining behaviour.
     pub unit: UnitType,
+    /// Current health points.
     pub health: i32,
+    /// Optional point the entity attempts to reach.
     pub target: Option<Vec2>,
 }
 
@@ -30,18 +38,28 @@ impl Default for DdlogEntity {
 }
 
 #[derive(Clone, Serialize)]
+/// Discrete update describing an entity's new position.
 pub struct NewPosition {
+    /// Identifier of the moved entity.
     pub entity: i64,
+    /// New x-coordinate.
     pub x: f32,
+    /// New y-coordinate.
     pub y: f32,
+    /// New z-coordinate.
     pub z: f32,
 }
 
 #[derive(Resource, Default)]
+/// In-memory snapshot of the world used for physics simulation.
 pub struct WorldHandle {
+    /// Blocks forming the terrain grid.
     pub blocks: Vec<Block>,
+    /// Optional slopes associated with blocks.
     pub slopes: HashMap<i64, BlockSlope>,
+    /// Active entities indexed by identifier.
     pub entities: HashMap<i64, DdlogEntity>,
+    /// Pending position deltas emitted after stepping.
     pub deltas: Vec<NewPosition>,
 }
 
@@ -59,14 +77,12 @@ impl WorldHandle {
     }
 
     pub fn floor_height_at(block: &Block, slope: Option<&BlockSlope>, x: f32, y: f32) -> f32 {
-        let base = block.z as f64 + 1.0;
+        let base = block.z as f32 + BLOCK_TOP_OFFSET as f32;
         if let Some(s) = slope {
-            let height = base
-                + (x as f64 - block.x as f64) * s.grad_x.into_inner()
-                + (y as f64 - block.y as f64) * s.grad_y.into_inner();
-            height as f32
+            base + (x - block.x as f32) * s.grad_x.into_inner() as f32
+                + (y - block.y as f32) * s.grad_y.into_inner() as f32
         } else {
-            base as f32
+            base
         }
     }
 
@@ -89,12 +105,8 @@ impl WorldHandle {
         }
     }
 
-    fn civvy_move(&self, id: i64, ent: &DdlogEntity, pos: Vec3) -> Vec2 {
-        let fraidiness = match ent.unit {
-            UnitType::Civvy { fraidiness } => fraidiness,
-            _ => return Vec2::ZERO,
-        };
-
+    /// Aggregate fear from nearby baddies and return the closest one.
+    fn aggregate_fear(&self, id: i64, pos: Vec3, fraidiness: f32) -> (f32, Option<Vec3>) {
         let mut min_d2 = f32::INFINITY;
         let mut closest = None;
         let mut total_fear = 0.0;
@@ -106,9 +118,10 @@ impl WorldHandle {
                 }
                 let to_actor = pos.truncate() - b_ent.position.truncate();
                 let d2 = to_actor.length_squared();
-                let fear_radius = fraidiness * meanness * 2.0;
+                let fear_radius = fraidiness * meanness * FEAR_RADIUS_MULTIPLIER as f32;
                 if d2 < fear_radius * fear_radius {
-                    total_fear += 1.0 / (d2 + 0.001);
+                    // Fear increases as distance to the threat decreases.
+                    total_fear += 1.0_f32 / (d2 + FEAR_DISTANCE_EPSILON as f32);
                 }
                 if d2 < min_d2 {
                     min_d2 = d2;
@@ -117,15 +130,31 @@ impl WorldHandle {
             }
         }
 
-        if total_fear > 0.2 {
+        (total_fear, closest)
+    }
+
+    /// Decide movement vector based on fear and the current target.
+    fn movement_vector(fear: f32, closest: Option<Vec3>, target: Option<Vec2>, pos: Vec3) -> Vec2 {
+        if fear > FEAR_THRESHOLD as f32 {
             if let Some(b_pos) = closest {
+                // Move away from the nearest threat when fear overwhelms.
                 return Vec2::new((pos.x - b_pos.x).signum(), (pos.y - b_pos.y).signum());
             }
-        } else if let Some(target) = ent.target {
+        } else if let Some(target) = target {
+            // Advance towards the target when calm.
             return Vec2::new((target.x - pos.x).signum(), (target.y - pos.y).signum());
         }
 
         Vec2::ZERO
+    }
+
+    fn civvy_move(&self, id: i64, ent: &DdlogEntity, pos: Vec3) -> Vec2 {
+        let fraidiness = match ent.unit {
+            UnitType::Civvy { fraidiness } => fraidiness,
+            _ => return Vec2::ZERO,
+        };
+        let (fear, closest) = self.aggregate_fear(id, pos, fraidiness);
+        Self::movement_vector(fear, closest, ent.target, pos)
     }
 
     fn compute_entity_update(&self, id: i64, ent: &DdlogEntity) -> Vec3 {
@@ -162,6 +191,18 @@ impl WorldHandle {
         }
     }
 
+    /// Advance the world simulation by one tick.
+    ///
+    /// This applies gravity and movement, recording any position changes.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use lille::world_handle::WorldHandle;
+    /// let mut handle = WorldHandle::default();
+    /// handle.step();
+    /// assert!(handle.deltas.is_empty());
+    /// ```
     pub fn step(&mut self) {
         let updates = self.collect_updates();
         self.apply_updates(updates);
