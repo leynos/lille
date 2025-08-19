@@ -1,7 +1,7 @@
-/// Game physics constants used across systems.
-///
-/// These values were previously loaded from `constants.toml` at build time but
-/// are now hardcoded for simplicity.
+//! Game physics constants shared across systems.
+//!
+//! These values were previously loaded from `constants.toml` at build time but
+//! are now hard-coded for simplicity.
 pub const GRACE_DISTANCE: f64 = 0.1;
 pub const GROUND_FRICTION: f64 = 0.1;
 pub const AIR_FRICTION: f64 = 0.02;
