@@ -18,10 +18,16 @@ use ordered_float::OrderedFloat;
 use crate::components::{Block, BlockSlope};
 use crate::{
     applied_acceleration, apply_ground_friction, BLOCK_CENTRE_OFFSET, BLOCK_TOP_OFFSET,
-    GRAVITY_PULL,
+    GRAVITY_PULL, TERMINAL_VELOCITY,
 };
 
 use super::{FloorHeightAt, Force, HighestBlockAt, Position, Velocity};
+
+/// Clamps a vertical velocity to the configured terminal speed.
+fn clamp_terminal_velocity(vz: f64) -> OrderedFloat<f64> {
+    // Prevent unbounded acceleration by enforcing a maximum fall speed.
+    OrderedFloat(vz.max(-TERMINAL_VELOCITY))
+}
 
 /// Returns a stream pairing each grid cell with its highest block and id.
 ///
@@ -132,7 +138,7 @@ pub(super) fn new_velocity_stream(
                     entity: vel.entity,
                     vx: OrderedFloat(vel.vx.into_inner() + ax),
                     vy: OrderedFloat(vel.vy.into_inner() + ay),
-                    vz: OrderedFloat(vel.vz.into_inner() + az + GRAVITY_PULL),
+                    vz: clamp_terminal_velocity(vel.vz.into_inner() + az + GRAVITY_PULL),
                 })
             },
             |_, vel| {
@@ -140,7 +146,7 @@ pub(super) fn new_velocity_stream(
                     entity: vel.entity,
                     vx: vel.vx,
                     vy: vel.vy,
-                    vz: OrderedFloat(vel.vz.into_inner() + GRAVITY_PULL),
+                    vz: clamp_terminal_velocity(vel.vz.into_inner() + GRAVITY_PULL),
                 })
             },
             |_, _| None,
