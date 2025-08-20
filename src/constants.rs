@@ -1,7 +1,8 @@
 //! Game physics constants shared across systems.
 //!
-//! These values were previously loaded from `constants.toml` at build time but
-//! are now hard-coded for simplicity.
+//! The DBSP circuit operates on `f64` values, so constants are declared with
+//! `f64` to align with the circuit's numeric expectations and minimise
+//! rounding error.
 pub const GRACE_DISTANCE: f64 = 0.1;
 pub const GROUND_FRICTION: f64 = 0.1;
 pub const AIR_FRICTION: f64 = 0.02;
