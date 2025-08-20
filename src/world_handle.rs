@@ -13,6 +13,82 @@ use crate::{
     GRACE_DISTANCE, GRAVITY_PULL,
 };
 
+/// Grid coordinate in the world terrain.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct GridCoordinate {
+    pub x: i32,
+    pub y: i32,
+}
+
+impl From<(i32, i32)> for GridCoordinate {
+    fn from((x, y): (i32, i32)) -> Self {
+        Self { x, y }
+    }
+}
+
+/// Entity identifier with type safety.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+pub struct EntityId(pub i64);
+
+impl From<i64> for EntityId {
+    fn from(id: i64) -> Self {
+        Self(id)
+    }
+}
+
+impl EntityId {
+    pub fn into_inner(self) -> i64 {
+        self.0
+    }
+}
+
+/// Fear level measurement for entities.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FearLevel(pub f32);
+
+impl FearLevel {
+    pub fn into_inner(self) -> f32 {
+        self.0
+    }
+}
+
+impl std::ops::Add for FearLevel {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        Self(self.0 + other.0)
+    }
+}
+
+impl std::ops::AddAssign for FearLevel {
+    fn add_assign(&mut self, other: Self) {
+        self.0 += other.0;
+    }
+}
+
+/// World position coordinates.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WorldPosition {
+    pub x: f32,
+    pub y: f32,
+}
+
+impl From<(f32, f32)> for WorldPosition {
+    fn from((x, y): (f32, f32)) -> Self {
+        Self { x, y }
+    }
+}
+
+/// Height measurement in world units.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Height(pub f32);
+
+impl Height {
+    pub fn into_inner(self) -> f32 {
+        self.0
+    }
+}
+
 #[derive(Clone, Serialize)]
 /// Simplified entity state synchronised with the dataflow engine.
 pub struct DdlogEntity {
@@ -41,7 +117,7 @@ impl Default for DdlogEntity {
 /// Discrete update describing an entity's new position.
 pub struct NewPosition {
     /// Identifier of the moved entity.
-    pub entity: i64,
+    pub entity: EntityId,
     /// New x-coordinate.
     pub x: f32,
     /// New y-coordinate.
@@ -69,59 +145,70 @@ pub fn init_world_handle_system(mut commands: Commands) {
 }
 
 impl WorldHandle {
-    fn highest_block_at(&self, x: i32, y: i32) -> Option<&Block> {
+    fn highest_block_at(&self, coord: GridCoordinate) -> Option<&Block> {
         self.blocks
             .iter()
-            .filter(|b| b.x == x && b.y == y)
+            .filter(|b| b.x == coord.x && b.y == coord.y)
             .max_by_key(|b| b.z)
     }
 
-    pub fn floor_height_at(block: &Block, slope: Option<&BlockSlope>, x: f32, y: f32) -> f32 {
+    pub fn floor_height_at(
+        block: &Block,
+        slope: Option<&BlockSlope>,
+        pos: WorldPosition,
+    ) -> Height {
         let base = block.z as f32 + BLOCK_TOP_OFFSET as f32;
         if let Some(s) = slope {
-            base + (x - block.x as f32) * s.grad_x.into_inner() as f32
-                + (y - block.y as f32) * s.grad_y.into_inner() as f32
+            Height(
+                base + (pos.x - block.x as f32) * s.grad_x.into_inner() as f32
+                    + (pos.y - block.y as f32) * s.grad_y.into_inner() as f32,
+            )
         } else {
-            base
+            Height(base)
         }
     }
 
-    fn floor_height_at_point(&self, x: f32, y: f32) -> f32 {
-        let x_grid = x.floor() as i32;
-        let y_grid = y.floor() as i32;
-        if let Some(block) = self.highest_block_at(x_grid, y_grid) {
+    fn floor_height_at_point(&self, pos: WorldPosition) -> Height {
+        let coord = GridCoordinate::from((pos.x.floor() as i32, pos.y.floor() as i32));
+        if let Some(block) = self.highest_block_at(coord) {
             let slope = self.slopes.get(&block.id);
-            WorldHandle::floor_height_at(block, slope, x, y)
+            WorldHandle::floor_height_at(block, slope, pos)
         } else {
-            0.0
+            Height(0.0)
         }
     }
 
-    fn apply_gravity(&self, pos: &mut Vec3, floor: f32) {
-        if pos.z > floor + GRACE_DISTANCE as f32 {
+    fn apply_gravity(&self, pos: &mut Vec3, floor: Height) {
+        if pos.z > floor.into_inner() + GRACE_DISTANCE as f32 {
             pos.z += GRAVITY_PULL as f32;
         } else {
-            pos.z = floor;
+            pos.z = floor.into_inner();
         }
     }
 
     /// Aggregate fear from nearby baddies and return the closest one.
-    fn aggregate_fear(&self, id: i64, pos: Vec3, fraidiness: f32) -> (f32, Option<Vec3>) {
+    fn aggregate_fear(
+        &self,
+        id: EntityId,
+        pos: Vec3,
+        fraidiness: FearLevel,
+    ) -> (FearLevel, Option<Vec3>) {
         let mut min_d2 = f32::INFINITY;
         let mut closest = None;
-        let mut total_fear = 0.0;
+        let mut total_fear = FearLevel(0.0);
 
         for (&bid, b_ent) in self.entities.iter() {
             if let UnitType::Baddie { meanness } = b_ent.unit {
-                if bid == id {
+                if EntityId::from(bid) == id {
                     continue;
                 }
                 let to_actor = pos.truncate() - b_ent.position.truncate();
                 let d2 = to_actor.length_squared();
-                let fear_radius = fraidiness * meanness * FEAR_RADIUS_MULTIPLIER as f32;
+                let fear_radius =
+                    fraidiness.into_inner() * meanness * FEAR_RADIUS_MULTIPLIER as f32;
                 if d2 < fear_radius * fear_radius {
                     // Fear increases as distance to the threat decreases.
-                    total_fear += 1.0_f32 / (d2 + FEAR_DISTANCE_EPSILON as f32);
+                    total_fear += FearLevel(1.0_f32 / (d2 + FEAR_DISTANCE_EPSILON as f32));
                 }
                 if d2 < min_d2 {
                     min_d2 = d2;
@@ -134,8 +221,13 @@ impl WorldHandle {
     }
 
     /// Decide movement vector based on fear and the current target.
-    fn movement_vector(fear: f32, closest: Option<Vec3>, target: Option<Vec2>, pos: Vec3) -> Vec2 {
-        if fear > FEAR_THRESHOLD as f32 {
+    fn movement_vector(
+        fear: FearLevel,
+        closest: Option<Vec3>,
+        target: Option<Vec2>,
+        pos: Vec3,
+    ) -> Vec2 {
+        if fear.into_inner() > FEAR_THRESHOLD as f32 {
             if let Some(b_pos) = closest {
                 // Move away from the nearest threat when fear overwhelms.
                 return Vec2::new((pos.x - b_pos.x).signum(), (pos.y - b_pos.y).signum());
@@ -148,17 +240,18 @@ impl WorldHandle {
         Vec2::ZERO
     }
 
-    fn civvy_move(&self, id: i64, ent: &DdlogEntity, pos: Vec3) -> Vec2 {
+    fn civvy_move(&self, id: EntityId, ent: &DdlogEntity, pos: Vec3) -> Vec2 {
         let fraidiness = match ent.unit {
             UnitType::Civvy { fraidiness } => fraidiness,
             _ => return Vec2::ZERO,
         };
-        let (fear, closest) = self.aggregate_fear(id, pos, fraidiness);
+        let (fear, closest) = self.aggregate_fear(id, pos, FearLevel(fraidiness));
         Self::movement_vector(fear, closest, ent.target, pos)
     }
 
-    fn compute_entity_update(&self, id: i64, ent: &DdlogEntity) -> Vec3 {
-        let floor = self.floor_height_at_point(ent.position.x, ent.position.y);
+    fn compute_entity_update(&self, id: EntityId, ent: &DdlogEntity) -> Vec3 {
+        let floor =
+            self.floor_height_at_point(WorldPosition::from((ent.position.x, ent.position.y)));
         let mut pos = ent.position;
         self.apply_gravity(&mut pos, floor);
         let delta = self.civvy_move(id, ent, pos);
@@ -167,17 +260,20 @@ impl WorldHandle {
         pos
     }
 
-    fn collect_updates(&self) -> Vec<(i64, Vec3)> {
+    fn collect_updates(&self) -> Vec<(EntityId, Vec3)> {
         self.entities
             .iter()
-            .map(|(&id, ent)| (id, self.compute_entity_update(id, ent)))
+            .map(|(&id, ent)| {
+                let eid = EntityId::from(id);
+                (eid, self.compute_entity_update(eid, ent))
+            })
             .collect()
     }
 
-    fn apply_updates(&mut self, updates: Vec<(i64, Vec3)>) {
+    fn apply_updates(&mut self, updates: Vec<(EntityId, Vec3)>) {
         self.deltas.clear();
         for (id, pos) in updates {
-            if let Some(ent) = self.entities.get_mut(&id) {
+            if let Some(ent) = self.entities.get_mut(&id.into_inner()) {
                 if pos != ent.position {
                     ent.position = pos;
                     self.deltas.push(NewPosition {
