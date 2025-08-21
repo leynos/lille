@@ -104,3 +104,29 @@ dbsp_record! {
         pub z: OrderedFloat<f64>,
     }
 }
+
+dbsp_record! {
+    /// Target position for an entity.
+    pub struct Target {
+        pub entity: i64,
+        pub x: OrderedFloat<f64>,
+        pub y: OrderedFloat<f64>,
+    }
+}
+
+dbsp_record! {
+    /// Fear level computed for an entity.
+    pub struct FearLevel {
+        pub entity: i64,
+        pub level: OrderedFloat<f64>,
+    }
+}
+
+dbsp_record! {
+    /// Decided movement vector for an entity.
+    pub struct MovementDecision {
+        pub entity: i64,
+        pub dx: OrderedFloat<f64>,
+        pub dy: OrderedFloat<f64>,
+    }
+}

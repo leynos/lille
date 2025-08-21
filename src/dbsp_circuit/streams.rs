@@ -18,10 +18,12 @@ use ordered_float::OrderedFloat;
 use crate::components::{Block, BlockSlope};
 use crate::{
     applied_acceleration, apply_ground_friction, BLOCK_CENTRE_OFFSET, BLOCK_TOP_OFFSET,
-    GRAVITY_PULL, TERMINAL_VELOCITY,
+    FEAR_THRESHOLD, GRAVITY_PULL, TERMINAL_VELOCITY,
 };
 
-use super::{FloorHeightAt, Force, HighestBlockAt, Position, Velocity};
+use super::{
+    FearLevel, FloorHeightAt, Force, HighestBlockAt, MovementDecision, Position, Target, Velocity,
+};
 
 /// Clamps a vertical velocity to the configured terminal speed.
 fn clamp_terminal_velocity(vz: f64) -> OrderedFloat<f64> {
@@ -314,4 +316,59 @@ pub(super) fn standing_motion_stream(
     let new_pos = with_floor.map(|(p, _)| *p);
     let new_vel = with_floor.map(|(_, v)| *v);
     (new_pos, new_vel)
+}
+
+/// Produces a zero fear level for each entity.
+///
+/// This is a placeholder pending a full AI implementation.
+pub(super) fn fear_level_stream(
+    positions: &Stream<RootCircuit, OrdZSet<Position>>,
+) -> Stream<RootCircuit, OrdZSet<FearLevel>> {
+    positions.map(|p| FearLevel {
+        entity: p.entity,
+        level: OrderedFloat(0.0),
+    })
+}
+
+/// Converts fear levels and targets into simple movement decisions.
+///
+/// Entities with a target move one unit towards it when their fear is below
+/// [`FEAR_THRESHOLD`]. Higher fear results in no movement.
+pub(super) fn movement_vector_stream(
+    fear: &Stream<RootCircuit, OrdZSet<FearLevel>>,
+    targets: &Stream<RootCircuit, OrdZSet<Target>>,
+    positions: &Stream<RootCircuit, OrdZSet<Position>>,
+) -> Stream<RootCircuit, OrdZSet<MovementDecision>> {
+    let pos_target = positions
+        .map_index(|p| (p.entity, (p.x, p.y)))
+        .join(
+            &targets.map_index(|t| (t.entity, (t.x, t.y))),
+            |id, &(px, py): &(OrderedFloat<f64>, OrderedFloat<f64>),
+             &(tx, ty): &(OrderedFloat<f64>, OrderedFloat<f64>)| { (*id, (px, py, tx, ty)) },
+        )
+        .map_index(|&(id, data)| (id, data));
+
+    fear
+        .map_index(|f| (f.entity, f.level))
+        .join(
+            &pos_target,
+            |&entity, &level, &(px, py, tx, ty): &(
+                OrderedFloat<f64>,
+                OrderedFloat<f64>,
+                OrderedFloat<f64>,
+                OrderedFloat<f64>,
+            )| {
+                let mut dx = 0.0;
+                let mut dy = 0.0;
+                if level.into_inner() <= FEAR_THRESHOLD {
+                    dx = (tx.into_inner() - px.into_inner()).signum();
+                    dy = (ty.into_inner() - py.into_inner()).signum();
+                }
+                MovementDecision {
+                    entity,
+                    dx: OrderedFloat(dx),
+                    dy: OrderedFloat(dy),
+                }
+            },
+        )
 }

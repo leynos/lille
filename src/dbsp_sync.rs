@@ -11,8 +11,10 @@ use std::collections::HashMap;
 use bevy::prelude::*;
 use log::error;
 
-use crate::components::{Block, BlockSlope, DdlogId, ForceComp, VelocityComp};
-use crate::dbsp_circuit::{DbspCircuit, Force, Position, Velocity};
+use crate::components::{
+    Block, BlockSlope, DdlogId, ForceComp, Target as TargetComp, VelocityComp,
+};
+use crate::dbsp_circuit::{DbspCircuit, Force, Position, Target, Velocity};
 
 /// Bevy plugin that wires the DBSP circuit into the app.
 ///
@@ -94,9 +96,16 @@ pub fn init_dbsp_system(world: &mut World) -> Result<(), dbsp::Error> {
 /// for entities not present in the current position pass are ignored. It also
 /// updates the internal mapping from DBSP entity identifiers to Bevy entities,
 /// ensuring the lookup is maintained without rebuilding the map each frame.
+#[allow(clippy::type_complexity)]
 pub fn cache_state_for_dbsp_system(
     mut state: NonSendMut<DbspState>,
-    entity_query: Query<(Entity, &DdlogId, &Transform, Option<&VelocityComp>)>,
+    entity_query: Query<(
+        Entity,
+        &DdlogId,
+        &Transform,
+        Option<&VelocityComp>,
+        Option<&TargetComp>,
+    )>,
     force_query: Query<(Entity, &DdlogId, &ForceComp)>,
     block_query: Query<(&Block, Option<&BlockSlope>)>,
     added_ids: Query<(Entity, &DdlogId), Added<DdlogId>>,
@@ -143,7 +152,7 @@ pub fn cache_state_for_dbsp_system(
         state.rev_map.insert(entity, id);
     }
 
-    for (_, id, transform, vel) in &entity_query {
+    for (_, id, transform, vel, target) in &entity_query {
         state.circuit.position_in().push(
             Position {
                 entity: id.0,
@@ -164,6 +173,17 @@ pub fn cache_state_for_dbsp_system(
             },
             1,
         );
+
+        if let Some(t) = target {
+            state.circuit.target_in().push(
+                Target {
+                    entity: id.0,
+                    x: (t.x as f64).into(),
+                    y: (t.y as f64).into(),
+                },
+                1,
+            );
+        }
     }
 
     for (entity, id, f) in &force_query {
