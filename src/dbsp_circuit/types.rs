@@ -123,7 +123,11 @@ dbsp_record! {
 }
 
 dbsp_record! {
-    /// Decided movement vector for an entity.
+    /// Decided unit movement vector for an entity.
+    ///
+    /// Each decision represents a normalised direction with a maximum
+    /// magnitude of one, ensuring diagonal movement is not faster than
+    /// axis-aligned movement.
     pub struct MovementDecision {
         pub entity: i64,
         pub dx: OrderedFloat<f64>,

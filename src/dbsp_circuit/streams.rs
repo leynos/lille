@@ -358,25 +358,32 @@ struct PositionTarget {
 
 fn decide_movement(level: OrderedFloat<f64>, pt: &PositionTarget) -> MovementDecision {
     let (dx, dy) = if level.into_inner() <= FEAR_THRESHOLD {
-        (
-            (pt.tx.into_inner() - pt.px.into_inner()).signum().into(),
-            (pt.ty.into_inner() - pt.py.into_inner()).signum().into(),
-        )
+        let raw_dx = (pt.tx.into_inner() - pt.px.into_inner()).signum();
+        let raw_dy = (pt.ty.into_inner() - pt.py.into_inner()).signum();
+        let magnitude = (raw_dx * raw_dx + raw_dy * raw_dy).sqrt();
+        // Normalise to prevent diagonal movement being faster than
+        // axis-aligned movement.
+        if magnitude > 0.0 {
+            (raw_dx / magnitude, raw_dy / magnitude)
+        } else {
+            (0.0, 0.0)
+        }
     } else {
-        (0.0.into(), 0.0.into())
+        (0.0, 0.0)
     };
     MovementDecision {
         entity: pt.entity,
-        dx,
-        dy,
+        dx: OrderedFloat(dx),
+        dy: OrderedFloat(dy),
     }
 }
 
 /// Converts fear levels and targets into simple movement decisions.
 ///
 /// Entities with a target move one unit towards it when their fear is below
-/// [`FEAR_THRESHOLD`]. Higher fear currently results in no movement; fleeing is
-/// not yet implemented.
+/// [`FEAR_THRESHOLD`]. Vectors are normalised to ensure consistent speed in all
+/// directions. Higher fear currently results in no movement; fleeing is not yet
+/// implemented.
 pub(super) fn movement_decision_stream(
     fear: &Stream<RootCircuit, OrdZSet<FearLevel>>,
     targets: &Stream<RootCircuit, OrdZSet<Target>>,
