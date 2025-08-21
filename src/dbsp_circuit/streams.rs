@@ -14,6 +14,8 @@
 
 use dbsp::{operator::Max, typed_batch::OrdZSet, RootCircuit, Stream};
 use ordered_float::OrderedFloat;
+use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
+use size_of::SizeOf;
 
 use crate::components::{Block, BlockSlope};
 use crate::{
@@ -330,45 +332,91 @@ pub(super) fn fear_level_stream(
     })
 }
 
+/// Intermediate structure pairing entity positions with their target.
+#[derive(
+    Archive,
+    RkyvSerialize,
+    RkyvDeserialize,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Default,
+    SizeOf,
+)]
+#[archive_attr(derive(Ord, PartialOrd, Eq, PartialEq, Hash))]
+struct PositionTarget {
+    entity: i64,
+    px: OrderedFloat<f64>,
+    py: OrderedFloat<f64>,
+    tx: OrderedFloat<f64>,
+    ty: OrderedFloat<f64>,
+}
+
+fn decide_movement(level: OrderedFloat<f64>, pt: &PositionTarget) -> MovementDecision {
+    let (dx, dy) = if level.into_inner() <= FEAR_THRESHOLD {
+        (
+            (pt.tx.into_inner() - pt.px.into_inner()).signum().into(),
+            (pt.ty.into_inner() - pt.py.into_inner()).signum().into(),
+        )
+    } else {
+        (0.0.into(), 0.0.into())
+    };
+    MovementDecision {
+        entity: pt.entity,
+        dx,
+        dy,
+    }
+}
+
 /// Converts fear levels and targets into simple movement decisions.
 ///
 /// Entities with a target move one unit towards it when their fear is below
-/// [`FEAR_THRESHOLD`]. Higher fear results in no movement.
-pub(super) fn movement_vector_stream(
+/// [`FEAR_THRESHOLD`]. Higher fear currently results in no movement; fleeing is
+/// not yet implemented.
+pub(super) fn movement_decision_stream(
     fear: &Stream<RootCircuit, OrdZSet<FearLevel>>,
     targets: &Stream<RootCircuit, OrdZSet<Target>>,
     positions: &Stream<RootCircuit, OrdZSet<Position>>,
 ) -> Stream<RootCircuit, OrdZSet<MovementDecision>> {
     let pos_target = positions
-        .map_index(|p| (p.entity, (p.x, p.y)))
-        .join(
-            &targets.map_index(|t| (t.entity, (t.x, t.y))),
-            |id, &(px, py): &(OrderedFloat<f64>, OrderedFloat<f64>),
-             &(tx, ty): &(OrderedFloat<f64>, OrderedFloat<f64>)| { (*id, (px, py, tx, ty)) },
-        )
-        .map_index(|&(id, data)| (id, data));
+        .map_index(|p| (p.entity, *p))
+        .join(&targets.map_index(|t| (t.entity, *t)), |_entity, p, t| {
+            PositionTarget {
+                entity: p.entity,
+                px: p.x,
+                py: p.y,
+                tx: t.x,
+                ty: t.y,
+            }
+        })
+        .map_index(|pt| (pt.entity, pt.clone()));
 
-    fear
-        .map_index(|f| (f.entity, f.level))
-        .join(
-            &pos_target,
-            |&entity, &level, &(px, py, tx, ty): &(
-                OrderedFloat<f64>,
-                OrderedFloat<f64>,
-                OrderedFloat<f64>,
-                OrderedFloat<f64>,
-            )| {
-                let mut dx = 0.0;
-                let mut dy = 0.0;
-                if level.into_inner() <= FEAR_THRESHOLD {
-                    dx = (tx.into_inner() - px.into_inner()).signum();
-                    dy = (ty.into_inner() - py.into_inner()).signum();
-                }
-                MovementDecision {
-                    entity,
-                    dx: OrderedFloat(dx),
-                    dy: OrderedFloat(dy),
-                }
-            },
-        )
+    fear.map_index(|f| (f.entity, f.level))
+        .join(&pos_target, |_entity, &level, pt| {
+            decide_movement(level, pt)
+        })
+}
+
+/// Applies movement decisions to base positions.
+pub(super) fn apply_movement(
+    base: &Stream<RootCircuit, OrdZSet<Position>>,
+    movement: &Stream<RootCircuit, OrdZSet<MovementDecision>>,
+) -> Stream<RootCircuit, OrdZSet<Position>> {
+    let base_idx = base.map_index(|p| (p.entity, *p));
+    let mv = movement.map_index(|m| (m.entity, (m.dx, m.dy)));
+
+    let moved = base_idx.join(&mv, |_, p, &(dx, dy)| Position {
+        entity: p.entity,
+        x: OrderedFloat(p.x.into_inner() + dx.into_inner()),
+        y: OrderedFloat(p.y.into_inner() + dy.into_inner()),
+        z: p.z,
+    });
+
+    let unmoved = base_idx.antijoin(&mv).map(|(_, p)| *p);
+
+    moved.plus(&unmoved)
 }

@@ -17,7 +17,6 @@
 
 use anyhow::Error as AnyError;
 use dbsp::{typed_batch::OrdZSet, CircuitHandle, OutputHandle, RootCircuit, ZSetHandle};
-use ordered_float::OrderedFloat;
 
 use crate::components::{Block, BlockSlope};
 use crate::GRACE_DISTANCE;
@@ -25,8 +24,8 @@ use crate::GRACE_DISTANCE;
 mod streams;
 mod types;
 use streams::{
-    fear_level_stream, floor_height_stream, movement_vector_stream, new_position_stream,
-    new_velocity_stream, position_floor_stream, standing_motion_stream,
+    apply_movement, fear_level_stream, floor_height_stream, movement_decision_stream,
+    new_position_stream, new_velocity_stream, position_floor_stream, standing_motion_stream,
 };
 pub use streams::{highest_block_pair, PositionFloor};
 pub use types::{
@@ -140,24 +139,9 @@ impl DbspCircuit {
         let new_vel = unsupported_velocities.plus(&new_vel_standing);
 
         let fear = fear_level_stream(&positions);
-        let movement = movement_vector_stream(&fear, &targets, &positions);
+        let decisions = movement_decision_stream(&fear, &targets, &positions);
 
-        let moved_pos = base_pos
-            .map_index(|p| (p.entity, *p))
-            .outer_join(
-                &movement.map_index(|m| (m.entity, (m.dx, m.dy))),
-                |_, &p, &(dx, dy)| {
-                    Some(Position {
-                        entity: p.entity,
-                        x: OrderedFloat(p.x.into_inner() + dx.into_inner()),
-                        y: OrderedFloat(p.y.into_inner() + dy.into_inner()),
-                        z: p.z,
-                    })
-                },
-                |_, &p| Some(p),
-                |_, _| None,
-            )
-            .flat_map(|p| (*p).into_iter());
+        let moved_pos = apply_movement(&base_pos, &decisions);
 
         Ok(BuildHandles {
             position_in,
