@@ -18,8 +18,8 @@ pub use constants::*;
 pub use actor::Actor;
 pub use components::{DdlogId, ForceComp, Health, Target, UnitType, VelocityComp};
 pub use dbsp_circuit::{
-    DbspCircuit, FearLevel, FloorHeightAt, Force, HighestBlockAt, MovementDecision,
-    NewPosition, Position, PositionFloor, Target as DbspTarget,
+    DbspCircuit, FearLevel, FloorHeightAt, Force, HighestBlockAt, MovementDecision, NewPosition,
+    Position, PositionFloor, Target as DbspTarget,
 };
 pub use dbsp_circuit::{NewVelocity, Velocity};
 pub use dbsp_sync::{
