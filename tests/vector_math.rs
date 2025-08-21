@@ -11,6 +11,10 @@ const TOLERANCE: f32 = 1e-6;
 #[case::unit_x(3.0, 0.0, 0.0, (1.0, 0.0, 0.0))]
 #[case::zero(0.0, 0.0, 0.0, (0.0, 0.0, 0.0))]
 #[case::infinite_x(f32::INFINITY, 0.0, 0.0, (0.0, 0.0, 0.0))]
+#[case::nan_y(0.0, f32::NAN, 0.0, (0.0, 0.0, 0.0))]
+#[case::nan_z(0.0, 0.0, f32::NAN, (0.0, 0.0, 0.0))]
+#[case::infinite_y(0.0, f32::INFINITY, 0.0, (0.0, 0.0, 0.0))]
+#[case::infinite_z(0.0, 0.0, f32::INFINITY, (0.0, 0.0, 0.0))]
 #[case::neg_x_axis(-3.0, 0.0, 0.0, (-1.0, 0.0, 0.0))]
 #[case::diagonal(1.0, 2.0, 2.0, (1.0 / 3.0, 2.0 / 3.0, 2.0 / 3.0))]
 fn vec_normalize_returns_expected(
