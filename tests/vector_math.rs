@@ -4,6 +4,8 @@ use approx::assert_relative_eq;
 use lille::vec_normalize;
 use rstest::rstest;
 
+const TOLERANCE: f32 = 1e-6;
+
 #[rstest]
 #[case::nan_x(f32::NAN, 1.0, 0.0, (0.0, 0.0, 0.0))]
 #[case::unit_x(3.0, 0.0, 0.0, (1.0, 0.0, 0.0))]
@@ -17,10 +19,11 @@ fn vec_normalize_returns_expected(
     #[case] z: f32,
     #[case] expected: (f32, f32, f32),
 ) {
-    let result = vec_normalize(x, y, z);
-    assert_relative_eq!(result.0, expected.0, epsilon = 1e-6, max_relative = 1e-6);
-    assert_relative_eq!(result.1, expected.1, epsilon = 1e-6, max_relative = 1e-6);
-    assert_relative_eq!(result.2, expected.2, epsilon = 1e-6, max_relative = 1e-6);
+    let (rx, ry, rz) = vec_normalize(x, y, z);
+    let (ex, ey, ez) = expected;
+    assert_relative_eq!(rx, ex, epsilon = TOLERANCE, max_relative = TOLERANCE);
+    assert_relative_eq!(ry, ey, epsilon = TOLERANCE, max_relative = TOLERANCE);
+    assert_relative_eq!(rz, ez, epsilon = TOLERANCE, max_relative = TOLERANCE);
 }
 
 #[test]
