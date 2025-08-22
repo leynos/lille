@@ -22,7 +22,7 @@ pub const FEAR_RADIUS_MULTIPLIER: f64 = 2.0;
 /// Threshold above which an entity is considered afraid, unitless.
 pub const FEAR_THRESHOLD: f64 = 0.2;
 /// Minimum squared distance added to fear calculations to avoid division by
-/// zero when threats coincide with the actor.
+/// zero when threats coincide with the actor, in block units.
 pub const FEAR_DISTANCE_EPSILON: f64 = 0.001;
 /// Normalized offset used to sample slopes within a block, unitless.
 ///
