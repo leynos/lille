@@ -1,7 +1,6 @@
 //! Game physics constants shared across systems.
 //!
-//! The DBSP circuit operates on `f64` values, so constants are declared with
-//! `f64` to align with the circuit's numeric expectations and minimise
+//! Values use `f64` to match the DBSP circuit's numeric type and reduce
 //! rounding error.
 pub const GRACE_DISTANCE: f64 = 0.1;
 pub const GROUND_FRICTION: f64 = 0.1;
