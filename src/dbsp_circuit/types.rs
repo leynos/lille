@@ -104,3 +104,49 @@ dbsp_record! {
         pub z: OrderedFloat<f64>,
     }
 }
+
+dbsp_record! {
+    /// Target position for an entity.
+    ///
+    /// Units:
+    /// - `x`, `y` are world coordinates in blocks (1.0 == one block).
+    ///
+    /// Invariants:
+    /// - One active `Target` per `entity` per tick is expected upstream.
+    pub struct Target {
+        pub entity: i64,
+        pub x: OrderedFloat<f64>,
+        pub y: OrderedFloat<f64>,
+    }
+}
+
+dbsp_record! {
+    /// Fear level computed for an entity.
+    ///
+    /// Units:
+    /// - `level` ∈ [0.0, 1.0] where higher implies greater fear.
+    pub struct FearLevel {
+        pub entity: i64,
+        pub level: OrderedFloat<f64>,
+    }
+}
+
+dbsp_record! {
+    /// Decided unit movement vector for an entity.
+    ///
+    /// Units:
+    /// - `dx`, `dy` are world-units per tick.
+    ///
+    /// Semantics:
+    /// - The vector is normalised with a maximum magnitude of one; diagonal
+    ///   movement is not faster than axis-aligned movement.
+    ///
+    /// Invariants:
+    /// - At most one `MovementDecision` per `entity` per tick is expected
+    ///   upstream.
+    pub struct MovementDecision {
+        pub entity: i64,
+        pub dx: OrderedFloat<f64>,
+        pub dy: OrderedFloat<f64>,
+    }
+}

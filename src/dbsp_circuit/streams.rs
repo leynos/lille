@@ -13,15 +13,20 @@
 //! circuit.
 
 use dbsp::{operator::Max, typed_batch::OrdZSet, RootCircuit, Stream};
+use log::warn;
 use ordered_float::OrderedFloat;
+use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
+use size_of::SizeOf;
 
 use crate::components::{Block, BlockSlope};
 use crate::{
     applied_acceleration, apply_ground_friction, BLOCK_CENTRE_OFFSET, BLOCK_TOP_OFFSET,
-    GRAVITY_PULL, TERMINAL_VELOCITY,
+    FEAR_THRESHOLD, GRAVITY_PULL, TERMINAL_VELOCITY,
 };
 
-use super::{FloorHeightAt, Force, HighestBlockAt, Position, Velocity};
+use super::{
+    FearLevel, FloorHeightAt, Force, HighestBlockAt, MovementDecision, Position, Target, Velocity,
+};
 
 /// Clamps a vertical velocity to the configured terminal speed.
 fn clamp_terminal_velocity(vz: f64) -> OrderedFloat<f64> {
@@ -128,7 +133,7 @@ pub(super) fn new_velocity_stream(
                     force.mass.map(|m| m.into_inner()),
                 );
                 if accel.is_none() {
-                    log::warn!(
+                    warn!(
                         "force with invalid mass for entity {} ignored",
                         force.entity
                     );
@@ -314,4 +319,172 @@ pub(super) fn standing_motion_stream(
     let new_pos = with_floor.map(|(p, _)| *p);
     let new_vel = with_floor.map(|(_, v)| *v);
     (new_pos, new_vel)
+}
+
+/// Produces a zero fear level for each entity.
+///
+/// This is a placeholder pending a full AI implementation.
+pub(super) fn fear_level_stream(
+    positions: &Stream<RootCircuit, OrdZSet<Position>>,
+) -> Stream<RootCircuit, OrdZSet<FearLevel>> {
+    positions.map(|p| FearLevel {
+        entity: p.entity,
+        level: OrderedFloat(0.0),
+    })
+}
+
+/// Intermediate structure pairing entity positions with their target.
+#[derive(
+    Archive,
+    RkyvSerialize,
+    RkyvDeserialize,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Default,
+    SizeOf,
+)]
+#[archive_attr(derive(Ord, PartialOrd, Eq, PartialEq, Hash))]
+struct PositionTarget {
+    entity: i64,
+    px: OrderedFloat<f64>,
+    py: OrderedFloat<f64>,
+    tx: OrderedFloat<f64>,
+    ty: OrderedFloat<f64>,
+}
+
+fn decide_movement(level: OrderedFloat<f64>, pt: &PositionTarget) -> MovementDecision {
+    let mut raw_dx = (pt.tx.into_inner() - pt.px.into_inner()).signum();
+    let mut raw_dy = (pt.ty.into_inner() - pt.py.into_inner()).signum();
+
+    if level.into_inner() > FEAR_THRESHOLD {
+        raw_dx = -raw_dx;
+        raw_dy = -raw_dy;
+    }
+
+    let magnitude = (raw_dx * raw_dx + raw_dy * raw_dy).sqrt();
+    // Normalise to prevent diagonal movement being faster than axis-aligned movement.
+    let (dx, dy) = if magnitude > 0.0 {
+        (raw_dx / magnitude, raw_dy / magnitude)
+    } else {
+        (0.0, 0.0)
+    };
+
+    MovementDecision {
+        entity: pt.entity,
+        dx: OrderedFloat(dx),
+        dy: OrderedFloat(dy),
+    }
+}
+
+/// Converts fear levels and targets into simple movement decisions.
+///
+/// Entities with a target move one unit towards it when their fear is below
+/// [`FEAR_THRESHOLD`]; otherwise, they flee one unit away. Vectors are
+/// normalised to ensure consistent speed in all directions.
+///
+/// # Examples
+///
+/// ```ignore
+/// use dbsp::{RootCircuit, typed_batch::OrdZSet};
+/// use crate::dbsp_circuit::{streams::movement_decision_stream, FearLevel, Position, Target};
+///
+/// let _circuit = RootCircuit::build(|c| {
+///     let (fear, fear_in) = c.add_input_zset::<FearLevel>();
+///     let (targets, target_in) = c.add_input_zset::<Target>();
+///     let (positions, pos_in) = c.add_input_zset::<Position>();
+///     let _decisions: OrdZSet<_> = movement_decision_stream(&fear, &targets, &positions).output();
+///     (fear_in, target_in, pos_in)
+/// }).unwrap();
+/// ```
+pub(super) fn movement_decision_stream(
+    fear: &Stream<RootCircuit, OrdZSet<FearLevel>>,
+    targets: &Stream<RootCircuit, OrdZSet<Target>>,
+    positions: &Stream<RootCircuit, OrdZSet<Position>>,
+) -> Stream<RootCircuit, OrdZSet<MovementDecision>> {
+    let pos_target = positions
+        .map_index(|p| (p.entity, *p))
+        .join(&targets.map_index(|t| (t.entity, *t)), |_entity, p, t| {
+            PositionTarget {
+                entity: p.entity,
+                px: p.x,
+                py: p.y,
+                tx: t.x,
+                ty: t.y,
+            }
+        })
+        .map_index(|pt| (pt.entity, pt.clone()));
+
+    fear.map_index(|f| (f.entity, f.level))
+        .join(&pos_target, |_entity, &level, pt| {
+            decide_movement(level, pt)
+        })
+}
+
+/// Applies movement decisions to base positions.
+///
+/// Panics in tests if multiple movement records exist for a single entity.
+pub(super) fn apply_movement(
+    base: &Stream<RootCircuit, OrdZSet<Position>>,
+    movement: &Stream<RootCircuit, OrdZSet<MovementDecision>>,
+) -> Stream<RootCircuit, OrdZSet<Position>> {
+    let base_idx = base.map_index(|p| (p.entity, *p));
+    let mv = movement
+        .map_index(|m| (m.entity, (m.dx, m.dy)))
+        .inspect(|batch| {
+            for (entity, _, weight) in batch.iter() {
+                if weight > 1 {
+                    if cfg!(test) {
+                        panic!("duplicate movement decisions for entity {entity}");
+                    } else {
+                        warn!("duplicate movement decisions for entity {entity}");
+                    }
+                }
+            }
+        });
+
+    let moved = base_idx.join(&mv, |_, p, &(dx, dy)| Position {
+        entity: p.entity,
+        x: OrderedFloat(p.x.into_inner() + dx.into_inner()),
+        y: OrderedFloat(p.y.into_inner() + dy.into_inner()),
+        z: p.z,
+    });
+
+    let unmoved = base_idx.antijoin(&mv).map(|(_, p)| *p);
+
+    moved.plus(&unmoved)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use approx::assert_relative_eq;
+    use rstest::rstest;
+
+    fn pt(px: f64, py: f64, tx: f64, ty: f64) -> PositionTarget {
+        PositionTarget {
+            entity: 1,
+            px: px.into(),
+            py: py.into(),
+            tx: tx.into(),
+            ty: ty.into(),
+        }
+    }
+
+    #[rstest]
+    #[case::approach(0.1, 0.7071067811865475, 0.7071067811865475)]
+    #[case::flee(0.3, -0.7071067811865475, -0.7071067811865475)]
+    fn decide_movement_direction(
+        #[case] fear: f64,
+        #[case] expected_dx: f64,
+        #[case] expected_dy: f64,
+    ) {
+        let mv = decide_movement(fear.into(), &pt(0.0, 0.0, 1.0, 1.0));
+        assert_relative_eq!(mv.dx.into_inner(), expected_dx);
+        assert_relative_eq!(mv.dy.into_inner(), expected_dy);
+    }
 }
