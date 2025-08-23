@@ -129,11 +129,20 @@ pub fn cache_state_for_dbsp_system(
     mut id_queries: IdQueries,
     mut world_handle: Option<ResMut<WorldHandle>>,
 ) {
-    if let Some(wh) = world_handle.as_mut() {
-        // TODO: Only clear when inputs changed; otherwise keep prior snapshot.
-        wh.blocks.clear();
-        wh.slopes.clear();
-        wh.entities.clear();
+    let has_inputs = !block_query.is_empty()
+        || !entity_query.is_empty()
+        || !force_query.is_empty()
+        || !id_queries.added.is_empty()
+        || !id_queries.changed.is_empty()
+        || !id_queries.removed.is_empty();
+
+    if has_inputs {
+        if let Some(wh) = world_handle.as_mut() {
+            // TODO: Only clear when inputs changed; otherwise keep prior snapshot.
+            wh.blocks.clear();
+            wh.slopes.clear();
+            wh.entities.clear();
+        }
     }
 
     for (block, slope) in &block_query {

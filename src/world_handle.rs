@@ -39,11 +39,11 @@ impl Default for DdlogEntity {
 /// Snapshot of ECS data mirrored for DBSP.
 pub struct WorldHandle {
     /// Blocks forming the terrain grid.
-    pub blocks: Vec<Block>,
+    pub(crate) blocks: Vec<Block>,
     /// Optional slopes associated with blocks.
-    pub slopes: HashMap<i64, BlockSlope>,
+    pub(crate) slopes: HashMap<i64, BlockSlope>,
     /// Active entities indexed by identifier.
-    pub entities: HashMap<i64, DdlogEntity>,
+    pub(crate) entities: HashMap<i64, DdlogEntity>,
 }
 
 /// Inserts an empty [`WorldHandle`] resource.
