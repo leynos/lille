@@ -18,6 +18,15 @@ use crate::components::{
 use crate::dbsp_circuit::{DbspCircuit, Force, Position, Target, Velocity};
 use crate::world_handle::{DdlogEntity, WorldHandle};
 
+// Compact alias for the per-entity inputs used by the cache system.
+type EntityRow<'w> = (
+    Entity,
+    &'w DdlogId,
+    &'w Transform, // Switch to &GlobalTransform if world-space is intended.
+    Option<&'w VelocityComp>,
+    Option<&'w TargetComp>,
+);
+
 /// Bevy plugin that wires the DBSP circuit into the app.
 ///
 /// Adding this plugin will insert [`DbspState`] as a non-send resource and
@@ -107,22 +116,21 @@ pub fn init_dbsp_system(world: &mut World) -> Result<(), dbsp::Error> {
 /// ensuring the lookup is maintained without rebuilding the map each frame.
 /// When a [`WorldHandle`] resource is present, it is refreshed with the same
 /// cached data for tests and diagnostics.
-#[allow(clippy::type_complexity)]
+#[expect(
+    clippy::type_complexity,
+    reason = "Bevy Query uses tuple world refs; complexity hidden behind EntityRow alias"
+)]
+#[allow(unfulfilled_lint_expectations)]
 pub fn cache_state_for_dbsp_system(
     mut state: NonSendMut<DbspState>,
-    entity_query: Query<(
-        Entity,
-        &DdlogId,
-        &Transform,
-        Option<&VelocityComp>,
-        Option<&TargetComp>,
-    )>,
+    entity_query: Query<EntityRow<'_>>,
     force_query: Query<(Entity, &DdlogId, &ForceComp)>,
     block_query: Query<(&Block, Option<&BlockSlope>)>,
     mut id_queries: IdQueries,
     mut world_handle: Option<ResMut<WorldHandle>>,
 ) {
     if let Some(wh) = world_handle.as_mut() {
+        // TODO: Only clear when inputs changed; otherwise keep prior snapshot.
         wh.blocks.clear();
         wh.slopes.clear();
         wh.entities.clear();

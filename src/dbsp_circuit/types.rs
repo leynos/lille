@@ -107,6 +107,9 @@ dbsp_record! {
 
 dbsp_record! {
     /// Target position for an entity.
+    ///
+    /// Coordinates use world units, typically metres. Values must be finite,
+    /// and no specific range is enforced.
     pub struct Target {
         pub entity: i64,
         pub x: OrderedFloat<f64>,
@@ -116,6 +119,9 @@ dbsp_record! {
 
 dbsp_record! {
     /// Fear level computed for an entity.
+    ///
+    /// This is a dimensionless scalar with `0.0` representing no fear. Values
+    /// are expected to be non-negative and finite.
     pub struct FearLevel {
         pub entity: i64,
         pub level: OrderedFloat<f64>,
@@ -125,9 +131,10 @@ dbsp_record! {
 dbsp_record! {
     /// Decided unit movement vector for an entity.
     ///
-    /// Each decision represents a normalised direction with a maximum
-    /// magnitude of one, ensuring diagonal movement is not faster than
-    /// axis-aligned movement.
+    /// Each decision represents a normalised direction where `dx` and `dy`
+    /// each fall in the range `[-1.0, 1.0]`. The combined magnitude does not
+    /// exceed one, ensuring diagonal movement is not faster than axis-aligned
+    /// movement.
     pub struct MovementDecision {
         pub entity: i64,
         pub dx: OrderedFloat<f64>,

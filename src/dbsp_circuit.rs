@@ -226,6 +226,19 @@ impl DbspCircuit {
     }
 
     /// Returns a reference to the input handle for entity targets.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # use ordered_float::OrderedFloat;
+    /// # use lille::dbsp_circuit::{DbspCircuit, Target as DbspTarget};
+    /// let circuit = DbspCircuit::new().expect("circuit construction failed");
+    /// let handle = circuit.target_in();
+    /// handle.push(
+    ///     DbspTarget { entity: 1, x: OrderedFloat(10.0), y: OrderedFloat(5.0) },
+    ///     1,
+    /// );
+    /// ```
     pub fn target_in(&self) -> &ZSetHandle<Target> {
         &self.target_in
     }
