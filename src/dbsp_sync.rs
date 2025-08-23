@@ -10,7 +10,7 @@ use std::collections::HashMap;
 
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
-use log::error;
+use log::{error, warn};
 
 use crate::components::{
     Block, BlockSlope, DdlogId, ForceComp, Target as TargetComp, VelocityComp,
@@ -166,7 +166,7 @@ pub fn cache_state_for_dbsp_system(
             if prev_entity != entity {
                 // Drop stale reverse mapping to maintain a bijection.
                 state.rev_map.remove(&prev_entity);
-                log::warn!("DdlogId {new_id} remapped from {prev_entity:?} to {entity:?}");
+                warn!("DdlogId {new_id} remapped from {prev_entity:?} to {entity:?}");
             }
         }
     }
@@ -176,7 +176,7 @@ pub fn cache_state_for_dbsp_system(
         if let Some(prev_entity) = state.id_map.insert(id, entity) {
             if prev_entity != entity {
                 state.rev_map.remove(&prev_entity);
-                log::warn!("DdlogId {id} remapped from {prev_entity:?} to {entity:?}");
+                warn!("DdlogId {id} remapped from {prev_entity:?} to {entity:?}");
             }
         }
         state.rev_map.insert(entity, id);
@@ -242,7 +242,7 @@ pub fn cache_state_for_dbsp_system(
                 1,
             );
         } else {
-            log::warn!("force component for unknown entity {entity:?} ignored");
+            warn!("force component for unknown entity {entity:?} ignored");
         }
     }
 }
@@ -250,11 +250,13 @@ pub fn cache_state_for_dbsp_system(
 /// Applies DBSP outputs back to ECS components.
 ///
 /// Steps the circuit, reads new positions and velocities, and updates the
-/// corresponding entities. Output handles are drained afterwards to avoid
-/// reapplying stale data.
+/// corresponding entities. When a [`WorldHandle`] resource is present, it is
+/// updated with the latest positions for diagnostics. Output handles are
+/// drained afterwards to avoid reapplying stale data.
 pub fn apply_dbsp_outputs_system(
     mut state: NonSendMut<DbspState>,
     mut write_query: Query<(Entity, &mut Transform, Option<&mut VelocityComp>), With<DdlogId>>,
+    mut world_handle: Option<ResMut<WorldHandle>>,
 ) {
     state.circuit.step().expect("DBSP step failed");
 
@@ -265,6 +267,11 @@ pub fn apply_dbsp_outputs_system(
                 transform.translation.x = pos.x.into_inner() as f32;
                 transform.translation.y = pos.y.into_inner() as f32;
                 transform.translation.z = pos.z.into_inner() as f32;
+                if let Some(ref mut wh) = world_handle {
+                    if let Some(e) = wh.entities.get_mut(&pos.entity) {
+                        e.position = transform.translation;
+                    }
+                }
             }
         }
     }

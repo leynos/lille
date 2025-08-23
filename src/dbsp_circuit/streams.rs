@@ -13,6 +13,7 @@
 //! circuit.
 
 use dbsp::{operator::Max, typed_batch::OrdZSet, RootCircuit, Stream};
+use log::warn;
 use ordered_float::OrderedFloat;
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 use size_of::SizeOf;
@@ -132,7 +133,7 @@ pub(super) fn new_velocity_stream(
                     force.mass.map(|m| m.into_inner()),
                 );
                 if accel.is_none() {
-                    log::warn!(
+                    warn!(
                         "force with invalid mass for entity {} ignored",
                         force.entity
                     );
@@ -425,12 +426,26 @@ pub(super) fn movement_decision_stream(
 }
 
 /// Applies movement decisions to base positions.
+///
+/// Panics in tests if multiple movement records exist for a single entity.
 pub(super) fn apply_movement(
     base: &Stream<RootCircuit, OrdZSet<Position>>,
     movement: &Stream<RootCircuit, OrdZSet<MovementDecision>>,
 ) -> Stream<RootCircuit, OrdZSet<Position>> {
     let base_idx = base.map_index(|p| (p.entity, *p));
-    let mv = movement.map_index(|m| (m.entity, (m.dx, m.dy)));
+    let mv = movement
+        .map_index(|m| (m.entity, (m.dx, m.dy)))
+        .inspect(|batch| {
+            for (entity, _, weight) in batch.iter() {
+                if weight > 1 {
+                    if cfg!(test) {
+                        panic!("duplicate movement decisions for entity {entity}");
+                    } else {
+                        warn!("duplicate movement decisions for entity {entity}");
+                    }
+                }
+            }
+        });
 
     let moved = base_idx.join(&mv, |_, p, &(dx, dy)| Position {
         entity: p.entity,
