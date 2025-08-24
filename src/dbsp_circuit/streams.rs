@@ -427,7 +427,7 @@ pub(super) fn movement_decision_stream(
 
 /// Applies movement decisions to base positions.
 ///
-/// Panics in tests if multiple movement records exist for a single entity.
+/// Panics if multiple movement records exist for a single entity.
 pub(super) fn apply_movement(
     base: &Stream<RootCircuit, OrdZSet<Position>>,
     movement: &Stream<RootCircuit, OrdZSet<MovementDecision>>,
@@ -438,11 +438,7 @@ pub(super) fn apply_movement(
         .inspect(|batch| {
             for (entity, _, weight) in batch.iter() {
                 if weight > 1 {
-                    if cfg!(test) {
-                        panic!("duplicate movement decisions for entity {entity}");
-                    } else {
-                        warn!("duplicate movement decisions for entity {entity}");
-                    }
+                    panic!("duplicate movement decisions for entity {entity}");
                 }
             }
         });
