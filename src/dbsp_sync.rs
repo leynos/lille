@@ -162,31 +162,44 @@ mod sync {
 
     pub(super) fn id_maps(state: &mut DbspState, queries: &mut IdQueries) {
         for entity in queries.removed.read() {
-            if let Some(old_id) = state.rev_map.remove(&entity) {
-                state.id_map.remove(&old_id);
-            }
+            remove_entity_mapping(state, entity);
         }
 
         for (entity, &DdlogId(new_id)) in queries.changed.iter() {
-            if let Some(old_id) = state.rev_map.insert(entity, new_id) {
-                state.id_map.remove(&old_id);
-            }
-            if let Some(prev) = state.id_map.insert(new_id, entity) {
-                if prev != entity {
-                    state.rev_map.remove(&prev);
-                    warn!("DdlogId {new_id} remapped from {prev:?} to {entity:?}");
-                }
-            }
+            update_entity_mapping(state, entity, new_id);
         }
 
         for (entity, &DdlogId(id)) in queries.added.iter() {
-            if let Some(prev) = state.id_map.insert(id, entity) {
-                if prev != entity {
-                    state.rev_map.remove(&prev);
-                    warn!("DdlogId {id} remapped from {prev:?} to {entity:?}");
-                }
+            add_entity_mapping(state, entity, id);
+        }
+    }
+
+    fn remove_entity_mapping(state: &mut DbspState, entity: Entity) {
+        if let Some(old_id) = state.rev_map.remove(&entity) {
+            state.id_map.remove(&old_id);
+        }
+    }
+
+    fn update_entity_mapping(state: &mut DbspState, entity: Entity, new_id: i64) {
+        if let Some(old_id) = state.rev_map.insert(entity, new_id) {
+            state.id_map.remove(&old_id);
+        }
+        handle_id_conflict(state, entity, new_id);
+    }
+
+    fn add_entity_mapping(state: &mut DbspState, entity: Entity, id: i64) {
+        handle_id_conflict(state, entity, id);
+        state.rev_map.insert(entity, id);
+    }
+
+    /// Handles ID mapping conflicts by removing stale reverse mappings and
+    /// logging warnings.
+    fn handle_id_conflict(state: &mut DbspState, entity: Entity, id: i64) {
+        if let Some(prev_entity) = state.id_map.insert(id, entity) {
+            if prev_entity != entity {
+                state.rev_map.remove(&prev_entity);
+                warn!("DdlogId {id} remapped from {prev_entity:?} to {entity:?}");
             }
-            state.rev_map.insert(entity, id);
         }
     }
 
