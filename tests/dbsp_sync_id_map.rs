@@ -1,7 +1,6 @@
 //! Tests for incremental maintenance of the entity ID mapping.
 
 use bevy::prelude::*;
-use bevy::ecs::system::RunSystemOnce;
 use rstest::{fixture, rstest};
 
 use lille::components::DdlogId;
@@ -19,7 +18,7 @@ use lille::init_world_handle_system;
 fn app() -> App {
     let mut app = App::new();
     init_dbsp_system(&mut app.world).expect("failed to initialise DbspState");
-    app.world.run_system_once(init_world_handle_system);
+    app.add_systems(Startup, init_world_handle_system);
     app.add_systems(Update, cache_state_for_dbsp_system);
     app
 }

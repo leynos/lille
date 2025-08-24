@@ -8,7 +8,7 @@
 
 use std::collections::HashMap;
 
-use bevy::ecs::system::{RunSystemOnce, SystemParam};
+use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use log::{error, warn};
 
@@ -42,8 +42,7 @@ impl Plugin for DbspPlugin {
             return;
         }
 
-        app.world.run_system_once(init_world_handle_system);
-
+        app.add_systems(Startup, init_world_handle_system);
         app.add_systems(
             Update,
             (cache_state_for_dbsp_system, apply_dbsp_outputs_system).chain(),
@@ -135,127 +134,127 @@ pub fn cache_state_for_dbsp_system(
     world_handle.slopes.clear();
     world_handle.entities.clear();
 
-    sync_blocks(&mut state.circuit, &block_query, world_handle.as_mut());
-    sync_id_maps(&mut state, &mut id_queries);
-    sync_entities(&mut state.circuit, &entity_query, world_handle.as_mut());
-    sync_forces(&mut state, &force_query);
+    sync::blocks(&mut state.circuit, &block_query, world_handle.as_mut());
+    sync::id_maps(&mut state, &mut id_queries);
+    sync::entities(&mut state.circuit, &entity_query, world_handle.as_mut());
+    sync::forces(&mut state, &force_query);
 }
 
-/// Pushes block and slope components into the circuit and world handle.
-fn sync_blocks(
-    circuit: &mut DbspCircuit,
-    block_query: &Query<(&Block, Option<&BlockSlope>)>,
-    wh: &mut WorldHandle,
-) {
-    for (block, slope) in block_query.iter() {
-        circuit.block_in().push(block.clone(), 1);
-        if let Some(s) = slope {
-            circuit.block_slope_in().push(s.clone(), 1);
-        }
-        wh.blocks.push(block.clone());
-        if let Some(s) = slope {
-            wh.slopes.insert(s.block_id, s.clone());
-        }
-    }
-}
+mod sync {
+    use super::*;
 
-/// Maintains the mapping between DBSP identifiers and Bevy entities.
-fn sync_id_maps(state: &mut DbspState, idq: &mut IdQueries) {
-    for entity in idq.removed.read() {
-        if let Some(old_id) = state.rev_map.remove(&entity) {
-            state.id_map.remove(&old_id);
-        }
-    }
-
-    for (entity, &DdlogId(new_id)) in idq.changed.iter() {
-        if let Some(old_id) = state.rev_map.insert(entity, new_id) {
-            state.id_map.remove(&old_id);
-        }
-        if let Some(prev_entity) = state.id_map.insert(new_id, entity) {
-            if prev_entity != entity {
-                state.rev_map.remove(&prev_entity);
-                warn!("DdlogId {new_id} remapped from {prev_entity:?} to {entity:?}");
+    pub(super) fn blocks(
+        circuit: &mut DbspCircuit,
+        query: &Query<(&Block, Option<&BlockSlope>)>,
+        world: &mut WorldHandle,
+    ) {
+        for (block, slope) in query.iter() {
+            circuit.block_in().push(block.clone(), 1);
+            if let Some(s) = slope {
+                circuit.block_slope_in().push(s.clone(), 1);
+            }
+            world.blocks.push(block.clone());
+            if let Some(s) = slope {
+                world.slopes.insert(s.block_id, s.clone());
             }
         }
     }
 
-    for (entity, &DdlogId(id)) in idq.added.iter() {
-        if let Some(prev_entity) = state.id_map.insert(id, entity) {
-            if prev_entity != entity {
-                state.rev_map.remove(&prev_entity);
-                warn!("DdlogId {id} remapped from {prev_entity:?} to {entity:?}");
+    pub(super) fn id_maps(state: &mut DbspState, queries: &mut IdQueries) {
+        for entity in queries.removed.read() {
+            if let Some(old_id) = state.rev_map.remove(&entity) {
+                state.id_map.remove(&old_id);
             }
         }
-        state.rev_map.insert(entity, id);
-    }
-}
 
-/// Pushes entity positions, velocities, and targets into the circuit and world handle.
-fn sync_entities(
-    circuit: &mut DbspCircuit,
-    entity_query: &Query<EntityRow<'_>>,
-    wh: &mut WorldHandle,
-) {
-    for (_, id, transform, vel, target) in entity_query.iter() {
-        circuit.position_in().push(
-            Position {
-                entity: id.0,
-                x: (transform.translation.x as f64).into(),
-                y: (transform.translation.y as f64).into(),
-                z: (transform.translation.z as f64).into(),
-            },
-            1,
-        );
-
-        let v = vel.map(|v| (v.vx, v.vy, v.vz)).unwrap_or_default();
-        circuit.velocity_in().push(
-            Velocity {
-                entity: id.0,
-                vx: (v.0 as f64).into(),
-                vy: (v.1 as f64).into(),
-                vz: (v.2 as f64).into(),
-            },
-            1,
-        );
-
-        if let Some(t) = target {
-            circuit.target_in().push(
-                Target {
-                    entity: id.0,
-                    x: (t.x as f64).into(),
-                    y: (t.y as f64).into(),
-                },
-                1,
-            );
+        for (entity, &DdlogId(new_id)) in queries.changed.iter() {
+            if let Some(old_id) = state.rev_map.insert(entity, new_id) {
+                state.id_map.remove(&old_id);
+            }
+            if let Some(prev) = state.id_map.insert(new_id, entity) {
+                if prev != entity {
+                    state.rev_map.remove(&prev);
+                    warn!("DdlogId {new_id} remapped from {prev:?} to {entity:?}");
+                }
+            }
         }
 
-        wh.entities.insert(
-            id.0,
-            DdlogEntity {
-                position: transform.translation,
-                target: target.map(|t| t.0),
-                ..DdlogEntity::default()
-            },
-        );
+        for (entity, &DdlogId(id)) in queries.added.iter() {
+            if let Some(prev) = state.id_map.insert(id, entity) {
+                if prev != entity {
+                    state.rev_map.remove(&prev);
+                    warn!("DdlogId {id} remapped from {prev:?} to {entity:?}");
+                }
+            }
+            state.rev_map.insert(entity, id);
+        }
     }
-}
 
-/// Pushes force components for entities known to the circuit.
-fn sync_forces(state: &mut DbspState, force_query: &Query<(Entity, &DdlogId, &ForceComp)>) {
-    for (entity, id, f) in force_query.iter() {
-        if state.id_map.contains_key(&id.0) {
-            state.circuit.force_in().push(
-                Force {
+    pub(super) fn entities(
+        circuit: &mut DbspCircuit,
+        query: &Query<EntityRow<'_>>,
+        world: &mut WorldHandle,
+    ) {
+        for (_, id, transform, vel, target) in query.iter() {
+            circuit.position_in().push(
+                Position {
                     entity: id.0,
-                    fx: f.force_x.into(),
-                    fy: f.force_y.into(),
-                    fz: f.force_z.into(),
-                    mass: f.mass.map(|m| m.into()),
+                    x: (transform.translation.x as f64).into(),
+                    y: (transform.translation.y as f64).into(),
+                    z: (transform.translation.z as f64).into(),
                 },
                 1,
             );
-        } else {
-            warn!("force component for unknown entity {entity:?} ignored");
+
+            let v = vel.map(|v| (v.vx, v.vy, v.vz)).unwrap_or_default();
+            circuit.velocity_in().push(
+                Velocity {
+                    entity: id.0,
+                    vx: (v.0 as f64).into(),
+                    vy: (v.1 as f64).into(),
+                    vz: (v.2 as f64).into(),
+                },
+                1,
+            );
+
+            if let Some(t) = target {
+                circuit.target_in().push(
+                    Target {
+                        entity: id.0,
+                        x: (t.x as f64).into(),
+                        y: (t.y as f64).into(),
+                    },
+                    1,
+                );
+            }
+
+            world.entities.insert(
+                id.0,
+                DdlogEntity {
+                    position: transform.translation,
+                    target: target.map(|t| t.0),
+                    ..DdlogEntity::default()
+                },
+            );
+        }
+    }
+
+    pub(super) fn forces(state: &mut DbspState, query: &Query<(Entity, &DdlogId, &ForceComp)>) {
+        for (entity, id, f) in query.iter() {
+            if state.id_map.contains_key(&id.0) {
+                state.circuit.force_in().push(
+                    Force {
+                        entity: id.0,
+                        fx: f.force_x.into(),
+                        fy: f.force_y.into(),
+                        fz: f.force_z.into(),
+                        mass: f.mass.map(|m| m.into()),
+                    },
+                    1,
+                );
+            } else {
+                warn!("force component for unknown entity {entity:?} ignored");
+            }
         }
     }
 }

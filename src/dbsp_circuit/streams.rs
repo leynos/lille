@@ -438,7 +438,11 @@ pub(super) fn apply_movement(
         .inspect(|batch| {
             for (entity, _, weight) in batch.iter() {
                 if weight > 1 {
-                    panic!("duplicate movement decisions for entity {entity}");
+                    debug_assert!(
+                        weight <= 1,
+                        "duplicate movement decisions for entity {entity}"
+                    );
+                    warn!("duplicate movement decisions for entity {entity}");
                 }
             }
         });
