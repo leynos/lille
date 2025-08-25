@@ -274,10 +274,12 @@ mod sync {
 
 /// Applies DBSP outputs back to ECS components.
 ///
-/// Steps the circuit, reads new positions and velocities, and updates the
-/// corresponding entities. The [`WorldHandle`] resource is updated with the
-/// latest positions for diagnostics. Output handles are drained afterwards to
-/// avoid reapplying stale data.
+/// Steps the circuit, consolidates new positions and velocities, and updates
+/// the corresponding entities. The [`WorldHandle`] resource is updated with the
+/// latest positions for diagnostics.
+///
+/// Outputs are drained after application to prevent reapplying stale deltas on
+/// subsequent frames.
 pub fn apply_dbsp_outputs_system(
     mut state: NonSendMut<DbspState>,
     mut write_query: Query<(Entity, &mut Transform, Option<&mut VelocityComp>), With<DdlogId>>,
