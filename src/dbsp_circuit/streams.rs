@@ -427,7 +427,10 @@ pub(super) fn movement_decision_stream(
 
 /// Applies movement decisions to base positions.
 ///
-/// Panics in tests if multiple movement records exist for a single entity.
+/// # Panics
+///
+/// Panics in debug builds if more than one movement record exists for the same
+/// entity in a single tick.
 pub(super) fn apply_movement(
     base: &Stream<RootCircuit, OrdZSet<Position>>,
     movement: &Stream<RootCircuit, OrdZSet<MovementDecision>>,
@@ -436,13 +439,19 @@ pub(super) fn apply_movement(
     let mv = movement
         .map_index(|m| (m.entity, (m.dx, m.dy)))
         .inspect(|batch| {
-            for (entity, _, weight) in batch.iter() {
-                if weight > 1 {
-                    if cfg!(test) {
-                        panic!("duplicate movement decisions for entity {entity}");
-                    } else {
-                        warn!("duplicate movement decisions for entity {entity}");
-                    }
+            // Accumulate counts per entity to catch duplicates emitted within a
+            // single tick. Duplicates indicate a bug upstream; release builds
+            // log the issue while debug builds panic for visibility.
+            use std::collections::HashMap;
+
+            let mut counts: HashMap<i64, i64> = HashMap::new();
+            for (entity, _mv, weight) in batch.iter() {
+                *counts.entry(entity).or_default() += weight;
+            }
+            for (entity, total) in counts {
+                if total > 1 {
+                    debug_assert!(false, "duplicate movement decisions for entity {entity}");
+                    warn!("duplicate movement decisions for entity {entity}");
                 }
             }
         });

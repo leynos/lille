@@ -16,7 +16,7 @@ use crate::components::{
     Block, BlockSlope, DdlogId, ForceComp, Target as TargetComp, VelocityComp,
 };
 use crate::dbsp_circuit::{DbspCircuit, Force, Position, Target, Velocity};
-use crate::world_handle::{DdlogEntity, WorldHandle};
+use crate::world_handle::{init_world_handle_system, DdlogEntity, WorldHandle};
 
 // Compact alias for the per-entity inputs used by the cache system.
 type EntityRow<'w> = (
@@ -42,6 +42,7 @@ impl Plugin for DbspPlugin {
             return;
         }
 
+        app.add_systems(Startup, init_world_handle_system);
         app.add_systems(
             Update,
             (cache_state_for_dbsp_system, apply_dbsp_outputs_system).chain(),
@@ -113,9 +114,9 @@ pub fn init_dbsp_system(world: &mut World) -> Result<(), dbsp::Error> {
 /// `Force` components and pushes them into the circuit's input handles. Forces
 /// for entities not present in the current position pass are ignored. It also
 /// updates the internal mapping from DBSP entity identifiers to Bevy entities,
-/// ensuring the lookup is maintained without rebuilding the map each frame.
-/// When a [`WorldHandle`] resource is present, it is refreshed with the same
-/// cached data for tests and diagnostics.
+/// ensuring the lookup is maintained without rebuilding the map each frame. It
+/// also refreshes the [`WorldHandle`] resource with the same cached data for
+/// tests and diagnostics.
 #[expect(
     clippy::type_complexity,
     reason = "Bevy Query uses tuple world refs; complexity hidden behind EntityRow alias"
@@ -127,105 +128,120 @@ pub fn cache_state_for_dbsp_system(
     force_query: Query<(Entity, &DdlogId, &ForceComp)>,
     block_query: Query<(&Block, Option<&BlockSlope>)>,
     mut id_queries: IdQueries,
-    mut world_handle: Option<ResMut<WorldHandle>>,
+    mut world_handle: ResMut<WorldHandle>,
 ) {
-    let has_inputs = !block_query.is_empty()
-        || !entity_query.is_empty()
-        || !force_query.is_empty()
-        || !id_queries.added.is_empty()
-        || !id_queries.changed.is_empty()
-        || !id_queries.removed.is_empty();
+    world_handle.blocks.clear();
+    world_handle.slopes.clear();
+    world_handle.entities.clear();
 
-    if has_inputs {
-        if let Some(wh) = world_handle.as_mut() {
-            // TODO: Only clear when inputs changed; otherwise keep prior snapshot.
-            wh.blocks.clear();
-            wh.slopes.clear();
-            wh.entities.clear();
-        }
-    }
+    sync::blocks(&mut state.circuit, &block_query, world_handle.as_mut());
+    sync::id_maps(&mut state, &mut id_queries);
+    sync::entities(&mut state.circuit, &entity_query, world_handle.as_mut());
+    sync::forces(&mut state, &force_query);
+}
 
-    for (block, slope) in &block_query {
-        state.circuit.block_in().push(block.clone(), 1);
-        if let Some(s) = slope {
-            state.circuit.block_slope_in().push(s.clone(), 1);
-        }
-        if let Some(ref mut wh) = world_handle {
-            wh.blocks.push(block.clone());
+mod sync {
+    use super::*;
+
+    pub(super) fn blocks(
+        circuit: &mut DbspCircuit,
+        query: &Query<(&Block, Option<&BlockSlope>)>,
+        world: &mut WorldHandle,
+    ) {
+        for (block, slope) in query.iter() {
+            circuit.block_in().push(block.clone(), 1);
             if let Some(s) = slope {
-                wh.slopes.insert(s.block_id, s.clone());
+                circuit.block_slope_in().push(s.clone(), 1);
+            }
+            world.blocks.push(block.clone());
+            if let Some(s) = slope {
+                world.slopes.insert(s.block_id, s.clone());
             }
         }
     }
 
-    // Remove mappings for entities whose `DdlogId` component was removed this
-    // frame.
-    for entity in id_queries.removed.read() {
+    pub(super) fn id_maps(state: &mut DbspState, queries: &mut IdQueries) {
+        for entity in queries.removed.read() {
+            remove_entity_mapping(state, entity);
+        }
+
+        for (entity, &DdlogId(new_id)) in queries.changed.iter() {
+            update_entity_mapping(state, entity, new_id);
+        }
+
+        for (entity, &DdlogId(id)) in queries.added.iter() {
+            add_entity_mapping(state, entity, id);
+        }
+    }
+
+    fn remove_entity_mapping(state: &mut DbspState, entity: Entity) {
         if let Some(old_id) = state.rev_map.remove(&entity) {
             state.id_map.remove(&old_id);
         }
     }
 
-    // Replace mappings for entities whose identifier changed.
-    for (entity, &DdlogId(new_id)) in &id_queries.changed {
+    fn update_entity_mapping(state: &mut DbspState, entity: Entity, new_id: i64) {
         if let Some(old_id) = state.rev_map.insert(entity, new_id) {
             state.id_map.remove(&old_id);
         }
-        if let Some(prev_entity) = state.id_map.insert(new_id, entity) {
-            if prev_entity != entity {
-                // Drop stale reverse mapping to maintain a bijection.
-                state.rev_map.remove(&prev_entity);
-                warn!("DdlogId {new_id} remapped from {prev_entity:?} to {entity:?}");
-            }
-        }
+        handle_id_conflict(state, entity, new_id);
     }
 
-    // Add mappings for newly spawned entities.
-    for (entity, &DdlogId(id)) in &id_queries.added {
+    fn add_entity_mapping(state: &mut DbspState, entity: Entity, id: i64) {
+        handle_id_conflict(state, entity, id);
+        state.rev_map.insert(entity, id);
+    }
+
+    /// Handles ID mapping conflicts by removing stale reverse mappings and
+    /// logging warnings.
+    fn handle_id_conflict(state: &mut DbspState, entity: Entity, id: i64) {
         if let Some(prev_entity) = state.id_map.insert(id, entity) {
             if prev_entity != entity {
                 state.rev_map.remove(&prev_entity);
                 warn!("DdlogId {id} remapped from {prev_entity:?} to {entity:?}");
             }
         }
-        state.rev_map.insert(entity, id);
     }
 
-    for (_, id, transform, vel, target) in &entity_query {
-        state.circuit.position_in().push(
-            Position {
-                entity: id.0,
-                x: (transform.translation.x as f64).into(),
-                y: (transform.translation.y as f64).into(),
-                z: (transform.translation.z as f64).into(),
-            },
-            1,
-        );
-
-        let v = vel.map(|v| (v.vx, v.vy, v.vz)).unwrap_or_default();
-        state.circuit.velocity_in().push(
-            Velocity {
-                entity: id.0,
-                vx: (v.0 as f64).into(),
-                vy: (v.1 as f64).into(),
-                vz: (v.2 as f64).into(),
-            },
-            1,
-        );
-
-        if let Some(t) = target {
-            state.circuit.target_in().push(
-                Target {
+    pub(super) fn entities(
+        circuit: &mut DbspCircuit,
+        query: &Query<EntityRow<'_>>,
+        world: &mut WorldHandle,
+    ) {
+        for (_, id, transform, vel, target) in query.iter() {
+            circuit.position_in().push(
+                Position {
                     entity: id.0,
-                    x: (t.x as f64).into(),
-                    y: (t.y as f64).into(),
+                    x: (transform.translation.x as f64).into(),
+                    y: (transform.translation.y as f64).into(),
+                    z: (transform.translation.z as f64).into(),
                 },
                 1,
             );
-        }
 
-        if let Some(ref mut wh) = world_handle {
-            wh.entities.insert(
+            let v = vel.map(|v| (v.vx, v.vy, v.vz)).unwrap_or_default();
+            circuit.velocity_in().push(
+                Velocity {
+                    entity: id.0,
+                    vx: (v.0 as f64).into(),
+                    vy: (v.1 as f64).into(),
+                    vz: (v.2 as f64).into(),
+                },
+                1,
+            );
+
+            if let Some(t) = target {
+                circuit.target_in().push(
+                    Target {
+                        entity: id.0,
+                        x: (t.x as f64).into(),
+                        y: (t.y as f64).into(),
+                    },
+                    1,
+                );
+            }
+
+            world.entities.insert(
                 id.0,
                 DdlogEntity {
                     position: transform.translation,
@@ -236,36 +252,38 @@ pub fn cache_state_for_dbsp_system(
         }
     }
 
-    for (entity, id, f) in &force_query {
-        // Only push forces for entities that already participated in the position
-        // loop; this avoids introducing stray IDs.
-        if state.id_map.contains_key(&id.0) {
-            state.circuit.force_in().push(
-                Force {
-                    entity: id.0,
-                    fx: f.force_x.into(),
-                    fy: f.force_y.into(),
-                    fz: f.force_z.into(),
-                    mass: f.mass.map(|m| m.into()),
-                },
-                1,
-            );
-        } else {
-            warn!("force component for unknown entity {entity:?} ignored");
+    pub(super) fn forces(state: &mut DbspState, query: &Query<(Entity, &DdlogId, &ForceComp)>) {
+        for (entity, id, f) in query.iter() {
+            if state.id_map.contains_key(&id.0) {
+                state.circuit.force_in().push(
+                    Force {
+                        entity: id.0,
+                        fx: f.force_x.into(),
+                        fy: f.force_y.into(),
+                        fz: f.force_z.into(),
+                        mass: f.mass.map(|m| m.into()),
+                    },
+                    1,
+                );
+            } else {
+                warn!("force component for unknown entity {entity:?} ignored");
+            }
         }
     }
 }
 
 /// Applies DBSP outputs back to ECS components.
 ///
-/// Steps the circuit, reads new positions and velocities, and updates the
-/// corresponding entities. When a [`WorldHandle`] resource is present, it is
-/// updated with the latest positions for diagnostics. Output handles are
-/// drained afterwards to avoid reapplying stale data.
+/// Steps the circuit, consolidates new positions and velocities, and updates
+/// the corresponding entities. The [`WorldHandle`] resource is updated with the
+/// latest positions for diagnostics.
+///
+/// Outputs are drained after application to prevent reapplying stale deltas on
+/// subsequent frames.
 pub fn apply_dbsp_outputs_system(
     mut state: NonSendMut<DbspState>,
     mut write_query: Query<(Entity, &mut Transform, Option<&mut VelocityComp>), With<DdlogId>>,
-    mut world_handle: Option<ResMut<WorldHandle>>,
+    mut world_handle: ResMut<WorldHandle>,
 ) {
     state.circuit.step().expect("DBSP step failed");
 
@@ -276,10 +294,8 @@ pub fn apply_dbsp_outputs_system(
                 transform.translation.x = pos.x.into_inner() as f32;
                 transform.translation.y = pos.y.into_inner() as f32;
                 transform.translation.z = pos.z.into_inner() as f32;
-                if let Some(ref mut wh) = world_handle {
-                    if let Some(e) = wh.entities.get_mut(&pos.entity) {
-                        e.position = transform.translation;
-                    }
+                if let Some(e) = world_handle.entities.get_mut(&pos.entity) {
+                    e.position = transform.translation;
                 }
             }
         }
