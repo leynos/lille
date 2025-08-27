@@ -321,16 +321,33 @@ pub(super) fn standing_motion_stream(
     (new_pos, new_vel)
 }
 
-/// Produces a zero fear level for each entity.
+/// Merges explicit fear inputs with entity positions, defaulting to zero.
 ///
-/// This is a placeholder pending a full AI implementation.
+/// Each position is paired with a [`FearLevel`] record. If no matching fear
+/// input exists for an entity the returned level is `0.0`.
 pub(super) fn fear_level_stream(
     positions: &Stream<RootCircuit, OrdZSet<Position>>,
+    fears: &Stream<RootCircuit, OrdZSet<FearLevel>>,
 ) -> Stream<RootCircuit, OrdZSet<FearLevel>> {
-    positions.map(|p| FearLevel {
+    let defaults = positions.map(|p| FearLevel {
         entity: p.entity,
         level: OrderedFloat(0.0),
-    })
+    });
+
+    defaults
+        .map_index(|f| (f.entity, *f))
+        .outer_join(
+            &fears.map_index(|f| (f.entity, f.level)),
+            |_, default, level| {
+                Some(FearLevel {
+                    entity: default.entity,
+                    level: *level,
+                })
+            },
+            |_, default| Some(*default),
+            |_, _| None,
+        )
+        .flat_map(|fl| (*fl).into_iter())
 }
 
 /// Intermediate structure pairing entity positions with their target.
@@ -495,5 +512,96 @@ mod tests {
         let mv = decide_movement(fear.into(), &pt(0.0, 0.0, 1.0, 1.0));
         assert_relative_eq!(mv.dx.into_inner(), expected_dx);
         assert_relative_eq!(mv.dy.into_inner(), expected_dy);
+    }
+
+    #[rstest]
+    #[case::approach(Some(0.1), 0.7071067811865475, 0.7071067811865475)]
+    #[case::flee(Some(0.3), -0.7071067811865475, -0.7071067811865475)]
+    #[case::default(None, 0.7071067811865475, 0.7071067811865475)]
+    fn movement_decision_join(
+        #[case] fear: Option<f64>,
+        #[case] expected_dx: f64,
+        #[case] expected_dy: f64,
+    ) {
+        let (circuit, (fear_in, target_in, pos_in, out)) = RootCircuit::build(|c| {
+            let (fear_input, fi) = c.add_input_zset::<FearLevel>();
+            let (tar_s, ti) = c.add_input_zset::<Target>();
+            let (pos_s, pi) = c.add_input_zset::<Position>();
+            let fear = fear_level_stream(&pos_s, &fear_input);
+            let out = movement_decision_stream(&fear, &tar_s, &pos_s).output();
+            Ok((fi, ti, pi, out))
+        })
+        .unwrap();
+
+        if let Some(level) = fear {
+            fear_in.push(
+                FearLevel {
+                    entity: 1,
+                    level: level.into(),
+                },
+                1,
+            );
+        }
+        target_in.push(
+            Target {
+                entity: 1,
+                x: 1.0.into(),
+                y: 1.0.into(),
+            },
+            1,
+        );
+        pos_in.push(
+            Position {
+                entity: 1,
+                x: 0.0.into(),
+                y: 0.0.into(),
+                z: 0.0.into(),
+            },
+            1,
+        );
+
+        circuit.step().unwrap();
+
+        let out: Vec<MovementDecision> =
+            out.consolidate().iter().map(|(m, _, _)| m).collect();
+        assert_eq!(out.len(), 1);
+        assert_relative_eq!(out[0].dx.into_inner(), expected_dx);
+        assert_relative_eq!(out[0].dy.into_inner(), expected_dy);
+    }
+
+    #[test]
+    fn no_decision_without_target() {
+        let (circuit, (fear_in, pos_in, out)) = RootCircuit::build(|c| {
+            let (fear_input, fi) = c.add_input_zset::<FearLevel>();
+            let (pos_s, pi) = c.add_input_zset::<Position>();
+            let dummy_targets = c.add_input_zset::<Target>().0; // unused
+            let fear = fear_level_stream(&pos_s, &fear_input);
+            let out = movement_decision_stream(&fear, &dummy_targets, &pos_s).output();
+            Ok((fi, pi, out))
+        })
+        .unwrap();
+
+        fear_in.push(
+            FearLevel {
+                entity: 1,
+                level: 0.0.into(),
+            },
+            1,
+        );
+        pos_in.push(
+            Position {
+                entity: 1,
+                x: 0.0.into(),
+                y: 0.0.into(),
+                z: 0.0.into(),
+            },
+            1,
+        );
+
+        circuit.step().unwrap();
+
+        let out: Vec<MovementDecision> =
+            out.consolidate().iter().map(|(m, _, _)| m).collect();
+        assert!(out.is_empty());
     }
 }

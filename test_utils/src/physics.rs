@@ -1,7 +1,7 @@
 //! Convenience constructors for physics-related records used in tests.
 
 use lille::components::Block;
-use lille::dbsp_circuit::{DbspCircuit, Force, Position, Velocity};
+use lille::dbsp_circuit::{DbspCircuit, FearLevel, Force, Position, Target, Velocity};
 
 /// Create a new [`DbspCircuit`] for tests.
 ///
@@ -55,6 +55,40 @@ pub fn vel(entity: i64, vx: f64, vy: f64, vz: f64) -> Velocity {
         vx: vx.into(),
         vy: vy.into(),
         vz: vz.into(),
+    }
+}
+
+/// Convenience constructor for [`Target`] records used in tests.
+///
+/// # Examples
+/// ```
+/// use test_utils::physics::target;
+/// let t = target(1, 1.0, 2.0);
+/// assert_eq!(t.entity, 1);
+/// assert_eq!(t.x.into_inner(), 1.0);
+/// assert_eq!(t.y.into_inner(), 2.0);
+/// ```
+pub fn target(entity: i64, x: f64, y: f64) -> Target {
+    Target {
+        entity,
+        x: x.into(),
+        y: y.into(),
+    }
+}
+
+/// Convenience constructor for [`FearLevel`] records used in tests.
+///
+/// # Examples
+/// ```
+/// use test_utils::physics::fear;
+/// let f = fear(1, 0.5);
+/// assert_eq!(f.entity, 1);
+/// assert_eq!(f.level.into_inner(), 0.5);
+/// ```
+pub fn fear(entity: i64, level: f64) -> FearLevel {
+    FearLevel {
+        entity,
+        level: level.into(),
     }
 }
 

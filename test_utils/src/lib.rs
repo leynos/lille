@@ -3,7 +3,7 @@
 //! common physics records.
 
 pub mod physics;
-pub use physics::{block, force, force_with_mass, new_circuit, pos, vel};
+pub use physics::{block, fear, force, force_with_mass, new_circuit, pos, target, vel};
 
 /// Assert that all strings in `keys` are present in `code`.
 ///
