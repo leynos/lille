@@ -323,31 +323,23 @@ pub(super) fn standing_motion_stream(
 
 /// Merges explicit fear inputs with entity positions, defaulting to zero.
 ///
-/// Each position is paired with a [`FearLevel`] record. If no matching fear
-/// input exists for an entity the returned level is `0.0`.
+/// Each position yields a [`FearLevel`] record. Entities with explicit fear
+/// inputs retain their provided value while all others receive `0.0`.
 pub(super) fn fear_level_stream(
     positions: &Stream<RootCircuit, OrdZSet<Position>>,
     fears: &Stream<RootCircuit, OrdZSet<FearLevel>>,
 ) -> Stream<RootCircuit, OrdZSet<FearLevel>> {
-    let defaults = positions.map(|p| FearLevel {
-        entity: p.entity,
-        level: OrderedFloat(0.0),
-    });
+    let explicit = fears.clone();
 
-    defaults
-        .map_index(|f| (f.entity, *f))
-        .outer_join(
-            &fears.map_index(|f| (f.entity, f.level)),
-            |_, default, level| {
-                Some(FearLevel {
-                    entity: default.entity,
-                    level: *level,
-                })
-            },
-            |_, default| Some(*default),
-            |_, _| None,
-        )
-        .flat_map(|fl| (*fl).into_iter())
+    let missing = positions
+        .map_index(|p| (p.entity, ()))
+        .antijoin(&explicit.map_index(|f| (f.entity, ())))
+        .map(|(entity, _)| FearLevel {
+            entity: *entity,
+            level: OrderedFloat(0.0),
+        });
+
+    explicit.plus(&missing)
 }
 
 /// Intermediate structure pairing entity positions with their target.
@@ -562,8 +554,7 @@ mod tests {
 
         circuit.step().unwrap();
 
-        let out: Vec<MovementDecision> =
-            out.consolidate().iter().map(|(m, _, _)| m).collect();
+        let out: Vec<MovementDecision> = out.consolidate().iter().map(|(m, _, _)| m).collect();
         assert_eq!(out.len(), 1);
         assert_relative_eq!(out[0].dx.into_inner(), expected_dx);
         assert_relative_eq!(out[0].dy.into_inner(), expected_dy);
@@ -600,8 +591,7 @@ mod tests {
 
         circuit.step().unwrap();
 
-        let out: Vec<MovementDecision> =
-            out.consolidate().iter().map(|(m, _, _)| m).collect();
+        let out: Vec<MovementDecision> = out.consolidate().iter().map(|(m, _, _)| m).collect();
         assert!(out.is_empty());
     }
 }

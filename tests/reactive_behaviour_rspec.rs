@@ -27,7 +27,7 @@ impl fmt::Debug for Env {
 impl Default for Env {
     #[expect(
         clippy::arc_with_non_send_sync,
-        reason = "DbspCircuit wrapped in Arc<Mutex<_>> for shared test access",
+        reason = "DbspCircuit wrapped in Arc<Mutex<_>> for shared test access"
     )]
     fn default() -> Self {
         let circuit = Arc::new(Mutex::new(
@@ -163,6 +163,62 @@ fn no_movement_without_target() {
                         y: 0.0.into(),
                         z: 1.0.into()
                     }],
+                );
+            });
+        },
+    ));
+}
+
+#[test]
+fn handles_multiple_entities_with_mixed_states() {
+    rspec::run(&rspec::given(
+        "multiple entities with mixed fear and target states",
+        Env::default(),
+        |ctx| {
+            ctx.before_each(|env| {
+                env.push_block(block(1, -1, 0, 0));
+                env.push_block(block(2, 0, 0, 0));
+                env.push_block(block(3, 1, 1, 0));
+
+                env.push_position(pos(1, 0.0, 0.0, 1.0));
+                env.push_velocity(vel(1, 0.0, 0.0, 0.0));
+                env.push_target(target(1, 1.0, 1.0));
+                env.push_fear(fear(1, 0.5));
+
+                env.push_position(pos(2, 0.0, 0.0, 1.0));
+                env.push_velocity(vel(2, 0.0, 0.0, 0.0));
+                env.push_target(target(2, 1.0, 1.0));
+
+                env.push_position(pos(3, 0.0, 0.0, 1.0));
+                env.push_velocity(vel(3, 0.0, 0.0, 0.0));
+
+                env.step();
+            });
+            ctx.then("each reacts independently", |env| {
+                let mut out = env.output();
+                out.sort_by_key(|p| p.entity);
+                assert_eq!(
+                    out,
+                    vec![
+                        NewPosition {
+                            entity: 1,
+                            x: (-0.7071067811865475).into(),
+                            y: (-0.7071067811865475).into(),
+                            z: 1.0.into(),
+                        },
+                        NewPosition {
+                            entity: 2,
+                            x: 0.7071067811865475.into(),
+                            y: 0.7071067811865475.into(),
+                            z: 1.0.into(),
+                        },
+                        NewPosition {
+                            entity: 3,
+                            x: 0.0.into(),
+                            y: 0.0.into(),
+                            z: 1.0.into(),
+                        },
+                    ],
                 );
             });
         },
