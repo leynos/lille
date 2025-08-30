@@ -5,6 +5,7 @@
 
 use lille::components::Block;
 use lille::dbsp_circuit::{DbspCircuit, FearLevel, NewPosition, Position, Target, Velocity};
+use rstest::rstest;
 use std::fmt;
 use std::sync::{Arc, Mutex};
 use test_utils::{block, fear, pos, target, vel};
@@ -80,93 +81,74 @@ impl Env {
     }
 }
 
-#[test]
-fn moves_towards_target_when_unafraid() {
-    rspec::run(&rspec::given(
-        "an entity with a target and no fear",
-        Env::default(),
-        |ctx| {
-            ctx.before_each(|env| {
-                env.push_block(block(1, 0, 0, 0));
-                env.push_block(block(2, 1, 1, 0));
-                env.push_position(pos(1, 0.0, 0.0, 1.0));
-                env.push_velocity(vel(1, 0.0, 0.0, 0.0));
-                env.push_target(target(1, 1.0, 1.0));
-                env.step();
-            });
-            ctx.then("it moves towards the target", |env| {
-                let out = env.output();
-                assert_eq!(
-                    out,
-                    vec![NewPosition {
-                        entity: 1,
-                        x: 0.7071067811865475.into(),
-                        y: 0.7071067811865475.into(),
-                        z: 1.0.into()
-                    }],
-                );
-            });
-        },
-    ));
-}
-
-#[test]
-fn flees_target_when_afraid() {
-    rspec::run(&rspec::given(
-        "an entity with a target and fear above threshold",
-        Env::default(),
-        |ctx| {
-            ctx.before_each(|env| {
-                env.push_block(block(1, -1, 0, 0));
-                env.push_block(block(2, 0, 0, 0));
-                env.push_target(target(1, 1.0, 1.0));
-                env.push_position(pos(1, 0.0, 0.0, 1.0));
-                env.push_velocity(vel(1, 0.0, 0.0, 0.0));
-                env.push_fear(fear(1, 0.5));
-                env.step();
-            });
-            ctx.then("it moves away from the target", |env| {
-                let out = env.output();
-                assert_eq!(
-                    out,
-                    vec![NewPosition {
-                        entity: 1,
-                        x: (-0.7071067811865475).into(),
-                        y: (-0.7071067811865475).into(),
-                        z: 1.0.into()
-                    }],
-                );
-            });
-        },
-    ));
-}
-
-#[test]
-fn no_movement_without_target() {
-    rspec::run(&rspec::given(
-        "an entity without a target",
-        Env::default(),
-        |ctx| {
-            ctx.before_each(|env| {
-                env.push_block(block(1, 0, 0, 0));
-                env.push_position(pos(1, 0.0, 0.0, 1.0));
-                env.push_velocity(vel(1, 0.0, 0.0, 0.0));
-                env.step();
-            });
-            ctx.then("it remains in place", |env| {
-                let out = env.output();
-                assert_eq!(
-                    out,
-                    vec![NewPosition {
-                        entity: 1,
-                        x: 0.0.into(),
-                        y: 0.0.into(),
-                        z: 1.0.into()
-                    }],
-                );
-            });
-        },
-    ));
+#[rstest]
+#[case(
+    "moves towards target when unafraid",
+    vec![(1, 0, 0, 0), (2, 1, 1, 0)],
+    None,
+    Some(target(1, 1.0, 1.0)),
+    vec![NewPosition {
+        entity: 1,
+        x: 0.7071067811865475.into(),
+        y: 0.7071067811865475.into(),
+        z: 1.0.into(),
+    }],
+)]
+#[case(
+    "flees target when afraid",
+    vec![(1, -1, 0, 0), (2, 0, 0, 0)],
+    Some(fear(1, 0.5)),
+    Some(target(1, 1.0, 1.0)),
+    vec![NewPosition {
+        entity: 1,
+        x: (-0.7071067811865475).into(),
+        y: (-0.7071067811865475).into(),
+        z: 1.0.into(),
+    }],
+)]
+#[case(
+    "no movement without target",
+    vec![(1, 0, 0, 0)],
+    None,
+    None,
+    vec![NewPosition {
+        entity: 1,
+        x: 0.0.into(),
+        y: 0.0.into(),
+        z: 1.0.into(),
+    }],
+)]
+fn reactive_movement_behaviour(
+    #[case] description: &str,
+    #[case] blocks: Vec<(u32, i32, i32, i32)>,
+    #[case] fear_input: Option<FearLevel>,
+    #[case] target_input: Option<Target>,
+    #[case] expected_output: Vec<NewPosition>,
+) {
+    rspec::run(&rspec::given(description, Env::default(), |ctx| {
+        let blocks = blocks.clone();
+        let target_input = target_input.clone();
+        let fear_input = fear_input.clone();
+        ctx.before_each(move |env| {
+            for (entity, x, y, z) in &blocks {
+                env.push_block(block(*entity, *x, *y, *z));
+            }
+            env.push_position(pos(1, 0.0, 0.0, 1.0));
+            env.push_velocity(vel(1, 0.0, 0.0, 0.0));
+            if let Some(t) = target_input.clone() {
+                env.push_target(t);
+            }
+            if let Some(f) = fear_input.clone() {
+                env.push_fear(f);
+            }
+            env.step();
+        });
+        let expected = expected_output.clone();
+        ctx.then("it yields expected positions", move |env| {
+            let out = env.output();
+            assert_eq!(out, expected);
+        });
+    }));
 }
 
 #[test]
