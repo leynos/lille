@@ -3,6 +3,7 @@
 //! Verifies that DBSP-derived movement responds to fear and target inputs,
 //! ensuring the circuit remains the source of truth for agent behaviour.
 
+use approx::assert_relative_eq;
 use lille::components::Block;
 use lille::dbsp_circuit::{DbspCircuit, FearLevel, NewPosition, Position, Target, Velocity};
 use rstest::rstest;
@@ -40,36 +41,40 @@ impl Default for Env {
 
 impl Env {
     fn push_block(&self, b: Block) {
-        let c = self.circuit.lock().unwrap();
+        let c = self.circuit.lock().expect("lock circuit to push block");
         c.block_in().push(b, 1);
     }
 
     fn push_position(&self, p: Position) {
-        let c = self.circuit.lock().unwrap();
+        let c = self.circuit.lock().expect("lock circuit to push position");
         c.position_in().push(p, 1);
     }
 
     fn push_velocity(&self, v: Velocity) {
-        let c = self.circuit.lock().unwrap();
+        let c = self.circuit.lock().expect("lock circuit to push velocity");
         c.velocity_in().push(v, 1);
     }
 
     fn push_target(&self, t: Target) {
-        let c = self.circuit.lock().unwrap();
+        let c = self.circuit.lock().expect("lock circuit to push target");
         c.target_in().push(t, 1);
     }
 
     fn push_fear(&self, f: FearLevel) {
-        let c = self.circuit.lock().unwrap();
+        let c = self.circuit.lock().expect("lock circuit to push fear");
         c.fear_in().push(f, 1);
     }
 
     fn step(&self) {
-        self.circuit.lock().unwrap().step().unwrap();
+        self.circuit
+            .lock()
+            .expect("lock circuit to step")
+            .step()
+            .expect("dbsp step");
     }
 
     fn output(&self) -> Vec<NewPosition> {
-        let mut c = self.circuit.lock().unwrap();
+        let mut c = self.circuit.lock().expect("lock circuit to read output");
         let vals: Vec<_> = c
             .new_position_out()
             .consolidate()
@@ -119,34 +124,40 @@ impl Env {
     }],
 )]
 fn reactive_movement_behaviour(
-    #[case] description: &str,
-    #[case] blocks: Vec<(u32, i32, i32, i32)>,
+    #[case] description: &'static str,
+    #[case] blocks: Vec<(i64, i32, i32, i32)>,
     #[case] fear_input: Option<FearLevel>,
     #[case] target_input: Option<Target>,
     #[case] expected_output: Vec<NewPosition>,
 ) {
-    rspec::run(&rspec::given(description, Env::default(), |ctx| {
-        let blocks = blocks.clone();
-        let target_input = target_input.clone();
-        let fear_input = fear_input.clone();
+    rspec::run(&rspec::given(description, Env::default(), move |ctx| {
+        let blocks = blocks;
+        let target_input = target_input;
+        let fear_input = fear_input;
+        let expected = expected_output;
         ctx.before_each(move |env| {
             for (entity, x, y, z) in &blocks {
                 env.push_block(block(*entity, *x, *y, *z));
             }
             env.push_position(pos(1, 0.0, 0.0, 1.0));
             env.push_velocity(vel(1, 0.0, 0.0, 0.0));
-            if let Some(t) = target_input.clone() {
-                env.push_target(t);
+            if let Some(t) = &target_input {
+                env.push_target(*t);
             }
-            if let Some(f) = fear_input.clone() {
-                env.push_fear(f);
+            if let Some(f) = &fear_input {
+                env.push_fear(*f);
             }
             env.step();
         });
-        let expected = expected_output.clone();
         ctx.then("it yields expected positions", move |env| {
             let out = env.output();
-            assert_eq!(out, expected);
+            assert_eq!(out.len(), expected.len());
+            for (actual, expected) in out.iter().zip(expected.iter()) {
+                assert_eq!(actual.entity, expected.entity);
+                assert_relative_eq!(actual.x.into_inner(), expected.x.into_inner());
+                assert_relative_eq!(actual.y.into_inner(), expected.y.into_inner());
+                assert_relative_eq!(actual.z.into_inner(), expected.z.into_inner());
+            }
         });
     }));
 }

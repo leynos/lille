@@ -523,7 +523,7 @@ mod tests {
             let out = movement_decision_stream(&fear, &tar_s, &pos_s).output();
             Ok((fi, ti, pi, out))
         })
-        .unwrap();
+        .expect("failed to build circuit for movement_decision_join");
 
         if let Some(level) = fear {
             fear_in.push(
@@ -552,7 +552,7 @@ mod tests {
             1,
         );
 
-        circuit.step().unwrap();
+        circuit.step().expect("dbsp step");
 
         let out: Vec<MovementDecision> = out.consolidate().iter().map(|(m, _, _)| m).collect();
         assert_eq!(out.len(), 1);
@@ -570,7 +570,7 @@ mod tests {
             let out = movement_decision_stream(&fear, &dummy_targets, &pos_s).output();
             Ok((fi, pi, out))
         })
-        .unwrap();
+        .expect("failed to build circuit for no_decision_without_target");
 
         fear_in.push(
             FearLevel {
@@ -589,7 +589,7 @@ mod tests {
             1,
         );
 
-        circuit.step().unwrap();
+        circuit.step().expect("dbsp step");
 
         let out: Vec<MovementDecision> = out.consolidate().iter().map(|(m, _, _)| m).collect();
         assert!(out.is_empty());

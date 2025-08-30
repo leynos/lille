@@ -61,7 +61,7 @@ pub fn vel(entity: i64, vx: f64, vy: f64, vz: f64) -> Velocity {
 /// Convenience constructor for [`Target`] records used in tests.
 ///
 /// # Examples
-/// ```
+/// ```rust
 /// use test_utils::physics::target;
 /// let t = target(1, 1.0, 2.0);
 /// assert_eq!(t.entity, 1);
@@ -79,7 +79,7 @@ pub fn target(entity: i64, x: f64, y: f64) -> Target {
 /// Convenience constructor for [`FearLevel`] records used in tests.
 ///
 /// # Examples
-/// ```
+/// ```rust
 /// use test_utils::physics::fear;
 /// let f = fear(1, 0.5);
 /// assert_eq!(f.entity, 1);

@@ -1,9 +1,11 @@
 //! DBSP-based world inference engine.
 //!
 //! This module defines [`DbspCircuit`], the authoritative dataflow program for
-//! Lille's game world. Callers feed [`Position`] and [`Block`] records into the
-//! circuit, call [`DbspCircuit::step`], then read [`NewPosition`] and
-//! [`HighestBlockAt`] outputs. Input collections persist across steps—invoke
+//! Lille's game world. Callers feed [`Position`], [`Velocity`], [`Force`],
+//! [`Target`], [`FearLevel`], and [`Block`] records into the circuit. Each tick
+//! [`DbspCircuit::step`] derives movement decisions that yield updated
+//! [`NewPosition`] and [`NewVelocity`] outputs alongside terrain queries like
+//! [`HighestBlockAt`]. Input collections persist across steps—invoke
 //! [`DbspCircuit::clear_inputs`] after each frame to prevent stale data from
 //! affecting subsequent computations.
 //!
