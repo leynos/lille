@@ -7,82 +7,57 @@ use approx::assert_relative_eq;
 use lille::components::Block;
 use lille::dbsp_circuit::{DbspCircuit, FearLevel, NewPosition, Position, Target, Velocity};
 use rstest::rstest;
-use std::fmt;
-use std::sync::{Arc, Mutex};
 use test_utils::{block, fear, pos, target, vel};
 
-#[derive(Clone)]
 struct Env {
-    circuit: Arc<Mutex<DbspCircuit>>,
-}
-
-// SAFETY: DbspCircuit is Send + Sync when wrapped by Arc<Mutex<_>>.
-unsafe impl Send for Env {}
-unsafe impl Sync for Env {}
-
-impl fmt::Debug for Env {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Env").finish()
-    }
-}
-
-impl Default for Env {
-    #[expect(
-        clippy::arc_with_non_send_sync,
-        reason = "DbspCircuit wrapped in Arc<Mutex<_>> for shared test access"
-    )]
-    fn default() -> Self {
-        let circuit = Arc::new(Mutex::new(
-            DbspCircuit::new().expect("failed to create DBSP circuit for test"),
-        ));
-        Self { circuit }
-    }
+    // Owns the circuit directly so tests can mutate it without synchronisation
+    // primitives.
+    circuit: DbspCircuit,
 }
 
 impl Env {
-    fn push_block(&self, b: Block) {
-        let c = self.circuit.lock().expect("lock circuit to push block");
-        c.block_in().push(b, 1);
+    fn push_block(&mut self, b: Block) {
+        self.circuit.block_in().push(b, 1);
     }
 
-    fn push_position(&self, p: Position) {
-        let c = self.circuit.lock().expect("lock circuit to push position");
-        c.position_in().push(p, 1);
+    fn push_position(&mut self, p: Position) {
+        self.circuit.position_in().push(p, 1);
     }
 
-    fn push_velocity(&self, v: Velocity) {
-        let c = self.circuit.lock().expect("lock circuit to push velocity");
-        c.velocity_in().push(v, 1);
+    fn push_velocity(&mut self, v: Velocity) {
+        self.circuit.velocity_in().push(v, 1);
     }
 
-    fn push_target(&self, t: Target) {
-        let c = self.circuit.lock().expect("lock circuit to push target");
-        c.target_in().push(t, 1);
+    fn push_target(&mut self, t: Target) {
+        self.circuit.target_in().push(t, 1);
     }
 
-    fn push_fear(&self, f: FearLevel) {
-        let c = self.circuit.lock().expect("lock circuit to push fear");
-        c.fear_in().push(f, 1);
+    fn push_fear(&mut self, f: FearLevel) {
+        self.circuit.fear_in().push(f, 1);
     }
 
-    fn step(&self) {
-        self.circuit
-            .lock()
-            .expect("lock circuit to step")
-            .step()
-            .expect("dbsp step");
+    fn step(&mut self) {
+        self.circuit.step().expect("dbsp step");
     }
 
-    fn output(&self) -> Vec<NewPosition> {
-        let mut c = self.circuit.lock().expect("lock circuit to read output");
-        let vals: Vec<_> = c
+    fn output(&mut self) -> Vec<NewPosition> {
+        let vals: Vec<_> = self
+            .circuit
             .new_position_out()
             .consolidate()
             .iter()
             .map(|(p, _, _)| p)
             .collect();
-        c.clear_inputs();
+        self.circuit.clear_inputs();
         vals
+    }
+}
+
+impl Default for Env {
+    fn default() -> Self {
+        Self {
+            circuit: DbspCircuit::new().expect("failed to create DBSP circuit for test"),
+        }
     }
 }
 
@@ -94,8 +69,8 @@ impl Env {
     Some(target(1, 1.0, 1.0)),
     vec![NewPosition {
         entity: 1,
-        x: 0.7071067811865475.into(),
-        y: 0.7071067811865475.into(),
+        x: 0.707_106_781_186_547_5.into(),
+        y: 0.707_106_781_186_547_5.into(),
         z: 1.0.into(),
     }],
 )]
@@ -106,8 +81,8 @@ impl Env {
     Some(target(1, 1.0, 1.0)),
     vec![NewPosition {
         entity: 1,
-        x: (-0.7071067811865475).into(),
-        y: (-0.7071067811865475).into(),
+        x: (-0.707_106_781_186_547_5).into(),
+        y: (-0.707_106_781_186_547_5).into(),
         z: 1.0.into(),
     }],
 )]
@@ -124,96 +99,78 @@ impl Env {
     }],
 )]
 fn reactive_movement_behaviour(
-    #[case] description: &'static str,
+    #[case] _description: &str,
     #[case] blocks: Vec<(i64, i32, i32, i32)>,
     #[case] fear_input: Option<FearLevel>,
     #[case] target_input: Option<Target>,
     #[case] expected_output: Vec<NewPosition>,
 ) {
-    rspec::run(&rspec::given(description, Env::default(), move |ctx| {
-        let blocks = blocks;
-        let target_input = target_input;
-        let fear_input = fear_input;
-        let expected = expected_output;
-        ctx.before_each(move |env| {
-            for (entity, x, y, z) in &blocks {
-                env.push_block(block(*entity, *x, *y, *z));
-            }
-            env.push_position(pos(1, 0.0, 0.0, 1.0));
-            env.push_velocity(vel(1, 0.0, 0.0, 0.0));
-            if let Some(t) = &target_input {
-                env.push_target(*t);
-            }
-            if let Some(f) = &fear_input {
-                env.push_fear(*f);
-            }
-            env.step();
-        });
-        ctx.then("it yields expected positions", move |env| {
-            let out = env.output();
-            assert_eq!(out.len(), expected.len());
-            for (actual, expected) in out.iter().zip(expected.iter()) {
-                assert_eq!(actual.entity, expected.entity);
-                assert_relative_eq!(actual.x.into_inner(), expected.x.into_inner());
-                assert_relative_eq!(actual.y.into_inner(), expected.y.into_inner());
-                assert_relative_eq!(actual.z.into_inner(), expected.z.into_inner());
-            }
-        });
-    }));
+    let mut env = Env::default();
+    for (entity, x, y, z) in blocks {
+        env.push_block(block(entity, x, y, z));
+    }
+    env.push_position(pos(1, 0.0, 0.0, 1.0));
+    env.push_velocity(vel(1, 0.0, 0.0, 0.0));
+    if let Some(t) = target_input {
+        env.push_target(t);
+    }
+    if let Some(f) = fear_input {
+        env.push_fear(f);
+    }
+    env.step();
+    let out = env.output();
+    assert_eq!(out.len(), expected_output.len());
+    for (actual, expected) in out.iter().zip(expected_output.iter()) {
+        assert_eq!(actual.entity, expected.entity);
+        assert_relative_eq!(actual.x.into_inner(), expected.x.into_inner());
+        assert_relative_eq!(actual.y.into_inner(), expected.y.into_inner());
+        assert_relative_eq!(actual.z.into_inner(), expected.z.into_inner());
+    }
 }
 
 #[test]
 fn handles_multiple_entities_with_mixed_states() {
-    rspec::run(&rspec::given(
-        "multiple entities with mixed fear and target states",
-        Env::default(),
-        |ctx| {
-            ctx.before_each(|env| {
-                env.push_block(block(1, -1, 0, 0));
-                env.push_block(block(2, 0, 0, 0));
-                env.push_block(block(3, 1, 1, 0));
+    let mut env = Env::default();
+    env.push_block(block(1, -1, 0, 0));
+    env.push_block(block(2, 0, 0, 0));
+    env.push_block(block(3, 1, 1, 0));
 
-                env.push_position(pos(1, 0.0, 0.0, 1.0));
-                env.push_velocity(vel(1, 0.0, 0.0, 0.0));
-                env.push_target(target(1, 1.0, 1.0));
-                env.push_fear(fear(1, 0.5));
+    env.push_position(pos(1, 0.0, 0.0, 1.0));
+    env.push_velocity(vel(1, 0.0, 0.0, 0.0));
+    env.push_target(target(1, 1.0, 1.0));
+    env.push_fear(fear(1, 0.5));
 
-                env.push_position(pos(2, 0.0, 0.0, 1.0));
-                env.push_velocity(vel(2, 0.0, 0.0, 0.0));
-                env.push_target(target(2, 1.0, 1.0));
+    env.push_position(pos(2, 0.0, 0.0, 1.0));
+    env.push_velocity(vel(2, 0.0, 0.0, 0.0));
+    env.push_target(target(2, 1.0, 1.0));
 
-                env.push_position(pos(3, 0.0, 0.0, 1.0));
-                env.push_velocity(vel(3, 0.0, 0.0, 0.0));
+    env.push_position(pos(3, 0.0, 0.0, 1.0));
+    env.push_velocity(vel(3, 0.0, 0.0, 0.0));
 
-                env.step();
-            });
-            ctx.then("each reacts independently", |env| {
-                let mut out = env.output();
-                out.sort_by_key(|p| p.entity);
-                assert_eq!(
-                    out,
-                    vec![
-                        NewPosition {
-                            entity: 1,
-                            x: (-0.7071067811865475).into(),
-                            y: (-0.7071067811865475).into(),
-                            z: 1.0.into(),
-                        },
-                        NewPosition {
-                            entity: 2,
-                            x: 0.7071067811865475.into(),
-                            y: 0.7071067811865475.into(),
-                            z: 1.0.into(),
-                        },
-                        NewPosition {
-                            entity: 3,
-                            x: 0.0.into(),
-                            y: 0.0.into(),
-                            z: 1.0.into(),
-                        },
-                    ],
-                );
-            });
-        },
-    ));
+    env.step();
+    let mut out = env.output();
+    out.sort_by_key(|p| p.entity);
+    assert_eq!(
+        out,
+        vec![
+            NewPosition {
+                entity: 1,
+                x: (-0.707_106_781_186_547_5).into(),
+                y: (-0.707_106_781_186_547_5).into(),
+                z: 1.0.into(),
+            },
+            NewPosition {
+                entity: 2,
+                x: 0.707_106_781_186_547_5.into(),
+                y: 0.707_106_781_186_547_5.into(),
+                z: 1.0.into(),
+            },
+            NewPosition {
+                entity: 3,
+                x: 0.0.into(),
+                y: 0.0.into(),
+                z: 1.0.into(),
+            },
+        ],
+    );
 }
