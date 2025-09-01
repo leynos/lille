@@ -41,12 +41,13 @@ impl Env {
     }
 
     fn output(&mut self) -> Vec<NewPosition> {
-        let vals: Vec<_> = self
+        let vals: Vec<NewPosition> = self
             .circuit
             .new_position_out()
             .consolidate()
             .iter()
-            .map(|(p, _, _)| p)
+            // Copy the `NewPosition` out of the tuple to return owned values.
+            .map(|t| t.0)
             .collect();
         self.circuit.clear_inputs();
         vals
@@ -150,27 +151,31 @@ fn handles_multiple_entities_with_mixed_states() {
     env.step();
     let mut out = env.output();
     out.sort_by_key(|p| p.entity);
-    assert_eq!(
-        out,
-        vec![
-            NewPosition {
-                entity: 1,
-                x: (-0.707_106_781_186_547_5).into(),
-                y: (-0.707_106_781_186_547_5).into(),
-                z: 1.0.into(),
-            },
-            NewPosition {
-                entity: 2,
-                x: 0.707_106_781_186_547_5.into(),
-                y: 0.707_106_781_186_547_5.into(),
-                z: 1.0.into(),
-            },
-            NewPosition {
-                entity: 3,
-                x: 0.0.into(),
-                y: 0.0.into(),
-                z: 1.0.into(),
-            },
-        ],
-    );
+    let expected = [
+        NewPosition {
+            entity: 1,
+            x: (-0.707_106_781_186_547_5).into(),
+            y: (-0.707_106_781_186_547_5).into(),
+            z: 1.0.into(),
+        },
+        NewPosition {
+            entity: 2,
+            x: 0.707_106_781_186_547_5.into(),
+            y: 0.707_106_781_186_547_5.into(),
+            z: 1.0.into(),
+        },
+        NewPosition {
+            entity: 3,
+            x: 0.0.into(),
+            y: 0.0.into(),
+            z: 1.0.into(),
+        },
+    ];
+    assert_eq!(out.len(), expected.len());
+    for (actual, exp) in out.iter().zip(expected.iter()) {
+        assert_eq!(actual.entity, exp.entity);
+        assert_relative_eq!(actual.x.into_inner(), exp.x.into_inner());
+        assert_relative_eq!(actual.y.into_inner(), exp.y.into_inner());
+        assert_relative_eq!(actual.z.into_inner(), exp.z.into_inner());
+    }
 }
