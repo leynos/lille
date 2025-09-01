@@ -367,13 +367,15 @@ struct PositionTarget {
 }
 
 fn decide_movement(level: OrderedFloat<f64>, pt: &PositionTarget) -> MovementDecision {
-    let mut raw_dx = (pt.tx.into_inner() - pt.px.into_inner()).signum();
-    let mut raw_dy = (pt.ty.into_inner() - pt.py.into_inner()).signum();
-
-    if level.into_inner() > FEAR_THRESHOLD {
-        raw_dx = -raw_dx;
-        raw_dy = -raw_dy;
-    }
+    let dir_x = (pt.tx.into_inner() - pt.px.into_inner()).signum();
+    let dir_y = (pt.ty.into_inner() - pt.py.into_inner()).signum();
+    let factor = if level.into_inner() > FEAR_THRESHOLD {
+        -1.0
+    } else {
+        1.0
+    };
+    let raw_dx = dir_x * factor;
+    let raw_dy = dir_y * factor;
 
     let magnitude = (raw_dx * raw_dx + raw_dy * raw_dy).sqrt();
     // Normalise to prevent diagonal movement being faster than axis-aligned movement.
