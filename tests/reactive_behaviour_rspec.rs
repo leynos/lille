@@ -152,30 +152,15 @@ fn handles_multiple_entities_with_mixed_states() {
     let mut out = env.output();
     out.sort_by_key(|p| p.entity);
     let expected = [
-        NewPosition {
-            entity: 1,
-            x: (-0.707_106_781_186_547_5).into(),
-            y: (-0.707_106_781_186_547_5).into(),
-            z: 1.0.into(),
-        },
-        NewPosition {
-            entity: 2,
-            x: 0.707_106_781_186_547_5.into(),
-            y: 0.707_106_781_186_547_5.into(),
-            z: 1.0.into(),
-        },
-        NewPosition {
-            entity: 3,
-            x: 0.0.into(),
-            y: 0.0.into(),
-            z: 1.0.into(),
-        },
+        (1, -0.707_106_781_186_547_5, -0.707_106_781_186_547_5, 1.0),
+        (2, 0.707_106_781_186_547_5, 0.707_106_781_186_547_5, 1.0),
+        (3, 0.0, 0.0, 1.0),
     ];
     assert_eq!(out.len(), expected.len());
-    for (actual, exp) in out.iter().zip(expected.iter()) {
-        assert_eq!(actual.entity, exp.entity);
-        assert_relative_eq!(actual.x.into_inner(), exp.x.into_inner());
-        assert_relative_eq!(actual.y.into_inner(), exp.y.into_inner());
-        assert_relative_eq!(actual.z.into_inner(), exp.z.into_inner());
+    for (p, (e, x, y, z)) in out.iter().zip(expected) {
+        assert_eq!(p.entity, e);
+        assert_relative_eq!(p.x.into_inner(), x);
+        assert_relative_eq!(p.y.into_inner(), y);
+        assert_relative_eq!(p.z.into_inner(), z);
     }
 }
