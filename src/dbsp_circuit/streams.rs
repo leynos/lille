@@ -323,8 +323,9 @@ pub(super) fn standing_motion_stream(
 
 /// Merges explicit fear inputs with entity positions, defaulting to zero.
 ///
-/// Each position yields a [`FearLevel`] record. Entities with explicit fear
-/// inputs retain their provided value while all others receive `0.0`.
+/// Each position yields a [`FearLevel`] record. Explicit fear levels flow
+/// through unchanged, while an antijoin identifies missing entities and
+/// assigns them a `0.0` level before the results are unioned back together.
 pub(super) fn fear_level_stream(
     positions: &Stream<RootCircuit, OrdZSet<Position>>,
     fears: &Stream<RootCircuit, OrdZSet<FearLevel>>,
