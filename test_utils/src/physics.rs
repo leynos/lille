@@ -68,6 +68,7 @@ pub fn vel(entity: i64, vx: f64, vy: f64, vz: f64) -> Velocity {
 /// assert_eq!(t.x.into_inner(), 1.0);
 /// assert_eq!(t.y.into_inner(), 2.0);
 /// ```
+#[inline]
 pub fn target(entity: i64, x: f64, y: f64) -> Target {
     Target {
         entity,

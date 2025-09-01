@@ -70,8 +70,8 @@ impl Default for Env {
     Some(target(1, 1.0, 1.0)),
     vec![NewPosition {
         entity: 1,
-        x: 0.707_106_781_186_547_5.into(),
-        y: 0.707_106_781_186_547_5.into(),
+        x: std::f64::consts::FRAC_1_SQRT_2.into(),
+        y: std::f64::consts::FRAC_1_SQRT_2.into(),
         z: 1.0.into(),
     }],
 )]
@@ -82,8 +82,8 @@ impl Default for Env {
     Some(target(1, 1.0, 1.0)),
     vec![NewPosition {
         entity: 1,
-        x: (-0.707_106_781_186_547_5).into(),
-        y: (-0.707_106_781_186_547_5).into(),
+        x: (-std::f64::consts::FRAC_1_SQRT_2).into(),
+        y: (-std::f64::consts::FRAC_1_SQRT_2).into(),
         z: 1.0.into(),
     }],
 )]
@@ -152,8 +152,18 @@ fn handles_multiple_entities_with_mixed_states() {
     let mut out = env.output();
     out.sort_by_key(|p| p.entity);
     let expected = [
-        (1, -0.707_106_781_186_547_5, -0.707_106_781_186_547_5, 1.0),
-        (2, 0.707_106_781_186_547_5, 0.707_106_781_186_547_5, 1.0),
+        (
+            1,
+            -std::f64::consts::FRAC_1_SQRT_2,
+            -std::f64::consts::FRAC_1_SQRT_2,
+            1.0,
+        ),
+        (
+            2,
+            std::f64::consts::FRAC_1_SQRT_2,
+            std::f64::consts::FRAC_1_SQRT_2,
+            1.0,
+        ),
         (3, 0.0, 0.0, 1.0),
     ];
     assert_eq!(out.len(), expected.len());
