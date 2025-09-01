@@ -13,6 +13,16 @@ use crate::FEAR_THRESHOLD;
 
 use crate::dbsp_circuit::{FearLevel, MovementDecision, Position, Target};
 
+trait StreamConcat {
+    fn concat(&self, other: &Self) -> Self;
+}
+
+impl StreamConcat for Stream<RootCircuit, OrdZSet<FearLevel>> {
+    fn concat(&self, other: &Self) -> Self {
+        self.plus(other)
+    }
+}
+
 /// Merges explicit fear inputs with entity positions, defaulting to zero.
 ///
 /// Each position yields a [`FearLevel`] record. Explicit fear levels flow
@@ -32,7 +42,7 @@ pub fn fear_level_stream(
             level: OrderedFloat(0.0),
         });
 
-    explicit.plus(&missing)
+    explicit.concat(&missing)
 }
 
 #[derive(
