@@ -448,25 +448,32 @@ pub(super) fn apply_movement(
     movement: &Stream<RootCircuit, OrdZSet<MovementDecision>>,
 ) -> Stream<RootCircuit, OrdZSet<Position>> {
     let base_idx = base.map_index(|p| (p.entity, *p));
-    let mv = movement
-        .map_index(|m| (m.entity, (m.dx, m.dy)))
-        .inspect(|batch| {
-            // Accumulate counts per entity to catch duplicates emitted within a
-            // single tick. Duplicates indicate a bug upstream; release builds
-            // log the issue while debug builds panic for visibility.
-            use std::collections::HashMap;
+    let mv_base = movement.map_index(|m| (m.entity, (m.dx, m.dy)));
 
-            let mut counts: HashMap<i64, i64> = HashMap::new();
-            for (entity, _mv, weight) in batch.iter() {
-                *counts.entry(entity).or_default() += weight;
+    #[cfg(debug_assertions)]
+    let mv = mv_base.inspect(|batch| {
+        // Accumulate counts per entity to catch duplicates emitted within a
+        // single tick. Duplicates indicate a bug upstream; release builds
+        // log the issue while debug builds panic for visibility.
+        use std::collections::HashMap;
+
+        let mut counts: HashMap<i64, i64> = HashMap::new();
+        for (entity, _mv, weight) in batch.iter() {
+            *counts.entry(entity).or_default() += weight;
+        }
+        for (entity, total) in counts {
+            debug_assert!(
+                total <= 1,
+                "duplicate movement decisions for entity {entity}"
+            );
+            if total > 1 {
+                warn!("duplicate movement decisions for entity {entity}");
             }
-            for (entity, total) in counts {
-                if total > 1 {
-                    debug_assert!(false, "duplicate movement decisions for entity {entity}");
-                    warn!("duplicate movement decisions for entity {entity}");
-                }
-            }
-        });
+        }
+    });
+
+    #[cfg(not(debug_assertions))]
+    let mv = mv_base;
 
     let moved = base_idx.join(&mv, |_, p, &(dx, dy)| Position {
         entity: p.entity,
