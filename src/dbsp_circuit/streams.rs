@@ -378,7 +378,7 @@ fn decide_movement(level: OrderedFloat<f64>, pt: &PositionTarget) -> MovementDec
     let raw_dx = dir_x * factor;
     let raw_dy = dir_y * factor;
 
-    let magnitude = (raw_dx * raw_dx + raw_dy * raw_dy).sqrt();
+    let magnitude = raw_dx.hypot(raw_dy);
     // Normalise to prevent diagonal movement being faster than axis-aligned movement.
     let (dx, dy) = if magnitude > 0.0 {
         (raw_dx / magnitude, raw_dy / magnitude)
@@ -462,11 +462,11 @@ pub(super) fn apply_movement(
             *counts.entry(entity).or_default() += weight;
         }
         for (entity, total) in counts {
-            debug_assert!(
-                total <= 1,
-                "duplicate movement decisions for entity {entity}"
-            );
             if total > 1 {
+                debug_assert!(
+                    total <= 1,
+                    "duplicate movement decisions for entity {entity}"
+                );
                 warn!("duplicate movement decisions for entity {entity}");
             }
         }
@@ -504,8 +504,12 @@ mod tests {
     }
 
     #[rstest]
-    #[case::approach(0.1, 0.7071067811865475, 0.7071067811865475)]
-    #[case::flee(0.3, -0.7071067811865475, -0.7071067811865475)]
+    #[case::approach(0.1, std::f64::consts::FRAC_1_SQRT_2, std::f64::consts::FRAC_1_SQRT_2)]
+    #[case::flee(
+        0.3,
+        -std::f64::consts::FRAC_1_SQRT_2,
+        -std::f64::consts::FRAC_1_SQRT_2
+    )]
     fn decide_movement_direction(
         #[case] fear: f64,
         #[case] expected_dx: f64,
@@ -517,9 +521,17 @@ mod tests {
     }
 
     #[rstest]
-    #[case::approach(Some(0.1), 0.7071067811865475, 0.7071067811865475)]
-    #[case::flee(Some(0.3), -0.7071067811865475, -0.7071067811865475)]
-    #[case::default(None, 0.7071067811865475, 0.7071067811865475)]
+    #[case::approach(
+        Some(0.1),
+        std::f64::consts::FRAC_1_SQRT_2,
+        std::f64::consts::FRAC_1_SQRT_2
+    )]
+    #[case::flee(
+        Some(0.3),
+        -std::f64::consts::FRAC_1_SQRT_2,
+        -std::f64::consts::FRAC_1_SQRT_2
+    )]
+    #[case::default(None, std::f64::consts::FRAC_1_SQRT_2, std::f64::consts::FRAC_1_SQRT_2)]
     fn movement_decision_join(
         #[case] fear: Option<f64>,
         #[case] expected_dx: f64,
