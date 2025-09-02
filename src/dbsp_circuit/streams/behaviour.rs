@@ -68,16 +68,17 @@ struct PositionTarget {
     ty: OrderedFloat<f64>,
 }
 
+#[inline]
 fn should_flee(level: OrderedFloat<f64>) -> bool {
     level.into_inner() > FEAR_THRESHOLD
 }
 
 fn decide_movement(level: OrderedFloat<f64>, pt: &PositionTarget) -> MovementDecision {
-    let dir_x = (pt.tx.into_inner() - pt.px.into_inner()).signum();
-    let dir_y = (pt.ty.into_inner() - pt.py.into_inner()).signum();
+    let dx_t = pt.tx.into_inner() - pt.px.into_inner();
+    let dy_t = pt.ty.into_inner() - pt.py.into_inner();
     let factor = if should_flee(level) { -1.0 } else { 1.0 };
-    let raw_dx = dir_x * factor;
-    let raw_dy = dir_y * factor;
+    let raw_dx = dx_t * factor;
+    let raw_dy = dy_t * factor;
 
     let magnitude = raw_dx.hypot(raw_dy);
     // Normalise to prevent diagonal movement being faster than axis-aligned movement.
@@ -134,11 +135,10 @@ pub fn apply_movement(
     let base_idx = base.map_index(|p| (p.entity, *p));
     let mv_base = movement.map_index(|m| (m.entity, (m.dx, m.dy)));
 
-    #[cfg(debug_assertions)]
     let mv = mv_base.inspect(|batch| {
         // Accumulate counts per entity to catch duplicates emitted within a
-        // single tick. Duplicates indicate a bug upstream; release builds
-        // log the issue while debug builds panic for visibility.
+        // single tick. Duplicates indicate a bug upstream; release builds log
+        // the issue while debug builds panic for visibility.
         use std::collections::HashMap;
 
         let mut counts: HashMap<i64, i64> = HashMap::new();
@@ -146,18 +146,15 @@ pub fn apply_movement(
             *counts.entry(entity).or_default() += weight;
         }
         for (entity, total) in counts {
+            if total > 1 {
+                warn!("duplicate movement decisions for entity {entity}");
+            }
             debug_assert!(
                 total <= 1,
                 "duplicate movement decisions for entity {entity}"
             );
-            if total > 1 {
-                warn!("duplicate movement decisions for entity {entity}");
-            }
         }
     });
-
-    #[cfg(not(debug_assertions))]
-    let mv = mv_base;
 
     let moved = base_idx.join(&mv, |_, p, &(dx, dy)| Position {
         entity: p.entity,
@@ -193,6 +190,11 @@ mod tests {
         0.3,
         -std::f64::consts::FRAC_1_SQRT_2,
         -std::f64::consts::FRAC_1_SQRT_2
+    )]
+    #[case::equals_threshold(
+        FEAR_THRESHOLD,
+        std::f64::consts::FRAC_1_SQRT_2,
+        std::f64::consts::FRAC_1_SQRT_2
     )]
     fn decide_movement_direction(
         #[case] fear: f64,
