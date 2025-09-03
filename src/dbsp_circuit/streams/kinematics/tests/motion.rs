@@ -1,11 +1,11 @@
 //! Tests for motion integration and ground interaction.
 
 use crate::components::Block;
+use crate::dbsp_circuit::streams::test_utils::{block, force, force_with_mass, new_circuit, vel};
 use crate::dbsp_circuit::{Force, NewPosition, NewVelocity, Position, Velocity};
 use crate::{apply_ground_friction, GRAVITY_PULL, TERMINAL_VELOCITY};
 use approx::assert_relative_eq;
 use rstest::rstest;
-use crate::dbsp_circuit::streams::test_utils::{block, force, force_with_mass, new_circuit, vel};
 
 #[rstest]
 #[case::standing_moves(
@@ -52,9 +52,9 @@ use crate::dbsp_circuit::streams::test_utils::{block, force, force_with_mass, ne
     Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 1.0.into() },
     vel(1, 0.0, 0.0, 0.0),
     vec![block(1, 0, 0, 0)],
-    Some(force(1, (crate::DEFAULT_MASS, 0.0, 0.0))),
-    Some(Position { entity: 1, x: apply_ground_friction(1.0).into(), y: 0.0.into(), z: 1.0.into() }),
-    Some(vel(1, apply_ground_friction(1.0), 0.0, 0.0)),
+    Some(force(1, (1.0, 0.0, 0.0))),
+    Some(Position { entity: 1, x: apply_ground_friction(1.0 / crate::DEFAULT_MASS).into(), y: 0.0.into(), z: 1.0.into() }),
+    Some(vel(1, apply_ground_friction(1.0 / crate::DEFAULT_MASS), 0.0, 0.0)),
 )]
 fn motion_cases(
     #[case] position: Position,

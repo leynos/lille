@@ -1,9 +1,9 @@
 //! Tests for floor streams aggregating block heights and slopes.
 
 use crate::components::{Block, BlockSlope};
+use crate::dbsp_circuit::streams::test_utils::{block, new_circuit, slope};
 use crate::dbsp_circuit::{FloorHeightAt, HighestBlockAt};
 use rstest::rstest;
-use crate::dbsp_circuit::streams::test_utils::{block, new_circuit, slope};
 
 fn hb(x: i32, y: i32, z: i32) -> HighestBlockAt {
     HighestBlockAt { x, y, z }
@@ -24,7 +24,7 @@ fn test_highest_block_aggregation() {
     circuit.step().expect("failed to step DBSP circuit");
 
     let output = circuit.highest_block_out().consolidate();
-    let mut vals: Vec<HighestBlockAt> = output.iter().map(|(hb, _, _)| hb).collect();
+    let mut vals: Vec<HighestBlockAt> = output.iter().map(|t| t.0).collect();
     vals.sort_by_key(|h| (h.x, h.y));
     assert_eq!(vals.len(), 2);
     assert!(vals.contains(&HighestBlockAt { x: 10, y: 20, z: 8 }));
@@ -47,7 +47,7 @@ fn highest_block_cases(#[case] blocks: Vec<Block>, #[case] expected: Vec<Highest
         .highest_block_out()
         .consolidate()
         .iter()
-        .map(|(hb, _, _)| hb)
+        .map(|t| t.0)
         .collect();
     vals.sort_by_key(|h| (h.x, h.y));
 
@@ -82,7 +82,7 @@ fn floor_height_cases(
         .floor_height_out()
         .consolidate()
         .iter()
-        .map(|(fh, _, _)| fh)
+        .map(|t| t.0)
         .collect();
     vals.sort_by_key(|h| (h.x, h.y));
     let mut exp = expected;
@@ -102,7 +102,7 @@ fn unmatched_slope_is_ignored() {
         .floor_height_out()
         .consolidate()
         .iter()
-        .map(|(fh, _, _)| fh)
+        .map(|t| t.0)
         .collect();
 
     assert_eq!(vals, vec![fh(0, 0, 1.0)]);
@@ -119,7 +119,7 @@ fn slope_without_block_yields_no_height() {
         .floor_height_out()
         .consolidate()
         .iter()
-        .map(|(fh, _, _)| fh)
+        .map(|t| t.0)
         .collect();
 
     assert!(vals.is_empty());
