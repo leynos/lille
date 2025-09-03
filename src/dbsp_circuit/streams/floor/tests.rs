@@ -1,30 +1,16 @@
+//! Tests for floor streams aggregating block heights and slopes.
+
 use crate::components::{Block, BlockSlope};
-use crate::dbsp_circuit::DbspCircuit;
 use crate::dbsp_circuit::{FloorHeightAt, HighestBlockAt};
 use rstest::rstest;
+use crate::dbsp_circuit::streams::test_utils::{block, new_circuit, slope};
 
 fn hb(x: i32, y: i32, z: i32) -> HighestBlockAt {
     HighestBlockAt { x, y, z }
 }
 
-fn slope(block_id: i64, gx: f64, gy: f64) -> BlockSlope {
-    BlockSlope {
-        block_id,
-        grad_x: gx.into(),
-        grad_y: gy.into(),
-    }
-}
-
 fn fh(x: i32, y: i32, z: f64) -> FloorHeightAt {
     FloorHeightAt { x, y, z: z.into() }
-}
-
-fn block(id: i64, x: i32, y: i32, z: i32) -> Block {
-    Block { id, x, y, z }
-}
-
-fn new_circuit() -> DbspCircuit {
-    DbspCircuit::new().expect("failed to build DBSP circuit")
 }
 
 #[test]
@@ -35,7 +21,7 @@ fn test_highest_block_aggregation() {
     circuit.block_in().push(block(1, 10, 20, 8), 1);
     circuit.block_in().push(block(2, 15, 25, 3), 1);
 
-    circuit.step().expect("Failed to step DBSP circuit");
+    circuit.step().expect("failed to step DBSP circuit");
 
     let output = circuit.highest_block_out().consolidate();
     let mut vals: Vec<HighestBlockAt> = output.iter().map(|(hb, _, _)| hb).collect();
@@ -55,7 +41,7 @@ fn highest_block_cases(#[case] blocks: Vec<Block>, #[case] expected: Vec<Highest
     for blk in blocks {
         circuit.block_in().push(blk, 1);
     }
-    circuit.step().expect("Failed to step DBSP circuit");
+    circuit.step().expect("failed to step DBSP circuit");
 
     let mut vals: Vec<HighestBlockAt> = circuit
         .highest_block_out()

@@ -1,144 +1,11 @@
-use crate::components::{Block, BlockSlope};
-use crate::dbsp_circuit::{
-    DbspCircuit, Force, NewPosition, NewVelocity, Position, PositionFloor, Velocity,
-};
+//! Tests for motion integration and ground interaction.
+
+use crate::components::Block;
+use crate::dbsp_circuit::{Force, NewPosition, NewVelocity, Position, Velocity};
 use crate::{apply_ground_friction, GRAVITY_PULL, TERMINAL_VELOCITY};
 use approx::assert_relative_eq;
 use rstest::rstest;
-
-fn slope(block_id: i64, gx: f64, gy: f64) -> BlockSlope {
-    BlockSlope {
-        block_id,
-        grad_x: gx.into(),
-        grad_y: gy.into(),
-    }
-}
-
-fn pf(position: Position, z_floor: f64) -> PositionFloor {
-    PositionFloor {
-        position,
-        z_floor: z_floor.into(),
-    }
-}
-
-fn block(id: i64, x: i32, y: i32, z: i32) -> Block {
-    Block { id, x, y, z }
-}
-
-fn pos(entity: i64, x: f64, y: f64, z: f64) -> Position {
-    Position {
-        entity,
-        x: x.into(),
-        y: y.into(),
-        z: z.into(),
-    }
-}
-
-fn vel(entity: i64, vx: f64, vy: f64, vz: f64) -> Velocity {
-    Velocity {
-        entity,
-        vx: vx.into(),
-        vy: vy.into(),
-        vz: vz.into(),
-    }
-}
-
-fn force(entity: i64, force: (f64, f64, f64)) -> Force {
-    Force {
-        entity,
-        fx: force.0.into(),
-        fy: force.1.into(),
-        fz: force.2.into(),
-        mass: None,
-    }
-}
-
-fn force_with_mass(entity: i64, force: (f64, f64, f64), mass: f64) -> Force {
-    Force {
-        entity,
-        fx: force.0.into(),
-        fy: force.1.into(),
-        fz: force.2.into(),
-        mass: Some(mass.into()),
-    }
-}
-
-fn new_circuit() -> DbspCircuit {
-    DbspCircuit::new().expect("failed to build DBSP circuit")
-}
-
-#[rstest]
-#[case(
-    vec![block(1,0,0,0)],
-    vec![],
-    vec![pos(1,0.2,0.3,2.0)],
-    vec![pf(pos(1,0.2,0.3,2.0),1.0)],
-)]
-#[case(
-    vec![],
-    vec![],
-    vec![pos(1,0.0,0.0,0.5)],
-    vec![],
-)]
-#[case(
-    vec![block(1,-1,-1,0)],
-    vec![slope(1,1.0,0.0)],
-    vec![pos(2,-0.8,-0.2,3.0)],
-    vec![pf(pos(2,-0.8,-0.2,3.0),1.5)],
-)]
-fn position_floor_cases(
-    #[case] blocks: Vec<Block>,
-    #[case] slopes: Vec<BlockSlope>,
-    #[case] positions: Vec<Position>,
-    #[case] expected: Vec<PositionFloor>,
-) {
-    let mut circuit = new_circuit();
-    for b in &blocks {
-        circuit.block_in().push(b.clone(), 1);
-    }
-    for s in &slopes {
-        circuit.block_slope_in().push(s.clone(), 1);
-    }
-    for p in &positions {
-        circuit.position_in().push(*p, 1);
-    }
-    circuit.step().expect("step");
-    let mut vals: Vec<PositionFloor> = circuit
-        .position_floor_out()
-        .consolidate()
-        .iter()
-        .map(|(pf, _, _)| pf.clone())
-        .collect();
-    vals.sort_by_key(|pf| pf.position.entity);
-    let mut exp = expected;
-    exp.sort_by_key(|pf| pf.position.entity);
-    assert_eq!(vals, exp);
-}
-
-#[test]
-fn multiple_positions_same_grid_cell() {
-    let mut circuit = new_circuit();
-    circuit.block_in().push(block(1, 0, 0, 0), 1);
-    circuit.position_in().push(pos(1, 0.1, 0.1, 2.0), 1);
-    circuit.position_in().push(pos(2, 0.8, 0.4, 3.0), 1);
-    circuit.step().expect("step");
-
-    let mut vals: Vec<PositionFloor> = circuit
-        .position_floor_out()
-        .consolidate()
-        .iter()
-        .map(|(pf, _, _)| pf.clone())
-        .collect();
-    vals.sort_by_key(|pf| pf.position.entity);
-
-    let mut exp = vec![
-        pf(pos(1, 0.1, 0.1, 2.0), 1.0),
-        pf(pos(2, 0.8, 0.4, 3.0), 1.0),
-    ];
-    exp.sort_by_key(|pf| pf.position.entity);
-
-    assert_eq!(vals, exp);
-}
+use crate::dbsp_circuit::streams::test_utils::{block, force, force_with_mass, new_circuit, vel};
 
 #[rstest]
 #[case::standing_moves(
@@ -208,7 +75,7 @@ fn motion_cases(
         circuit.force_in().push(f, 1);
     }
 
-    circuit.step().expect("circuit step failed");
+    circuit.step().expect("step failed");
 
     let pos_out: Vec<NewPosition> = circuit
         .new_position_out()
@@ -265,7 +132,7 @@ fn standing_friction(#[case] vx: f64) {
     );
     circuit.velocity_in().push(vel(1, vx, 0.0, 0.0), 1);
 
-    circuit.step().expect("circuit step failed");
+    circuit.step().expect("step failed");
 
     let pos_out: Vec<NewPosition> = circuit
         .new_position_out()
@@ -306,7 +173,7 @@ fn airborne_preserves_velocity() {
     );
     circuit.velocity_in().push(vel(1, 1.0, 0.0, 0.0), 1);
 
-    circuit.step().expect("circuit step failed");
+    circuit.step().expect("step failed");
 
     let vel_out: Vec<NewVelocity> = circuit
         .new_velocity_out()
@@ -342,7 +209,7 @@ fn terminal_velocity_clamping(#[case] start_vz: f64, #[case] expected_vz: f64) {
     );
     circuit.velocity_in().push(vel(1, 0.0, 0.0, start_vz), 1);
 
-    circuit.step().expect("circuit step failed");
+    circuit.step().expect("step failed");
 
     let pos_out: Vec<NewPosition> = circuit
         .new_position_out()

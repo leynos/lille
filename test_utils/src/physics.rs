@@ -1,6 +1,6 @@
 //! Convenience constructors for physics-related records used in tests.
 
-use lille::components::Block;
+use lille::components::{Block, BlockSlope};
 use lille::dbsp_circuit::{DbspCircuit, FearLevel, Force, Position, Target, Velocity};
 
 /// Create a new [`DbspCircuit`] for tests.
@@ -129,6 +129,24 @@ pub fn force(entity: i64, force: (f64, f64, f64)) -> Force {
 /// ```
 pub fn force_with_mass(entity: i64, force: (f64, f64, f64), mass: f64) -> Force {
     force_inner(entity, force, Some(mass))
+}
+
+/// Convenience constructor for [`BlockSlope`] records used in tests.
+///
+/// # Examples
+/// ```rust
+/// use test_utils::physics::slope;
+/// let s = slope(1, 1.0, 0.5);
+/// assert_eq!(s.block_id, 1);
+/// assert_eq!(s.grad_x.into_inner(), 1.0);
+/// assert_eq!(s.grad_y.into_inner(), 0.5);
+/// ```
+pub fn slope(block_id: i64, gx: f64, gy: f64) -> BlockSlope {
+    BlockSlope {
+        block_id,
+        grad_x: gx.into(),
+        grad_y: gy.into(),
+    }
 }
 
 /// Convenience constructor for [`Block`] records used in tests.
