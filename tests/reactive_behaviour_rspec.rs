@@ -40,14 +40,13 @@ impl Env {
         self.circuit.step().expect("dbsp step");
     }
 
-    fn output(&mut self) -> Vec<NewPosition> {
+    fn drain_output(&mut self) -> Vec<NewPosition> {
         let vals: Vec<NewPosition> = self
             .circuit
             .new_position_out()
             .consolidate()
             .iter()
-            // Copy the `NewPosition` out of the tuple to return owned values.
-            .map(|t| t.0)
+            .map(|(p, _w, _ts)| p)
             .collect();
         self.circuit.clear_inputs();
         vals
@@ -119,7 +118,7 @@ fn reactive_movement_behaviour(
         env.push_fear(f);
     }
     env.step();
-    let out = env.output();
+    let out = env.drain_output();
     assert_eq!(out.len(), expected_output.len());
     for (actual, expected) in out.iter().zip(expected_output.iter()) {
         assert_eq!(actual.entity, expected.entity);
@@ -149,7 +148,7 @@ fn handles_multiple_entities_with_mixed_states() {
     env.push_velocity(vel(3, 0.0, 0.0, 0.0));
 
     env.step();
-    let mut out = env.output();
+    let mut out = env.drain_output();
     out.sort_by_key(|p| p.entity);
     let expected = [
         (

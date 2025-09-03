@@ -86,6 +86,7 @@ pub fn target(entity: i64, x: f64, y: f64) -> Target {
 /// assert_eq!(f.entity, 1);
 /// assert_eq!(f.level.into_inner(), 0.5);
 /// ```
+#[inline]
 pub fn fear(entity: i64, level: f64) -> FearLevel {
     FearLevel {
         entity,
