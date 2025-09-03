@@ -236,7 +236,12 @@ declarative dataflow model.
 - **Seeking and Fleeing**: AI motivations like seeking a target or fleeing a
   source of fear are implemented as `join` operations. Joining the `Standing`
   entities with `Target` and `Fear` streams produces a movement vector for each
-  entity.
+  entity. `Fear` records are optional—entities without an explicit entry
+  default to a level of `0.0`. A simple priority system ensures that when fear
+  exceeds `FEAR_THRESHOLD`, the resulting vector is inverted so the agent flees
+  rather than approaches the target. The DBSP circuit emits these vectors as
+  authoritative `MovementDecision` records which are applied downstream to
+  update positions.
 
 - **State-driven Decisions**: More complex logic can be built by composing
   operators. For example, to make an agent flee when its health is low, we

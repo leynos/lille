@@ -1,9 +1,11 @@
 //! DBSP-based world inference engine.
 //!
 //! This module defines [`DbspCircuit`], the authoritative dataflow program for
-//! Lille's game world. Callers feed [`Position`] and [`Block`] records into the
-//! circuit, call [`DbspCircuit::step`], then read [`NewPosition`] and
-//! [`HighestBlockAt`] outputs. Input collections persist across steps—invoke
+//! Lille's game world. Callers feed [`Position`], [`Velocity`], [`Force`],
+//! [`Target`], [`FearLevel`], and [`Block`] records into the circuit. Each tick
+//! [`DbspCircuit::step`] derives movement decisions that yield updated
+//! [`NewPosition`] and [`NewVelocity`] outputs alongside terrain queries like
+//! [`HighestBlockAt`]. Input collections persist across steps—invoke
 //! [`DbspCircuit::clear_inputs`] after each frame to prevent stale data from
 //! affecting subsequent computations.
 //!
@@ -51,6 +53,8 @@ pub use types::{
 /// // circuit.position_in().push(Position { /* ... */ }, 1);
 /// // circuit.velocity_in().push(Velocity { /* ... */ }, 1);
 /// // circuit.force_in().push(Force { /* ... */ }, 1);
+/// // circuit.fear_in().push(FearLevel { /* ... */ }, 1);
+/// // circuit.target_in().push(Target { /* ... */ }, 1);
 /// // circuit.block_in().push(Block { /* ... */ }, 1);
 /// // circuit.block_slope_in().push(BlockSlope { /* ... */ }, 1);
 ///
@@ -68,6 +72,7 @@ pub struct DbspCircuit {
     position_in: ZSetHandle<Position>,
     velocity_in: ZSetHandle<Velocity>,
     force_in: ZSetHandle<Force>,
+    fear_in: ZSetHandle<FearLevel>,
     target_in: ZSetHandle<Target>,
     block_in: ZSetHandle<Block>,
     block_slope_in: ZSetHandle<BlockSlope>,
@@ -82,6 +87,7 @@ struct BuildHandles {
     position_in: ZSetHandle<Position>,
     velocity_in: ZSetHandle<Velocity>,
     force_in: ZSetHandle<Force>,
+    fear_in: ZSetHandle<FearLevel>,
     target_in: ZSetHandle<Target>,
     block_in: ZSetHandle<Block>,
     block_slope_in: ZSetHandle<BlockSlope>,
@@ -118,6 +124,7 @@ impl DbspCircuit {
             position_in: handles.position_in,
             velocity_in: handles.velocity_in,
             force_in: handles.force_in,
+            fear_in: handles.fear_in,
             target_in: handles.target_in,
             block_in: handles.block_in,
             block_slope_in: handles.block_slope_in,
@@ -157,6 +164,7 @@ impl DbspCircuit {
         let (positions, position_in) = circuit.add_input_zset::<Position>();
         let (velocities, velocity_in) = circuit.add_input_zset::<Velocity>();
         let (forces, force_in) = circuit.add_input_zset::<Force>();
+        let (fears, fear_in) = circuit.add_input_zset::<FearLevel>();
         let (targets, target_in) = circuit.add_input_zset::<Target>();
         let (blocks, block_in) = circuit.add_input_zset::<Block>();
         let (slopes, block_slope_in) = circuit.add_input_zset::<BlockSlope>();
@@ -188,7 +196,7 @@ impl DbspCircuit {
         let base_pos = new_pos_unsupported.plus(&new_pos_standing);
         let new_vel = unsupported_velocities.plus(&new_vel_standing);
 
-        let fear = fear_level_stream(&positions);
+        let fear = fear_level_stream(&positions, &fears);
         let decisions = movement_decision_stream(&fear, &targets, &positions);
 
         let moved_pos = apply_movement(&base_pos, &decisions);
@@ -197,6 +205,7 @@ impl DbspCircuit {
             position_in,
             velocity_in,
             force_in,
+            fear_in,
             target_in,
             block_in,
             block_slope_in,
@@ -273,6 +282,24 @@ impl DbspCircuit {
     /// ```
     pub fn force_in(&self) -> &ZSetHandle<Force> {
         &self.force_in
+    }
+
+    /// Returns a reference to the input handle for entity fear levels.
+    ///
+    /// Supply `FearLevel` records to influence movement decisions. Omitted
+    /// entities default to a fear level of `0.0`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # use ordered_float::OrderedFloat;
+    /// # use lille::dbsp_circuit::{DbspCircuit, FearLevel};
+    /// let circuit = DbspCircuit::new().expect("circuit construction failed");
+    /// let handle = circuit.fear_in();
+    /// handle.push(FearLevel { entity: 1, level: OrderedFloat(0.5) }, 1);
+    /// ```
+    pub fn fear_in(&self) -> &ZSetHandle<FearLevel> {
+        &self.fear_in
     }
 
     /// Returns a reference to the input handle for entity targets.
@@ -431,6 +458,7 @@ impl DbspCircuit {
         self.position_in.clear_input();
         self.velocity_in.clear_input();
         self.force_in.clear_input();
+        self.fear_in.clear_input();
         self.target_in.clear_input();
         self.block_in.clear_input();
         self.block_slope_in.clear_input();

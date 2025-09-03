@@ -1,3 +1,4 @@
+use approx::assert_relative_eq;
 use bevy::prelude::*;
 use lille::{components::Block, DbspPlugin, DdlogId, VelocityComp, GRAVITY_PULL};
 
@@ -28,8 +29,8 @@ fn ecs_dbsp_round_trip_applies_gravity() {
     app.update();
 
     let transform = app.world.get::<Transform>(entity).unwrap();
-    assert!((transform.translation.z - (2.0 + GRAVITY_PULL as f32)).abs() < f32::EPSILON);
+    assert_relative_eq!(transform.translation.z, 2.0 + GRAVITY_PULL as f32);
 
     let vel = app.world.get::<VelocityComp>(entity).unwrap();
-    assert!((vel.vz - GRAVITY_PULL as f32).abs() < f32::EPSILON);
+    assert_relative_eq!(vel.vz, GRAVITY_PULL as f32);
 }

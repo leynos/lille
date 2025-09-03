@@ -160,12 +160,12 @@ physical properties and agent behaviours.
 
 2. **Reactive Agent Behaviours**:
 
-   - [ ] Add `Target` and `Fear` as input streams.
+   - [x] Add `Target` and `Fear` as input streams.
 
-   - [ ] Implement `join` operations to generate movement vectors based on these
+   - [x] Implement `join` operations to generate movement vectors based on these
      inputs (e.g., move towards target, move away from fear source).
 
-   - [ ] Implement a simple priority system (e.g., fear overrides targeting).
+   - [x] Implement a simple priority system (e.g., fear overrides targeting).
 
 3. **Health and Damage**:
 

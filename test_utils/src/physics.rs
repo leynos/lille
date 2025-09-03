@@ -1,7 +1,7 @@
 //! Convenience constructors for physics-related records used in tests.
 
 use lille::components::Block;
-use lille::dbsp_circuit::{DbspCircuit, Force, Position, Velocity};
+use lille::dbsp_circuit::{DbspCircuit, FearLevel, Force, Position, Target, Velocity};
 
 /// Create a new [`DbspCircuit`] for tests.
 ///
@@ -9,7 +9,7 @@ use lille::dbsp_circuit::{DbspCircuit, Force, Position, Velocity};
 /// Panics if the circuit cannot be constructed.
 ///
 /// # Examples
-/// ```no_run
+/// ```rust,no_run
 /// use test_utils::physics::new_circuit;
 /// let circuit = new_circuit();
 /// drop(circuit);
@@ -21,7 +21,7 @@ pub fn new_circuit() -> DbspCircuit {
 /// Convenience constructor for [`Position`] records used in tests.
 ///
 /// # Examples
-/// ```
+/// ```rust
 /// use test_utils::physics::pos;
 /// let p = pos(1, 0.0, 1.0, 2.0);
 /// assert_eq!(p.entity, 1);
@@ -41,7 +41,7 @@ pub fn pos(entity: i64, x: f64, y: f64, z: f64) -> Position {
 /// Convenience constructor for [`Velocity`] records used in tests.
 ///
 /// # Examples
-/// ```
+/// ```rust
 /// use test_utils::physics::vel;
 /// let v = vel(1, 0.5, -0.5, 1.0);
 /// assert_eq!(v.entity, 1);
@@ -58,10 +58,46 @@ pub fn vel(entity: i64, vx: f64, vy: f64, vz: f64) -> Velocity {
     }
 }
 
+/// Convenience constructor for [`Target`] records used in tests.
+///
+/// # Examples
+/// ```rust
+/// use test_utils::physics::target;
+/// let t = target(1, 1.0, 2.0);
+/// assert_eq!(t.entity, 1);
+/// assert_eq!(t.x.into_inner(), 1.0);
+/// assert_eq!(t.y.into_inner(), 2.0);
+/// ```
+#[inline]
+pub fn target(entity: i64, x: f64, y: f64) -> Target {
+    Target {
+        entity,
+        x: x.into(),
+        y: y.into(),
+    }
+}
+
+/// Convenience constructor for [`FearLevel`] records used in tests.
+///
+/// # Examples
+/// ```rust
+/// use test_utils::physics::fear;
+/// let f = fear(1, 0.5);
+/// assert_eq!(f.entity, 1);
+/// assert_eq!(f.level.into_inner(), 0.5);
+/// ```
+#[inline]
+pub fn fear(entity: i64, level: f64) -> FearLevel {
+    FearLevel {
+        entity,
+        level: level.into(),
+    }
+}
+
 /// Convenience constructor for [`Force`] records without mass used in tests.
 ///
 /// # Examples
-/// ```
+/// ```rust
 /// use test_utils::physics::force;
 /// let f = force(1, (10.0, 0.0, 0.0));
 /// assert_eq!(f.entity, 1);
@@ -85,7 +121,7 @@ pub fn force(entity: i64, force: (f64, f64, f64)) -> Force {
 /// tests.
 ///
 /// # Examples
-/// ```
+/// ```rust
 /// use test_utils::physics::force_with_mass;
 /// let f = force_with_mass(1, (10.0, 0.0, 0.0), 5.0);
 /// assert_eq!(f.entity, 1);
@@ -98,7 +134,7 @@ pub fn force_with_mass(entity: i64, force: (f64, f64, f64), mass: f64) -> Force 
 /// Convenience constructor for [`Block`] records used in tests.
 ///
 /// # Examples
-/// ```
+/// ```rust
 /// use test_utils::physics::block;
 /// let b = block(1, 0, 0, 0);
 /// assert_eq!(b.id, 1);
