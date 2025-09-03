@@ -203,3 +203,6 @@ pub fn standing_motion_stream(
     let new_vel = with_floor.map(|(_, v)| *v);
     (new_pos, new_vel)
 }
+
+#[cfg(test)]
+mod tests;

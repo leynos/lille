@@ -86,3 +86,6 @@ pub fn floor_height_stream(
         // unmatched slope records.
         .flat_map(|fh| (*fh).into_iter())
 }
+
+#[cfg(test)]
+mod tests;
