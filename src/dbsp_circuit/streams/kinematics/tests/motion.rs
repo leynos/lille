@@ -1,7 +1,10 @@
 //! Tests for motion integration and ground interaction.
 
 use crate::components::Block;
-use crate::dbsp_circuit::streams::test_utils::{block, force, force_with_mass, new_circuit, vel};
+use crate::dbsp_circuit::streams::test_utils::{
+    block, force, force_with_mass, new_circuit, vel, BlockCoords, BlockId, Coords3D, EntityId,
+    ForceVector, Mass,
+};
 use crate::dbsp_circuit::{Force, NewPosition, NewVelocity, Position, Velocity};
 use crate::{apply_ground_friction, GRAVITY_PULL, TERMINAL_VELOCITY};
 use approx::assert_relative_eq;
@@ -10,51 +13,51 @@ use rstest::rstest;
 #[rstest]
 #[case::standing_moves(
     Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 1.0.into() },
-    vel(1, 1.0, 0.0, 0.0),
-    vec![block(1, 0, 0, 0), block(2, 1, 0, 1)],
+    vel(EntityId::new(1), Coords3D::new(1.0, 0.0, 0.0)),
+    vec![block(BlockId::new(1), BlockCoords::new(0, 0, 0)), block(BlockId::new(2), BlockCoords::new(1, 0, 1))],
     None,
     Some(Position { entity: 1, x: apply_ground_friction(1.0).into(), y: 0.0.into(), z: 1.0.into() }),
-    Some(vel(1, apply_ground_friction(1.0), 0.0, 0.0)),
+    Some(vel(EntityId::new(1), Coords3D::new(apply_ground_friction(1.0), 0.0, 0.0))),
 )]
 #[case::unsupported_falls(
     Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 2.1.into() },
-    vel(1, 0.0, 0.0, 0.0),
-    vec![block(1, 0, 0, 0)],
+    vel(EntityId::new(1), Coords3D::new(0.0, 0.0, 0.0)),
+    vec![block(BlockId::new(1), BlockCoords::new(0, 0, 0))],
     None,
     Some(Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 1.1.into() }),
-    Some(vel(1, 0.0, 0.0, GRAVITY_PULL)),
+    Some(vel(EntityId::new(1), Coords3D::new(0.0, 0.0, GRAVITY_PULL))),
 )]
 #[case::boundary_snaps_to_floor(
     Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 1.1.into() },
-    vel(1, 0.0, 0.0, 0.0),
-    vec![block(1, 0, 0, 0)],
+    vel(EntityId::new(1), Coords3D::new(0.0, 0.0, 0.0)),
+    vec![block(BlockId::new(1), BlockCoords::new(0, 0, 0))],
     None,
     Some(Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 1.0.into() }),
-    Some(vel(1, 0.0, 0.0, 0.0)),
+    Some(vel(EntityId::new(1), Coords3D::new(0.0, 0.0, 0.0))),
 )]
 #[case::force_accelerates(
     Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 1.0.into() },
-    vel(1, 0.0, 0.0, 0.0),
-    vec![block(1, 0, 0, 0), block(2, 1, 0, 1)],
-    Some(force_with_mass(1, (5.0, 0.0, 0.0), 5.0)),
+    vel(EntityId::new(1), Coords3D::new(0.0, 0.0, 0.0)),
+    vec![block(BlockId::new(1), BlockCoords::new(0, 0, 0)), block(BlockId::new(2), BlockCoords::new(1, 0, 1))],
+    Some(force_with_mass(EntityId::new(1), ForceVector::new(5.0, 0.0, 0.0), Mass::new(5.0))),
     Some(Position { entity: 1, x: apply_ground_friction(1.0).into(), y: 0.0.into(), z: 1.0.into() }),
-    Some(vel(1, apply_ground_friction(1.0), 0.0, 0.0)),
+    Some(vel(EntityId::new(1), Coords3D::new(apply_ground_friction(1.0), 0.0, 0.0))),
 )]
 #[case::invalid_mass_ignores_force(
     Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 2.1.into() },
-    vel(1, 0.0, 0.0, 0.0),
-    vec![block(1, 0, 0, 0)],
-    Some(force_with_mass(1, (0.0, 0.0, 10.0), 0.0)),
+    vel(EntityId::new(1), Coords3D::new(0.0, 0.0, 0.0)),
+    vec![block(BlockId::new(1), BlockCoords::new(0, 0, 0))],
+    Some(force_with_mass(EntityId::new(1), ForceVector::new(0.0, 0.0, 10.0), Mass::new(0.0))),
     Some(Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 1.1.into() }),
-    Some(vel(1, 0.0, 0.0, GRAVITY_PULL)),
+    Some(vel(EntityId::new(1), Coords3D::new(0.0, 0.0, GRAVITY_PULL))),
 )]
 #[case::force_with_default_mass(
     Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 1.0.into() },
-    vel(1, 0.0, 0.0, 0.0),
-    vec![block(1, 0, 0, 0)],
-    Some(force(1, (1.0, 0.0, 0.0))),
+    vel(EntityId::new(1), Coords3D::new(0.0, 0.0, 0.0)),
+    vec![block(BlockId::new(1), BlockCoords::new(0, 0, 0))],
+    Some(force(EntityId::new(1), ForceVector::new(1.0, 0.0, 0.0))),
     Some(Position { entity: 1, x: apply_ground_friction(1.0 / crate::DEFAULT_MASS).into(), y: 0.0.into(), z: 1.0.into() }),
-    Some(vel(1, apply_ground_friction(1.0 / crate::DEFAULT_MASS), 0.0, 0.0)),
+    Some(vel(EntityId::new(1), Coords3D::new(apply_ground_friction(1.0 / crate::DEFAULT_MASS), 0.0, 0.0))),
 )]
 fn motion_cases(
     #[case] position: Position,
@@ -119,8 +122,12 @@ fn motion_cases(
 fn standing_friction(#[case] vx: f64) {
     let mut circuit = new_circuit();
 
-    circuit.block_in().push(block(1, 0, 0, 0), 1);
-    circuit.block_in().push(block(2, -1, 0, 0), 1);
+    circuit
+        .block_in()
+        .push(block(BlockId::new(1), BlockCoords::new(0, 0, 0)), 1);
+    circuit
+        .block_in()
+        .push(block(BlockId::new(2), BlockCoords::new(-1, 0, 0)), 1);
     circuit.position_in().push(
         Position {
             entity: 1,
@@ -130,7 +137,9 @@ fn standing_friction(#[case] vx: f64) {
         },
         1,
     );
-    circuit.velocity_in().push(vel(1, vx, 0.0, 0.0), 1);
+    circuit
+        .velocity_in()
+        .push(vel(EntityId::new(1), Coords3D::new(vx, 0.0, 0.0)), 1);
 
     circuit.step().expect("step failed");
 
@@ -161,7 +170,9 @@ fn standing_friction(#[case] vx: f64) {
 fn airborne_preserves_velocity() {
     let mut circuit = new_circuit();
 
-    circuit.block_in().push(block(1, 0, 0, 0), 1);
+    circuit
+        .block_in()
+        .push(block(BlockId::new(1), BlockCoords::new(0, 0, 0)), 1);
     circuit.position_in().push(
         Position {
             entity: 1,
@@ -171,7 +182,9 @@ fn airborne_preserves_velocity() {
         },
         1,
     );
-    circuit.velocity_in().push(vel(1, 1.0, 0.0, 0.0), 1);
+    circuit
+        .velocity_in()
+        .push(vel(EntityId::new(1), Coords3D::new(1.0, 0.0, 0.0)), 1);
 
     circuit.step().expect("step failed");
 
@@ -197,7 +210,9 @@ fn airborne_preserves_velocity() {
 fn terminal_velocity_clamping(#[case] start_vz: f64, #[case] expected_vz: f64) {
     let mut circuit = new_circuit();
 
-    circuit.block_in().push(block(1, 0, 0, -10), 1);
+    circuit
+        .block_in()
+        .push(block(BlockId::new(1), BlockCoords::new(0, 0, -10)), 1);
     circuit.position_in().push(
         Position {
             entity: 1,
@@ -207,7 +222,9 @@ fn terminal_velocity_clamping(#[case] start_vz: f64, #[case] expected_vz: f64) {
         },
         1,
     );
-    circuit.velocity_in().push(vel(1, 0.0, 0.0, start_vz), 1);
+    circuit
+        .velocity_in()
+        .push(vel(EntityId::new(1), Coords3D::new(0.0, 0.0, start_vz)), 1);
 
     circuit.step().expect("step failed");
 

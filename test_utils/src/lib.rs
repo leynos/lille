@@ -3,7 +3,10 @@
 //! common physics records.
 
 pub mod physics;
-pub use physics::{block, fear, force, force_with_mass, new_circuit, pos, slope, target, vel};
+pub use physics::{
+    block, fear, force, force_with_mass, new_circuit, pos, slope, target, vel, BlockCoords,
+    BlockId, Coords2D, Coords3D, EntityId, FearValue, ForceVector, Gradient, Mass,
+};
 
 /// Assert that all strings in `keys` are present in `code`.
 ///
