@@ -56,4 +56,3 @@ pub fn force_with_mass(entity: i64, force: (f64, f64, f64), mass: f64) -> Force 
         mass: Some(mass.into()),
     }
 }
-
