@@ -34,7 +34,9 @@ fn test_highest_block_aggregation() {
     let output = circuit.highest_block_out().consolidate();
     let mut vals: Vec<HighestBlockAt> = output.iter().map(|(hb, _, _)| hb).collect();
     vals.sort_by_key(|h| (h.x, h.y));
-    assert!(vals.windows(2).all(|w| w[0].x != w[1].x || w[0].y != w[1].y));
+    assert!(vals
+        .windows(2)
+        .all(|w| w[0].x != w[1].x || w[0].y != w[1].y));
     assert_eq!(vals.len(), 2);
     assert!(vals.contains(&HighestBlockAt { x: 10, y: 20, z: 8 }));
     assert!(vals.contains(&HighestBlockAt { x: 15, y: 25, z: 3 }));

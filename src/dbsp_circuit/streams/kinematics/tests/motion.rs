@@ -78,7 +78,7 @@ fn motion_cases(
         circuit.force_in().push(f, 1);
     }
 
-    circuit.step().expect("step failed");
+    circuit.step().expect("circuit step failed: motion_cases");
 
     let pos_out: Vec<NewPosition> = circuit
         .new_position_out()
@@ -141,7 +141,9 @@ fn standing_friction(#[case] vx: f64) {
         .velocity_in()
         .push(vel(EntityId::new(1), Coords3D::new(vx, 0.0, 0.0)), 1);
 
-    circuit.step().expect("step failed");
+    circuit
+        .step()
+        .expect("circuit step failed: standing_friction");
 
     let pos_out: Vec<NewPosition> = circuit
         .new_position_out()
@@ -186,7 +188,9 @@ fn airborne_preserves_velocity() {
         .velocity_in()
         .push(vel(EntityId::new(1), Coords3D::new(1.0, 0.0, 0.0)), 1);
 
-    circuit.step().expect("step failed");
+    circuit
+        .step()
+        .expect("circuit step failed: airborne_preserves_velocity");
 
     let vel_out: Vec<NewVelocity> = circuit
         .new_velocity_out()
@@ -226,7 +230,9 @@ fn terminal_velocity_clamping(#[case] start_vz: f64, #[case] expected_vz: f64) {
         .velocity_in()
         .push(vel(EntityId::new(1), Coords3D::new(0.0, 0.0, start_vz)), 1);
 
-    circuit.step().expect("step failed");
+    circuit
+        .step()
+        .expect("circuit step failed: terminal_velocity_clamping");
 
     let pos_out: Vec<NewPosition> = circuit
         .new_position_out()
