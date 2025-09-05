@@ -67,6 +67,10 @@ fn motion_cases(
     #[case] expected_pos: Option<NewPosition>,
     #[case] expected_vel: Option<NewVelocity>,
 ) {
+    #[allow(clippy::assertions_on_constants)]
+    {
+        debug_assert!(crate::DEFAULT_MASS > 0.0);
+    }
     let mut circuit = new_circuit();
 
     for b in blocks {

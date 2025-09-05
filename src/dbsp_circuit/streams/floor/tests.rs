@@ -11,8 +11,12 @@ fn hb(x: i32, y: i32, z: i32) -> HighestBlockAt {
     HighestBlockAt { x, y, z }
 }
 
-fn fh(x: i32, y: i32, z: f64) -> FloorHeightAt {
-    FloorHeightAt { x, y, z: z.into() }
+fn fh(x: i32, y: i32, height: f64) -> FloorHeightAt {
+    FloorHeightAt {
+        x,
+        y,
+        z: height.into(),
+    }
 }
 
 #[test]
@@ -33,8 +37,7 @@ fn test_highest_block_aggregation() {
 
     let output = circuit.highest_block_out().consolidate();
     #[allow(clippy::clone_on_copy)]
-    let mut vals: Vec<HighestBlockAt> =
-        output.iter().map(|(hb, _, _)| hb.clone()).collect();
+    let mut vals: Vec<HighestBlockAt> = output.iter().map(|(hb, _, _)| hb.clone()).collect();
     vals.sort_by_key(|h| (h.x, h.y));
     assert!(vals
         .windows(2)
