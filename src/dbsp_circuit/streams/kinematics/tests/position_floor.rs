@@ -46,10 +46,10 @@ fn position_floor_cases(
     for s in &slopes {
         circuit.block_slope_in().push(s.clone(), 1);
     }
-    for p in &positions {
-        circuit.position_in().push(*p, 1);
+    for p in positions {
+        circuit.position_in().push(p, 1);
     }
-    circuit.step().expect("step failed");
+    circuit.step().expect("circuit step");
     let mut vals: Vec<PositionFloor> = circuit
         .position_floor_out()
         .consolidate()
@@ -74,7 +74,7 @@ fn multiple_positions_same_grid_cell() {
     circuit
         .position_in()
         .push(pos(EntityId::new(2), Coords3D::new(0.8, 0.4, 3.0)), 1);
-    circuit.step().expect("step failed");
+    circuit.step().expect("circuit step");
     let mut vals: Vec<PositionFloor> = circuit
         .position_floor_out()
         .consolidate()
