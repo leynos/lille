@@ -69,8 +69,8 @@ fn motion_cases(
 ) {
     let mut circuit = new_circuit();
 
-    for b in &blocks {
-        circuit.block_in().push(b.clone(), 1);
+    for b in blocks {
+        circuit.block_in().push(b, 1);
     }
     circuit.position_in().push(position, 1);
     circuit.velocity_in().push(velocity, 1);
