@@ -32,7 +32,9 @@ fn test_highest_block_aggregation() {
     circuit.step().expect("circuit step");
 
     let output = circuit.highest_block_out().consolidate();
-    let mut vals: Vec<HighestBlockAt> = output.iter().map(|(hb, _, _)| hb).collect();
+    #[allow(clippy::clone_on_copy)]
+    let mut vals: Vec<HighestBlockAt> =
+        output.iter().map(|(hb, _, _)| hb.clone()).collect();
     vals.sort_by_key(|h| (h.x, h.y));
     assert!(vals
         .windows(2)
@@ -54,11 +56,12 @@ fn highest_block_cases(#[case] blocks: Vec<Block>, #[case] expected: Vec<Highest
     }
     circuit.step().expect("circuit step");
 
+    #[allow(clippy::clone_on_copy)]
     let mut vals: Vec<HighestBlockAt> = circuit
         .highest_block_out()
         .consolidate()
         .iter()
-        .map(|(hb, _, _)| hb)
+        .map(|(hb, _, _)| hb.clone())
         .collect();
     vals.sort_by_key(|h| (h.x, h.y));
 
@@ -89,11 +92,12 @@ fn floor_height_cases(
         circuit.block_slope_in().push(s.clone(), 1);
     }
     circuit.step().expect("circuit step");
+    #[allow(clippy::clone_on_copy)]
     let mut vals: Vec<FloorHeightAt> = circuit
         .floor_height_out()
         .consolidate()
         .iter()
-        .map(|(fh, _, _)| fh)
+        .map(|(fh, _, _)| fh.clone())
         .collect();
     vals.sort_by_key(|h| (h.x, h.y));
     let mut exp = expected;
@@ -113,11 +117,12 @@ fn unmatched_slope_is_ignored() {
 
     circuit.step().expect("circuit step");
 
+    #[allow(clippy::clone_on_copy)]
     let vals: Vec<FloorHeightAt> = circuit
         .floor_height_out()
         .consolidate()
         .iter()
-        .map(|(fh, _, _)| fh)
+        .map(|(fh, _, _)| fh.clone())
         .collect();
 
     assert_eq!(vals, vec![fh(0, 0, 1.0)]);
@@ -132,11 +137,12 @@ fn slope_without_block_yields_no_height() {
 
     circuit.step().expect("circuit step");
 
+    #[allow(clippy::clone_on_copy)]
     let vals: Vec<FloorHeightAt> = circuit
         .floor_height_out()
         .consolidate()
         .iter()
-        .map(|(fh, _, _)| fh)
+        .map(|(fh, _, _)| fh.clone())
         .collect();
 
     assert!(vals.is_empty());

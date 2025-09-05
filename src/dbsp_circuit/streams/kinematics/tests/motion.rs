@@ -252,3 +252,9 @@ fn terminal_velocity_clamping(#[case] start_vz: f64, #[case] expected_vz: f64) {
     assert_eq!(vel_out.len(), 1);
     assert_relative_eq!(vel_out[0].vz.into_inner(), expected_vz);
 }
+
+#[test]
+#[allow(clippy::assertions_on_constants)]
+fn default_mass_is_positive() {
+    assert!(crate::DEFAULT_MASS > 0.0, "DEFAULT_MASS must be > 0.0");
+}
