@@ -29,11 +29,12 @@ fn test_highest_block_aggregation() {
         .block_in()
         .push(block(BlockId::new(2), BlockCoords::new(15, 25, 3)), 1);
 
-    circuit.step().expect("failed to step DBSP circuit");
+    circuit.step().expect("circuit step");
 
     let output = circuit.highest_block_out().consolidate();
-    let mut vals: Vec<HighestBlockAt> = output.iter().map(|t| t.0).collect();
+    let mut vals: Vec<HighestBlockAt> = output.iter().map(|(hb, _, _)| hb).collect();
     vals.sort_by_key(|h| (h.x, h.y));
+    assert!(vals.windows(2).all(|w| w[0].x != w[1].x || w[0].y != w[1].y));
     assert_eq!(vals.len(), 2);
     assert!(vals.contains(&HighestBlockAt { x: 10, y: 20, z: 8 }));
     assert!(vals.contains(&HighestBlockAt { x: 15, y: 25, z: 3 }));
@@ -49,13 +50,13 @@ fn highest_block_cases(#[case] blocks: Vec<Block>, #[case] expected: Vec<Highest
     for blk in blocks {
         circuit.block_in().push(blk, 1);
     }
-    circuit.step().expect("failed to step DBSP circuit");
+    circuit.step().expect("circuit step");
 
     let mut vals: Vec<HighestBlockAt> = circuit
         .highest_block_out()
         .consolidate()
         .iter()
-        .map(|t| t.0)
+        .map(|(hb, _, _)| hb)
         .collect();
     vals.sort_by_key(|h| (h.x, h.y));
 
@@ -65,14 +66,14 @@ fn highest_block_cases(#[case] blocks: Vec<Block>, #[case] expected: Vec<Highest
 }
 
 #[rstest]
-#[case(vec![block(BlockId::new(1), BlockCoords::new(0, 0, 0))], vec![], vec![fh(0,0,1.0)])]
-#[case(vec![block(BlockId::new(1), BlockCoords::new(0, 0, 0))], vec![slope(BlockId::new(1), Gradient::new(1.0, 0.0))], vec![fh(0,0,1.5)])]
-#[case(vec![block(BlockId::new(1), BlockCoords::new(0, 0, 0)), block(BlockId::new(2), BlockCoords::new(0, 0, 1))], vec![], vec![fh(0,0,2.0)])] // highest block wins
-#[case(vec![block(BlockId::new(1), BlockCoords::new(0, 0, 0))], vec![slope(BlockId::new(1), Gradient::new(-1.0, 0.0))], vec![fh(0,0,0.5)])] // negative slope
-#[case(vec![block(BlockId::new(1), BlockCoords::new(0, 0, 0))], vec![slope(BlockId::new(1), Gradient::new(0.0, 0.0))], vec![fh(0,0,1.0)])] // zero slope
-#[case(vec![block(BlockId::new(1), BlockCoords::new(-1, -1, 0))], vec![slope(BlockId::new(1), Gradient::new(1.0, 1.0))], vec![fh(-1,-1,2.0)])] // negative coordinates
-#[case(vec![block(BlockId::new(1), BlockCoords::new(0, 0, 0))], vec![slope(BlockId::new(1), Gradient::new(100.0, 100.0))], vec![fh(0,0,101.0)])] // large gradients
-#[case(vec![block(BlockId::new(1), BlockCoords::new(0, 0, 0)), block(BlockId::new(2), BlockCoords::new(0, 0, 1))], vec![slope(BlockId::new(1), Gradient::new(1.0, 0.0)), slope(BlockId::new(2), Gradient::new(0.0, 1.0))], vec![fh(0,0,2.5)])] // multiple slopes, highest wins
+#[case::block_only(vec![block(BlockId::new(1), BlockCoords::new(0, 0, 0))], vec![], vec![fh(0,0,1.0)])]
+#[case::block_with_slope(vec![block(BlockId::new(1), BlockCoords::new(0, 0, 0))], vec![slope(BlockId::new(1), Gradient::new(1.0, 0.0))], vec![fh(0,0,1.5)])]
+#[case::highest_block_wins(vec![block(BlockId::new(1), BlockCoords::new(0, 0, 0)), block(BlockId::new(2), BlockCoords::new(0, 0, 1))], vec![], vec![fh(0,0,2.0)])] // highest block wins
+#[case::negative_slope(vec![block(BlockId::new(1), BlockCoords::new(0, 0, 0))], vec![slope(BlockId::new(1), Gradient::new(-1.0, 0.0))], vec![fh(0,0,0.5)])] // negative slope
+#[case::zero_slope(vec![block(BlockId::new(1), BlockCoords::new(0, 0, 0))], vec![slope(BlockId::new(1), Gradient::new(0.0, 0.0))], vec![fh(0,0,1.0)])] // zero slope
+#[case::negative_coords(vec![block(BlockId::new(1), BlockCoords::new(-1, -1, 0))], vec![slope(BlockId::new(1), Gradient::new(1.0, 1.0))], vec![fh(-1,-1,2.0)])] // negative coordinates
+#[case::large_gradients(vec![block(BlockId::new(1), BlockCoords::new(0, 0, 0))], vec![slope(BlockId::new(1), Gradient::new(100.0, 100.0))], vec![fh(0,0,101.0)])] // large gradients
+#[case::multiple_slopes(vec![block(BlockId::new(1), BlockCoords::new(0, 0, 0)), block(BlockId::new(2), BlockCoords::new(0, 0, 1))], vec![slope(BlockId::new(1), Gradient::new(1.0, 0.0)), slope(BlockId::new(2), Gradient::new(0.0, 1.0))], vec![fh(0,0,2.5)])] // multiple slopes, highest wins
 fn floor_height_cases(
     #[case] blocks: Vec<Block>,
     #[case] slopes: Vec<BlockSlope>,
@@ -85,12 +86,12 @@ fn floor_height_cases(
     for s in &slopes {
         circuit.block_slope_in().push(s.clone(), 1);
     }
-    circuit.step().expect("step");
+    circuit.step().expect("circuit step");
     let mut vals: Vec<FloorHeightAt> = circuit
         .floor_height_out()
         .consolidate()
         .iter()
-        .map(|t| t.0)
+        .map(|(fh, _, _)| fh)
         .collect();
     vals.sort_by_key(|h| (h.x, h.y));
     let mut exp = expected;
@@ -108,13 +109,13 @@ fn unmatched_slope_is_ignored() {
         .block_slope_in()
         .push(slope(BlockId::new(2), Gradient::new(1.0, 0.0)), 1);
 
-    circuit.step().expect("step");
+    circuit.step().expect("circuit step");
 
     let vals: Vec<FloorHeightAt> = circuit
         .floor_height_out()
         .consolidate()
         .iter()
-        .map(|t| t.0)
+        .map(|(fh, _, _)| fh)
         .collect();
 
     assert_eq!(vals, vec![fh(0, 0, 1.0)]);
@@ -127,13 +128,13 @@ fn slope_without_block_yields_no_height() {
         .block_slope_in()
         .push(slope(BlockId::new(1), Gradient::new(1.0, 0.0)), 1);
 
-    circuit.step().expect("step");
+    circuit.step().expect("circuit step");
 
     let vals: Vec<FloorHeightAt> = circuit
         .floor_height_out()
         .consolidate()
         .iter()
-        .map(|t| t.0)
+        .map(|(fh, _, _)| fh)
         .collect();
 
     assert!(vals.is_empty());
