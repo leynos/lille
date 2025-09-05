@@ -3,6 +3,7 @@
 //! common physics records.
 
 pub mod physics;
+use lille::dbsp_circuit::DbspCircuit;
 pub use physics::{
     block, fear, force, force_with_mass, new_circuit, pos, slope, target, vel, BlockCoords,
     BlockId, Coords2D, Coords3D, EntityId, FearValue, ForceVector, Gradient, Mass,
@@ -44,4 +45,19 @@ pub fn assert_valid_rust_syntax(code: &str) {
     if let Err(err) = parse_file(code) {
         panic!("generated code is not valid Rust:\n{code}\nError: {err}",);
     }
+}
+
+/// Step the circuit and panic if evaluation fails.
+///
+/// # Panics
+/// Panics when the circuit step returns an error.
+///
+/// # Examples
+/// ```
+/// use test_utils::{new_circuit, step};
+/// let mut circuit = new_circuit();
+/// step(&mut circuit);
+/// ```
+pub fn step(circuit: &mut DbspCircuit) {
+    circuit.step().expect("DBSP step failed");
 }

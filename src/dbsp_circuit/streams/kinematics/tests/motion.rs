@@ -2,8 +2,8 @@
 
 use crate::components::Block;
 use crate::dbsp_circuit::streams::test_utils::{
-    block, force, force_with_mass, new_circuit, vel, BlockCoords, BlockId, Coords3D, EntityId,
-    ForceVector, Mass,
+    block, force, force_with_mass, new_circuit, step, vel, BlockCoords, BlockId, Coords3D,
+    EntityId, ForceVector, Mass,
 };
 use crate::dbsp_circuit::{Force, NewPosition, NewVelocity, Position, Velocity};
 use crate::{apply_ground_friction, GRAVITY_PULL, TERMINAL_VELOCITY};
@@ -82,8 +82,7 @@ fn motion_cases(
         circuit.force_in().push(f, 1);
     }
 
-    circuit.step().expect("circuit step failed: motion_cases");
-
+    step(&mut circuit);
     let pos_out: Vec<NewPosition> = circuit
         .new_position_out()
         .consolidate()
@@ -145,9 +144,7 @@ fn standing_friction(#[case] vx: f64) {
         .velocity_in()
         .push(vel(EntityId::new(1), Coords3D::new(vx, 0.0, 0.0)), 1);
 
-    circuit
-        .step()
-        .expect("circuit step failed: standing_friction");
+    step(&mut circuit);
 
     let pos_out: Vec<NewPosition> = circuit
         .new_position_out()
@@ -192,9 +189,7 @@ fn airborne_preserves_velocity() {
         .velocity_in()
         .push(vel(EntityId::new(1), Coords3D::new(1.0, 0.0, 0.0)), 1);
 
-    circuit
-        .step()
-        .expect("circuit step failed: airborne_preserves_velocity");
+    step(&mut circuit);
 
     let vel_out: Vec<NewVelocity> = circuit
         .new_velocity_out()
@@ -234,9 +229,7 @@ fn terminal_velocity_clamping(#[case] start_vz: f64, #[case] expected_vz: f64) {
         .velocity_in()
         .push(vel(EntityId::new(1), Coords3D::new(0.0, 0.0, start_vz)), 1);
 
-    circuit
-        .step()
-        .expect("circuit step failed: terminal_velocity_clamping");
+    step(&mut circuit);
 
     let pos_out: Vec<NewPosition> = circuit
         .new_position_out()

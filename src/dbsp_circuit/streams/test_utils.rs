@@ -11,6 +11,21 @@ pub fn new_circuit() -> DbspCircuit {
     DbspCircuit::new().expect("failed to build DBSP circuit")
 }
 
+/// Advances the circuit by one tick.
+///
+/// # Panics
+/// Panics if circuit evaluation fails.
+///
+/// # Examples
+/// ```
+/// use crate::dbsp_circuit::streams::test_utils::{new_circuit, step};
+/// let mut circuit = new_circuit();
+/// step(&mut circuit);
+/// ```
+pub fn step(circuit: &mut DbspCircuit) {
+    circuit.step().expect("circuit step failed");
+}
+
 /// Constructs a [`Block`] with the given identifier and coordinates.
 pub fn block(id: BlockId, coords: BlockCoords) -> Block {
     Block {
