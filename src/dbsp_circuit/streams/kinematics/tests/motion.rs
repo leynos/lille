@@ -9,7 +9,7 @@ use crate::dbsp_circuit::{Force, NewPosition, NewVelocity, Position, Velocity};
 use crate::{apply_ground_friction, GRAVITY_PULL, TERMINAL_VELOCITY};
 use approx::assert_relative_eq;
 use rstest::rstest;
-use test_utils::step;
+use crate::dbsp_circuit::{step, step_named};
 
 #[rstest]
 #[case::standing_moves(
@@ -83,7 +83,7 @@ fn motion_cases(
         circuit.force_in().push(f, 1);
     }
 
-    step!(&mut circuit);
+    step_named(&mut circuit, "motion_cases");
     let pos_out: Vec<NewPosition> = circuit
         .new_position_out()
         .consolidate()
@@ -145,7 +145,7 @@ fn standing_friction(#[case] vx: f64) {
         .velocity_in()
         .push(vel(EntityId::new(1), Coords3D::new(vx, 0.0, 0.0)), 1);
 
-    step!(&mut circuit);
+    step(&mut circuit);
 
     let pos_out: Vec<NewPosition> = circuit
         .new_position_out()
@@ -190,7 +190,7 @@ fn airborne_preserves_velocity() {
         .velocity_in()
         .push(vel(EntityId::new(1), Coords3D::new(1.0, 0.0, 0.0)), 1);
 
-    step!(&mut circuit);
+    step(&mut circuit);
 
     let vel_out: Vec<NewVelocity> = circuit
         .new_velocity_out()
@@ -230,7 +230,7 @@ fn terminal_velocity_clamping(#[case] start_vz: f64, #[case] expected_vz: f64) {
         .velocity_in()
         .push(vel(EntityId::new(1), Coords3D::new(0.0, 0.0, start_vz)), 1);
 
-    step!(&mut circuit);
+    step(&mut circuit);
 
     let pos_out: Vec<NewPosition> = circuit
         .new_position_out()

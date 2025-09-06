@@ -64,7 +64,7 @@ impl Env {
     /// Advances the circuit by one tick.
     fn step(&self) {
         let mut c = self.circuit.lock().expect("lock");
-        step!(&mut c);
+        step(&mut c);
     }
 
     /// Retrieves and clears the `PositionFloor` output collection.

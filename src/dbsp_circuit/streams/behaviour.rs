@@ -173,7 +173,7 @@ mod tests {
     use approx::assert_relative_eq;
     use dbsp::RootCircuit;
     use rstest::rstest;
-
+    
     fn pt(px: f64, py: f64, tx: f64, ty: f64) -> PositionTarget {
         PositionTarget {
             entity: 1,

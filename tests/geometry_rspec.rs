@@ -53,7 +53,7 @@ impl Env {
 
     fn step(&self) {
         let mut c = self.circuit.lock().expect("mutex poisoned");
-        step!(&mut c);
+        step(&mut c);
     }
 
     fn output(&self) -> Vec<FloorHeightAt> {

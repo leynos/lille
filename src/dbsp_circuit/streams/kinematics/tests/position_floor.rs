@@ -6,7 +6,7 @@ use crate::dbsp_circuit::streams::test_utils::{
 };
 use crate::dbsp_circuit::{Position, PositionFloor};
 use rstest::rstest;
-use test_utils::step;
+use crate::dbsp_circuit::step;
 
 fn pf(position: Position, z_floor: f64) -> PositionFloor {
     PositionFloor {
@@ -41,16 +41,16 @@ fn position_floor_cases(
     #[case] expected: Vec<PositionFloor>,
 ) {
     let mut circuit = new_circuit();
-    for b in &blocks {
-        circuit.block_in().push(b.clone(), 1);
+    for b in blocks {
+        circuit.block_in().push(b, 1);
     }
-    for s in &slopes {
-        circuit.block_slope_in().push(s.clone(), 1);
+    for s in slopes {
+        circuit.block_slope_in().push(s, 1);
     }
     for p in positions {
         circuit.position_in().push(p, 1);
     }
-    step!(&mut circuit);
+    step(&mut circuit);
     let mut vals: Vec<PositionFloor> = circuit
         .position_floor_out()
         .consolidate()
@@ -75,7 +75,7 @@ fn multiple_positions_same_grid_cell() {
     circuit
         .position_in()
         .push(pos(EntityId::new(2), Coords3D::new(0.8, 0.4, 3.0)), 1);
-    step!(&mut circuit);
+    step(&mut circuit);
     let mut vals: Vec<PositionFloor> = circuit
         .position_floor_out()
         .consolidate()
