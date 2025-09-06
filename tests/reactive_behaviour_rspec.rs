@@ -7,9 +7,7 @@ use approx::assert_relative_eq;
 use lille::components::Block;
 use lille::dbsp_circuit::{DbspCircuit, FearLevel, NewPosition, Position, Target, Velocity};
 use rstest::rstest;
-use test_utils::{
-    block, fear, pos, target, vel, BlockCoords, BlockId, Coords2D, Coords3D, EntityId, FearValue,
-};
+use test_utils::prelude::*;
 
 struct Env {
     // Owns the circuit directly so tests can mutate it without synchronisation

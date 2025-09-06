@@ -12,7 +12,7 @@ use lille::{
 };
 use std::fmt;
 use std::sync::{Arc, Mutex};
-use test_utils::{pos, Coords3D, EntityId};
+use test_utils::prelude::*;
 
 #[derive(Clone)]
 /// Shared test environment wrapping a `DbspCircuit` in a thread-safe container.
