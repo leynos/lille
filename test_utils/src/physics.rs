@@ -5,6 +5,19 @@ use lille::dbsp_circuit::{DbspCircuit, FearLevel, Force, Position, Target, Veloc
 
 #[derive(Clone, Copy, Debug)]
 pub struct EntityId(pub i64);
+
+impl From<i64> for EntityId {
+    fn from(id: i64) -> Self {
+        Self(id)
+    }
+}
+
+impl From<EntityId> for i64 {
+    fn from(id: EntityId) -> Self {
+        id.0
+    }
+}
+
 impl EntityId {
     /// Create a new [`EntityId`].
     ///
@@ -21,6 +34,19 @@ impl EntityId {
 
 #[derive(Clone, Copy, Debug)]
 pub struct BlockId(pub i64);
+
+impl From<i64> for BlockId {
+    fn from(id: i64) -> Self {
+        Self(id)
+    }
+}
+
+impl From<BlockId> for i64 {
+    fn from(id: BlockId) -> Self {
+        id.0
+    }
+}
+
 impl BlockId {
     /// Create a new [`BlockId`].
     ///
@@ -41,6 +67,19 @@ pub struct Coords3D {
     pub y: f64,
     pub z: f64,
 }
+
+impl From<(f64, f64, f64)> for Coords3D {
+    fn from((x, y, z): (f64, f64, f64)) -> Self {
+        Self { x, y, z }
+    }
+}
+
+impl From<Coords3D> for (f64, f64, f64) {
+    fn from(coords: Coords3D) -> Self {
+        (coords.x, coords.y, coords.z)
+    }
+}
+
 impl Coords3D {
     /// Create new 3D coordinates.
     ///
@@ -61,6 +100,19 @@ pub struct BlockCoords {
     pub y: i32,
     pub z: i32,
 }
+
+impl From<(i32, i32, i32)> for BlockCoords {
+    fn from((x, y, z): (i32, i32, i32)) -> Self {
+        Self { x, y, z }
+    }
+}
+
+impl From<BlockCoords> for (i32, i32, i32) {
+    fn from(coords: BlockCoords) -> Self {
+        (coords.x, coords.y, coords.z)
+    }
+}
+
 impl BlockCoords {
     /// Create new block coordinates.
     ///
@@ -80,6 +132,19 @@ pub struct Coords2D {
     pub x: f64,
     pub y: f64,
 }
+
+impl From<(f64, f64)> for Coords2D {
+    fn from((x, y): (f64, f64)) -> Self {
+        Self { x, y }
+    }
+}
+
+impl From<Coords2D> for (f64, f64) {
+    fn from(coords: Coords2D) -> Self {
+        (coords.x, coords.y)
+    }
+}
+
 impl Coords2D {
     /// Create new 2D coordinates.
     ///
@@ -100,6 +165,19 @@ pub struct ForceVector {
     pub y: f64,
     pub z: f64,
 }
+
+impl From<(f64, f64, f64)> for ForceVector {
+    fn from((x, y, z): (f64, f64, f64)) -> Self {
+        Self { x, y, z }
+    }
+}
+
+impl From<ForceVector> for (f64, f64, f64) {
+    fn from(vec: ForceVector) -> Self {
+        (vec.x, vec.y, vec.z)
+    }
+}
+
 impl ForceVector {
     /// Create a new [`ForceVector`].
     ///
@@ -119,6 +197,19 @@ pub struct Gradient {
     pub x: f64,
     pub y: f64,
 }
+
+impl From<(f64, f64)> for Gradient {
+    fn from((x, y): (f64, f64)) -> Self {
+        Self { x, y }
+    }
+}
+
+impl From<Gradient> for (f64, f64) {
+    fn from(grad: Gradient) -> Self {
+        (grad.x, grad.y)
+    }
+}
+
 impl Gradient {
     /// Create a new [`Gradient`].
     ///
