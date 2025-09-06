@@ -5,11 +5,11 @@ use crate::dbsp_circuit::streams::test_utils::{
     block, force, force_with_mass, new_circuit, vel, BlockCoords, BlockId, Coords3D, EntityId,
     ForceVector, Mass,
 };
+use crate::dbsp_circuit::{step, step_named};
 use crate::dbsp_circuit::{Force, NewPosition, NewVelocity, Position, Velocity};
 use crate::{apply_ground_friction, GRAVITY_PULL, TERMINAL_VELOCITY};
 use approx::assert_relative_eq;
 use rstest::rstest;
-use crate::dbsp_circuit::{step, step_named};
 
 #[rstest]
 #[case::standing_moves(

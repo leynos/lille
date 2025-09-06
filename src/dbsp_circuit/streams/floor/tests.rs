@@ -1,12 +1,12 @@
 //! Tests for floor streams aggregating block heights and slopes.
 
 use crate::components::{Block, BlockSlope};
+use crate::dbsp_circuit::step;
 use crate::dbsp_circuit::streams::test_utils::{
     block, new_circuit, slope, BlockCoords, BlockId, Gradient,
 };
 use crate::dbsp_circuit::{FloorHeightAt, HighestBlockAt};
 use rstest::rstest;
-use crate::dbsp_circuit::step;
 
 fn hb(x: i32, y: i32, z: i32) -> HighestBlockAt {
     HighestBlockAt { x, y, z }

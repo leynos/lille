@@ -1,12 +1,12 @@
 //! Tests for joining positions with floor heights.
 
 use crate::components::{Block, BlockSlope};
+use crate::dbsp_circuit::step;
 use crate::dbsp_circuit::streams::test_utils::{
     block, new_circuit, pos, slope, BlockCoords, BlockId, Coords3D, EntityId, Gradient,
 };
 use crate::dbsp_circuit::{Position, PositionFloor};
 use rstest::rstest;
-use crate::dbsp_circuit::step;
 
 fn pf(position: Position, z_floor: f64) -> PositionFloor {
     PositionFloor {
