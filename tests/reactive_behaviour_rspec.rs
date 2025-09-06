@@ -40,7 +40,7 @@ impl Env {
     }
 
     fn step(&mut self) {
-        step(&mut self.circuit);
+        step!(&mut self.circuit);
     }
 
     fn drain_output(&mut self) -> Vec<NewPosition> {

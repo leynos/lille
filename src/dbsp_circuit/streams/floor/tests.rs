@@ -2,10 +2,11 @@
 
 use crate::components::{Block, BlockSlope};
 use crate::dbsp_circuit::streams::test_utils::{
-    block, new_circuit, slope, step, BlockCoords, BlockId, Gradient,
+    block, new_circuit, slope, BlockCoords, BlockId, Gradient,
 };
 use crate::dbsp_circuit::{FloorHeightAt, HighestBlockAt};
 use rstest::rstest;
+use test_utils::step;
 
 fn hb(x: i32, y: i32, z: i32) -> HighestBlockAt {
     HighestBlockAt { x, y, z }
@@ -33,7 +34,7 @@ fn test_highest_block_aggregation() {
         .block_in()
         .push(block(BlockId::new(2), BlockCoords::new(15, 25, 3)), 1);
 
-    step(&mut circuit);
+    step!(&mut circuit);
 
     let output = circuit.highest_block_out().consolidate();
     #[allow(clippy::clone_on_copy)]
@@ -57,7 +58,7 @@ fn highest_block_cases(#[case] blocks: Vec<Block>, #[case] expected: Vec<Highest
     for blk in blocks {
         circuit.block_in().push(blk, 1);
     }
-    step(&mut circuit);
+    step!(&mut circuit);
 
     #[allow(clippy::clone_on_copy)]
     let mut vals: Vec<HighestBlockAt> = circuit
@@ -94,7 +95,7 @@ fn floor_height_cases(
     for s in &slopes {
         circuit.block_slope_in().push(s.clone(), 1);
     }
-    step(&mut circuit);
+    step!(&mut circuit);
     #[allow(clippy::clone_on_copy)]
     let mut vals: Vec<FloorHeightAt> = circuit
         .floor_height_out()
@@ -118,7 +119,7 @@ fn unmatched_slope_is_ignored() {
         .block_slope_in()
         .push(slope(BlockId::new(2), Gradient::new(1.0, 0.0)), 1);
 
-    step(&mut circuit);
+    step!(&mut circuit);
 
     #[allow(clippy::clone_on_copy)]
     let vals: Vec<FloorHeightAt> = circuit
@@ -138,7 +139,7 @@ fn slope_without_block_yields_no_height() {
         .block_slope_in()
         .push(slope(BlockId::new(1), Gradient::new(1.0, 0.0)), 1);
 
-    step(&mut circuit);
+    step!(&mut circuit);
 
     #[allow(clippy::clone_on_copy)]
     let vals: Vec<FloorHeightAt> = circuit
