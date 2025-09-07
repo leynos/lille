@@ -3,20 +3,54 @@
 use lille::components::{Block, BlockSlope};
 use lille::dbsp_circuit::{DbspCircuit, FearLevel, Force, Position, Target, Velocity};
 
+macro_rules! impl_newtype_conversions {
+    ($name:ident, $ty:ty) => {
+        impl From<$ty> for $name {
+            fn from(value: $ty) -> Self {
+                Self(value)
+            }
+        }
+        impl From<$name> for $ty {
+            fn from(value: $name) -> Self {
+                value.0
+            }
+        }
+    };
+}
+
+macro_rules! impl_coords3_conversions {
+    ($name:ident, $ty:ty) => {
+        impl From<($ty, $ty, $ty)> for $name {
+            fn from((x, y, z): ($ty, $ty, $ty)) -> Self {
+                Self { x, y, z }
+            }
+        }
+        impl From<$name> for ($ty, $ty, $ty) {
+            fn from(coords: $name) -> Self {
+                (coords.x, coords.y, coords.z)
+            }
+        }
+    };
+}
+
+macro_rules! impl_coords2_conversions {
+    ($name:ident, $ty:ty) => {
+        impl From<($ty, $ty)> for $name {
+            fn from((x, y): ($ty, $ty)) -> Self {
+                Self { x, y }
+            }
+        }
+        impl From<$name> for ($ty, $ty) {
+            fn from(coords: $name) -> Self {
+                (coords.x, coords.y)
+            }
+        }
+    };
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct EntityId(pub i64);
-
-impl From<i64> for EntityId {
-    fn from(id: i64) -> Self {
-        Self(id)
-    }
-}
-
-impl From<EntityId> for i64 {
-    fn from(id: EntityId) -> Self {
-        id.0
-    }
-}
+impl_newtype_conversions!(EntityId, i64);
 
 impl EntityId {
     /// Create a new [`EntityId`].
@@ -34,18 +68,7 @@ impl EntityId {
 
 #[derive(Clone, Copy, Debug)]
 pub struct BlockId(pub i64);
-
-impl From<i64> for BlockId {
-    fn from(id: i64) -> Self {
-        Self(id)
-    }
-}
-
-impl From<BlockId> for i64 {
-    fn from(id: BlockId) -> Self {
-        id.0
-    }
-}
+impl_newtype_conversions!(BlockId, i64);
 
 impl BlockId {
     /// Create a new [`BlockId`].
@@ -67,18 +90,7 @@ pub struct Coords3D {
     pub y: f64,
     pub z: f64,
 }
-
-impl From<(f64, f64, f64)> for Coords3D {
-    fn from((x, y, z): (f64, f64, f64)) -> Self {
-        Self { x, y, z }
-    }
-}
-
-impl From<Coords3D> for (f64, f64, f64) {
-    fn from(coords: Coords3D) -> Self {
-        (coords.x, coords.y, coords.z)
-    }
-}
+impl_coords3_conversions!(Coords3D, f64);
 
 impl Coords3D {
     /// Create new 3D coordinates.
@@ -100,18 +112,7 @@ pub struct BlockCoords {
     pub y: i32,
     pub z: i32,
 }
-
-impl From<(i32, i32, i32)> for BlockCoords {
-    fn from((x, y, z): (i32, i32, i32)) -> Self {
-        Self { x, y, z }
-    }
-}
-
-impl From<BlockCoords> for (i32, i32, i32) {
-    fn from(coords: BlockCoords) -> Self {
-        (coords.x, coords.y, coords.z)
-    }
-}
+impl_coords3_conversions!(BlockCoords, i32);
 
 impl BlockCoords {
     /// Create new block coordinates.
@@ -132,18 +133,7 @@ pub struct Coords2D {
     pub x: f64,
     pub y: f64,
 }
-
-impl From<(f64, f64)> for Coords2D {
-    fn from((x, y): (f64, f64)) -> Self {
-        Self { x, y }
-    }
-}
-
-impl From<Coords2D> for (f64, f64) {
-    fn from(coords: Coords2D) -> Self {
-        (coords.x, coords.y)
-    }
-}
+impl_coords2_conversions!(Coords2D, f64);
 
 impl Coords2D {
     /// Create new 2D coordinates.
@@ -165,18 +155,7 @@ pub struct ForceVector {
     pub y: f64,
     pub z: f64,
 }
-
-impl From<(f64, f64, f64)> for ForceVector {
-    fn from((x, y, z): (f64, f64, f64)) -> Self {
-        Self { x, y, z }
-    }
-}
-
-impl From<ForceVector> for (f64, f64, f64) {
-    fn from(vec: ForceVector) -> Self {
-        (vec.x, vec.y, vec.z)
-    }
-}
+impl_coords3_conversions!(ForceVector, f64);
 
 impl ForceVector {
     /// Create a new [`ForceVector`].
@@ -197,18 +176,7 @@ pub struct Gradient {
     pub x: f64,
     pub y: f64,
 }
-
-impl From<(f64, f64)> for Gradient {
-    fn from((x, y): (f64, f64)) -> Self {
-        Self { x, y }
-    }
-}
-
-impl From<Gradient> for (f64, f64) {
-    fn from(grad: Gradient) -> Self {
-        (grad.x, grad.y)
-    }
-}
+impl_coords2_conversions!(Gradient, f64);
 
 impl Gradient {
     /// Create a new [`Gradient`].
