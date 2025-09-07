@@ -509,5 +509,19 @@ pub fn step_named(circuit: &mut DbspCircuit, ctx: &str) {
         .unwrap_or_else(|e| panic!("DbspCircuit::step failed: {ctx}: {e}"));
 }
 
+/// Attempts to advance the circuit by one tick.
+///
+/// Returns an error if evaluation fails.
+///
+/// # Examples
+/// ```rust
+/// use lille::dbsp_circuit::{DbspCircuit, try_step};
+/// let mut circuit = DbspCircuit::new().expect("circuit construction failed");
+/// try_step(&mut circuit).expect("circuit evaluation failed");
+/// ```
+pub fn try_step(circuit: &mut DbspCircuit) -> Result<(), dbsp::Error> {
+    circuit.step()
+}
+
 #[cfg(test)]
 mod tests;

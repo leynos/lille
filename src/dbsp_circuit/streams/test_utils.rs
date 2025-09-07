@@ -1,4 +1,5 @@
-//! Shared constructors for physics records used in tests and examples.
+//! Shared constructors for physics records and a helper to initialise a
+//! `DbspCircuit` for tests and examples.
 
 use crate::components::{Block, BlockSlope};
 use crate::dbsp_circuit::{DbspCircuit, Force, Position, Velocity};

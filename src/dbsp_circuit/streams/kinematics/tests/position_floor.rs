@@ -1,7 +1,7 @@
 //! Tests for joining positions with floor heights.
 
 use crate::components::{Block, BlockSlope};
-use crate::dbsp_circuit::step;
+use crate::dbsp_circuit::step_named;
 use crate::dbsp_circuit::streams::test_utils::{
     block, new_circuit, pos, slope, BlockCoords, BlockId, Coords3D, EntityId, Gradient,
 };
@@ -50,12 +50,12 @@ fn position_floor_cases(
     for p in positions {
         circuit.position_in().push(p, 1);
     }
-    step(&mut circuit);
+    step_named(&mut circuit, "position_floor_cases");
     let mut vals: Vec<PositionFloor> = circuit
         .position_floor_out()
         .consolidate()
         .iter()
-        .map(|(pf, _, _)| pf.clone())
+        .map(|(pf, _, _)| pf)
         .collect();
     vals.sort_by_key(|pf| pf.position.entity);
     let mut exp = expected;
@@ -75,12 +75,12 @@ fn multiple_positions_same_grid_cell() {
     circuit
         .position_in()
         .push(pos(EntityId::new(2), Coords3D::new(0.8, 0.4, 3.0)), 1);
-    step(&mut circuit);
+    step_named(&mut circuit, "multiple_positions_same_grid_cell");
     let mut vals: Vec<PositionFloor> = circuit
         .position_floor_out()
         .consolidate()
         .iter()
-        .map(|(pf, _, _)| pf.clone())
+        .map(|(pf, _, _)| pf)
         .collect();
     vals.sort_by_key(|pf| pf.position.entity);
     let mut exp = vec![
