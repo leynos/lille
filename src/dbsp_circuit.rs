@@ -61,7 +61,7 @@ pub use types::{
 /// // circuit.block_slope_in().push(BlockSlope { /* ... */ }, 1);
 ///
 /// // 2) Advance the circuit.
-/// step(&mut circuit);
+/// lille::dbsp_circuit::step(&mut circuit);
 ///
 /// // 3) Read outputs via the getters.
 /// // let _ = circuit.new_position_out();
