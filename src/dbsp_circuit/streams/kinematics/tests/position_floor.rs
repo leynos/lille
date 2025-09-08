@@ -2,9 +2,7 @@
 
 use crate::components::{Block, BlockSlope};
 use crate::dbsp_circuit::step_named;
-use crate::dbsp_circuit::streams::test_utils::{
-    block, new_circuit, pos, slope, 
-};
+use crate::dbsp_circuit::streams::test_utils::{block, new_circuit, pos, slope};
 use crate::dbsp_circuit::{Position, PositionFloor};
 use rstest::rstest;
 

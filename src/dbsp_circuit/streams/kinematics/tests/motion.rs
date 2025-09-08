@@ -3,8 +3,7 @@
 use crate::components::Block;
 use crate::dbsp_circuit::step_named;
 use crate::dbsp_circuit::streams::test_utils::{
-    block, force, force_with_mass, new_circuit, vel, 
-    Mass,
+    block, force, force_with_mass, new_circuit, vel, Mass,
 };
 use crate::dbsp_circuit::{Force, NewPosition, NewVelocity, Position, Velocity};
 use crate::{apply_ground_friction, GRAVITY_PULL, TERMINAL_VELOCITY};

@@ -7,9 +7,7 @@ use approx::assert_relative_eq;
 use lille::components::Block;
 use lille::dbsp_circuit::{DbspCircuit, FearLevel, NewPosition, Position, Target, Velocity};
 use rstest::rstest;
-use test_utils::{
-    block, fear, pos, step, target, vel, FearValue,
-};
+use test_utils::{block, fear, pos, step, target, vel};
 
 struct Env {
     // Owns the circuit directly so tests can mutate it without synchronisation
@@ -79,7 +77,7 @@ impl Default for Env {
 #[case(
     "flees target when afraid",
     vec![(1, -1, 0, 0), (2, 0, 0, 0)],
-    Some(fear(1.into(), FearValue::new(0.5))),
+    Some(fear(1.into(), 0.5.into())),
     Some(target(1.into(), (1.0, 1.0).into())),
     vec![NewPosition {
         entity: 1,
@@ -140,7 +138,7 @@ fn handles_multiple_entities_with_mixed_states() {
     env.push_position(pos(1.into(), (0.0, 0.0, 1.0).into()));
     env.push_velocity(vel(1.into(), (0.0, 0.0, 0.0).into()));
     env.push_target(target(1.into(), (1.0, 1.0).into()));
-    env.push_fear(fear(1.into(), FearValue::new(0.5)));
+    env.push_fear(fear(1.into(), 0.5.into()));
 
     env.push_position(pos(2.into(), (0.0, 0.0, 1.0).into()));
     env.push_velocity(vel(2.into(), (0.0, 0.0, 0.0).into()));
