@@ -51,11 +51,12 @@ fn position_floor_cases(
         circuit.position_in().push(p, 1);
     }
     step_named(&mut circuit, "position_floor_cases");
+    // `consolidate()` yields a `TypedBatch` without `IntoIterator`; clone values for comparison.
     let mut vals: Vec<PositionFloor> = circuit
         .position_floor_out()
         .consolidate()
         .iter()
-        .map(|(pf, _, _)| pf)
+        .map(|(pf, _, _)| pf.clone())
         .collect();
     vals.sort_by_key(|pf| pf.position.entity);
     let mut exp = expected;
@@ -76,11 +77,12 @@ fn multiple_positions_same_grid_cell() {
         .position_in()
         .push(pos(EntityId::new(2), Coords3D::new(0.8, 0.4, 3.0)), 1);
     step_named(&mut circuit, "multiple_positions_same_grid_cell");
+    // `consolidate()` yields a `TypedBatch` without `IntoIterator`; clone values for comparison.
     let mut vals: Vec<PositionFloor> = circuit
         .position_floor_out()
         .consolidate()
         .iter()
-        .map(|(pf, _, _)| pf)
+        .map(|(pf, _, _)| pf.clone())
         .collect();
     vals.sort_by_key(|pf| pf.position.entity);
     let mut exp = vec![

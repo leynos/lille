@@ -488,6 +488,7 @@ impl DbspCircuit {
 /// let mut circuit = DbspCircuit::new().expect("circuit construction failed");
 /// step(&mut circuit);
 /// ```
+#[track_caller]
 pub fn step(circuit: &mut DbspCircuit) {
     circuit.step().expect("DbspCircuit::step failed");
 }
@@ -500,6 +501,7 @@ pub fn step(circuit: &mut DbspCircuit) {
 /// let mut circuit = DbspCircuit::new().expect("circuit construction failed");
 /// step_named(&mut circuit, "context");
 /// ```
+#[track_caller]
 pub fn step_named(circuit: &mut DbspCircuit, ctx: &str) {
     circuit
         .step()
