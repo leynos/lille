@@ -48,7 +48,7 @@ pub use types::{
 ///
 /// ```rust,no_run
 /// # use lille::prelude::*;
-/// # use lille::dbsp_circuit::step;
+/// # use lille::dbsp_circuit::step as _;
 /// let mut circuit = DbspCircuit::new().expect("circuit construction failed");
 ///
 /// // 1) Feed inputs for this frame.
