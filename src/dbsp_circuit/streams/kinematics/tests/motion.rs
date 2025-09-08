@@ -2,9 +2,7 @@
 
 use crate::components::Block;
 use crate::dbsp_circuit::step_named;
-use crate::dbsp_circuit::streams::test_utils::{
-    block, force, force_with_mass, new_circuit, vel, Mass,
-};
+use crate::dbsp_circuit::streams::test_utils::{block, force, force_with_mass, new_circuit, vel};
 use crate::dbsp_circuit::{Force, NewPosition, NewVelocity, Position, Velocity};
 use crate::{apply_ground_friction, GRAVITY_PULL, TERMINAL_VELOCITY};
 use approx::assert_relative_eq;
@@ -39,7 +37,7 @@ use rstest::rstest;
     Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 1.0.into() },
     vel(1.into(), (0.0, 0.0, 0.0).into()),
     vec![block(1.into(), (0, 0, 0).into()), block(2.into(), (1, 0, 1).into())],
-    Some(force_with_mass(1.into(), (5.0, 0.0, 0.0).into(), Mass::new(5.0))),
+    Some(force_with_mass(1.into(), (5.0, 0.0, 0.0).into(), 5.0.into())),
     Some(Position { entity: 1, x: apply_ground_friction(1.0).into(), y: 0.0.into(), z: 1.0.into() }),
     Some(vel(1.into(), (apply_ground_friction(1.0), 0.0, 0.0).into())),
 )]
@@ -47,7 +45,7 @@ use rstest::rstest;
     Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 2.1.into() },
     vel(1.into(), (0.0, 0.0, 0.0).into()),
     vec![block(1.into(), (0, 0, 0).into())],
-    Some(force_with_mass(1.into(), (0.0, 0.0, 10.0).into(), Mass::new(0.0))),
+    Some(force_with_mass(1.into(), (0.0, 0.0, 10.0).into(), 0.0.into())),
     Some(Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 1.1.into() }),
     Some(vel(1.into(), (0.0, 0.0, GRAVITY_PULL).into())),
 )]

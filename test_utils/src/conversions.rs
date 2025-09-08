@@ -1,17 +1,34 @@
 //! Conversion helpers for test physics newtypes.
 //! Centralises `From` implementations enabling literal usage in tests.
+//!
+//! # Examples
+//! ```
+//! # use test_utils::conversions::*;
+//! # use test_utils::physics::{EntityId, Coords3D, Coords2D, FearValue};
+//! let id: EntityId = 1_i64.into();
+//! let p: Coords3D = (0.0, 0.0, 1.0).into();
+//! let t: Coords2D = (1.0, 1.0).into();
+//! let fear: FearValue = 0.5_f64.into();
+//! let (x, y): (f64, f64) = t.into();
+//! assert_eq!(x, 1.0);
+//! ```
 
 use crate::physics::{
     BlockCoords, BlockId, Coords2D, Coords3D, EntityId, FearValue, ForceVector, Gradient, Mass,
 };
 
 macro_rules! impl_newtype_conversions {
-    ($name:ident, $ty:ty) => {
+    ($name:ident, $ty:ty $(, $extra:ty)*) => {
         impl From<$ty> for $name {
             fn from(value: $ty) -> Self {
                 Self(value)
             }
         }
+        $(impl From<$extra> for $name {
+            fn from(value: $extra) -> Self {
+                Self(value as $ty)
+            }
+        })*
         impl From<$name> for $ty {
             fn from(value: $name) -> Self {
                 value.0
@@ -22,9 +39,18 @@ macro_rules! impl_newtype_conversions {
 
 macro_rules! impl_coords3_conversions {
     ($name:ident, $ty:ty) => {
-        impl From<($ty, $ty, $ty)> for $name {
-            fn from((x, y, z): ($ty, $ty, $ty)) -> Self {
-                Self { x, y, z }
+        impl<TX, TY, TZ> From<(TX, TY, TZ)> for $name
+        where
+            TX: Into<$ty>,
+            TY: Into<$ty>,
+            TZ: Into<$ty>,
+        {
+            fn from((x, y, z): (TX, TY, TZ)) -> Self {
+                Self {
+                    x: x.into(),
+                    y: y.into(),
+                    z: z.into(),
+                }
             }
         }
         impl From<$name> for ($ty, $ty, $ty) {
@@ -37,9 +63,16 @@ macro_rules! impl_coords3_conversions {
 
 macro_rules! impl_coords2_conversions {
     ($name:ident, $ty:ty) => {
-        impl From<($ty, $ty)> for $name {
-            fn from((x, y): ($ty, $ty)) -> Self {
-                Self { x, y }
+        impl<TX, TY> From<(TX, TY)> for $name
+        where
+            TX: Into<$ty>,
+            TY: Into<$ty>,
+        {
+            fn from((x, y): (TX, TY)) -> Self {
+                Self {
+                    x: x.into(),
+                    y: y.into(),
+                }
             }
         }
         impl From<$name> for ($ty, $ty) {
@@ -50,8 +83,8 @@ macro_rules! impl_coords2_conversions {
     };
 }
 
-impl_newtype_conversions!(EntityId, i64);
-impl_newtype_conversions!(BlockId, i64);
+impl_newtype_conversions!(EntityId, i64, i32);
+impl_newtype_conversions!(BlockId, i64, i32);
 impl_newtype_conversions!(Mass, f64);
 impl_newtype_conversions!(FearValue, f64);
 impl_coords3_conversions!(Coords3D, f64);
@@ -66,7 +99,7 @@ mod tests {
 
     #[test]
     fn entity_id_roundtrip() {
-        let id: EntityId = 42_i64.into();
+        let id: EntityId = 42.into();
         let raw: i64 = id.into();
         assert_eq!(raw, 42);
     }
@@ -80,14 +113,14 @@ mod tests {
 
     #[test]
     fn coords3d_from_tuple_roundtrip() {
-        let coords: Coords3D = (1.0, 2.0, 3.0).into();
+        let coords: Coords3D = (1, 2, 3).into();
         let tuple: (f64, f64, f64) = coords.into();
         assert_eq!(tuple, (1.0, 2.0, 3.0));
     }
 
     #[test]
     fn coords2d_from_tuple_roundtrip() {
-        let coords: Coords2D = (1.0, 2.0).into();
+        let coords: Coords2D = (1, 2).into();
         let tuple: (f64, f64) = coords.into();
         assert_eq!(tuple, (1.0, 2.0));
     }

@@ -251,7 +251,7 @@ pub fn target(entity: EntityId, coords: Coords2D) -> Target {
 /// # Examples
 /// ```rust
 /// use test_utils::physics::{fear, EntityId, FearValue};
-/// let f = fear(EntityId::new(1), FearValue::new(0.5));
+/// let f = fear(1.into(), 0.5.into());
 /// assert_eq!(f.entity, 1);
 /// assert_eq!(f.level.into_inner(), 0.5);
 /// ```
@@ -291,8 +291,8 @@ pub fn force(entity: EntityId, vec: ForceVector) -> Force {
 ///
 /// # Examples
 /// ```rust
-/// use test_utils::physics::{force_with_mass, EntityId, ForceVector, Mass};
-/// let f = force_with_mass(EntityId::new(1), ForceVector::new(10.0, 0.0, 0.0), Mass::new(5.0));
+/// use test_utils::physics::{force_with_mass, ForceVector};
+/// let f = force_with_mass(1.into(), ForceVector::new(10.0, 0.0, 0.0), 5.0.into());
 /// assert_eq!(f.entity, 1);
 /// assert_eq!(f.mass.unwrap().into_inner(), 5.0);
 /// ```
