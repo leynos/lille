@@ -28,7 +28,6 @@ where
     }
 }
 
-
 /// Constructs a [`BlockSlope`] describing the block gradient.
 pub fn slope<I, G>(block_id: I, gradient: G) -> BlockSlope
 where
@@ -43,7 +42,6 @@ where
         grad_y: gradient.y.into(),
     }
 }
-
 
 /// Builds a [`Position`] from an entity identifier and coordinates.
 pub fn pos<E, C>(entity: E, coords: C) -> Position
@@ -61,7 +59,6 @@ where
     }
 }
 
-
 /// Builds a [`Velocity`] with the given entity and components.
 pub fn vel<E, V>(entity: E, velocity: V) -> Velocity
 where
@@ -77,7 +74,6 @@ where
         vz: velocity.z.into(),
     }
 }
-
 
 /// Constructs a [`Force`] without specifying mass.
 pub fn force<E, V>(entity: E, vec: V) -> Force
@@ -95,7 +91,6 @@ where
         mass: None,
     }
 }
-
 
 /// Constructs a [`Force`] with an explicit mass.
 pub fn force_with_mass<E, V, M>(entity: E, vec: V, mass: M) -> Force
@@ -115,4 +110,3 @@ where
         mass: Some(mass.0.into()),
     }
 }
-
