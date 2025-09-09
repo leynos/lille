@@ -22,15 +22,9 @@ fn fh(x: i32, y: i32, height: f64) -> FloorHeightAt {
 fn test_highest_block_aggregation() {
     let mut circuit = new_circuit();
 
-    circuit
-        .block_in()
-        .push(block(0.into(), (10, 20, 5).into()), 1);
-    circuit
-        .block_in()
-        .push(block(1.into(), (10, 20, 8).into()), 1);
-    circuit
-        .block_in()
-        .push(block(2.into(), (15, 25, 3).into()), 1);
+    circuit.block_in().push(block(0, (10, 20, 5)), 1);
+    circuit.block_in().push(block(1, (10, 20, 8)), 1);
+    circuit.block_in().push(block(2, (15, 25, 3)), 1);
 
     step_named(&mut circuit, "test_highest_block_aggregation");
 
@@ -51,9 +45,9 @@ fn test_highest_block_aggregation() {
 
 #[rstest]
 #[case::empty(vec![], vec![])]
-#[case::single(vec![block(1.into(), (0, 0, 2).into())], vec![hb(0, 0, 2)])]
-#[case::duplicate_same_height(vec![block(1.into(), (1, 1, 5).into()), block(2.into(), (1, 1, 5).into())], vec![hb(1,1,5)])]
-#[case::mixed(vec![block(1.into(), (0, 0, 3).into()), block(2.into(), (0, 0, 1).into()), block(3.into(), (0, 1, 4).into())], vec![hb(0,0,3), hb(0,1,4)])]
+#[case::single(vec![block(1, (0, 0, 2))], vec![hb(0, 0, 2)])]
+#[case::duplicate_same_height(vec![block(1, (1, 1, 5)), block(2, (1, 1, 5))], vec![hb(1,1,5)])]
+#[case::mixed(vec![block(1, (0, 0, 3)), block(2, (0, 0, 1)), block(3, (0, 1, 4))], vec![hb(0,0,3), hb(0,1,4)])]
 fn highest_block_cases(#[case] blocks: Vec<Block>, #[case] expected: Vec<HighestBlockAt>) {
     let mut circuit = new_circuit();
     for blk in blocks {
@@ -75,14 +69,14 @@ fn highest_block_cases(#[case] blocks: Vec<Block>, #[case] expected: Vec<Highest
 }
 
 #[rstest]
-#[case::block_only(vec![block(1.into(), (0, 0, 0).into())], vec![], vec![fh(0,0,1.0)])]
-#[case::block_with_slope(vec![block(1.into(), (0, 0, 0).into())], vec![slope(1.into(), (1.0, 0.0).into())], vec![fh(0,0,1.5)])]
-#[case::highest_block_wins(vec![block(1.into(), (0, 0, 0).into()), block(2.into(), (0, 0, 1).into())], vec![], vec![fh(0,0,2.0)])] // highest block wins
-#[case::negative_slope(vec![block(1.into(), (0, 0, 0).into())], vec![slope(1.into(), (-1.0, 0.0).into())], vec![fh(0,0,0.5)])] // negative slope
-#[case::zero_slope(vec![block(1.into(), (0, 0, 0).into())], vec![slope(1.into(), (0.0, 0.0).into())], vec![fh(0,0,1.0)])] // zero slope
-#[case::negative_coords(vec![block(1.into(), (-1, -1, 0).into())], vec![slope(1.into(), (1.0, 1.0).into())], vec![fh(-1,-1,2.0)])] // negative coordinates
-#[case::large_gradients(vec![block(1.into(), (0, 0, 0).into())], vec![slope(1.into(), (100.0, 100.0).into())], vec![fh(0,0,101.0)])] // large gradients
-#[case::multiple_slopes(vec![block(1.into(), (0, 0, 0).into()), block(2.into(), (0, 0, 1).into())], vec![slope(1.into(), (1.0, 0.0).into()), slope(2.into(), (0.0, 1.0).into())], vec![fh(0,0,2.5)])] // multiple slopes, highest wins
+#[case::block_only(vec![block(1, (0, 0, 0))], vec![], vec![fh(0,0,1.0)])]
+#[case::block_with_slope(vec![block(1, (0, 0, 0))], vec![slope(1, (1.0, 0.0))], vec![fh(0,0,1.5)])]
+#[case::highest_block_wins(vec![block(1, (0, 0, 0)), block(2, (0, 0, 1))], vec![], vec![fh(0,0,2.0)])] // highest block wins
+#[case::negative_slope(vec![block(1, (0, 0, 0))], vec![slope(1, (-1.0, 0.0))], vec![fh(0,0,0.5)])] // negative slope
+#[case::zero_slope(vec![block(1, (0, 0, 0))], vec![slope(1, (0.0, 0.0))], vec![fh(0,0,1.0)])] // zero slope
+#[case::negative_coords(vec![block(1, (-1, -1, 0))], vec![slope(1, (1.0, 1.0))], vec![fh(-1,-1,2.0)])] // negative coordinates
+#[case::large_gradients(vec![block(1, (0, 0, 0))], vec![slope(1, (100.0, 100.0))], vec![fh(0,0,101.0)])] // large gradients
+#[case::multiple_slopes(vec![block(1, (0, 0, 0)), block(2, (0, 0, 1))], vec![slope(1, (1.0, 0.0)), slope(2, (0.0, 1.0))], vec![fh(0,0,2.5)])] // multiple slopes, highest wins
 fn floor_height_cases(
     #[case] blocks: Vec<Block>,
     #[case] slopes: Vec<BlockSlope>,
@@ -111,12 +105,8 @@ fn floor_height_cases(
 #[test]
 fn unmatched_slope_is_ignored() {
     let mut circuit = new_circuit();
-    circuit
-        .block_in()
-        .push(block(1.into(), (0, 0, 0).into()), 1);
-    circuit
-        .block_slope_in()
-        .push(slope(2.into(), (1.0, 0.0).into()), 1);
+    circuit.block_in().push(block(1, (0, 0, 0)), 1);
+    circuit.block_slope_in().push(slope(2, (1.0, 0.0)), 1);
 
     step_named(&mut circuit, "unmatched_slope_is_ignored");
 
@@ -133,9 +123,7 @@ fn unmatched_slope_is_ignored() {
 #[test]
 fn slope_without_block_yields_no_height() {
     let mut circuit = new_circuit();
-    circuit
-        .block_slope_in()
-        .push(slope(1.into(), (1.0, 0.0).into()), 1);
+    circuit.block_slope_in().push(slope(1, (1.0, 0.0)), 1);
 
     step_named(&mut circuit, "slope_without_block_yields_no_height");
 

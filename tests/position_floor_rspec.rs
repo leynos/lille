@@ -98,7 +98,7 @@ fn join_position_with_floor() {
                     },
                     None,
                 );
-                env.push_position(pos(1.into(), (0.2, 0.2, 2.0).into()));
+                env.push_position(pos(1, (0.2, 0.2, 2.0)));
                 env.step();
             });
             ctx.then("position is paired with floor height", |env| {
@@ -106,7 +106,7 @@ fn join_position_with_floor() {
                 assert_eq!(
                     out,
                     vec![PositionFloor {
-                        position: pos(1.into(), (0.2, 0.2, 2.0).into()),
+                        position: pos(1, (0.2, 0.2, 2.0)),
                         z_floor: 1.0.into(),
                     }]
                 );

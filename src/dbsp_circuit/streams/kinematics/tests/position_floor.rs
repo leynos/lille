@@ -15,22 +15,22 @@ fn pf(position: Position, z_floor: f64) -> PositionFloor {
 
 #[rstest]
 #[case(
-    vec![block(1.into(), (0, 0, 0).into())],
+    vec![block(1, (0, 0, 0))],
     vec![],
-    vec![pos(1.into(), (0.2, 0.3, 2.0).into())],
-    vec![pf(pos(1.into(), (0.2, 0.3, 2.0).into()),1.0)],
+    vec![pos(1, (0.2, 0.3, 2.0))],
+    vec![pf(pos(1, (0.2, 0.3, 2.0)),1.0)],
 )]
 #[case(
     vec![],
     vec![],
-    vec![pos(1.into(), (0.0, 0.0, 0.5).into())],
+    vec![pos(1, (0.0, 0.0, 0.5))],
     vec![],
 )]
 #[case(
-    vec![block(1.into(), (-1, -1, 0).into())],
-    vec![slope(1.into(), (1.0, 0.0).into())],
-    vec![pos(2.into(), (-0.8, -0.2, 3.0).into())],
-    vec![pf(pos(2.into(), (-0.8, -0.2, 3.0).into()),1.5)],
+    vec![block(1, (-1, -1, 0))],
+    vec![slope(1, (1.0, 0.0))],
+    vec![pos(2, (-0.8, -0.2, 3.0))],
+    vec![pf(pos(2, (-0.8, -0.2, 3.0)),1.5)],
 )]
 fn position_floor_cases(
     #[case] blocks: Vec<Block>,
@@ -65,15 +65,9 @@ fn position_floor_cases(
 #[test]
 fn multiple_positions_same_grid_cell() {
     let mut circuit = new_circuit();
-    circuit
-        .block_in()
-        .push(block(1.into(), (0, 0, 0).into()), 1);
-    circuit
-        .position_in()
-        .push(pos(1.into(), (0.1, 0.1, 2.0).into()), 1);
-    circuit
-        .position_in()
-        .push(pos(2.into(), (0.8, 0.4, 3.0).into()), 1);
+    circuit.block_in().push(block(1, (0, 0, 0)), 1);
+    circuit.position_in().push(pos(1, (0.1, 0.1, 2.0)), 1);
+    circuit.position_in().push(pos(2, (0.8, 0.4, 3.0)), 1);
     step_named(&mut circuit, "multiple_positions_same_grid_cell");
     // `consolidate()` yields a `TypedBatch` without `IntoIterator`; clone values for comparison.
     let mut vals: Vec<PositionFloor> = circuit
@@ -84,8 +78,8 @@ fn multiple_positions_same_grid_cell() {
         .collect();
     vals.sort_by_key(|pf| pf.position.entity);
     let mut exp = vec![
-        pf(pos(1.into(), (0.1, 0.1, 2.0).into()), 1.0),
-        pf(pos(2.into(), (0.8, 0.4, 3.0).into()), 1.0),
+        pf(pos(1, (0.1, 0.1, 2.0)), 1.0),
+        pf(pos(2, (0.8, 0.4, 3.0)), 1.0),
     ];
     exp.sort_by_key(|pf| pf.position.entity);
     assert_eq!(vals, exp);
