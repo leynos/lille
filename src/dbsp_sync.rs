@@ -15,7 +15,7 @@ use log::{error, warn};
 use crate::components::{
     Block, BlockSlope, DdlogId, ForceComp, Target as TargetComp, VelocityComp,
 };
-use crate::dbsp_circuit::{DbspCircuit, Force, Position, Target, Velocity};
+use crate::dbsp_circuit::{try_step, DbspCircuit, Force, Position, Target, Velocity};
 use crate::world_handle::{init_world_handle_system, DdlogEntity, WorldHandle};
 
 // Compact alias for the per-entity inputs used by the cache system.
@@ -285,7 +285,10 @@ pub fn apply_dbsp_outputs_system(
     mut write_query: Query<(Entity, &mut Transform, Option<&mut VelocityComp>), With<DdlogId>>,
     mut world_handle: ResMut<WorldHandle>,
 ) {
-    state.circuit.step().expect("DBSP step failed");
+    if let Err(e) = try_step(&mut state.circuit) {
+        error!("DbspCircuit::step failed: {e}");
+        return;
+    }
 
     let positions = state.circuit.new_position_out().consolidate();
     for (pos, _, _) in positions.iter() {

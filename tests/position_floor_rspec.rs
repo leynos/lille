@@ -12,7 +12,7 @@ use lille::{
 };
 use std::fmt;
 use std::sync::{Arc, Mutex};
-use test_utils::prelude::*;
+use test_utils::{pos, step, Coords3D, EntityId};
 
 #[derive(Clone)]
 /// Shared test environment wrapping a `DbspCircuit` in a thread-safe container.
@@ -63,7 +63,8 @@ impl Env {
 
     /// Advances the circuit by one tick.
     fn step(&self) {
-        self.circuit.lock().expect("lock").step().expect("step");
+        let mut c = self.circuit.lock().expect("lock");
+        step(&mut c);
     }
 
     /// Retrieves and clears the `PositionFloor` output collection.

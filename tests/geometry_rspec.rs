@@ -9,6 +9,7 @@ use lille::{
 };
 use std::fmt;
 use std::sync::{Arc, Mutex};
+use test_utils::step;
 
 #[derive(Clone)]
 struct Env {
@@ -51,11 +52,8 @@ impl Env {
     }
 
     fn step(&self) {
-        self.circuit
-            .lock()
-            .expect("mutex poisoned")
-            .step()
-            .expect("step failed");
+        let mut c = self.circuit.lock().expect("mutex poisoned");
+        step(&mut c);
     }
 
     fn output(&self) -> Vec<FloorHeightAt> {

@@ -1,6 +1,7 @@
 //! Tests for joining positions with floor heights.
 
 use crate::components::{Block, BlockSlope};
+use crate::dbsp_circuit::step_named;
 use crate::dbsp_circuit::streams::test_utils::{
     block, new_circuit, pos, slope, BlockCoords, BlockId, Coords3D, EntityId, Gradient,
 };
@@ -40,16 +41,17 @@ fn position_floor_cases(
     #[case] expected: Vec<PositionFloor>,
 ) {
     let mut circuit = new_circuit();
-    for b in &blocks {
-        circuit.block_in().push(b.clone(), 1);
+    for b in blocks {
+        circuit.block_in().push(b, 1);
     }
-    for s in &slopes {
-        circuit.block_slope_in().push(s.clone(), 1);
+    for s in slopes {
+        circuit.block_slope_in().push(s, 1);
     }
     for p in positions {
         circuit.position_in().push(p, 1);
     }
-    circuit.step().expect("circuit step");
+    step_named(&mut circuit, "position_floor_cases");
+    // `consolidate()` yields a `TypedBatch` without `IntoIterator`; clone values for comparison.
     let mut vals: Vec<PositionFloor> = circuit
         .position_floor_out()
         .consolidate()
@@ -74,7 +76,8 @@ fn multiple_positions_same_grid_cell() {
     circuit
         .position_in()
         .push(pos(EntityId::new(2), Coords3D::new(0.8, 0.4, 3.0)), 1);
-    circuit.step().expect("circuit step");
+    step_named(&mut circuit, "multiple_positions_same_grid_cell");
+    // `consolidate()` yields a `TypedBatch` without `IntoIterator`; clone values for comparison.
     let mut vals: Vec<PositionFloor> = circuit
         .position_floor_out()
         .consolidate()

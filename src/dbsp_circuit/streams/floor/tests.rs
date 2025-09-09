@@ -1,6 +1,7 @@
 //! Tests for floor streams aggregating block heights and slopes.
 
 use crate::components::{Block, BlockSlope};
+use crate::dbsp_circuit::step_named;
 use crate::dbsp_circuit::streams::test_utils::{
     block, new_circuit, slope, BlockCoords, BlockId, Gradient,
 };
@@ -33,11 +34,14 @@ fn test_highest_block_aggregation() {
         .block_in()
         .push(block(BlockId::new(2), BlockCoords::new(15, 25, 3)), 1);
 
-    circuit.step().expect("circuit step");
+    step_named(&mut circuit, "test_highest_block_aggregation");
 
-    let output = circuit.highest_block_out().consolidate();
-    #[allow(clippy::clone_on_copy)]
-    let mut vals: Vec<HighestBlockAt> = output.iter().map(|(hb, _, _)| hb.clone()).collect();
+    let mut vals: Vec<HighestBlockAt> = circuit
+        .highest_block_out()
+        .consolidate()
+        .iter()
+        .map(|(hb, _, _)| hb)
+        .collect();
     vals.sort_by_key(|h| (h.x, h.y));
     assert!(vals
         .windows(2)
@@ -57,14 +61,13 @@ fn highest_block_cases(#[case] blocks: Vec<Block>, #[case] expected: Vec<Highest
     for blk in blocks {
         circuit.block_in().push(blk, 1);
     }
-    circuit.step().expect("circuit step");
+    step_named(&mut circuit, "highest_block_cases");
 
-    #[allow(clippy::clone_on_copy)]
     let mut vals: Vec<HighestBlockAt> = circuit
         .highest_block_out()
         .consolidate()
         .iter()
-        .map(|(hb, _, _)| hb.clone())
+        .map(|(hb, _, _)| hb)
         .collect();
     vals.sort_by_key(|h| (h.x, h.y));
 
@@ -88,19 +91,18 @@ fn floor_height_cases(
     #[case] expected: Vec<FloorHeightAt>,
 ) {
     let mut circuit = new_circuit();
-    for b in &blocks {
-        circuit.block_in().push(b.clone(), 1);
+    for b in blocks {
+        circuit.block_in().push(b, 1);
     }
-    for s in &slopes {
-        circuit.block_slope_in().push(s.clone(), 1);
+    for s in slopes {
+        circuit.block_slope_in().push(s, 1);
     }
-    circuit.step().expect("circuit step");
-    #[allow(clippy::clone_on_copy)]
+    step_named(&mut circuit, "floor_height_cases");
     let mut vals: Vec<FloorHeightAt> = circuit
         .floor_height_out()
         .consolidate()
         .iter()
-        .map(|(fh, _, _)| fh.clone())
+        .map(|(fh, _, _)| fh)
         .collect();
     vals.sort_by_key(|h| (h.x, h.y));
     let mut exp = expected;
@@ -118,14 +120,13 @@ fn unmatched_slope_is_ignored() {
         .block_slope_in()
         .push(slope(BlockId::new(2), Gradient::new(1.0, 0.0)), 1);
 
-    circuit.step().expect("circuit step");
+    step_named(&mut circuit, "unmatched_slope_is_ignored");
 
-    #[allow(clippy::clone_on_copy)]
     let vals: Vec<FloorHeightAt> = circuit
         .floor_height_out()
         .consolidate()
         .iter()
-        .map(|(fh, _, _)| fh.clone())
+        .map(|(fh, _, _)| fh)
         .collect();
 
     assert_eq!(vals, vec![fh(0, 0, 1.0)]);
@@ -138,14 +139,13 @@ fn slope_without_block_yields_no_height() {
         .block_slope_in()
         .push(slope(BlockId::new(1), Gradient::new(1.0, 0.0)), 1);
 
-    circuit.step().expect("circuit step");
+    step_named(&mut circuit, "slope_without_block_yields_no_height");
 
-    #[allow(clippy::clone_on_copy)]
     let vals: Vec<FloorHeightAt> = circuit
         .floor_height_out()
         .consolidate()
         .iter()
-        .map(|(fh, _, _)| fh.clone())
+        .map(|(fh, _, _)| fh)
         .collect();
 
     assert!(vals.is_empty());

@@ -7,7 +7,10 @@ use approx::assert_relative_eq;
 use lille::components::Block;
 use lille::dbsp_circuit::{DbspCircuit, FearLevel, NewPosition, Position, Target, Velocity};
 use rstest::rstest;
-use test_utils::prelude::*;
+use test_utils::{
+    block, fear, pos, step, target, vel, BlockCoords, BlockId, Coords2D, Coords3D, EntityId,
+    FearValue,
+};
 
 struct Env {
     // Owns the circuit directly so tests can mutate it without synchronisation
@@ -37,7 +40,7 @@ impl Env {
     }
 
     fn step(&mut self) {
-        self.circuit.step().expect("dbsp step");
+        step(&mut self.circuit);
     }
 
     fn drain_output(&mut self) -> Vec<NewPosition> {

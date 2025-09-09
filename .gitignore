@@ -4,3 +4,4 @@ Cargo.lock
 *.ttf
 assets/
 .env
+.crush/

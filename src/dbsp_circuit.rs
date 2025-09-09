@@ -15,6 +15,7 @@
 //!
 //! ```rust,no_run
 //! # use lille::prelude::*;
+//! # use lille::dbsp_circuit::step as _;
 //! ```
 
 use anyhow::Error as AnyError;
@@ -47,6 +48,7 @@ pub use types::{
 ///
 /// ```rust,no_run
 /// # use lille::prelude::*;
+/// # use lille::dbsp_circuit::step as _;
 /// let mut circuit = DbspCircuit::new().expect("circuit construction failed");
 ///
 /// // 1) Feed inputs for this frame.
@@ -59,7 +61,7 @@ pub use types::{
 /// // circuit.block_slope_in().push(BlockSlope { /* ... */ }, 1);
 ///
 /// // 2) Advance the circuit.
-/// circuit.step().expect("circuit evaluation failed");
+/// lille::dbsp_circuit::step(&mut circuit);
 ///
 /// // 3) Read outputs via the getters.
 /// // let _ = circuit.new_position_out();
@@ -114,6 +116,7 @@ impl DbspCircuit {
     ///
     /// ```rust,no_run
     /// # use lille::prelude::*;
+    /// # use lille::dbsp_circuit::step as _;
     /// let circuit = DbspCircuit::new().expect("circuit construction failed");
     /// ```
     pub fn new() -> Result<Self, dbsp::Error> {
@@ -225,6 +228,7 @@ impl DbspCircuit {
     ///
     /// ```rust,no_run
     /// # use lille::prelude::*;
+    /// # use lille::dbsp_circuit::step as _;
     /// let circuit = DbspCircuit::new().expect("circuit construction failed");
     /// let position_handle = circuit.position_in();
     /// // Feed positions into the circuit using `position_handle`
@@ -241,6 +245,7 @@ impl DbspCircuit {
     ///
     /// ```rust,no_run
     /// # use lille::prelude::*;
+    /// # use lille::dbsp_circuit::step as _;
     /// let circuit = DbspCircuit::new().expect("circuit construction failed");
     /// let velocity_in = circuit.velocity_in();
     /// velocity_in.push(
@@ -266,6 +271,7 @@ impl DbspCircuit {
     ///
     /// ```rust,no_run
     /// # use lille::prelude::*;
+    /// # use lille::dbsp_circuit::step as _;
     /// # use ordered_float::OrderedFloat;
     /// let circuit = DbspCircuit::new().expect("circuit construction failed");
     /// let force_in = circuit.force_in();
@@ -328,6 +334,7 @@ impl DbspCircuit {
     ///
     /// ```rust,no_run
     /// # use lille::prelude::*;
+    /// # use lille::dbsp_circuit::step as _;
     /// let circuit = DbspCircuit::new().expect("circuit construction failed");
     /// let block_handle = circuit.block_in();
     /// // Feed block data into the circuit using `block_handle`
@@ -345,6 +352,7 @@ impl DbspCircuit {
     ///
     /// ```rust,no_run
     /// # use lille::prelude::*;
+    /// # use lille::dbsp_circuit::step as _;
     /// let circuit = DbspCircuit::new().expect("circuit construction failed");
     /// let slope_handle = circuit.block_slope_in();
     /// // Feed block slope data into the circuit using `slope_handle`
@@ -361,6 +369,7 @@ impl DbspCircuit {
     ///
     /// ```rust,no_run
     /// # use lille::prelude::*;
+    /// # use lille::dbsp_circuit::step as _;
     /// let circuit = DbspCircuit::new().expect("circuit construction failed");
     /// let new_positions = circuit.new_position_out();
     /// // Read new positions from the output handle
@@ -378,6 +387,7 @@ impl DbspCircuit {
     ///
     /// ```rust,no_run
     /// # use lille::prelude::*;
+    /// # use lille::dbsp_circuit::step as _;
     /// let circuit = DbspCircuit::new().expect("circuit construction failed");
     /// let velocities = circuit.new_velocity_out();
     /// // Use `velocities` to read updated velocity data.
@@ -395,6 +405,7 @@ impl DbspCircuit {
     ///
     /// ```rust,no_run
     /// # use lille::prelude::*;
+    /// # use lille::dbsp_circuit::step as _;
     /// let circuit = DbspCircuit::new().expect("circuit construction failed");
     /// let highest_block_handle = circuit.highest_block_out();
     /// // Use `highest_block_handle` to read aggregated highest block data.
@@ -413,6 +424,7 @@ impl DbspCircuit {
     ///
     /// ```rust,no_run
     /// # use lille::prelude::*;
+    /// # use lille::dbsp_circuit::step as _;
     /// let circuit = DbspCircuit::new().expect("circuit construction failed");
     /// let floor_heights = circuit.floor_height_out();
     /// // Read computed floor heights from the output handle
@@ -463,6 +475,51 @@ impl DbspCircuit {
         self.block_in.clear_input();
         self.block_slope_in.clear_input();
     }
+}
+
+/// Advances the circuit by one tick.
+///
+/// # Panics
+/// Panics if evaluation fails.
+///
+/// # Examples
+/// ```rust
+/// use lille::dbsp_circuit::{DbspCircuit, step};
+/// let mut circuit = DbspCircuit::new().expect("circuit construction failed");
+/// step(&mut circuit);
+/// ```
+#[track_caller]
+pub fn step(circuit: &mut DbspCircuit) {
+    circuit.step().expect("DbspCircuit::step failed");
+}
+
+/// Advances the circuit and includes context in panic messages.
+///
+/// # Examples
+/// ```rust
+/// use lille::dbsp_circuit::{DbspCircuit, step_named};
+/// let mut circuit = DbspCircuit::new().expect("circuit construction failed");
+/// step_named(&mut circuit, "context");
+/// ```
+#[track_caller]
+pub fn step_named(circuit: &mut DbspCircuit, ctx: &str) {
+    circuit
+        .step()
+        .unwrap_or_else(|e| panic!("DbspCircuit::step failed: {ctx}: {e}"));
+}
+
+/// Attempts to advance the circuit by one tick.
+///
+/// Returns an error if evaluation fails.
+///
+/// # Examples
+/// ```rust
+/// use lille::dbsp_circuit::{DbspCircuit, try_step};
+/// let mut circuit = DbspCircuit::new().expect("circuit construction failed");
+/// try_step(&mut circuit).expect("circuit evaluation failed");
+/// ```
+pub fn try_step(circuit: &mut DbspCircuit) -> Result<(), dbsp::Error> {
+    circuit.step()
 }
 
 #[cfg(test)]

@@ -45,3 +45,23 @@ pub fn assert_valid_rust_syntax(code: &str) {
         panic!("generated code is not valid Rust:\n{code}\nError: {err}",);
     }
 }
+
+/// Step the circuit and panic if evaluation fails.
+///
+/// # Examples
+/// ```rust
+/// use test_utils::{new_circuit, step};
+/// let mut circuit = new_circuit();
+/// step(&mut circuit);
+/// ```
+pub use lille::dbsp_circuit::step;
+
+/// Advances the circuit and includes context in panic messages.
+///
+/// # Examples
+/// ```rust
+/// use test_utils::{new_circuit, step_named};
+/// let mut circuit = new_circuit();
+/// step_named(&mut circuit, "ctx");
+/// ```
+pub use lille::dbsp_circuit::step_named;
