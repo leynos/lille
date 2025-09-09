@@ -612,7 +612,7 @@ configurations observed in such workflows include:
     matrix testing is a best practice for ensuring broad compatibility.
   - Execution with Miri (`miri`) to detect undefined behavior.
   - Static analysis and linting (`clippy`).
-  - Code formatting checks (`rustfmt`).
+  - Code formatting checks (`check-fmt` wrapping `rustfmt`).
   - Spell checking in documentation and comments (`typos`).
 - **Caching Strategy:** The caching configuration in Bevy's CI is typically
   fine-tuned, specifying paths such as `~/.cargo/bin/`,

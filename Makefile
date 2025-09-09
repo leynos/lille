@@ -1,4 +1,4 @@
-.PHONY: all clean build fmt fmt-check test lint build-support-run markdownlint nixie
+.PHONY: all clean build fmt check-fmt test lint build-support-run markdownlint nixie
 
 .ONESHELL:
 SHELL := bash
@@ -21,7 +21,7 @@ fmt:
 	cargo fmt $(WORKSPACE_PACKAGES)
 	mdformat-all
 
-fmt-check:
+check-fmt:
 	cargo fmt $(WORKSPACE_PACKAGES) -- --check
 
 build-support-run:
