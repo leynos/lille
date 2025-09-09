@@ -3,7 +3,7 @@
 
 pub mod font;
 
-use color_eyre::eyre::Result;
+use anyhow::Result;
 use std::path::PathBuf;
 
 /// Execute all build steps required by `build.rs`.
@@ -13,7 +13,7 @@ use std::path::PathBuf;
 ///
 /// # Examples
 /// ```rust,no_run
-/// use color_eyre::eyre::Result;
+/// use anyhow::Result;
 /// fn main() -> Result<()> {
 ///     build_support::build()
 /// }

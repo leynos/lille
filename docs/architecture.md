@@ -125,5 +125,8 @@ architecture.
   computation while expressing complex rules in a clear, declarative style, as
   outlined in `docs/lille-physics-engine-design.md`.
 
+- **Flexible error handling**: `anyhow` supplies context-rich errors without
+  ceremony.
+
 This architecture provides a robust and scalable foundation for building the
 complex, emergent world of Lille.

@@ -4,7 +4,7 @@
 //! [`FontFetcher`], checks its SHA-256 digest and writes the verified font to
 //! disk. This ensures deterministic builds without shipping the font in the
 //! repository.
-use color_eyre::eyre::{eyre, Result};
+use anyhow::{anyhow, Result};
 use reqwest::blocking::Client;
 use sha2::{Digest, Sha256};
 use std::fs;
@@ -76,7 +76,7 @@ fn fallback_font_path() -> PathBuf {
 /// ```rust,no_run
 /// # use std::env;
 /// build_support::font::download_font(env::current_dir()?)?;
-/// # Ok::<(), color_eyre::Report>(())
+/// # Ok::<(), anyhow::Error>(())
 /// ```
 pub fn download_font(manifest_dir: impl AsRef<Path>) -> Result<PathBuf> {
     download_font_with(&HttpFontFetcher, manifest_dir)
@@ -156,7 +156,7 @@ fn fetch_font_data() -> Result<Vec<u8>> {
     let digest = Sha256::digest(&bytes);
     let actual = format!("{digest:x}");
     if actual != FONT_SHA256 {
-        return Err(eyre!("font checksum mismatch"));
+        return Err(anyhow!("font checksum mismatch"));
     }
     Ok(bytes.to_vec())
 }
@@ -207,7 +207,7 @@ mod tests {
         let mut fetcher = MockFontFetcher::new();
         fetcher
             .expect_fetch()
-            .returning(|| Err(eyre!("network error")));
+            .returning(|| Err(anyhow!("network error")));
         let result = download_font_with(&fetcher, &manifest_path).unwrap();
         assert!(result == fallback_font_path() || result.exists());
     }
@@ -217,7 +217,7 @@ mod tests {
         let mut fetcher = MockFontFetcher::new();
         fetcher
             .expect_fetch()
-            .returning(|| Err(eyre!("network error")));
+            .returning(|| Err(anyhow!("network error")));
         let result = download_font_with(&fetcher, Path::new("/non/existent/path"));
         assert!(result.is_ok());
         let p = result.unwrap();

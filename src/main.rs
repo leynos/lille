@@ -1,9 +1,9 @@
 //! Example game application using the Lille library.
 //! Launches a Bevy app and wires up logging, world state, and basic systems.
+use anyhow::Result;
 use bevy::log::LogPlugin;
 use bevy::prelude::*;
 use clap::Parser;
-use color_eyre::eyre::Result;
 use lille::{init_logging, spawn_world_system, DbspPlugin};
 
 /// A realtime strategy game
@@ -19,7 +19,6 @@ struct Args {
 ///
 /// Parses command-line arguments, configures logging, and launches the Bevy app with custom system scheduling for world state integration and world setup.
 fn main() -> Result<()> {
-    color_eyre::install()?;
     let args = Args::parse();
     init_logging(args.verbose);
 
