@@ -12,7 +12,7 @@ use lille::{
 };
 use std::fmt;
 use std::sync::{Arc, Mutex};
-use test_utils::{pos, step, Coords3D, EntityId};
+use test_utils::{pos, step};
 
 #[derive(Clone)]
 /// Shared test environment wrapping a `DbspCircuit` in a thread-safe container.
@@ -98,7 +98,7 @@ fn join_position_with_floor() {
                     },
                     None,
                 );
-                env.push_position(pos(EntityId::new(1), Coords3D::new(0.2, 0.2, 2.0)));
+                env.push_position(pos(1, (0.2, 0.2, 2.0)));
                 env.step();
             });
             ctx.then("position is paired with floor height", |env| {
@@ -106,7 +106,7 @@ fn join_position_with_floor() {
                 assert_eq!(
                     out,
                     vec![PositionFloor {
-                        position: pos(EntityId::new(1), Coords3D::new(0.2, 0.2, 2.0)),
+                        position: pos(1, (0.2, 0.2, 2.0)),
                         z_floor: 1.0.into(),
                     }]
                 );

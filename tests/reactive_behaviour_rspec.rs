@@ -7,10 +7,7 @@ use approx::assert_relative_eq;
 use lille::components::Block;
 use lille::dbsp_circuit::{DbspCircuit, FearLevel, NewPosition, Position, Target, Velocity};
 use rstest::rstest;
-use test_utils::{
-    block, fear, pos, step, target, vel, BlockCoords, BlockId, Coords2D, Coords3D, EntityId,
-    FearValue,
-};
+use test_utils::{block, fear, pos, step, vel};
 
 struct Env {
     // Owns the circuit directly so tests can mutate it without synchronisation
@@ -69,7 +66,7 @@ impl Default for Env {
     "moves towards target when unafraid",
     vec![(1, 0, 0, 0), (2, 1, 1, 0)],
     None,
-    Some(target(EntityId::new(1), Coords2D::new(1.0, 1.0))),
+    Some(Target { entity: 1, x: 1.0.into(), y: 1.0.into() }),
     vec![NewPosition {
         entity: 1,
         x: std::f64::consts::FRAC_1_SQRT_2.into(),
@@ -80,8 +77,8 @@ impl Default for Env {
 #[case(
     "flees target when afraid",
     vec![(1, -1, 0, 0), (2, 0, 0, 0)],
-    Some(fear(EntityId::new(1), FearValue::new(0.5))),
-    Some(target(EntityId::new(1), Coords2D::new(1.0, 1.0))),
+    Some(fear(1, 0.5_f32)),
+    Some(Target { entity: 1, x: 1.0.into(), y: 1.0.into() }),
     vec![NewPosition {
         entity: 1,
         x: (-std::f64::consts::FRAC_1_SQRT_2).into(),
@@ -110,10 +107,10 @@ fn reactive_movement_behaviour(
 ) {
     let mut env = Env::default();
     for (entity, x, y, z) in blocks {
-        env.push_block(block(BlockId::new(entity), BlockCoords::new(x, y, z)));
+        env.push_block(block(entity, (x, y, z)));
     }
-    env.push_position(pos(EntityId::new(1), Coords3D::new(0.0, 0.0, 1.0)));
-    env.push_velocity(vel(EntityId::new(1), Coords3D::new(0.0, 0.0, 0.0)));
+    env.push_position(pos(1, (0.0, 0.0, 1.0)));
+    env.push_velocity(vel(1, (0.0, 0.0, 0.0)));
     if let Some(t) = target_input {
         env.push_target(t);
     }
@@ -134,21 +131,29 @@ fn reactive_movement_behaviour(
 #[test]
 fn handles_multiple_entities_with_mixed_states() {
     let mut env = Env::default();
-    env.push_block(block(BlockId::new(1), BlockCoords::new(-1, 0, 0)));
-    env.push_block(block(BlockId::new(2), BlockCoords::new(0, 0, 0)));
-    env.push_block(block(BlockId::new(3), BlockCoords::new(1, 1, 0)));
+    env.push_block(block(1, (-1, 0, 0)));
+    env.push_block(block(2, (0, 0, 0)));
+    env.push_block(block(3, (1, 1, 0)));
 
-    env.push_position(pos(EntityId::new(1), Coords3D::new(0.0, 0.0, 1.0)));
-    env.push_velocity(vel(EntityId::new(1), Coords3D::new(0.0, 0.0, 0.0)));
-    env.push_target(target(EntityId::new(1), Coords2D::new(1.0, 1.0)));
-    env.push_fear(fear(EntityId::new(1), FearValue::new(0.5)));
+    env.push_position(pos(1, (0.0, 0.0, 1.0)));
+    env.push_velocity(vel(1, (0.0, 0.0, 0.0)));
+    env.push_target(Target {
+        entity: 1,
+        x: 1.0.into(),
+        y: 1.0.into(),
+    });
+    env.push_fear(fear(1, 0.5_f32));
 
-    env.push_position(pos(EntityId::new(2), Coords3D::new(0.0, 0.0, 1.0)));
-    env.push_velocity(vel(EntityId::new(2), Coords3D::new(0.0, 0.0, 0.0)));
-    env.push_target(target(EntityId::new(2), Coords2D::new(1.0, 1.0)));
+    env.push_position(pos(2, (0.0, 0.0, 1.0)));
+    env.push_velocity(vel(2, (0.0, 0.0, 0.0)));
+    env.push_target(Target {
+        entity: 2,
+        x: 1.0.into(),
+        y: 1.0.into(),
+    });
 
-    env.push_position(pos(EntityId::new(3), Coords3D::new(0.0, 0.0, 1.0)));
-    env.push_velocity(vel(EntityId::new(3), Coords3D::new(0.0, 0.0, 0.0)));
+    env.push_position(pos(3, (0.0, 0.0, 1.0)));
+    env.push_velocity(vel(3, (0.0, 0.0, 0.0)));
 
     env.step();
     let mut out = env.drain_output();

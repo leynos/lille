@@ -13,7 +13,13 @@ pub fn new_circuit() -> DbspCircuit {
 }
 
 /// Constructs a [`Block`] with the given identifier and coordinates.
-pub fn block(id: BlockId, coords: BlockCoords) -> Block {
+pub fn block<I, C>(id: I, coords: C) -> Block
+where
+    I: Into<BlockId>,
+    C: Into<BlockCoords>,
+{
+    let id: BlockId = id.into();
+    let coords: BlockCoords = coords.into();
     Block {
         id: id.0,
         x: coords.x,
@@ -23,7 +29,13 @@ pub fn block(id: BlockId, coords: BlockCoords) -> Block {
 }
 
 /// Constructs a [`BlockSlope`] describing the block gradient.
-pub fn slope(block_id: BlockId, gradient: Gradient) -> BlockSlope {
+pub fn slope<I, G>(block_id: I, gradient: G) -> BlockSlope
+where
+    I: Into<BlockId>,
+    G: Into<Gradient>,
+{
+    let block_id: BlockId = block_id.into();
+    let gradient: Gradient = gradient.into();
     BlockSlope {
         block_id: block_id.0,
         grad_x: gradient.x.into(),
@@ -32,7 +44,13 @@ pub fn slope(block_id: BlockId, gradient: Gradient) -> BlockSlope {
 }
 
 /// Builds a [`Position`] from an entity identifier and coordinates.
-pub fn pos(entity: EntityId, coords: Coords3D) -> Position {
+pub fn pos<E, C>(entity: E, coords: C) -> Position
+where
+    E: Into<EntityId>,
+    C: Into<Coords3D>,
+{
+    let entity: EntityId = entity.into();
+    let coords: Coords3D = coords.into();
     Position {
         entity: entity.0,
         x: coords.x.into(),
@@ -42,7 +60,13 @@ pub fn pos(entity: EntityId, coords: Coords3D) -> Position {
 }
 
 /// Builds a [`Velocity`] with the given entity and components.
-pub fn vel(entity: EntityId, velocity: Coords3D) -> Velocity {
+pub fn vel<E, V>(entity: E, velocity: V) -> Velocity
+where
+    E: Into<EntityId>,
+    V: Into<Coords3D>,
+{
+    let entity: EntityId = entity.into();
+    let velocity: Coords3D = velocity.into();
     Velocity {
         entity: entity.0,
         vx: velocity.x.into(),
@@ -52,7 +76,13 @@ pub fn vel(entity: EntityId, velocity: Coords3D) -> Velocity {
 }
 
 /// Constructs a [`Force`] without specifying mass.
-pub fn force(entity: EntityId, vec: ForceVector) -> Force {
+pub fn force<E, V>(entity: E, vec: V) -> Force
+where
+    E: Into<EntityId>,
+    V: Into<ForceVector>,
+{
+    let entity: EntityId = entity.into();
+    let vec: ForceVector = vec.into();
     Force {
         entity: entity.0,
         fx: vec.x.into(),
@@ -63,7 +93,15 @@ pub fn force(entity: EntityId, vec: ForceVector) -> Force {
 }
 
 /// Constructs a [`Force`] with an explicit mass.
-pub fn force_with_mass(entity: EntityId, vec: ForceVector, mass: Mass) -> Force {
+pub fn force_with_mass<E, V, M>(entity: E, vec: V, mass: M) -> Force
+where
+    E: Into<EntityId>,
+    V: Into<ForceVector>,
+    M: Into<Mass>,
+{
+    let entity: EntityId = entity.into();
+    let vec: ForceVector = vec.into();
+    let mass: Mass = mass.into();
     Force {
         entity: entity.0,
         fx: vec.x.into(),

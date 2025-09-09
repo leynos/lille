@@ -2,6 +2,7 @@
 //! Provides assertions for verifying generated code and constructors for
 //! common physics records.
 
+pub mod conversions;
 pub mod physics;
 pub use physics::{
     block, fear, force, force_with_mass, new_circuit, pos, slope, target, vel, BlockCoords,
