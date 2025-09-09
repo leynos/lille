@@ -28,12 +28,8 @@ fn test_highest_block_aggregation() {
 
     step_named(&mut circuit, "test_highest_block_aggregation");
 
-    let mut vals: Vec<HighestBlockAt> = circuit
-        .highest_block_out()
-        .consolidate()
-        .iter()
-        .map(|(hb, _, _)| hb)
-        .collect();
+    let output = circuit.highest_block_out().consolidate();
+    let mut vals: Vec<HighestBlockAt> = output.iter().map(|(hb, _, _)| hb).collect();
     vals.sort_by_key(|h| (h.x, h.y));
     assert!(vals
         .windows(2)

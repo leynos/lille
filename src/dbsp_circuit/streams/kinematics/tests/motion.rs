@@ -65,10 +65,7 @@ fn motion_cases(
     #[case] expected_pos: Option<NewPosition>,
     #[case] expected_vel: Option<NewVelocity>,
 ) {
-    #[allow(clippy::assertions_on_constants)]
-    {
-        debug_assert!(crate::DEFAULT_MASS > 0.0);
-    }
+    // DEFAULT_MASS is validated in `default_mass_is_positive`.
     let mut circuit = new_circuit();
 
     for b in blocks {
@@ -235,7 +232,10 @@ fn terminal_velocity_clamping(#[case] start_vz: f64, #[case] expected_vz: f64) {
 }
 
 #[test]
-#[allow(clippy::assertions_on_constants)]
+#[expect(
+    clippy::assertions_on_constants,
+    reason = "Document DEFAULT_MASS invariant in a focused test"
+)]
 fn default_mass_is_positive() {
     assert!(crate::DEFAULT_MASS > 0.0, "DEFAULT_MASS must be > 0.0");
 }

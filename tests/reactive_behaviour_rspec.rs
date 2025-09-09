@@ -7,7 +7,7 @@ use approx::assert_relative_eq;
 use lille::components::Block;
 use lille::dbsp_circuit::{DbspCircuit, FearLevel, NewPosition, Position, Target, Velocity};
 use rstest::rstest;
-use test_utils::{block, fear, pos, step, target, vel};
+use test_utils::{block, fear, pos, step, vel};
 
 struct Env {
     // Owns the circuit directly so tests can mutate it without synchronisation
@@ -66,7 +66,7 @@ impl Default for Env {
     "moves towards target when unafraid",
     vec![(1, 0, 0, 0), (2, 1, 1, 0)],
     None,
-    Some(target(1, (1.0, 1.0))),
+    Some(Target { entity: 1, x: 1.0.into(), y: 1.0.into() }),
     vec![NewPosition {
         entity: 1,
         x: std::f64::consts::FRAC_1_SQRT_2.into(),
@@ -77,8 +77,8 @@ impl Default for Env {
 #[case(
     "flees target when afraid",
     vec![(1, -1, 0, 0), (2, 0, 0, 0)],
-    Some(fear(1, 0.5)),
-    Some(target(1, (1.0, 1.0))),
+    Some(fear(1, 0.5_f32)),
+    Some(Target { entity: 1, x: 1.0.into(), y: 1.0.into() }),
     vec![NewPosition {
         entity: 1,
         x: (-std::f64::consts::FRAC_1_SQRT_2).into(),
@@ -137,12 +137,20 @@ fn handles_multiple_entities_with_mixed_states() {
 
     env.push_position(pos(1, (0.0, 0.0, 1.0)));
     env.push_velocity(vel(1, (0.0, 0.0, 0.0)));
-    env.push_target(target(1, (1.0, 1.0)));
-    env.push_fear(fear(1, 0.5));
+    env.push_target(Target {
+        entity: 1,
+        x: 1.0.into(),
+        y: 1.0.into(),
+    });
+    env.push_fear(fear(1, 0.5_f32));
 
     env.push_position(pos(2, (0.0, 0.0, 1.0)));
     env.push_velocity(vel(2, (0.0, 0.0, 0.0)));
-    env.push_target(target(2, (1.0, 1.0)));
+    env.push_target(Target {
+        entity: 2,
+        x: 1.0.into(),
+        y: 1.0.into(),
+    });
 
     env.push_position(pos(3, (0.0, 0.0, 1.0)));
     env.push_velocity(vel(3, (0.0, 0.0, 0.0)));
