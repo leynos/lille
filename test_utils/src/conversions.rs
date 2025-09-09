@@ -8,7 +8,7 @@
 //! let id: EntityId = 1_i64.into();
 //! let p: Coords3D = (0.0, 0.0, 1.0).into();
 //! let t: Coords2D = (1.0, 1.0).into();
-//! let fear: FearValue = 0.5_f64.into();
+//! let fear: FearValue = 0.5.into();
 //! let (x, y): (f64, f64) = t.into();
 //! assert_eq!(x, 1.0);
 //! ```
@@ -26,7 +26,7 @@ macro_rules! impl_newtype_conversions {
         }
         $(impl From<$extra> for $name {
             fn from(value: $extra) -> Self {
-                Self(value as $ty)
+                Self(value.into())
             }
         })*
         impl From<$name> for $ty {
@@ -85,8 +85,8 @@ macro_rules! impl_coords2_conversions {
 
 impl_newtype_conversions!(EntityId, i64, i32);
 impl_newtype_conversions!(BlockId, i64, i32);
-impl_newtype_conversions!(Mass, f64);
-impl_newtype_conversions!(FearValue, f64);
+impl_newtype_conversions!(Mass, f64, f32);
+impl_newtype_conversions!(FearValue, f64, f32);
 impl_coords3_conversions!(Coords3D, f64);
 impl_coords3_conversions!(BlockCoords, i32);
 impl_coords2_conversions!(Coords2D, f64);
@@ -126,8 +126,15 @@ mod tests {
     }
 
     #[test]
+    fn mass_roundtrip() {
+        let mass: Mass = 1.0_f32.into();
+        let raw: f64 = mass.into();
+        assert_eq!(raw, 1.0);
+    }
+
+    #[test]
     fn fear_value_roundtrip() {
-        let fear: FearValue = 0.5_f64.into();
+        let fear: FearValue = 0.5_f32.into();
         let raw: f64 = fear.into();
         assert_eq!(raw, 0.5);
     }

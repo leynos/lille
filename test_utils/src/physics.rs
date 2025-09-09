@@ -269,7 +269,7 @@ where
 /// # Examples
 /// ```rust
 /// use test_utils::physics::fear;
-/// let f = fear(1, 0.5);
+/// let f = fear(1.into(), 0.5.into());
 /// assert_eq!(f.entity, 1);
 /// assert_eq!(f.level.into_inner(), 0.5);
 /// ```
