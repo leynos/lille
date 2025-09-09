@@ -207,76 +207,82 @@ where
     f(entity, coords)
 }
 
-/// Convenience constructor for [`Position`] records used in tests.
-///
-/// # Examples
-/// ```rust
-/// use test_utils::physics::pos;
-/// let p = pos(1, (0.0, 1.0, 2.0));
-/// assert_eq!(p.entity, 1);
-/// assert_eq!(p.x.into_inner(), 0.0);
-/// assert_eq!(p.y.into_inner(), 1.0);
-/// assert_eq!(p.z.into_inner(), 2.0);
-/// ```
-pub fn pos<E, C>(entity: E, coords: C) -> Position
-where
-    E: Into<EntityId>,
-    C: Into<Coords3D>,
-{
-    with_coords3(entity, coords, |entity, coords| Position {
-        entity: entity.0,
-        x: coords.x.into(),
-        y: coords.y.into(),
-        z: coords.z.into(),
-    })
+macro_rules! impl_record_constructor {
+    ($(#[$attr:meta])* 3d $name:ident, $record:ident, $fx:ident, $fy:ident, $fz:ident) => {
+        $(#[$attr])* 
+        pub fn $name<E, C>(entity: E, coords: C) -> $record
+        where
+            E: Into<EntityId>,
+            C: Into<Coords3D>,
+        {
+            with_coords3(entity, coords, |entity, coords| $record {
+                entity: entity.0,
+                $fx: coords.x.into(),
+                $fy: coords.y.into(),
+                $fz: coords.z.into(),
+            })
+        }
+    };
+    ($(#[$attr:meta])* 2d $name:ident, $record:ident, $fx:ident, $fy:ident) => {
+        $(#[$attr])* 
+        pub fn $name<E, C>(entity: E, coords: C) -> $record
+        where
+            E: Into<EntityId>,
+            C: Into<Coords2D>,
+        {
+            with_coords2(entity, coords, |entity, coords| $record {
+                entity: entity.0,
+                $fx: coords.x.into(),
+                $fy: coords.y.into(),
+            })
+        }
+    };
 }
 
-/// Convenience constructor for [`Velocity`] records used in tests.
-///
-/// # Examples
-/// ```rust
-/// use test_utils::physics::vel;
-/// let v = vel(1, (0.5, -0.5, 1.0));
-/// assert_eq!(v.entity, 1);
-/// assert_eq!(v.vx.into_inner(), 0.5);
-/// assert_eq!(v.vy.into_inner(), -0.5);
-/// assert_eq!(v.vz.into_inner(), 1.0);
-/// ```
-pub fn vel<E, V>(entity: E, velocity: V) -> Velocity
-where
-    E: Into<EntityId>,
-    V: Into<Coords3D>,
-{
-    with_coords3(entity, velocity, |entity, velocity| Velocity {
-        entity: entity.0,
-        vx: velocity.x.into(),
-        vy: velocity.y.into(),
-        vz: velocity.z.into(),
-    })
-}
+impl_record_constructor!(
+    /// Convenience constructor for [`Position`] records used in tests.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use test_utils::physics::pos;
+    /// let p = pos(1, (0.0, 1.0, 2.0));
+    /// assert_eq!(p.entity, 1);
+    /// assert_eq!(p.x.into_inner(), 0.0);
+    /// assert_eq!(p.y.into_inner(), 1.0);
+    /// assert_eq!(p.z.into_inner(), 2.0);
+    /// ```
+    3d pos, Position, x, y, z
+);
 
-/// Convenience constructor for [`Target`] records used in tests.
-///
-/// # Examples
-/// ```rust
-/// use test_utils::physics::target;
-/// let t = target(1, (1.0, 2.0));
-/// assert_eq!(t.entity, 1);
-/// assert_eq!(t.x.into_inner(), 1.0);
-/// assert_eq!(t.y.into_inner(), 2.0);
-/// ```
-#[inline]
-pub fn target<E, C>(entity: E, coords: C) -> Target
-where
-    E: Into<EntityId>,
-    C: Into<Coords2D>,
-{
-    with_coords2(entity, coords, |entity, coords| Target {
-        entity: entity.0,
-        x: coords.x.into(),
-        y: coords.y.into(),
-    })
-}
+impl_record_constructor!(
+    /// Convenience constructor for [`Velocity`] records used in tests.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use test_utils::physics::vel;
+    /// let v = vel(1, (0.5, -0.5, 1.0));
+    /// assert_eq!(v.entity, 1);
+    /// assert_eq!(v.vx.into_inner(), 0.5);
+    /// assert_eq!(v.vy.into_inner(), -0.5);
+    /// assert_eq!(v.vz.into_inner(), 1.0);
+    /// ```
+    3d vel, Velocity, vx, vy, vz
+);
+
+impl_record_constructor!(
+    /// Convenience constructor for [`Target`] records used in tests.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use test_utils::physics::target;
+    /// let t = target(1, (1.0, 2.0));
+    /// assert_eq!(t.entity, 1);
+    /// assert_eq!(t.x.into_inner(), 1.0);
+    /// assert_eq!(t.y.into_inner(), 2.0);
+    /// ```
+    #[inline]
+    2d target, Target, x, y
+);
 
 /// Convenience constructor for [`FearLevel`] records used in tests.
 ///
