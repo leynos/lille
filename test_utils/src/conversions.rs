@@ -26,7 +26,7 @@ macro_rules! impl_newtype_conversions {
         }
         $(impl From<$extra> for $name {
             fn from(value: $extra) -> Self {
-                Self(value.into())
+                Self(<$ty>::from(value))
             }
         })*
         impl From<$name> for $ty {

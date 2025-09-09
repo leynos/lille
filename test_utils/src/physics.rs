@@ -187,6 +187,26 @@ pub fn new_circuit() -> DbspCircuit {
     DbspCircuit::new().expect("failed to build DBSP circuit")
 }
 
+fn with_coords3<E, C, R>(entity: E, coords: C, f: impl Fn(EntityId, Coords3D) -> R) -> R
+where
+    E: Into<EntityId>,
+    C: Into<Coords3D>,
+{
+    let entity: EntityId = entity.into();
+    let coords: Coords3D = coords.into();
+    f(entity, coords)
+}
+
+fn with_coords2<E, C, R>(entity: E, coords: C, f: impl Fn(EntityId, Coords2D) -> R) -> R
+where
+    E: Into<EntityId>,
+    C: Into<Coords2D>,
+{
+    let entity: EntityId = entity.into();
+    let coords: Coords2D = coords.into();
+    f(entity, coords)
+}
+
 /// Convenience constructor for [`Position`] records used in tests.
 ///
 /// # Examples
@@ -203,14 +223,12 @@ where
     E: Into<EntityId>,
     C: Into<Coords3D>,
 {
-    let entity: EntityId = entity.into();
-    let coords: Coords3D = coords.into();
-    Position {
+    with_coords3(entity, coords, |entity, coords| Position {
         entity: entity.0,
         x: coords.x.into(),
         y: coords.y.into(),
         z: coords.z.into(),
-    }
+    })
 }
 
 /// Convenience constructor for [`Velocity`] records used in tests.
@@ -229,14 +247,12 @@ where
     E: Into<EntityId>,
     V: Into<Coords3D>,
 {
-    let entity: EntityId = entity.into();
-    let velocity: Coords3D = velocity.into();
-    Velocity {
+    with_coords3(entity, velocity, |entity, velocity| Velocity {
         entity: entity.0,
         vx: velocity.x.into(),
         vy: velocity.y.into(),
         vz: velocity.z.into(),
-    }
+    })
 }
 
 /// Convenience constructor for [`Target`] records used in tests.
@@ -255,13 +271,11 @@ where
     E: Into<EntityId>,
     C: Into<Coords2D>,
 {
-    let entity: EntityId = entity.into();
-    let coords: Coords2D = coords.into();
-    Target {
+    with_coords2(entity, coords, |entity, coords| Target {
         entity: entity.0,
         x: coords.x.into(),
         y: coords.y.into(),
-    }
+    })
 }
 
 /// Convenience constructor for [`FearLevel`] records used in tests.
