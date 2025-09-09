@@ -209,7 +209,7 @@ where
 
 macro_rules! impl_record_constructor {
     ($(#[$attr:meta])* 3d $name:ident, $record:ident, $fx:ident, $fy:ident, $fz:ident) => {
-        $(#[$attr])* 
+        $(#[$attr])*
         pub fn $name<E, C>(entity: E, coords: C) -> $record
         where
             E: Into<EntityId>,
@@ -224,7 +224,7 @@ macro_rules! impl_record_constructor {
         }
     };
     ($(#[$attr:meta])* 2d $name:ident, $record:ident, $fx:ident, $fy:ident) => {
-        $(#[$attr])* 
+        $(#[$attr])*
         pub fn $name<E, C>(entity: E, coords: C) -> $record
         where
             E: Into<EntityId>,
