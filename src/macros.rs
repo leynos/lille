@@ -14,20 +14,28 @@
 //!         pub value: i32,
 //!     }
 //! }
+//!
+//! // Derive additional traits
+//! dbsp_record! {
+//!     /// Example needing Copy
+//!     pub struct ExampleCopy {
+//!         pub value: i32,
+//!     }, Copy
+//! }
 //! ```
 //!
 //! The macro expands to a struct deriving serialisation, ordering, and size
-//! accounting traits required by the circuit.
+//! accounting traits required by the circuit. Optional traits can be
+//! appended after the struct definition.
 #[macro_export]
 macro_rules! dbsp_record {
-    ($(#[$meta:meta])* $vis:vis struct $name:ident { $($fields:tt)* }) => {
+    ($(#[$meta:meta])* $vis:vis struct $name:ident { $($fields:tt)* } $(, $extra:ident)* ) => {
         $(#[$meta])*
         #[derive(
             ::rkyv::Archive,
             ::rkyv::Serialize,
             ::rkyv::Deserialize,
             Clone,
-            Copy,
             Debug,
             PartialEq,
             Eq,
@@ -35,7 +43,8 @@ macro_rules! dbsp_record {
             Ord,
             Hash,
             Default,
-            ::size_of::SizeOf,
+            ::size_of::SizeOf
+            $(, $extra)*
         )]
         #[archive_attr(derive(Ord, PartialOrd, Eq, PartialEq, Hash))]
         $vis struct $name { $($fields)* }

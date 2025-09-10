@@ -24,7 +24,7 @@ dbsp_record! {
         pub x: OrderedFloat<f64>,
         pub y: OrderedFloat<f64>,
         pub z: OrderedFloat<f64>,
-    }
+    }, Copy
 }
 
 /// Newly computed position emitted by the circuit in the current step.
@@ -37,7 +37,7 @@ dbsp_record! {
         pub vx: OrderedFloat<f64>,
         pub vy: OrderedFloat<f64>,
         pub vz: OrderedFloat<f64>,
-    }
+    }, Copy
 }
 
 /// Newly computed velocity emitted by the circuit in the current step.
@@ -93,7 +93,7 @@ dbsp_record! {
         pub x: i32,
         pub y: i32,
         pub z: i32,
-    }
+    }, Copy
 }
 
 dbsp_record! {
@@ -102,7 +102,7 @@ dbsp_record! {
         pub x: i32,
         pub y: i32,
         pub z: OrderedFloat<f64>,
-    }
+    }, Copy
 }
 
 dbsp_record! {
@@ -117,7 +117,7 @@ dbsp_record! {
         pub entity: i64,
         pub x: OrderedFloat<f64>,
         pub y: OrderedFloat<f64>,
-    }
+    }, Copy
 }
 
 dbsp_record! {
@@ -148,5 +148,5 @@ dbsp_record! {
         pub entity: i64,
         pub dx: OrderedFloat<f64>,
         pub dy: OrderedFloat<f64>,
-    }
+    }, Copy
 }
