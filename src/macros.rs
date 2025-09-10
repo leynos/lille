@@ -27,6 +27,14 @@
 //! The macro expands to a struct deriving serialisation, ordering, and size
 //! accounting traits required by the circuit. Optional traits can be
 //! appended after the struct definition.
+//!
+//! # Note
+//! If the `Copy` trait is omitted from the list of optional traits, the
+//! generated struct will not implement `Copy`. This means instances of the
+//! struct cannot be implicitly copied and must be explicitly cloned where
+//! required. Users upgrading from earlier versions should ensure their
+//! code does not rely on implicit copying or include `Copy` in the trait
+//! list if necessary.
 #[macro_export]
 macro_rules! dbsp_record {
     ($(#[$meta:meta])* $vis:vis struct $name:ident { $($fields:tt)* } $(, $extra:ident)* ) => {
