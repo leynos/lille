@@ -15,11 +15,6 @@ use lille::{spawn_world_system, DdlogId, Health, Target, UnitType};
 ///
 /// The test also asserts that all entities with a `Health` component have positive health.
 ///
-/// # Examples
-///
-/// ```
-/// spawns_world_entities();
-/// ```
 fn spawns_world_entities() {
     let mut app = App::new();
     app.add_plugins(MinimalPlugins);

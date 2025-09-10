@@ -21,6 +21,7 @@ bevy_hierarchy = "0.12"
 bevy_math = "0.12"
 bevy_reflect = { version = "0.12", features = ["bevy"] }
 bevy_transform = "0.12"
+bevy_log = { version = "0.12", optional = true }
 log = "0.4"  # Structured logging facade
 env_logger = "0.10"  # Logger implementation controlled via RUST_LOG
 serde = { version = "1.0", features = ["derive"] }
@@ -41,6 +42,7 @@ render = [
     "bevy/bevy_sprite",
     "bevy/bevy_winit",
     "bevy/x11",
+    "bevy_log",
 ]
 text = ["render", "bevy/bevy_text"]
 
