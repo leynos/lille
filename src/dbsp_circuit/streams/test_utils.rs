@@ -19,7 +19,7 @@ macro_rules! impl_test_helper {
         where
             $($generic: Into<$target>),+
         {
-            $(let $param = $param.into();)+
+            $(let $param: $target = $param.into();)+
             $ret_type {
                 $($field: $expr),+
             }
