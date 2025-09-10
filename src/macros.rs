@@ -15,18 +15,19 @@
 //!     }
 //! }
 //!
-//! // Derive additional traits
+//! // Derive additional traits (any derive path; trailing comma allowed)
 //! dbsp_record! {
 //!     /// Example needing Copy
 //!     pub struct ExampleCopy {
 //!         pub value: i32,
-//!     }, Copy
+//!     }, Copy,
 //! }
 //! ```
 //!
 //! The macro expands to a struct deriving serialisation, ordering, and size
 //! accounting traits required by the circuit. Optional traits can be
-//! appended after the struct definition.
+//! appended after the struct definition as derive paths (e.g.,
+//! `serde::Serialize`), separated by commas, with an optional trailing comma.
 //!
 //! # Note
 //! If the `Copy` trait is omitted from the list of optional traits, the
@@ -35,9 +36,13 @@
 //! required. Users upgrading from earlier versions should ensure their
 //! code does not rely on implicit copying or include `Copy` in the trait
 //! list if necessary.
+//!
+//! Additionally, deriving `Copy` places a `Copy` bound on any generic
+//! parameters of the generated struct, and is only permitted when all
+//! fields implement `Copy` and the type does not implement `Drop`.
 #[macro_export]
 macro_rules! dbsp_record {
-    ($(#[$meta:meta])* $vis:vis struct $name:ident { $($fields:tt)* } $(, $extra:ident)* ) => {
+    ($(#[$meta:meta])* $vis:vis struct $name:ident { $($fields:tt)* } $(, $extra:path)* $(,)? ) => {
         $(#[$meta])*
         #[derive(
             ::rkyv::Archive,
