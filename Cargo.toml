@@ -15,6 +15,12 @@ hashbrown = "0.14"  # High performance HashMap implementation
 clap = { version = "4.4", features = ["derive"] }  # Command line argument parsing
 glam = { workspace = true }  # Linear algebra for games
 bevy = { version = "0.12", default-features = false }
+bevy_app = "0.12"
+bevy_ecs = "0.12"
+bevy_hierarchy = "0.12"
+bevy_math = "0.12"
+bevy_reflect = { version = "0.12", features = ["bevy"] }
+bevy_transform = "0.12"
 log = "0.4"  # Structured logging facade
 env_logger = "0.10"  # Logger implementation controlled via RUST_LOG
 serde = { version = "1.0", features = ["derive"] }
@@ -34,6 +40,7 @@ render = [
     "bevy/bevy_render",
     "bevy/bevy_sprite",
     "bevy/bevy_winit",
+    "bevy/x11",
 ]
 text = ["render", "bevy/bevy_text"]
 
