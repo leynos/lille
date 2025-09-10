@@ -7,6 +7,26 @@ pub use test_utils::physics::{
     BlockCoords, BlockId, Coords3D, EntityId, ForceVector, Gradient, Mass,
 };
 
+macro_rules! impl_test_helper {
+    (
+        $(#[$attr:meta])*
+        $fn_name:ident<$($generic:ident: Into<$target:ty>),+>($($param:ident: $generic_param:ident),+) -> $ret_type:path {
+            $($field:ident: $expr:expr),+ $(,)?
+        }
+    ) => {
+        $(#[$attr])*
+        pub fn $fn_name<$($generic),+>($($param: $generic),+) -> $ret_type
+        where
+            $($generic: Into<$target>),+
+        {
+            $(let $param: $target = $param.into();)+
+            $ret_type {
+                $($field: $expr),+
+            }
+        }
+    };
+}
+
 /// Builds a new [`DbspCircuit`] for tests.
 pub fn new_circuit() -> DbspCircuit {
     DbspCircuit::new().expect("failed to build DBSP circuit")
@@ -43,70 +63,44 @@ where
     }
 }
 
-/// Builds a [`Position`] from an entity identifier and coordinates.
-pub fn pos<E, C>(entity: E, coords: C) -> Position
-where
-    E: Into<EntityId>,
-    C: Into<Coords3D>,
-{
-    let entity: EntityId = entity.into();
-    let coords: Coords3D = coords.into();
-    Position {
+impl_test_helper!(
+    /// Builds a [`Position`] from an entity identifier and coordinates.
+    pos<E: Into<EntityId>, C: Into<Coords3D> >(entity: E, coords: C) -> Position {
         entity: entity.0,
         x: coords.x.into(),
         y: coords.y.into(),
         z: coords.z.into(),
     }
-}
+);
 
-/// Builds a [`Velocity`] with the given entity and components.
-pub fn vel<E, V>(entity: E, velocity: V) -> Velocity
-where
-    E: Into<EntityId>,
-    V: Into<Coords3D>,
-{
-    let entity: EntityId = entity.into();
-    let velocity: Coords3D = velocity.into();
-    Velocity {
+impl_test_helper!(
+    /// Builds a [`Velocity`] with the given entity and components.
+    vel<E: Into<EntityId>, V: Into<Coords3D> >(entity: E, velocity: V) -> Velocity {
         entity: entity.0,
         vx: velocity.x.into(),
         vy: velocity.y.into(),
         vz: velocity.z.into(),
     }
-}
+);
 
-/// Constructs a [`Force`] without specifying mass.
-pub fn force<E, V>(entity: E, vec: V) -> Force
-where
-    E: Into<EntityId>,
-    V: Into<ForceVector>,
-{
-    let entity: EntityId = entity.into();
-    let vec: ForceVector = vec.into();
-    Force {
+impl_test_helper!(
+    /// Constructs a [`Force`] without specifying mass.
+    force<E: Into<EntityId>, V: Into<ForceVector> >(entity: E, vec: V) -> Force {
         entity: entity.0,
         fx: vec.x.into(),
         fy: vec.y.into(),
         fz: vec.z.into(),
         mass: None,
     }
-}
+);
 
-/// Constructs a [`Force`] with an explicit mass.
-pub fn force_with_mass<E, V, M>(entity: E, vec: V, mass: M) -> Force
-where
-    E: Into<EntityId>,
-    V: Into<ForceVector>,
-    M: Into<Mass>,
-{
-    let entity: EntityId = entity.into();
-    let vec: ForceVector = vec.into();
-    let mass: Mass = mass.into();
-    Force {
+impl_test_helper!(
+    /// Constructs a [`Force`] with an explicit mass.
+    force_with_mass<E: Into<EntityId>, V: Into<ForceVector>, M: Into<Mass> >(entity: E, vec: V, mass: M) -> Force {
         entity: entity.0,
         fx: vec.x.into(),
         fy: vec.y.into(),
         fz: vec.z.into(),
         mass: Some(mass.0.into()),
     }
-}
+);
