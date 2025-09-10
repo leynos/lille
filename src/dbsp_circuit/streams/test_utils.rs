@@ -15,7 +15,7 @@ macro_rules! impl_test_helper {
         }
     ) => {
         $(#[$attr])*
-        pub fn $fn_name<$($generic),+>($($param: $generic),+) -> $ret_type
+        pub fn $fn_name<$($generic),+>($($param: $generic_param),+) -> $ret_type
         where
             $($generic: Into<$target>),+
         {
@@ -67,8 +67,8 @@ impl_test_helper!(
     /// Builds a [`Position`] from an entity identifier and coordinates.
     ///
     /// # Examples
-    /// ```ignore
-    /// // Given EntityId(u64) and Coords3D { x, y, z }
+    /// ```rust,no_run
+    /// use lille::dbsp_circuit::streams::test_utils::{pos, EntityId, Coords3D};
     /// let p = pos(EntityId(42), Coords3D { x: 1.0, y: 2.0, z: 3.0 });
     /// assert_eq!(p.entity, 42);
     /// assert_eq!((p.x, p.y, p.z), (1.0, 2.0, 3.0));
@@ -85,7 +85,8 @@ impl_test_helper!(
     /// Builds a [`Velocity`] with the given entity and components.
     ///
     /// # Examples
-    /// ```ignore
+    /// ```rust,no_run
+    /// use lille::dbsp_circuit::streams::test_utils::{vel, EntityId, Coords3D};
     /// let v = vel(EntityId(42), Coords3D { x: 0.1, y: 0.0, z: -0.1 });
     /// assert_eq!(v.entity, 42);
     /// assert_eq!((v.vx, v.vy, v.vz), (0.1, 0.0, -0.1));
@@ -102,7 +103,8 @@ impl_test_helper!(
     /// Constructs a [`Force`] without specifying mass.
     ///
     /// # Examples
-    /// ```ignore
+    /// ```rust,no_run
+    /// use lille::dbsp_circuit::streams::test_utils::{force, EntityId, ForceVector};
     /// let f = force(EntityId(7), ForceVector { x: 3.0, y: 0.0, z: -1.0 });
     /// assert_eq!(f.entity, 7);
     /// assert_eq!((f.fx, f.fy, f.fz), (3.0, 0.0, -1.0));
@@ -121,12 +123,15 @@ impl_test_helper!(
     /// Constructs a [`Force`] with an explicit mass.
     ///
     /// # Examples
-    /// ```ignore
+    /// ```rust,no_run
     /// use ordered_float::OrderedFloat;
+    /// use lille::dbsp_circuit::streams::test_utils::{
+    ///     force_with_mass, EntityId, ForceVector, Mass,
+    /// };
     /// let f = force_with_mass(
     ///     EntityId(7),
     ///     ForceVector { x: 3.0, y: 0.0, z: -1.0 },
-    ///     Mass(2.0)
+    ///     Mass(2.0),
     /// );
     /// assert_eq!(f.entity, 7);
     /// assert_eq!((f.fx, f.fy, f.fz), (3.0, 0.0, -1.0));
