@@ -5,11 +5,16 @@ edition = "2021"
 description = "A realtime strategy game"
 build = "build.rs"
 
+[[bin]]
+name = "lille"
+path = "src/main.rs"
+required-features = ["render"]
+
 [dependencies]
 hashbrown = "0.14"  # High performance HashMap implementation
 clap = { version = "4.4", features = ["derive"] }  # Command line argument parsing
 glam = { workspace = true }  # Linear algebra for games
-bevy = { version = "0.12", default-features = false, features = ["bevy_asset","bevy_core_pipeline","bevy_render","bevy_sprite","bevy_text","png"] }
+bevy = { version = "0.12", default-features = false }
 log = "0.4"  # Structured logging facade
 env_logger = "0.10"  # Logger implementation controlled via RUST_LOG
 serde = { version = "1.0", features = ["derive"] }
@@ -20,6 +25,17 @@ ordered-float = { workspace = true }
 size-of = { version = "0.1", package = "feldera-size-of", features = ["ordered-float"] }
 rkyv = { version = "0.7", default-features = false, features = ["std", "size_64", "validation", "uuid"] }
 dbsp = "0.98"
+
+[features]
+default = []
+render = [
+    "bevy/bevy_asset",
+    "bevy/bevy_core_pipeline",
+    "bevy/bevy_render",
+    "bevy/bevy_sprite",
+    "bevy/bevy_winit",
+]
+text = ["render", "bevy/bevy_text"]
 
 [build-dependencies]
 build_support = { path = "build_support" }

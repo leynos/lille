@@ -1,3 +1,4 @@
+#![cfg(feature = "render")]
 //! Unit tests for the world-spawning system.
 //! Verifies entity counts and component assignments after system execution.
 use bevy::prelude::*;
