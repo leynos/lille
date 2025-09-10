@@ -125,8 +125,11 @@ architecture.
   computation while expressing complex rules in a clear, declarative style, as
   outlined in `docs/lille-physics-engine-design.md`.
 
-- **Flexible error handling**: `anyhow` supplies context-rich errors without
-  ceremony.
+- **Error handling**: `anyhow` simplifies error propagation and supports adding
+  manual context via `anyhow::Context`. Enable backtraces with
+  `RUST_BACKTRACE=1` during development. Coloured, suggestion-rich reports from
+  `color-eyre` are no longer installed by default; install a companion such as
+  `color-backtrace` in developer builds if coloured output is desired.
 
 This architecture provides a robust and scalable foundation for building the
 complex, emergent world of Lille.

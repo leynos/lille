@@ -4,7 +4,7 @@
 //! [`FontFetcher`], checks its SHA-256 digest and writes the verified font to
 //! disk. This ensures deterministic builds without shipping the font in the
 //! repository.
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use reqwest::blocking::Client;
 use sha2::{Digest, Sha256};
 use std::fs;
@@ -150,9 +150,15 @@ fn fetch_font_data() -> Result<Vec<u8>> {
     let client = Client::builder()
         .timeout(Duration::from_secs(10))
         .user_agent("lille-build/1.0")
-        .build()?;
-    let resp = client.get(FONT_URL).send()?.error_for_status()?;
-    let bytes = resp.bytes()?;
+        .build()
+        .context("create HTTP client")?;
+    let resp = client
+        .get(FONT_URL)
+        .send()
+        .context("send font request")?
+        .error_for_status()
+        .context("font request returned error status")?;
+    let bytes = resp.bytes().context("read font bytes")?;
     let digest = Sha256::digest(&bytes);
     let actual = format!("{digest:x}");
     if actual != FONT_SHA256 {
