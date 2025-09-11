@@ -6,6 +6,32 @@ while text rendering builds on top via the `text` feature. The project
 currently implements "Phase 1" of the migration roadmap, synchronising the
 legacy `GameWorld` state into Bevy and rendering static entities.
 
+## Features & usage
+
+- Rendering: enable with `render`.
+- Text rendering: enable with `text` (implies `render`).
+
+Run the game:
+
+```bash
+cargo run -p lille --features render
+```
+
+Enable text:
+
+```bash
+cargo run -p lille --features text
+```
+
+Run tests that depend on rendering:
+
+```bash
+cargo test -p lille --features render -- tests/spawn.rs
+```
+
+Sprites that load PNG assets require Bevy's `png` feature; the `render` feature
+in this crate enables it (see Cargo.toml).
+
 ## Game Setting
 
 *A fractured city of steel, brick, and neon — and your next battlefield.*

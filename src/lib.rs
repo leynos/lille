@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, feature(doc_cfg))]
 //! Library crate providing core Lille game logic.
 //! Re-exports common components and systems for the main application and tests.
 pub mod actor;
@@ -10,6 +11,7 @@ pub mod logging;
 mod macros;
 pub mod physics;
 #[cfg(feature = "render")]
+#[cfg_attr(docsrs, doc(cfg(feature = "render")))]
 pub mod spawn_world;
 pub mod vector_math;
 pub mod world_handle;
@@ -30,6 +32,7 @@ pub use entity::{BadGuy, Entity};
 pub use logging::init as init_logging;
 pub use physics::{applied_acceleration, apply_ground_friction};
 #[cfg(feature = "render")]
+#[cfg_attr(docsrs, doc(cfg(feature = "render")))]
 pub use spawn_world::spawn_world_system;
 pub use vector_math::{vec_mag, vec_normalize};
 pub use world_handle::{init_world_handle_system, WorldHandle};
