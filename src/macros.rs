@@ -20,7 +20,7 @@
 //!     /// Example needing Copy
 //!     pub struct ExampleCopy {
 //!         pub value: i32,
-//!     }, Copy,
+//!     }, serde::Serialize, Copy,
 //! }
 //! ```
 //!
