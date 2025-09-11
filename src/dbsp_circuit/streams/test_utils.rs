@@ -142,6 +142,6 @@ impl_test_helper!(
         fx: vec.x.into(),
         fy: vec.y.into(),
         fz: vec.z.into(),
-        mass: Some(mass.0.into()),
+        mass: Some(mass.into()),
     }
 );

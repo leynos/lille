@@ -2,6 +2,7 @@
 
 use lille::components::{Block, BlockSlope};
 use lille::dbsp_circuit::{DbspCircuit, FearLevel, Force, Position, Target, Velocity};
+use ordered_float::OrderedFloat;
 
 #[derive(Clone, Copy, Debug)]
 pub struct EntityId(pub i64);
@@ -147,12 +148,21 @@ impl Mass {
     ///
     /// # Examples
     /// ```
+    /// use ordered_float::OrderedFloat;
     /// use test_utils::physics::Mass;
     /// let m = Mass::new(5.0);
-    /// assert_eq!(m.0, 5.0);
+    /// let val: OrderedFloat<f64> = m.into();
+    /// assert_eq!(val, OrderedFloat(5.0));
     /// ```
     pub fn new(val: f64) -> Self {
         Self(val)
+    }
+}
+
+impl From<Mass> for OrderedFloat<f64> {
+    fn from(mass: Mass) -> Self {
+        let Mass(inner) = mass;
+        OrderedFloat(inner)
     }
 }
 
@@ -322,7 +332,7 @@ fn force_inner(entity: EntityId, vec: ForceVector, mass: Option<Mass>) -> Force 
         fx: vec.x.into(),
         fy: vec.y.into(),
         fz: vec.z.into(),
-        mass: mass.map(|m| m.0.into()),
+        mass: mass.map(|m| m.into()),
     }
 }
 
