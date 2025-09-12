@@ -20,7 +20,7 @@
 //!     /// Example needing Copy
 //!     pub struct ExampleCopy {
 //!         pub value: i32,
-//!     }, serde::Serialize, Copy,
+//!     }, Copy
 //! }
 //! ```
 //!
@@ -42,7 +42,7 @@
 //! fields implement `Copy` and the type does not implement `Drop`.
 #[macro_export]
 macro_rules! dbsp_record {
-    ($(#[$meta:meta])* $vis:vis struct $name:ident { $($fields:tt)* } $(, $extra:path)* $(,)? ) => {
+    ($(#[$meta:meta])* $vis:vis struct $name:ident { $($fields:tt)* } $(, $($extra:tt)+ ),* $(,)? ) => {
         $(#[$meta])*
         #[derive(
             ::rkyv::Archive,
@@ -57,9 +57,19 @@ macro_rules! dbsp_record {
             Hash,
             Default,
             ::size_of::SizeOf
-            $(, $extra)*
+            $(, $($extra)+ )*
         )]
         #[archive_attr(derive(Ord, PartialOrd, Eq, PartialEq, Hash))]
         $vis struct $name { $($fields)* }
+    };
+}
+
+/// Convenience wrapper around `dbsp_record!` that also derives `Copy`.
+#[macro_export]
+macro_rules! dbsp_copy_record {
+    ($(#[$meta:meta])* $vis:vis struct $name:ident { $($fields:tt)* } $(, $($extra:tt)+ ),* $(,)? ) => {
+        $crate::dbsp_record! {
+            $(#[$meta])* $vis struct $name { $($fields)* }, Copy $(, $($extra)+ )*
+        }
     };
 }

@@ -15,29 +15,29 @@
 
 use ordered_float::OrderedFloat;
 
-use crate::dbsp_record;
+use crate::{dbsp_copy_record, dbsp_record};
 
-dbsp_record! {
+dbsp_copy_record! {
     /// Public data type for entity positions.
     pub struct Position {
         pub entity: i64,
         pub x: OrderedFloat<f64>,
         pub y: OrderedFloat<f64>,
         pub z: OrderedFloat<f64>,
-    }, Copy
+    }
 }
 
 /// Newly computed position emitted by the circuit in the current step.
 pub type NewPosition = Position;
 
-dbsp_record! {
+dbsp_copy_record! {
     /// Entity velocity vector.
     pub struct Velocity {
         pub entity: i64,
         pub vx: OrderedFloat<f64>,
         pub vy: OrderedFloat<f64>,
         pub vz: OrderedFloat<f64>,
-    }, Copy
+    }
 }
 
 /// Newly computed velocity emitted by the circuit in the current step.
@@ -87,25 +87,25 @@ pub struct Force {
     pub mass: Option<OrderedFloat<f64>>,
 }
 
-dbsp_record! {
+dbsp_copy_record! {
     /// Discrete highest block at a grid cell.
     pub struct HighestBlockAt {
         pub x: i32,
         pub y: i32,
         pub z: i32,
-    }, Copy
+    }
 }
 
-dbsp_record! {
+dbsp_copy_record! {
     /// Floor height at a grid cell, accounting for slopes.
     pub struct FloorHeightAt {
         pub x: i32,
         pub y: i32,
         pub z: OrderedFloat<f64>,
-    }, Copy
+    }
 }
 
-dbsp_record! {
+dbsp_copy_record! {
     /// Target position for an entity.
     ///
     /// Units:
@@ -117,7 +117,7 @@ dbsp_record! {
         pub entity: i64,
         pub x: OrderedFloat<f64>,
         pub y: OrderedFloat<f64>,
-    }, Copy
+    }
 }
 
 dbsp_record! {
@@ -131,7 +131,7 @@ dbsp_record! {
     }
 }
 
-dbsp_record! {
+dbsp_copy_record! {
     /// Decided unit movement vector for an entity.
     ///
     /// Units:
@@ -148,5 +148,5 @@ dbsp_record! {
         pub entity: i64,
         pub dx: OrderedFloat<f64>,
         pub dy: OrderedFloat<f64>,
-    }, Copy
+    }
 }
