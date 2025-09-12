@@ -66,9 +66,9 @@ can take them — and keep them.
 The `build.rs` entry point delegates to the `build_support` crate. This helper
 crate downloads the project font during compilation.
 
-The font download uses the operating system's certificate store for TLS
-verification. Ensure your environment has a valid set of root certificates so
-the HTTPS request succeeds.
+The font download uses the operating system’s certificate store for TLS
+verification. A valid set of root certificates must be present in the
+environment for the HTTPS request to succeed.
 
 ## Isolated build support
 
