@@ -20,12 +20,12 @@ use std::path::PathBuf;
 /// ```
 ///
 /// # Returns
-/// `Ok(())` if all build steps succeed, otherwise an error is returned from the
-/// failing step.
+/// `Ok(())` when build steps complete. Network and write failures in font
+/// setup fall back to a platform font and still return `Ok(())`.
 ///
 /// # Errors
-/// Returns an error if required environment variables are missing or if any file
-/// operation fails.
+/// Returns an error if required environment variables are missing or if creating
+/// temporary files fails.
 pub fn build() -> Result<()> {
     dotenvy::dotenv_override().ok();
     set_rerun_triggers();

@@ -22,6 +22,7 @@ use tempfile::NamedTempFile;
 ///
 /// # Examples
 /// ```rust,no_run
+/// use anyhow::Result;
 /// use build_support::font::{FontFetcher, download_font_with};
 /// struct Dummy;
 /// impl FontFetcher for Dummy {
@@ -155,14 +156,18 @@ fn fetch_font_data() -> Result<Vec<u8>> {
     let resp = client
         .get(FONT_URL)
         .send()
-        .context("send font request")?
+        .with_context(|| format!("requesting font from {FONT_URL}"))?
         .error_for_status()
-        .context("font request returned error status")?;
-    let bytes = resp.bytes().context("read font bytes")?;
+        .with_context(|| format!("unexpected HTTP status for {FONT_URL}"))?;
+    let bytes = resp
+        .bytes()
+        .with_context(|| format!("reading response body from {FONT_URL}"))?;
     let digest = Sha256::digest(&bytes);
     let actual = format!("{digest:x}");
     if actual != FONT_SHA256 {
-        return Err(anyhow!("font checksum mismatch"));
+        return Err(anyhow!(
+            "font checksum mismatch (expected {FONT_SHA256}, got {actual})"
+        ));
     }
     Ok(bytes.to_vec())
 }
@@ -198,11 +203,11 @@ mod tests {
         let manifest_path = temp_dir.path().to_path_buf();
         let assets_dir = temp_dir.path().join("assets");
         let font_path = assets_dir.join("FiraSans-Regular.ttf");
-        fs::create_dir_all(&assets_dir).unwrap();
-        fs::write(&font_path, b"fake font data").unwrap();
+        fs::create_dir_all(&assets_dir).expect("create assets dir");
+        fs::write(&font_path, b"fake font data").expect("write fake font");
         let mut fetcher = MockFontFetcher::new();
         fetcher.expect_fetch().times(0);
-        let result = download_font_with(&fetcher, &manifest_path).unwrap();
+        let result = download_font_with(&fetcher, &manifest_path).expect("existing font path");
         assert_eq!(result, font_path);
         assert!(result.exists());
     }
@@ -214,7 +219,8 @@ mod tests {
         fetcher
             .expect_fetch()
             .returning(|| Err(anyhow!("network error")));
-        let result = download_font_with(&fetcher, &manifest_path).unwrap();
+        let result =
+            download_font_with(&fetcher, &manifest_path).expect("fallback path on write error");
         assert!(result == fallback_font_path() || result.exists());
     }
 
@@ -226,7 +232,7 @@ mod tests {
             .returning(|| Err(anyhow!("network error")));
         let result = download_font_with(&fetcher, Path::new("/non/existent/path"));
         assert!(result.is_ok());
-        let p = result.unwrap();
+        let p = result.expect("fallback path when manifest dir is invalid");
         assert!(p == fallback_font_path() || p.exists());
     }
 
@@ -247,7 +253,7 @@ mod tests {
             })
             .collect();
         for h in handles {
-            assert!(h.join().unwrap());
+            assert!(h.join().expect("thread panicked"));
         }
     }
 
