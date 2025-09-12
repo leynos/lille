@@ -15,9 +15,7 @@
 
 use ordered_float::OrderedFloat;
 
-use crate::{dbsp_copy_record, dbsp_record};
-
-dbsp_copy_record! {
+crate::dbsp_copy_record! {
     /// Public data type for entity positions.
     pub struct Position {
         pub entity: i64,
@@ -30,7 +28,7 @@ dbsp_copy_record! {
 /// Newly computed position emitted by the circuit in the current step.
 pub type NewPosition = Position;
 
-dbsp_copy_record! {
+crate::dbsp_copy_record! {
     /// Entity velocity vector.
     pub struct Velocity {
         pub entity: i64,
@@ -87,7 +85,7 @@ pub struct Force {
     pub mass: Option<OrderedFloat<f64>>,
 }
 
-dbsp_copy_record! {
+crate::dbsp_copy_record! {
     /// Discrete highest block at a grid cell.
     pub struct HighestBlockAt {
         pub x: i32,
@@ -96,7 +94,7 @@ dbsp_copy_record! {
     }
 }
 
-dbsp_copy_record! {
+crate::dbsp_copy_record! {
     /// Floor height at a grid cell, accounting for slopes.
     pub struct FloorHeightAt {
         pub x: i32,
@@ -105,7 +103,7 @@ dbsp_copy_record! {
     }
 }
 
-dbsp_copy_record! {
+crate::dbsp_copy_record! {
     /// Target position for an entity.
     ///
     /// Units:
@@ -120,7 +118,7 @@ dbsp_copy_record! {
     }
 }
 
-dbsp_record! {
+crate::dbsp_record! {
     /// Fear level computed for an entity.
     ///
     /// Units:
@@ -131,7 +129,7 @@ dbsp_record! {
     }
 }
 
-dbsp_copy_record! {
+crate::dbsp_copy_record! {
     /// Decided unit movement vector for an entity.
     ///
     /// Units:
