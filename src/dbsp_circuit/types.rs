@@ -118,6 +118,8 @@ crate::dbsp_copy_record! {
     }
 }
 
+// Fear levels may evolve to hold non-`Copy` state. We avoid implicit duplication
+// by keeping this record non-`Copy` and requiring explicit clones.
 crate::dbsp_record! {
     /// Fear level computed for an entity.
     ///
