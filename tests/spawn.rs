@@ -4,7 +4,6 @@
 use bevy::prelude::*;
 use lille::{spawn_world_system, DdlogId, Health, Target, UnitType};
 
-#[test]
 /// Tests that the `spawn_world_system` correctly spawns Civvy, Baddie, static, and camera entities with expected properties.
 ///
 /// This test initialises a minimal Bevy app, runs the world-spawning system, and verifies that:
@@ -15,6 +14,8 @@ use lille::{spawn_world_system, DdlogId, Health, Target, UnitType};
 ///
 /// The test also asserts that all entities with a `Health` component have positive health.
 ///
+#[cfg(feature = "render")]
+#[test]
 fn spawns_world_entities() {
     let mut app = App::new();
     app.add_plugins(MinimalPlugins);
