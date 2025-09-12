@@ -7,6 +7,26 @@ pub use test_utils::physics::{
     BlockCoords, BlockId, Coords3D, EntityId, ForceVector, Gradient, Mass,
 };
 
+macro_rules! impl_test_helper {
+    (
+        $(#[$attr:meta])*
+        $fn_name:ident<$($generic:ident: Into<$target:ty>),+>($($param:ident: $generic_param:ident),+) -> $ret_type:path {
+            $($field:ident: $expr:expr),+ $(,)?
+        }
+    ) => {
+        $(#[$attr])*
+        pub fn $fn_name<$($generic),+>($($param: $generic_param),+) -> $ret_type
+        where
+            $($generic: Into<$target>),+
+        {
+            $(let $param: $target = $param.into();)+
+            $ret_type {
+                $($field: $expr),+
+            }
+        }
+    };
+}
+
 /// Builds a new [`DbspCircuit`] for tests.
 pub fn new_circuit() -> DbspCircuit {
     DbspCircuit::new().expect("failed to build DBSP circuit")
@@ -43,70 +63,85 @@ where
     }
 }
 
-/// Builds a [`Position`] from an entity identifier and coordinates.
-pub fn pos<E, C>(entity: E, coords: C) -> Position
-where
-    E: Into<EntityId>,
-    C: Into<Coords3D>,
-{
-    let entity: EntityId = entity.into();
-    let coords: Coords3D = coords.into();
-    Position {
+impl_test_helper!(
+    /// Builds a [`Position`] from an entity identifier and coordinates.
+    ///
+    /// # Examples
+    /// ```rust,no_run
+    /// use lille::dbsp_circuit::streams::test_utils::{pos, EntityId, Coords3D};
+    /// let p = pos(EntityId(42), Coords3D { x: 1.0, y: 2.0, z: 3.0 });
+    /// assert_eq!(p.entity, 42);
+    /// assert_eq!((p.x, p.y, p.z), (1.0, 2.0, 3.0));
+    /// ```
+    pos<E: Into<EntityId>, C: Into<Coords3D> >(entity: E, coords: C) -> Position {
         entity: entity.0,
         x: coords.x.into(),
         y: coords.y.into(),
         z: coords.z.into(),
     }
-}
+);
 
-/// Builds a [`Velocity`] with the given entity and components.
-pub fn vel<E, V>(entity: E, velocity: V) -> Velocity
-where
-    E: Into<EntityId>,
-    V: Into<Coords3D>,
-{
-    let entity: EntityId = entity.into();
-    let velocity: Coords3D = velocity.into();
-    Velocity {
+impl_test_helper!(
+    /// Builds a [`Velocity`] with the given entity and components.
+    ///
+    /// # Examples
+    /// ```rust,no_run
+    /// use lille::dbsp_circuit::streams::test_utils::{vel, EntityId, Coords3D};
+    /// let v = vel(EntityId(42), Coords3D { x: 0.1, y: 0.0, z: -0.1 });
+    /// assert_eq!(v.entity, 42);
+    /// assert_eq!((v.vx, v.vy, v.vz), (0.1, 0.0, -0.1));
+    /// ```
+    vel<E: Into<EntityId>, V: Into<Coords3D> >(entity: E, velocity: V) -> Velocity {
         entity: entity.0,
         vx: velocity.x.into(),
         vy: velocity.y.into(),
         vz: velocity.z.into(),
     }
-}
+);
 
-/// Constructs a [`Force`] without specifying mass.
-pub fn force<E, V>(entity: E, vec: V) -> Force
-where
-    E: Into<EntityId>,
-    V: Into<ForceVector>,
-{
-    let entity: EntityId = entity.into();
-    let vec: ForceVector = vec.into();
-    Force {
+impl_test_helper!(
+    /// Constructs a [`Force`] without specifying mass.
+    ///
+    /// # Examples
+    /// ```rust,no_run
+    /// use lille::dbsp_circuit::streams::test_utils::{force, EntityId, ForceVector};
+    /// let f = force(EntityId(7), ForceVector { x: 3.0, y: 0.0, z: -1.0 });
+    /// assert_eq!(f.entity, 7);
+    /// assert_eq!((f.fx, f.fy, f.fz), (3.0, 0.0, -1.0));
+    /// assert!(f.mass.is_none());
+    /// ```
+    force<E: Into<EntityId>, V: Into<ForceVector> >(entity: E, vec: V) -> Force {
         entity: entity.0,
         fx: vec.x.into(),
         fy: vec.y.into(),
         fz: vec.z.into(),
         mass: None,
     }
-}
+);
 
-/// Constructs a [`Force`] with an explicit mass.
-pub fn force_with_mass<E, V, M>(entity: E, vec: V, mass: M) -> Force
-where
-    E: Into<EntityId>,
-    V: Into<ForceVector>,
-    M: Into<Mass>,
-{
-    let entity: EntityId = entity.into();
-    let vec: ForceVector = vec.into();
-    let mass: Mass = mass.into();
-    Force {
+impl_test_helper!(
+    /// Constructs a [`Force`] with an explicit mass.
+    ///
+    /// # Examples
+    /// ```rust,no_run
+    /// use ordered_float::OrderedFloat;
+    /// use lille::dbsp_circuit::streams::test_utils::{
+    ///     force_with_mass, EntityId, ForceVector, Mass,
+    /// };
+    /// let f = force_with_mass(
+    ///     EntityId(7),
+    ///     ForceVector { x: 3.0, y: 0.0, z: -1.0 },
+    ///     Mass(2.0),
+    /// );
+    /// assert_eq!(f.entity, 7);
+    /// assert_eq!((f.fx, f.fy, f.fz), (3.0, 0.0, -1.0));
+    /// assert_eq!(f.mass, Some(OrderedFloat(2.0)));
+    /// ```
+    force_with_mass<E: Into<EntityId>, V: Into<ForceVector>, M: Into<Mass> >(entity: E, vec: V, mass: M) -> Force {
         entity: entity.0,
         fx: vec.x.into(),
         fy: vec.y.into(),
         fz: vec.z.into(),
-        mass: Some(mass.0.into()),
+        mass: Some(mass.into()),
     }
-}
+);
