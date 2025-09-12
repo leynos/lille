@@ -126,7 +126,7 @@ architecture.
   outlined in `docs/lille-physics-engine-design.md`.
 
 - **Error handling**: `anyhow` simplifies error propagation and supports adding
-  manual context via `anyhow::Context`. Enable backtraces with
+  manual context via `anyhow::Context`. Backtraces can be enabled with
   `RUST_BACKTRACE=1` during development. Coloured, suggestion-rich reports from
   `color-eyre` are no longer installed by default; install a companion such as
   `color-backtrace` in developer builds if coloured output is desired.
