@@ -3,7 +3,7 @@
 
 pub mod font;
 
-use color_eyre::eyre::Result;
+use anyhow::Result;
 use std::path::PathBuf;
 
 /// Execute all build steps required by `build.rs`.
@@ -13,19 +13,19 @@ use std::path::PathBuf;
 ///
 /// # Examples
 /// ```rust,no_run
-/// use color_eyre::eyre::Result;
+/// use anyhow::Result;
 /// fn main() -> Result<()> {
 ///     build_support::build()
 /// }
 /// ```
 ///
 /// # Returns
-/// `Ok(())` if all build steps succeed, otherwise an error is returned from the
-/// failing step.
+/// `Ok(())` when build steps complete. Network and write failures in font
+/// setup fall back to a platform font and still return `Ok(())`.
 ///
 /// # Errors
-/// Returns an error if required environment variables are missing or if any file
-/// operation fails.
+/// Returns an error if required environment variables are missing or if creating
+/// temporary files fails.
 pub fn build() -> Result<()> {
     dotenvy::dotenv_override().ok();
     set_rerun_triggers();

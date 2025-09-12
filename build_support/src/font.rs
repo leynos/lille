@@ -4,7 +4,7 @@
 //! [`FontFetcher`], checks its SHA-256 digest and writes the verified font to
 //! disk. This ensures deterministic builds without shipping the font in the
 //! repository.
-use color_eyre::eyre::{eyre, Result};
+use anyhow::{anyhow, Context, Result};
 use reqwest::blocking::Client;
 use sha2::{Digest, Sha256};
 use std::fs;
@@ -22,6 +22,7 @@ use tempfile::NamedTempFile;
 ///
 /// # Examples
 /// ```rust,no_run
+/// use anyhow::Result;
 /// use build_support::font::{FontFetcher, download_font_with};
 /// struct Dummy;
 /// impl FontFetcher for Dummy {
@@ -76,7 +77,7 @@ fn fallback_font_path() -> PathBuf {
 /// ```rust,no_run
 /// # use std::env;
 /// build_support::font::download_font(env::current_dir()?)?;
-/// # Ok::<(), color_eyre::Report>(())
+/// # Ok::<(), anyhow::Error>(())
 /// ```
 pub fn download_font(manifest_dir: impl AsRef<Path>) -> Result<PathBuf> {
     download_font_with(&HttpFontFetcher, manifest_dir)
@@ -150,13 +151,23 @@ fn fetch_font_data() -> Result<Vec<u8>> {
     let client = Client::builder()
         .timeout(Duration::from_secs(10))
         .user_agent("lille-build/1.0")
-        .build()?;
-    let resp = client.get(FONT_URL).send()?.error_for_status()?;
-    let bytes = resp.bytes()?;
+        .build()
+        .context("create HTTP client")?;
+    let resp = client
+        .get(FONT_URL)
+        .send()
+        .with_context(|| format!("requesting font from {FONT_URL}"))?
+        .error_for_status()
+        .with_context(|| format!("unexpected HTTP status for {FONT_URL}"))?;
+    let bytes = resp
+        .bytes()
+        .with_context(|| format!("reading response body from {FONT_URL}"))?;
     let digest = Sha256::digest(&bytes);
     let actual = format!("{digest:x}");
     if actual != FONT_SHA256 {
-        return Err(eyre!("font checksum mismatch"));
+        return Err(anyhow!(
+            "font checksum mismatch (expected {FONT_SHA256}, got {actual})"
+        ));
     }
     Ok(bytes.to_vec())
 }
@@ -192,11 +203,11 @@ mod tests {
         let manifest_path = temp_dir.path().to_path_buf();
         let assets_dir = temp_dir.path().join("assets");
         let font_path = assets_dir.join("FiraSans-Regular.ttf");
-        fs::create_dir_all(&assets_dir).unwrap();
-        fs::write(&font_path, b"fake font data").unwrap();
+        fs::create_dir_all(&assets_dir).expect("create assets dir");
+        fs::write(&font_path, b"fake font data").expect("write fake font");
         let mut fetcher = MockFontFetcher::new();
         fetcher.expect_fetch().times(0);
-        let result = download_font_with(&fetcher, &manifest_path).unwrap();
+        let result = download_font_with(&fetcher, &manifest_path).expect("existing font path");
         assert_eq!(result, font_path);
         assert!(result.exists());
     }
@@ -207,8 +218,9 @@ mod tests {
         let mut fetcher = MockFontFetcher::new();
         fetcher
             .expect_fetch()
-            .returning(|| Err(eyre!("network error")));
-        let result = download_font_with(&fetcher, &manifest_path).unwrap();
+            .returning(|| Err(anyhow!("network error")));
+        let result =
+            download_font_with(&fetcher, &manifest_path).expect("fallback path on write error");
         assert!(result == fallback_font_path() || result.exists());
     }
 
@@ -217,10 +229,10 @@ mod tests {
         let mut fetcher = MockFontFetcher::new();
         fetcher
             .expect_fetch()
-            .returning(|| Err(eyre!("network error")));
+            .returning(|| Err(anyhow!("network error")));
         let result = download_font_with(&fetcher, Path::new("/non/existent/path"));
         assert!(result.is_ok());
-        let p = result.unwrap();
+        let p = result.expect("fallback path when manifest dir is invalid");
         assert!(p == fallback_font_path() || p.exists());
     }
 
@@ -241,7 +253,7 @@ mod tests {
             })
             .collect();
         for h in handles {
-            assert!(h.join().unwrap());
+            assert!(h.join().expect("thread panicked"));
         }
     }
 
