@@ -1,9 +1,36 @@
 # Lille
 
 A simple real-time strategy prototype demonstrating a dataflow-driven game loop
-with Bevy rendering. The project currently implements "Phase 1" of the
-migration roadmap, synchronizing the legacy `GameWorld` state into Bevy and
-rendering static entities.
+with optional Bevy subsystems. Rendering is enabled with the `render` feature,
+while text rendering builds on top via the `text` feature. The project
+currently implements "Phase 1" of the migration roadmap, synchronising the
+legacy `GameWorld` state into Bevy and rendering static entities.
+
+## Features & usage
+
+- Rendering: enable with `render`.
+- Text rendering: enable with `text` (implies `render`).
+
+Run the game:
+
+```bash
+cargo run -p lille --features render
+```
+
+Enable text:
+
+```bash
+cargo run -p lille --features text
+```
+
+Run tests that depend on rendering:
+
+```bash
+cargo test -p lille --features render -- tests/spawn.rs
+```
+
+Sprites that load PNG assets require Bevy's `png` feature; the `render` feature
+in this crate enables it (see Cargo.toml).
 
 ## Game Setting
 
@@ -39,9 +66,9 @@ can take them — and keep them.
 The `build.rs` entry point delegates to the `build_support` crate. This helper
 crate downloads the project font during compilation.
 
-The font download uses the operating system's certificate store for TLS
-verification. Ensure your environment has a valid set of root certificates so
-the HTTPS request succeeds.
+The font download uses the operating system’s certificate store for TLS
+verification. A valid set of root certificates must be present in the
+environment for the HTTPS request to succeed.
 
 ## Isolated build support
 

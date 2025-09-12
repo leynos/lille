@@ -1,3 +1,4 @@
+#![cfg(feature = "render")]
 //! Example game application using the Lille library.
 //! Launches a Bevy app and wires up logging, world state, and basic systems.
 use anyhow::Result;

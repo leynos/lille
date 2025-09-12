@@ -5,11 +5,23 @@ edition = "2021"
 description = "A realtime strategy game"
 build = "build.rs"
 
+[[bin]]
+name = "lille"
+path = "src/main.rs"
+required-features = ["render"]
+
 [dependencies]
 hashbrown = "0.14"  # High performance HashMap implementation
 clap = { version = "4.4", features = ["derive"] }  # Command line argument parsing
 glam = { workspace = true }  # Linear algebra for games
-bevy = { version = "0.12", default-features = false, features = ["bevy_asset","bevy_core_pipeline","bevy_render","bevy_sprite","bevy_text","png"] }
+bevy = { version = "0.12", default-features = false }
+bevy_app = "0.12"
+bevy_ecs = "0.12"
+bevy_hierarchy = "0.12"
+bevy_math = "0.12"
+bevy_reflect = { version = "0.12", features = ["bevy"] }
+bevy_transform = "0.12"
+bevy_log = { version = "0.12", optional = true }
 log = "0.4"  # Structured logging facade
 env_logger = "0.10"  # Logger implementation controlled via RUST_LOG
 serde = { version = "1.0", features = ["derive"] }
@@ -19,6 +31,21 @@ ordered-float = { workspace = true }
 size-of = { version = "0.1", package = "feldera-size-of", features = ["ordered-float"] }
 rkyv = { version = "0.7", default-features = false, features = ["std", "size_64", "validation", "uuid"] }
 dbsp = "0.98"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+bevy = { version = "0.12", default-features = false, features = ["x11"] }
+
+[features]
+default = []
+render = [
+    "bevy/bevy_asset",
+    "bevy/bevy_core_pipeline",
+    "bevy/bevy_render",
+    "bevy/bevy_sprite",
+    "bevy/bevy_winit",
+    "bevy_log",
+]
+text = ["render", "bevy/bevy_text"]
 
 [build-dependencies]
 build_support = { path = "build_support" }
