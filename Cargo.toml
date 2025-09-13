@@ -56,7 +56,7 @@ members = ["build_support", "test_utils"]
 
 [workspace.dependencies]
 anyhow = "1"
-glam = "0.24"
+glam = "0.30"
 ordered-float = { version = "3", features = ["serde", "rkyv_64"] }
 
 [dev-dependencies]
