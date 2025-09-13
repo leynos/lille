@@ -40,6 +40,17 @@
 //! Additionally, deriving `Copy` places a `Copy` bound on any generic
 //! parameters of the generated struct, and is only permitted when all
 //! fields implement `Copy` and the type does not implement `Drop`.
+//!
+//! ```compile_fail
+//! use lille::dbsp_record;
+//!
+//! dbsp_record! {
+//!     pub struct G<T> { pub t: T }, Copy,
+//! }
+//! // error: `T` does not implement `Copy`
+//! ```
+//!
+//! A `Copy` bound on the generic parameter is required: `dbsp_record! { pub struct G<T: Copy> { pub t: T }, Copy, }`
 #[macro_export]
 macro_rules! dbsp_record {
     ($(#[$meta:meta])* $vis:vis struct $name:ident { $($fields:tt)* } $(, $extra:tt)* $(,)? ) => {
