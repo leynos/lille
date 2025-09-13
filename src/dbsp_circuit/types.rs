@@ -127,6 +127,16 @@ crate::dbsp_record! {
     /// This type intentionally omits `Copy`; clone it explicitly when duplication
     /// is required.
     ///
+    /// # Examples
+    /// ```rust
+    /// use ordered_float::OrderedFloat;
+    /// use lille::dbsp_circuit::FearLevel;
+    ///
+    /// let fear = FearLevel { entity: 1, level: OrderedFloat(0.5) };
+    /// let clone = fear.clone();
+    /// assert_eq!(clone.level, OrderedFloat(0.5));
+    /// ```
+    ///
     /// Units:
     /// - `level` ∈ [0.0, 1.0] where higher implies greater fear.
     pub struct FearLevel {
