@@ -42,7 +42,7 @@
 //! fields implement `Copy` and the type does not implement `Drop`.
 #[macro_export]
 macro_rules! dbsp_record {
-    ($(#[$meta:meta])* $vis:vis struct $name:ident { $($fields:tt)* } $(, $extra:path)* $(,)? ) => {
+    ($(#[$meta:meta])* $vis:vis struct $name:ident { $($fields:tt)* } $(, $extra:tt)* $(,)? ) => {
         $(#[$meta])*
         #[derive(
             ::rkyv::Archive,
@@ -68,7 +68,7 @@ macro_rules! dbsp_record {
 /// Do not include `Copy` in extras to avoid duplicate derives.
 #[macro_export]
 macro_rules! dbsp_copy_record {
-    ($(#[$meta:meta])* $vis:vis struct $name:ident { $($fields:tt)* } $(, $extra:path)* $(,)? ) => {
+    ($(#[$meta:meta])* $vis:vis struct $name:ident { $($fields:tt)* } $(, $extra:tt)* $(,)? ) => {
         $crate::dbsp_record! {
             $(#[$meta])* $vis struct $name { $($fields)* }, Copy $(, $extra)*
         }
