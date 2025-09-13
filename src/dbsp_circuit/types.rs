@@ -118,10 +118,14 @@ crate::dbsp_copy_record! {
     }
 }
 
-// Fear levels may evolve to hold non-`Copy` state. We avoid implicit duplication
-// by keeping this record non-`Copy` and requiring explicit clones.
+// `FearLevel` must remain non-`Copy` to avoid implicit duplication and to
+// permit future non-`Copy` fields. A compile-time test asserts this type never
+// gains `Copy` accidentally.
 crate::dbsp_record! {
     /// Fear level computed for an entity.
+    ///
+    /// This type intentionally omits `Copy`; clone it explicitly when duplication
+    /// is required.
     ///
     /// Units:
     /// - `level` ∈ [0.0, 1.0] where higher implies greater fear.
