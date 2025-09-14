@@ -1,2 +1,3 @@
 [env]
 CFLAGS_aarch64_unknown_linux_gnu = "-std=gnu11"
+CFLAGS_x86_64_unknown_linux_gnu = "-std=gnu11"
