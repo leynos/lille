@@ -15,9 +15,7 @@
 
 use ordered_float::OrderedFloat;
 
-use crate::dbsp_record;
-
-dbsp_record! {
+crate::dbsp_copy_record! {
     /// Public data type for entity positions.
     pub struct Position {
         pub entity: i64,
@@ -30,7 +28,7 @@ dbsp_record! {
 /// Newly computed position emitted by the circuit in the current step.
 pub type NewPosition = Position;
 
-dbsp_record! {
+crate::dbsp_copy_record! {
     /// Entity velocity vector.
     pub struct Velocity {
         pub entity: i64,
@@ -87,7 +85,7 @@ pub struct Force {
     pub mass: Option<OrderedFloat<f64>>,
 }
 
-dbsp_record! {
+crate::dbsp_copy_record! {
     /// Discrete highest block at a grid cell.
     pub struct HighestBlockAt {
         pub x: i32,
@@ -96,7 +94,7 @@ dbsp_record! {
     }
 }
 
-dbsp_record! {
+crate::dbsp_copy_record! {
     /// Floor height at a grid cell, accounting for slopes.
     pub struct FloorHeightAt {
         pub x: i32,
@@ -105,7 +103,7 @@ dbsp_record! {
     }
 }
 
-dbsp_record! {
+crate::dbsp_copy_record! {
     /// Target position for an entity.
     ///
     /// Units:
@@ -120,8 +118,24 @@ dbsp_record! {
     }
 }
 
-dbsp_record! {
+// `FearLevel` must remain non-`Copy` to avoid implicit duplication and to
+// permit future non-`Copy` fields. A compile-time test asserts this type never
+// gains `Copy` accidentally.
+crate::dbsp_record! {
     /// Fear level computed for an entity.
+    ///
+    /// This type intentionally omits `Copy`; clone it explicitly when duplication
+    /// is required.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use ordered_float::OrderedFloat;
+    /// use lille::dbsp_circuit::FearLevel;
+    ///
+    /// let fear = FearLevel { entity: 1, level: OrderedFloat(0.5) };
+    /// let clone = fear.clone();
+    /// assert_eq!(clone.level, OrderedFloat(0.5));
+    /// ```
     ///
     /// Units:
     /// - `level` ∈ [0.0, 1.0] where higher implies greater fear.
@@ -131,7 +145,7 @@ dbsp_record! {
     }
 }
 
-dbsp_record! {
+crate::dbsp_copy_record! {
     /// Decided unit movement vector for an entity.
     ///
     /// Units:
