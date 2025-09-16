@@ -228,6 +228,29 @@ erDiagram
     Position }o--|| FloorHeightAt : at
 ```
 
+### 3.5. Health and Damage Integration
+
+The health system follows the same DBSP-first approach as motion. Entities
+carry a `Health` component with `current` and `max` values; the component is
+mirrored into the circuit as an input collection so damage and regeneration can
+be folded into a single `HealthState` stream. A dedicated `DamageEvent` input
+collection receives external damage sources, while fall damage generated within
+the circuit is injected through the same path. The circuit aggregates these
+events into a canonical `HealthDelta` output that the marshalling layer applies
+back to ECS components. Because all reductions happen inside DBSP, Bevy never
+infers health changes independently.
+
+Landing damage is derived by detecting transitions from `Unsupported` to
+`Standing` with a negative `vz`. The circuit calculates the impact speed,
+clamps a safe landing threshold, and emits a `DamageEvent` when the impact
+exceeds the limit. This keeps DBSP as the sole authority on fall damage while
+reusing the existing velocity dataflows.
+
+Testing mirrors the motion pipeline. Unit tests cover the reducers and landing
+detection logic, using `rstest` fixtures for edge cases. Headless Bevy BDD
+scenarios exercise full loops where an entity falls, lands, and loses health,
+ensuring the ECS observes only circuit-driven updates.
+
 ## 4. Agent Behaviour (AI)
 
 Simple, reactive agent behaviours can be expressed elegantly within the same

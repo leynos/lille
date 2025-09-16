@@ -172,8 +172,34 @@ physical properties and agent behaviours.
    - [ ] Introduce a `Health` component and a corresponding `Damage` input
      stream.
 
+     - [ ] Specify the ECS `Health` component fields (e.g., current and maximum
+       hit points) and mirror the structure for a DBSP input collection.
+
+     - [ ] Extend the DBSP circuit schema with health state and damage event
+       streams so the circuit remains the canonical interpreter of health
+       changes.
+
+     - [ ] Update the Bevy → DBSP → Bevy marshalling layer to publish health
+       snapshots into the circuit and apply circuit-emitted health deltas back
+       onto ECS components.
+
+     - [ ] Add data-driven tests—`rstest` fixtures and headless Bevy BDD
+       scenarios—covering health synchronisation across the circuit boundary.
+
    - [ ] Implement a simple damage model (e.g., falling damage calculated from
      velocity upon landing).
+
+     - [ ] Detect landing events inside the circuit by tracking transitions
+       from `Unsupported` to `Standing` alongside vertical velocity.
+
+     - [ ] Define a fall-damage operator that applies a safe-velocity threshold
+       and scaling factor entirely within DBSP.
+
+     - [ ] Emit derived damage events into the `Damage` stream and reduce
+       entity health through the circuit's health accumulator.
+
+     - [ ] Cover the damage flow with DBSP unit tests and headless Bevy
+       simulations demonstrating falling damage.
 
 **Acceptance Criteria**:
 
