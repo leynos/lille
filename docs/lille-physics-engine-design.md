@@ -228,7 +228,36 @@ erDiagram
     Position }o--|| FloorHeightAt : at
 ```
 
-### 3.5. Health and Damage Integration
+### 3.5. Health and damage integration
+
+Schema (authoritative circuit I/O):
+
+```plaintext
+HealthState
+  - entity: EntityId
+  - current: u16
+  - max: u16
+
+DamageEvent
+  - entity: EntityId
+  - amount: u16
+  - source: DamageSource
+  - at_tick: Tick
+
+HealthDelta
+  - entity: EntityId
+  - delta: i32      # negative for damage, positive for healing
+  - death: bool     # true when current hits 0 this tick
+```
+
+Semantics:
+
+- Enforce `0 ≤ current ≤ max` at all times by applying saturating addition and
+  subtraction inside the circuit.
+- Treat the circuit as the sole authority; Bevy never mutates health outside
+  the marshalling callbacks.
+- Apply each `HealthDelta` once per tick and guard idempotency via tick or
+  sequence identifiers.
 
 The health system follows the same DBSP-first approach as motion. Entities
 carry a `Health` component with `current` and `max` values; the component is
@@ -237,14 +266,33 @@ be folded into a single `HealthState` stream. A dedicated `DamageEvent` input
 collection receives external damage sources, while fall damage generated within
 the circuit is injected through the same path. The circuit aggregates these
 events into a canonical `HealthDelta` output that the marshalling layer applies
-back to ECS components. Because all reductions happen inside DBSP, Bevy never
-infers health changes independently.
+back to ECS components.
 
-Landing damage is derived by detecting transitions from `Unsupported` to
-`Standing` with a negative `vz`. The circuit calculates the impact speed,
-clamps a safe landing threshold, and emits a `DamageEvent` when the impact
-exceeds the limit. This keeps DBSP as the sole authority on fall damage while
-reusing the existing velocity dataflows.
+Landing damage is derived by a single-fire edge detector:
+`Unsupported_prev && Standing_now && vz_before_contact < 0`. The circuit keeps
+a per-entity cooldown window (for example ≥100 ms) and reuses the motion
+system's `z_floor` hysteresis band to avoid double hits from oscillation. It
+computes impact speed from `vz_before_contact`, clamps it against
+`SAFE_LANDING_SPEED`, scales the excess by `FALL_DAMAGE_SCALE`, and respects
+the global `TERMINAL_VELOCITY`. A `DamageEvent` is emitted only when the
+clamped impact exceeds the safe threshold.
+
+Short description: The diagram shows the authoritative health dataflow. ECS
+snapshots and external damage enter the circuit, which emits deltas that are
+applied back to ECS.
+
+```mermaid
+graph TD
+    H[HealthState snapshot] --> A[Health accumulator]
+    D[DamageEvent external] --> A
+    F[FallDamage derived] --> D
+    A --> Delta[HealthDelta]
+    Delta --> E[Apply to ECS]
+    subgraph Circuit
+      A
+      F
+    end
+```
 
 The following sequence diagram illustrates how the Bevy ECS, marshalling layer,
 and DBSP circuit collaborate to calculate and apply fall damage without
@@ -276,10 +324,14 @@ sequenceDiagram
   end
 ```
 
-Testing mirrors the motion pipeline. Unit tests cover the reducers and landing
-detection logic, using `rstest` fixtures for edge cases. Headless Bevy BDD
-scenarios exercise full loops where an entity falls, lands, and loses health,
-ensuring the ECS observes only circuit-driven updates.
+Testing mirrors the motion pipeline. Unit tests cover reducers, edge detection,
+and cooldown behaviour using `rstest` fixtures. Headless Bevy BDD scenarios
+exercise fall→land→health-loss loops. Assert:
+
+- deterministic aggregation with multiple `DamageEvent`s in a tick,
+- saturating arithmetic at `0` and at `max`,
+- single hits on jittery landings, and
+- convergence of ECS and circuit health within one tick.
 
 ## 4. Agent Behaviour (AI)
 
