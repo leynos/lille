@@ -246,6 +246,36 @@ clamps a safe landing threshold, and emits a `DamageEvent` when the impact
 exceeds the limit. This keeps DBSP as the sole authority on fall damage while
 reusing the existing velocity dataflows.
 
+The following sequence diagram illustrates how the Bevy ECS, marshalling layer,
+and DBSP circuit collaborate to calculate and apply fall damage without
+duplicated logic outside the circuit.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor Dev as Bevy ECS
+  participant M as Marshalling Layer
+  participant C as DBSP Circuit
+
+  rect rgb(235,245,255)
+  note right of Dev: Startup / Tick
+  Dev->>M: Read Health components<br/>and external DamageEvents
+  M->>C: Publish HealthState and DamageEvent inputs
+  end
+
+  rect rgb(245,235,255)
+  note over C: In-circuit processing
+  C->>C: Detect landing (Unsupported→Standing with -vz)
+  C->>C: Compute fall damage (threshold, scale)
+  C-->>M: Emit HealthDelta and Damage events
+  end
+
+  rect rgb(235,255,235)
+  note right of M: Apply outputs
+  M->>Dev: Apply HealthDelta to ECS
+  end
+```
+
 Testing mirrors the motion pipeline. Unit tests cover the reducers and landing
 detection logic, using `rstest` fixtures for edge cases. Headless Bevy BDD
 scenarios exercise full loops where an entity falls, lands, and loses health,
