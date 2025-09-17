@@ -236,8 +236,8 @@ physical properties and agent behaviours.
         - Edge detection: fire once on the boolean edge
           `Unsupported_prev && Standing_now`.
 
-        - Debounce: add a per-entity cooldown (for example ≥100 ms) before
-          another landing can trigger.
+        - Debounce: add a per-entity cooldown of `LANDING_COOLDOWN_TICKS: u32`
+          (default: 6 ticks). Document how ticks map to wall time in the engine.
 
         - Hysteresis: reuse the motion system's `z_floor` grace band to avoid
           chatter-induced re-triggers.
@@ -245,14 +245,15 @@ physical properties and agent behaviours.
       - [ ] Define a fall-damage operator that applies a safe-velocity threshold
         and scaling factor entirely within DBSP.
 
-        - Units: state velocity units (world units per second) and derive impact
-          speed as `abs(vz_before_contact)`.
+        - Units: velocity in world units per second; derive impact speed as
+          `abs(vz_before_contact)` sampled from the last `Unsupported` frame.
 
-        - Constants: document defaults for `SAFE_LANDING_SPEED` and
-          `FALL_DAMAGE_SCALE`.
+        - Constants (defaults): `SAFE_LANDING_SPEED = 6.0`,
+          `FALL_DAMAGE_SCALE = 4.0`. State that tuning may change but tests pin
+          current values.
 
-        - Clamp: never emit negative damage and round fractional results down
-          before casting to `u16`.
+        - Clamp: never emit negative damage; round down before casting to `u16`.
+          Respect `TERMINAL_VELOCITY` before computing impact.
 
       - [ ] Emit derived damage events into the `Damage` stream and reduce
         entity health through the circuit's health accumulator.

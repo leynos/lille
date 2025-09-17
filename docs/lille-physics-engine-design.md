@@ -265,8 +265,9 @@ Semantics:
   subtraction inside the circuit.
 - Treat the circuit as the sole authority; Bevy never mutates health outside
   the marshalling callbacks.
-- Apply each `HealthDelta` once per tick. Guard idempotency with `(entity,
-  at_tick, seq)` triples.
+- Emit `death = true` only on transitions where `current_prev > 0` and
+  `current_now == 0`. Healing from zero clears the dead state according to the
+  gameplay rules (documented in AI/agent sections if applicable).
 - Round fractional damage and healing magnitudes down before applying deltas.
 
 The health system follows the same DBSP-first approach as motion. Entities
