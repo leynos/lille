@@ -233,25 +233,28 @@ erDiagram
 Type definitions:
 
 ```plaintext
-EntityId = u32
+EntityId = u64
 Tick = u64          # simulation ticks; monotonic and wrap-safe
 DamageSource = { External, Fall, Script, Other(u16) }
 ```
+
+Note: Treat these as canonical engine-wide type aliases; reference this section
+from planning documents to avoid duplication and drift.
 
 Schema (authoritative circuit I/O):
 
 ```plaintext
 HealthState
-  - entity: EntityId
+  - entity: EntityId         # concrete alias: u64 (documented elsewhere)
   - current: u16
   - max: u16
 
 DamageEvent
   - entity: EntityId
   - amount: u16
-  - source: DamageSource
-  - at_tick: Tick
-  - seq: u32        # optional sequence for idempotency
+  - source: DamageSource     # { External, Fall, Script, Other(u16) }
+  - at_tick: Tick            # u64 simulation tick
+  - seq: u32        # optional per-entity sequence for idempotency
 
 HealthDelta
   - entity: EntityId
@@ -274,10 +277,11 @@ The health system follows the same DBSP-first approach as motion. Entities
 carry a `Health` component with `current` and `max` values; the component is
 mirrored into the circuit as an input collection so damage and regeneration can
 be folded into a single `HealthState` stream. A dedicated `DamageEvent` input
-collection receives external damage sources, while fall damage generated within
-the circuit is injected through the same path. The circuit aggregates these
-events into a canonical `HealthDelta` output that the marshalling layer applies
-back to ECS components.
+collection receives external damage sources (and optional healing via a
+`HealEvent` or by interpreting signed script inputs), while fall damage
+generated within the circuit is injected through the same path. The circuit
+aggregates these events into a canonical `HealthDelta` output that the
+marshalling layer applies back to ECS components.
 
 Landing damage is derived by a single-fire edge detector:
 `Unsupported_prev && Standing_now && vz_before_contact < 0`. The circuit keeps

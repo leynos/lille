@@ -178,8 +178,9 @@ physical properties and agent behaviours.
         - Field types: `entity: EntityId`, `current: u16`, `max: u16`.
           Enforce `0 ≤ current ≤ max` at all times.
 
-        - Type aliases: `type EntityId = u32; type Tick = u64`.
-          `Tick` counts simulation ticks and advances monotonically.
+        - Type aliases: `type EntityId = u64; type Tick = u64`. Treat the
+          definitions in the physics design (Section 3.5) as canonical to avoid
+          drift. `Tick` counts simulation ticks and advances monotonically.
 
         - Arithmetic: apply saturating add/sub inside the circuit so health
           never underflows below `0` or overflows above `max`.
@@ -214,9 +215,10 @@ physical properties and agent behaviours.
         - Authority: treat DBSP as the single writer and prohibit out-of-band
           ECS health mutation.
 
-        - Idempotency: track and apply each `HealthDelta` at most once per
-          `(entity, at_tick, seq)` triple; ignore duplicates and log at debug.
-          On missing deltas, carry forward last applied state (no-op).
+        - Idempotency: apply each `HealthDelta` at most once per
+          `(entity, at_tick, seq)` triple; ignore duplicates and log at debug
+          with a counter. On missing deltas, carry forward last applied state
+          (no-op) and emit a resynchronisation metric.
 
       - [ ] Add data-driven tests—`rstest` fixtures and headless Bevy BDD
         scenarios—covering health synchronisation across the circuit boundary.
@@ -246,14 +248,16 @@ physical properties and agent behaviours.
         and scaling factor entirely within DBSP.
 
         - Units: velocity in world units per second; derive impact speed as
-          `abs(vz_before_contact)` sampled from the last `Unsupported` frame.
+          `abs(vz_before_contact)` sampled from the last `Unsupported` frame
+          immediately before contact detection.
 
         - Constants (defaults): `SAFE_LANDING_SPEED = 6.0`,
           `FALL_DAMAGE_SCALE = 4.0`. State that tuning may change but tests pin
           current values.
 
         - Clamp: never emit negative damage; round down before casting to `u16`.
-          Respect `TERMINAL_VELOCITY` before computing impact.
+          Clamp `vz_before_contact` by `TERMINAL_VELOCITY` before computing
+          impact.
 
       - [ ] Emit derived damage events into the `Damage` stream and reduce
         entity health through the circuit's health accumulator.
