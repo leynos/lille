@@ -175,8 +175,11 @@ physical properties and agent behaviours.
       - [ ] Specify the ECS `Health` component fields (e.g., current and maximum
         hit points) and mirror the structure for a DBSP input collection.
 
-        - Field types: `current: u16`, `max: u16`. Enforce the invariant
-          `0 ≤ current ≤ max`.
+        - Field types: `entity: EntityId`, `current: u16`, `max: u16`.
+          Enforce `0 ≤ current ≤ max` at all times.
+
+        - Type aliases: `type EntityId = u32; type Tick = u64`.
+          `Tick` counts simulation ticks and advances monotonically.
 
         - Arithmetic: apply saturating add/sub inside the circuit so health
           never underflows below `0` or overflows above `max`.
@@ -184,15 +187,19 @@ physical properties and agent behaviours.
         - Serialisation: mirror the component layout into a `HealthState` input
           collection for the circuit.
 
-        - Rounding: if non-integer sources emerge, round damage down before
-          applying deltas.
+        - Rounding: if non-integer sources emerge, round damage down and round
+          healing down before applying deltas.
 
       - [ ] Extend the DBSP circuit schema with health state and damage event
         streams so the circuit remains the canonical interpreter of health
         changes.
 
-        - Define `DamageEvent { entity, amount: u16, source, at_tick }` and
-          `HealthDelta { entity, delta: i32, death: bool }`.
+        - Define:
+          - `DamageSource = { External, Fall, Script, Other(u16) }`.
+          - `Tick = u64` (simulation ticks; monotonic).
+          - `DamageEvent { entity: EntityId, amount: u16, source: DamageSource,
+              at_tick: Tick, seq: u32 }` (`seq` optional but recommended).
+          - `HealthDelta { entity: EntityId, delta: i32, death: bool }`.
 
         - Ordering: reduce multiple `DamageEvent`s for an entity
           deterministically within a tick.
@@ -207,8 +214,9 @@ physical properties and agent behaviours.
         - Authority: treat DBSP as the single writer and prohibit out-of-band
           ECS health mutation.
 
-        - Idempotency: guard against double-application of the same
-          `HealthDelta`, for example by tracking tick and delta identifiers.
+        - Idempotency: track and apply each `HealthDelta` at most once per
+          `(entity, at_tick, seq)` triple; ignore duplicates and log at debug.
+          On missing deltas, carry forward last applied state (no-op).
 
       - [ ] Add data-driven tests—`rstest` fixtures and headless Bevy BDD
         scenarios—covering health synchronisation across the circuit boundary.

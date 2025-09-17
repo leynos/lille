@@ -230,6 +230,14 @@ erDiagram
 
 ### 3.5. Health and damage integration
 
+Type definitions:
+
+```plaintext
+EntityId = u32
+Tick = u64          # simulation ticks; monotonic and wrap-safe
+DamageSource = { External, Fall, Script, Other(u16) }
+```
+
 Schema (authoritative circuit I/O):
 
 ```plaintext
@@ -243,6 +251,7 @@ DamageEvent
   - amount: u16
   - source: DamageSource
   - at_tick: Tick
+  - seq: u32        # optional sequence for idempotency
 
 HealthDelta
   - entity: EntityId
@@ -256,8 +265,9 @@ Semantics:
   subtraction inside the circuit.
 - Treat the circuit as the sole authority; Bevy never mutates health outside
   the marshalling callbacks.
-- Apply each `HealthDelta` once per tick and guard idempotency via tick or
-  sequence identifiers.
+- Apply each `HealthDelta` once per tick. Guard idempotency with `(entity,
+  at_tick, seq)` triples.
+- Round fractional damage and healing magnitudes down before applying deltas.
 
 The health system follows the same DBSP-first approach as motion. Entities
 carry a `Health` component with `current` and `max` values; the component is
@@ -282,7 +292,7 @@ snapshots and external damage enter the circuit, which emits deltas that are
 applied back to ECS.
 
 ```mermaid
-graph TD
+flowchart TD
     H[HealthState snapshot] --> A[Health accumulator]
     D[DamageEvent external] --> A
     F[FallDamage derived] --> D
@@ -307,7 +317,7 @@ sequenceDiagram
 
   rect rgb(235,245,255)
   note right of Dev: Startup / Tick
-  Dev->>M: Read Health components<br/>and external DamageEvents
+  Dev->>M: Read Health components\nand external DamageEvents
   M->>C: Publish HealthState and DamageEvent inputs
   end
 
@@ -330,7 +340,9 @@ exercise fall→land→health-loss loops. Assert:
 
 - deterministic aggregation with multiple `DamageEvent`s in a tick,
 - saturating arithmetic at 0 and at `max`,
-- single hit on jittery landings, and
+- single hit on jittery landings,
+- healing from low and zero health without exceeding `max`,
+- idempotent application of duplicate `(entity, at_tick, seq)` deltas, and
 - convergence of ECS to circuit within one tick.
 
 ## 4. Agent Behaviour (AI)
