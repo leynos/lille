@@ -329,9 +329,9 @@ and cooldown behaviour using `rstest` fixtures. Headless Bevy BDD scenarios
 exercise fall→land→health-loss loops. Assert:
 
 - deterministic aggregation with multiple `DamageEvent`s in a tick,
-- saturating arithmetic at `0` and at `max`,
-- single hits on jittery landings, and
-- convergence of ECS and circuit health within one tick.
+- saturating arithmetic at 0 and at `max`,
+- single hit on jittery landings, and
+- convergence of ECS to circuit within one tick.
 
 ## 4. Agent Behaviour (AI)
 
