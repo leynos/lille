@@ -230,37 +230,36 @@ erDiagram
 
 ### 3.5. Health and damage integration
 
-Type definitions:
+Authoritative type aliases and circuit schema:
 
 ```plaintext
-EntityId = u64
-Tick = u64          # simulation ticks; monotonic and wrap-safe
+EntityId = u64              # canonical entity identifier alias
+Tick = u64                  # authoritative simulation tick counter
 DamageSource = { External, Fall, Script, Other(u16) }
-```
 
-Note: Treat these as canonical engine-wide type aliases; reference this section
-from planning documents to avoid duplication and drift.
-
-Schema (authoritative circuit I/O):
-
-```plaintext
 HealthState
-  - entity: EntityId         # concrete alias: u64 (documented elsewhere)
+  - entity: EntityId        # concrete alias: u64 (documented elsewhere)
   - current: u16
   - max: u16
 
 DamageEvent
   - entity: EntityId
   - amount: u16
-  - source: DamageSource     # { External, Fall, Script, Other(u16) }
-  - at_tick: Tick            # u64 simulation tick
-  - seq: u32                 # optional per-entity sequence for idempotency
+  - source: DamageSource
+  - at_tick: Tick
+  - seq: Option<u32>        # optional per-entity sequence for idempotency
 
 HealthDelta
   - entity: EntityId
-  - delta: i32      # negative for damage, positive for healing
-  - death: bool     # true when current hits 0 this tick
+  - delta: i32              # negative for damage, positive for healing
+  - death: bool             # true when current hits 0 this tick
 ```
+
+The sequence identifier remains optional because only marshalling layers that
+deduplicate external submissions need to supply it; in-circuit producers rely
+on `(entity, at_tick)` alone. Treat these alias definitions as the canonical
+reference for health integration so roadmap entries and tests reuse the same
+types while keeping the DBSP circuit authoritative over derived behaviour.
 
 Semantics:
 
@@ -277,8 +276,9 @@ The health system follows the same DBSP-first approach as motion. Entities
 carry a `Health` component with `current` and `max` values; the component is
 mirrored into the circuit as an input collection so damage and regeneration can
 be folded into a single `HealthState` stream. A dedicated `DamageEvent` input
-collection receives external damage sources and script-driven healing. Healing
-reuses the same schema: emit `DamageEvent` records tagged
+collection receives external damage sources and script-driven healing,
+attaching per-entity sequence counters when the marshalling layer needs
+idempotency. Healing reuses the same schema: emit `DamageEvent` records tagged
 `DamageSource::Script` with `amount` set to the healed magnitude. The circuit
 negates the effect by outputting positive `HealthDelta` entries, keeping a
 single ingress path for both damage and healing. Fall damage generated within
