@@ -287,13 +287,16 @@ events into a canonical `HealthDelta` output that the marshalling layer applies
 back to ECS components.
 
 Landing damage is derived by a single-fire edge detector:
-`Unsupported_prev && Standing_now && vz_before_contact < 0`. The circuit keeps
-a per-entity cooldown window (for example ≥100 ms) and reuses the motion
-system's `z_floor` hysteresis band to avoid double hits from oscillation. It
-computes impact speed from `vz_before_contact`, clamps it against
-`SAFE_LANDING_SPEED`, scales the excess by `FALL_DAMAGE_SCALE`, and respects
-the global `TERMINAL_VELOCITY`. A `DamageEvent` is emitted only when the
-clamped impact exceeds the safe threshold.
+`Unsupported_prev && Standing_now && vz_before_contact < 0`, where
+`vz_before_contact` captures the last vertical velocity recorded while the
+entity was `Unsupported`. The circuit keeps a per-entity cooldown of
+`LANDING_COOLDOWN_TICKS` (default: 6 ticks) and reuses the motion system's
+`z_floor` hysteresis band to avoid double hits from oscillation. It computes
+impact speed from `vz_before_contact`, clamps it against the default
+`SAFE_LANDING_SPEED = 6.0`, scales the excess by the default
+`FALL_DAMAGE_SCALE = 4.0`, and respects the global `TERMINAL_VELOCITY`. A
+`DamageEvent` is emitted only when the clamped impact exceeds the safe
+threshold.
 
 Short description: The diagram shows the authoritative health dataflow. ECS
 snapshots and external damage enter the circuit, which emits deltas that are
