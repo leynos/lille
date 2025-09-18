@@ -233,7 +233,7 @@ erDiagram
 Type definitions:
 
 ```plaintext
-EntityId = u32
+EntityId = u64
 Tick = u64          # simulation ticks; monotonic and wrap-safe
 DamageSource = { External, Fall, Script, Other(u16) }
 ```
@@ -245,7 +245,7 @@ Schema (authoritative circuit I/O):
 
 ```plaintext
 HealthState
-  - entity: EntityId         # canonical alias (u32) defined above
+  - entity: EntityId         # concrete alias: u64 (documented elsewhere)
   - current: u16
   - max: u16
 
@@ -278,11 +278,13 @@ carry a `Health` component with `current` and `max` values; the component is
 mirrored into the circuit as an input collection so damage and regeneration can
 be folded into a single `HealthState` stream. A dedicated `DamageEvent` input
 collection receives external damage sources and script-driven healing. Healing
-enters as `DamageEvent` records tagged `DamageSource::Script`, which the
-circuit converts into positive `HealthDelta` values. Fall damage generated
-within the circuit is injected through the same path. The circuit aggregates
-these events into a canonical `HealthDelta` output that the marshalling layer
-applies back to ECS components.
+reuses the same schema: emit `DamageEvent` records tagged
+`DamageSource::Script` with `amount` set to the healed magnitude. The circuit
+negates the effect by outputting positive `HealthDelta` entries, keeping a
+single ingress path for both damage and healing. Fall damage generated within
+the circuit is injected through the same path. The circuit aggregates these
+events into a canonical `HealthDelta` output that the marshalling layer applies
+back to ECS components.
 
 Landing damage is derived by a single-fire edge detector:
 `Unsupported_prev && Standing_now && vz_before_contact < 0`. The circuit keeps
