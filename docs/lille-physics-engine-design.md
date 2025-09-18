@@ -230,6 +230,8 @@ erDiagram
 
 ### 3.5. Health and damage integration
 
+#### Canonical type definitions
+
 Authoritative type aliases and circuit schema:
 
 ```plaintext

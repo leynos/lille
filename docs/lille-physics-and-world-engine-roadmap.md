@@ -178,9 +178,9 @@ physical properties and agent behaviours.
         - Field types: `entity: EntityId`, `current: u16`, `max: u16`.
           Enforce `0 ≤ current ≤ max` at all times.
 
-        - Type aliases: `type EntityId = u64; type Tick = u64`. Treat the
-          definitions in the physics design (Section 3.5) as canonical to avoid
-          drift. `Tick` counts simulation ticks and advances monotonically.
+        - Type aliases: use the [canonical type definitions][health-type-defs]
+          (`type EntityId = u64; type Tick = u64`). `Tick` counts simulation
+          ticks and advances monotonically.
 
         - Arithmetic: apply saturating add/sub inside the circuit so health
           never underflows below `0` or overflows above `max`.
@@ -270,6 +270,8 @@ physical properties and agent behaviours.
 
         - Tests: cover stair-step jitter (single hit), terminal-velocity caps,
           cooldown enforcement, and mixed external plus fall damage.
+
+[health-type-defs]: ./lille-physics-engine-design.md#canonical-type-definitions
 
 **Acceptance Criteria**:
 
