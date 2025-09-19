@@ -230,6 +230,9 @@ erDiagram
 
 ### 3.5. Health and damage integration
 
+Health integration mirrors the motion pipeline: Bevy snapshots component state,
+publishes it to DBSP, and applies the circuit's authoritative deltas each tick.
+
 #### Canonical type definitions
 
 Authoritative type aliases and circuit schema:
@@ -240,7 +243,7 @@ Tick = u64                  # authoritative simulation tick counter
 DamageSource = { External, Fall, Script, Other(u16) }
 
 HealthState
-  - entity: EntityId        # concrete alias: u64 (documented elsewhere)
+  - entity: EntityId
   - current: u16
   - max: u16
 
