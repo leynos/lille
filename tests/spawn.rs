@@ -40,7 +40,7 @@ fn spawns_world_entities() {
 
     for (entity, dd_id, unit, transform, health, target) in query.iter(world) {
         if let Some(h) = health {
-            assert!(h.0 > 0, "Entity {entity:?} missing health");
+            assert!(h.current > 0, "Entity {entity:?} missing health");
         }
 
         match unit {

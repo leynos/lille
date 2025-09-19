@@ -228,6 +228,139 @@ erDiagram
     Position }o--|| FloorHeightAt : at
 ```
 
+### 3.5. Health and damage integration
+
+Health integration mirrors the motion pipeline: Bevy snapshots component state,
+publishes it to DBSP, and applies the circuit's authoritative deltas each tick.
+
+#### Canonical type definitions
+
+Authoritative type aliases and circuit schema:
+
+```plaintext
+EntityId = u64              # canonical entity identifier alias
+Tick = u64                  # authoritative simulation tick counter
+DamageSource = { External, Fall, Script, Other(u16) }
+
+HealthState
+  - entity: EntityId
+  - current: u16
+  - max: u16
+
+DamageEvent
+  - entity: EntityId
+  - amount: u16
+  - source: DamageSource
+  - at_tick: Tick
+  - seq: Option<u32>        # optional per-entity sequence for idempotency
+
+HealthDelta
+  - entity: EntityId
+  - delta: i32              # negative for damage, positive for healing
+  - death: bool             # true when current hits 0 this tick
+```
+
+The sequence identifier remains optional because only marshalling layers that
+deduplicate external submissions need to supply it; in-circuit producers rely
+on `(entity, at_tick)` alone. Treat these alias definitions as the canonical
+reference for health integration so roadmap entries and tests reuse the same
+types while keeping the DBSP circuit authoritative over derived behaviour.
+
+Semantics:
+
+- Enforce `0 ≤ current ≤ max` at all times by applying saturating addition and
+  subtraction inside the circuit.
+- Treat the circuit as the sole authority; Bevy never mutates health outside
+  the marshalling callbacks.
+- Emit `death = true` only on transitions where `current_prev > 0` and
+  `current_now == 0`. Healing from zero clears the dead state according to the
+  gameplay rules (documented in AI/agent sections if applicable).
+- Round fractional damage and healing magnitudes down before applying deltas.
+
+The health system follows the same DBSP-first approach as motion. Entities
+carry a `Health` component with `current` and `max` values; the component is
+mirrored into the circuit as an input collection so damage and regeneration can
+be folded into a single `HealthState` stream. A dedicated `DamageEvent` input
+collection receives external damage sources and script-driven healing,
+attaching per-entity sequence counters when the marshalling layer needs
+idempotency. Healing reuses the same schema: emit `DamageEvent` records tagged
+`DamageSource::Script` with `amount` set to the healed magnitude. The circuit
+negates the effect by outputting positive `HealthDelta` entries, keeping a
+single ingress path for both damage and healing. Fall damage generated within
+the circuit is injected through the same path. The circuit aggregates these
+events into a canonical `HealthDelta` output that the marshalling layer applies
+back to ECS components.
+
+Landing damage is derived by a single-fire edge detector:
+`Unsupported_prev && Standing_now && vz_before_contact < 0`, where
+`vz_before_contact` captures the last vertical velocity recorded while the
+entity was `Unsupported`. The circuit keeps a per-entity cooldown of
+`LANDING_COOLDOWN_TICKS` (default: 6 ticks) and reuses the motion system's
+`z_floor` hysteresis band to avoid double hits from oscillation. It computes
+impact speed from `vz_before_contact`, clamps it against the default
+`SAFE_LANDING_SPEED = 6.0`, scales the excess by the default
+`FALL_DAMAGE_SCALE = 4.0`, and respects the global `TERMINAL_VELOCITY`. A
+`DamageEvent` is emitted only when the clamped impact exceeds the safe
+threshold.
+
+Short description: The diagram shows the authoritative health dataflow. ECS
+snapshots and external damage enter the circuit, which emits deltas that are
+applied back to ECS.
+
+```mermaid
+flowchart TD
+    H[HealthState snapshot] --> A[Health accumulator]
+    D[DamageEvent external] --> A
+    F[FallDamage derived] --> D
+    A --> Delta[HealthDelta]
+    Delta --> E[Apply to ECS]
+    subgraph Circuit
+      A
+      F
+    end
+```
+
+The following sequence diagram illustrates how the Bevy ECS, marshalling layer,
+and DBSP circuit collaborate to calculate and apply fall damage without
+duplicated logic outside the circuit.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor Dev as Bevy ECS
+  participant M as Marshalling Layer
+  participant C as DBSP Circuit
+
+  rect rgb(235,245,255)
+  note right of Dev: Startup / Tick
+  Dev->>M: Read Health components\nand external DamageEvents
+  M->>C: Publish HealthState and DamageEvent inputs
+  end
+
+  rect rgb(245,235,255)
+  note over C: In-circuit processing
+  C->>C: Detect landing (Unsupported→Standing with -vz)
+  C->>C: Compute fall damage (threshold, scale)
+  C-->>M: Emit HealthDelta and Damage events
+  end
+
+  rect rgb(235,255,235)
+  note right of M: Apply outputs
+  M->>Dev: Apply HealthDelta to ECS
+  end
+```
+
+Testing mirrors the motion pipeline. Unit tests cover reducers, edge detection,
+and cooldown behaviour using `rstest` fixtures. Headless Bevy BDD scenarios
+exercise fall→land→health-loss loops. Assert:
+
+- deterministic aggregation with multiple `DamageEvent`s in a tick,
+- saturating arithmetic at 0 and at `max`,
+- single hit on jittery landings,
+- healing from low and zero health without exceeding `max`,
+- idempotent application of duplicate `(entity, at_tick, seq)` deltas, and
+- convergence of ECS to circuit within one tick.
+
 ## 4. Agent Behaviour (AI)
 
 Simple, reactive agent behaviours can be expressed elegantly within the same

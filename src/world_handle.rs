@@ -19,7 +19,9 @@ pub struct DdlogEntity {
     /// The unit archetype determining behaviour.
     pub unit: UnitType,
     /// Current health points.
-    pub health: i32,
+    pub health_current: u16,
+    /// Maximum health points.
+    pub health_max: u16,
     /// Optional point the entity attempts to reach.
     pub target: Option<Vec2>,
 }
@@ -29,7 +31,8 @@ impl Default for DdlogEntity {
         Self {
             position: Vec3::ZERO,
             unit: UnitType::Civvy { fraidiness: 0.0 },
-            health: 0,
+            health_current: 0,
+            health_max: 0,
             target: None,
         }
     }

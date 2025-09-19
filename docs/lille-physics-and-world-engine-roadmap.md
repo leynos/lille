@@ -169,11 +169,109 @@ physical properties and agent behaviours.
 
 3. **Health and Damage**:
 
-   - [ ] Introduce a `Health` component and a corresponding `Damage` input
-     stream.
+    - [ ] Introduce a `Health` component and a corresponding `Damage` input
+      stream.
 
-   - [ ] Implement a simple damage model (e.g., falling damage calculated from
+      - [ ] Specify the ECS `Health` component fields (e.g., current and maximum
+        hit points) and mirror the structure for a DBSP input collection.
+
+        - Field types: `entity: EntityId`, `current: u16`, `max: u16`.
+          Enforce `0 ≤ current ≤ max` at all times.
+
+        - Type aliases: use the [canonical type definitions][health-type-defs]
+          (`type EntityId = u64; type Tick = u64`). `Tick` counts simulation
+          ticks and advances monotonically.
+
+        - Arithmetic: apply saturating add/sub inside the circuit so health
+          never underflows below `0` or overflows above `max`.
+
+        - Serialisation: mirror the component layout into a `HealthState` input
+          collection for the circuit.
+
+        - Rounding: if non-integer sources emerge, round damage down and round
+          healing down before applying deltas.
+
+      - [ ] Extend the DBSP circuit schema with health state and damage event
+        streams so the circuit remains the canonical interpreter of health
+        changes.
+
+        - Define:
+          - `DamageSource = { External, Fall, Script, Other(u16) }`.
+          - `Tick = u64` (simulation ticks; monotonic).
+          - `DamageEvent { entity: EntityId, amount: u16, source: DamageSource,
+              at_tick: Tick, seq: u32 }` (`seq` optional but recommended).
+          - `HealthDelta { entity: EntityId, delta: i32, death: bool }`.
+
+        - Ordering: reduce multiple `DamageEvent`s for an entity
+          deterministically within a tick.
+
+      - [ ] Update the Bevy → DBSP → Bevy marshalling layer to publish health
+        snapshots into the circuit and apply circuit-emitted health deltas back
+        onto ECS components.
+
+        - Snapshot cadence: publish the full `HealthState` at the start of each
+          tick and apply `HealthDelta` after `circuit.step()`.
+
+        - Authority: treat DBSP as the single writer and prohibit out-of-band
+          ECS health mutation.
+
+        - Idempotency: apply each `HealthDelta` at most once per
+          `(entity, at_tick, seq)` triple; ignore duplicates and log at debug
+          with a counter. On missing deltas, carry forward last applied state
+          (no-op) and emit a resynchronisation metric.
+
+      - [ ] Add data-driven tests—`rstest` fixtures and headless Bevy BDD
+        scenarios—covering health synchronisation across the circuit boundary.
+
+        - Acceptance: achieve tick-bounded convergence where ECS and circuit
+          health match within one tick.
+
+        - Edge cases: cover max-health clamps, zero-health death flags, large
+          burst damage, and concurrent external plus derived damage.
+
+    - [ ] Implement a simple damage model (e.g., falling damage calculated from
      velocity upon landing).
+
+      - [ ] Detect landing events inside the circuit by tracking transitions
+        from `Unsupported` to `Standing` alongside vertical velocity.
+
+        - Edge detection: fire once on the boolean edge
+          `Unsupported_prev && Standing_now`.
+
+        - Debounce: add a per-entity cooldown of `LANDING_COOLDOWN_TICKS: u32`
+          (default: 6 ticks). Document how ticks map to wall time in the engine.
+
+        - Hysteresis: reuse the motion system's `z_floor` grace band to avoid
+          chatter-induced re-triggers.
+
+      - [ ] Define a fall-damage operator that applies a safe-velocity threshold
+        and scaling factor entirely within DBSP.
+
+        - Units: velocity in world units per second; derive impact speed as
+          `abs(vz_before_contact)` sampled from the last `Unsupported` frame
+          immediately before contact detection.
+
+        - Constants (defaults): `SAFE_LANDING_SPEED = 6.0`,
+          `FALL_DAMAGE_SCALE = 4.0`. State that tuning may change but tests pin
+          current values.
+
+        - Clamp: never emit negative damage; round down before casting to `u16`.
+          Clamp `vz_before_contact` by `TERMINAL_VELOCITY` before computing
+          impact.
+
+      - [ ] Emit derived damage events into the `Damage` stream and reduce
+        entity health through the circuit's health accumulator.
+
+        - Determinism: ensure a stable per-tick ordering for multiple derived
+          `DamageEvent`s targeting one entity.
+
+      - [ ] Cover the damage flow with DBSP unit tests and headless Bevy
+        simulations demonstrating falling damage.
+
+        - Tests: cover stair-step jitter (single hit), terminal-velocity caps,
+          cooldown enforcement, and mixed external plus fall damage.
+
+[health-type-defs]: ./lille-physics-engine-design.md#canonical-type-definitions
 
 **Acceptance Criteria**:
 

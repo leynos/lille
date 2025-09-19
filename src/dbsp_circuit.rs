@@ -26,14 +26,15 @@ use crate::GRACE_DISTANCE;
 
 mod streams;
 mod types;
-use streams::{
-    apply_movement, fear_level_stream, floor_height_stream, movement_decision_stream,
-    new_position_stream, new_velocity_stream, position_floor_stream, standing_motion_stream,
+pub use streams::{
+    apply_movement, fear_level_stream, floor_height_stream, health_delta_stream,
+    highest_block_pair, movement_decision_stream, new_position_stream, new_velocity_stream,
+    position_floor_stream, standing_motion_stream, PositionFloor,
 };
-pub use streams::{highest_block_pair, PositionFloor};
+
 pub use types::{
-    FearLevel, FloorHeightAt, Force, HighestBlockAt, MovementDecision, NewPosition, NewVelocity,
-    Position, Target, Velocity,
+    DamageEvent, DamageSource, EntityId, FearLevel, FloorHeightAt, Force, HealthDelta, HealthState,
+    HighestBlockAt, MovementDecision, NewPosition, NewVelocity, Position, Target, Tick, Velocity,
 };
 
 /// Authoritative DBSP dataflow for Lille's world simulation.
@@ -76,6 +77,8 @@ pub struct DbspCircuit {
     force_in: ZSetHandle<Force>,
     fear_in: ZSetHandle<FearLevel>,
     target_in: ZSetHandle<Target>,
+    health_state_in: ZSetHandle<HealthState>,
+    damage_in: ZSetHandle<DamageEvent>,
     block_in: ZSetHandle<Block>,
     block_slope_in: ZSetHandle<BlockSlope>,
     new_position_out: OutputHandle<OrdZSet<NewPosition>>,
@@ -83,6 +86,7 @@ pub struct DbspCircuit {
     highest_block_out: OutputHandle<OrdZSet<HighestBlockAt>>,
     floor_height_out: OutputHandle<OrdZSet<FloorHeightAt>>,
     position_floor_out: OutputHandle<OrdZSet<PositionFloor>>,
+    health_delta_out: OutputHandle<OrdZSet<HealthDelta>>,
 }
 
 struct BuildHandles {
@@ -91,6 +95,8 @@ struct BuildHandles {
     force_in: ZSetHandle<Force>,
     fear_in: ZSetHandle<FearLevel>,
     target_in: ZSetHandle<Target>,
+    health_state_in: ZSetHandle<HealthState>,
+    damage_in: ZSetHandle<DamageEvent>,
     block_in: ZSetHandle<Block>,
     block_slope_in: ZSetHandle<BlockSlope>,
     new_position_out: OutputHandle<OrdZSet<NewPosition>>,
@@ -98,6 +104,7 @@ struct BuildHandles {
     highest_block_out: OutputHandle<OrdZSet<HighestBlockAt>>,
     floor_height_out: OutputHandle<OrdZSet<FloorHeightAt>>,
     position_floor_out: OutputHandle<OrdZSet<PositionFloor>>,
+    health_delta_out: OutputHandle<OrdZSet<HealthDelta>>,
 }
 
 impl DbspCircuit {
@@ -129,6 +136,8 @@ impl DbspCircuit {
             force_in: handles.force_in,
             fear_in: handles.fear_in,
             target_in: handles.target_in,
+            health_state_in: handles.health_state_in,
+            damage_in: handles.damage_in,
             block_in: handles.block_in,
             block_slope_in: handles.block_slope_in,
             new_position_out: handles.new_position_out,
@@ -136,6 +145,7 @@ impl DbspCircuit {
             highest_block_out: handles.highest_block_out,
             floor_height_out: handles.floor_height_out,
             position_floor_out: handles.position_floor_out,
+            health_delta_out: handles.health_delta_out,
         })
     }
 
@@ -169,6 +179,8 @@ impl DbspCircuit {
         let (forces, force_in) = circuit.add_input_zset::<Force>();
         let (fears, fear_in) = circuit.add_input_zset::<FearLevel>();
         let (targets, target_in) = circuit.add_input_zset::<Target>();
+        let (health_states, health_state_in) = circuit.add_input_zset::<HealthState>();
+        let (damage_events, damage_in) = circuit.add_input_zset::<DamageEvent>();
         let (blocks, block_in) = circuit.add_input_zset::<Block>();
         let (slopes, block_slope_in) = circuit.add_input_zset::<BlockSlope>();
 
@@ -204,12 +216,16 @@ impl DbspCircuit {
 
         let moved_pos = apply_movement(&base_pos, &decisions);
 
+        let health_deltas = health_delta_stream(&health_states, &damage_events);
+
         Ok(BuildHandles {
             position_in,
             velocity_in,
             force_in,
             fear_in,
             target_in,
+            health_state_in,
+            damage_in,
             block_in,
             block_slope_in,
             new_position_out: moved_pos.output(),
@@ -217,6 +233,7 @@ impl DbspCircuit {
             highest_block_out: highest.output(),
             floor_height_out: floor_height.output(),
             position_floor_out: pos_floor.output(),
+            health_delta_out: health_deltas.output(),
         })
     }
 
@@ -324,6 +341,16 @@ impl DbspCircuit {
     /// ```
     pub fn target_in(&self) -> &ZSetHandle<Target> {
         &self.target_in
+    }
+
+    /// Returns a reference to the input handle for entity health snapshots.
+    pub fn health_state_in(&self) -> &ZSetHandle<HealthState> {
+        &self.health_state_in
+    }
+
+    /// Returns a reference to the damage/healing input stream.
+    pub fn damage_in(&self) -> &ZSetHandle<DamageEvent> {
+        &self.damage_in
     }
 
     /// Returns a reference to the input handle for feeding block records into the circuit.
@@ -453,6 +480,11 @@ impl DbspCircuit {
         &self.position_floor_out
     }
 
+    /// Returns a reference to the health delta output handle.
+    pub fn health_delta_out(&self) -> &OutputHandle<OrdZSet<HealthDelta>> {
+        &self.health_delta_out
+    }
+
     /// Clears all input collections to remove accumulated records.
     ///
     /// Input ZSets retain data across [`DbspCircuit::step`] calls. Invoke this method after
@@ -472,6 +504,8 @@ impl DbspCircuit {
         self.force_in.clear_input();
         self.fear_in.clear_input();
         self.target_in.clear_input();
+        self.health_state_in.clear_input();
+        self.damage_in.clear_input();
         self.block_in.clear_input();
         self.block_slope_in.clear_input();
     }

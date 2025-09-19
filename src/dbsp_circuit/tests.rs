@@ -1,6 +1,9 @@
 //! Tests for the DBSP circuit's grace distance.
 use super::*;
+use crate::dbsp_circuit::streams::health_delta_stream;
+use crate::dbsp_circuit::{DamageEvent, DamageSource, HealthDelta, HealthState};
 use crate::GRACE_DISTANCE;
+use dbsp::RootCircuit;
 use rstest::rstest;
 
 fn make_pf(z: f64, z_floor: f64) -> PositionFloor {
@@ -46,4 +49,81 @@ fn beyond_grace_or_at_boundary(#[case] z: f64, #[case] z_floor: f64) {
     } else {
         assert!(pf.position.z.into_inner() > pf.z_floor.into_inner() + GRACE_DISTANCE);
     }
+}
+
+fn run_health_delta(health: HealthState, events: &[(DamageEvent, i32)]) -> Vec<HealthDelta> {
+    let (circuit, (health_handle, damage_handle, output)) = RootCircuit::build(|circuit| {
+        let (health_stream, health_handle) = circuit.add_input_zset::<HealthState>();
+        let (damage_stream, damage_handle) = circuit.add_input_zset::<DamageEvent>();
+        let output = health_delta_stream(&health_stream, &damage_stream).output();
+        Ok((health_handle, damage_handle, output))
+    })
+    .expect("failed to build health circuit");
+
+    health_handle.push(health, 1);
+    for (event, weight) in events {
+        damage_handle.push(*event, i64::from(*weight));
+    }
+
+    circuit.step().expect("health circuit step failed");
+    output
+        .consolidate()
+        .iter()
+        .map(|(delta, _, _)| delta)
+        .collect()
+}
+
+#[rstest]
+#[case(80, 100, 50, 20)]
+#[case(10, 50, 5, 5)]
+fn healing_clamped_to_max(
+    #[case] current: u16,
+    #[case] max: u16,
+    #[case] heal: u16,
+    #[case] expected_delta: i32,
+) {
+    let health = HealthState {
+        entity: 1,
+        current,
+        max,
+    };
+    let event = DamageEvent {
+        entity: 1,
+        amount: heal,
+        source: DamageSource::Script,
+        at_tick: 5,
+        seq: Some(1),
+    };
+
+    let deltas = run_health_delta(health, &[(event, 1)]);
+    assert_eq!(deltas.len(), 1);
+    let delta = deltas[0];
+    assert_eq!(delta.delta, expected_delta);
+    assert!(!delta.death);
+    assert_eq!(delta.seq, Some(1));
+}
+
+#[rstest]
+#[case(Some(3))]
+#[case(None)]
+fn duplicate_damage_events_idempotent(#[case] seq: Option<u32>) {
+    let health = HealthState {
+        entity: 2,
+        current: 90,
+        max: 100,
+    };
+    let event = DamageEvent {
+        entity: 2,
+        amount: 30,
+        source: DamageSource::External,
+        at_tick: 9,
+        seq,
+    };
+
+    let deltas = run_health_delta(health, &[(event, 1), (event, 1)]);
+    assert_eq!(deltas.len(), 1);
+    let delta = deltas[0];
+    assert_eq!(delta.delta, -30);
+    assert!(!delta.death);
+    assert_eq!(delta.seq, seq);
 }
