@@ -26,7 +26,8 @@ pub use dbsp_circuit::{
 };
 pub use dbsp_circuit::{NewVelocity, Velocity};
 pub use dbsp_sync::{
-    apply_dbsp_outputs_system, cache_state_for_dbsp_system, init_dbsp_system, DbspPlugin,
+    apply_dbsp_outputs_system, cache_state_for_dbsp_system, init_dbsp_system, DamageInbox,
+    DbspPlugin,
 };
 pub use entity::{BadGuy, Entity};
 pub use logging::init as init_logging;

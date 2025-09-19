@@ -59,7 +59,10 @@ pub fn spawn_world_system(mut commands: Commands) {
         .spawn(basic_sprite(Color::WHITE, Vec3::new(125.0, 125.0, 0.0)))
         .insert((
             DdlogId(next_id),
-            Health(100),
+            Health {
+                current: 100,
+                max: 100,
+            },
             UnitType::Civvy { fraidiness: 1.0 },
             Target(Vec2::new(202.0, 200.0)),
             VelocityComp::default(),
@@ -71,7 +74,10 @@ pub fn spawn_world_system(mut commands: Commands) {
         .spawn(basic_sprite(Color::RED, Vec3::new(150.0, 150.5, 0.0)))
         .insert((
             DdlogId(next_id),
-            Health(100),
+            Health {
+                current: 100,
+                max: 100,
+            },
             UnitType::Baddie { meanness: 10.0 },
             VelocityComp::default(),
         ));

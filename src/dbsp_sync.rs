@@ -6,26 +6,56 @@
 //! the results back to entities. The underlying systems are also exposed for
 //! tests.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, convert::TryFrom};
 
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use log::{error, warn};
 
 use crate::components::{
-    Block, BlockSlope, DdlogId, ForceComp, Target as TargetComp, VelocityComp,
+    Block, BlockSlope, DdlogId, ForceComp, Health, Target as TargetComp, VelocityComp,
 };
-use crate::dbsp_circuit::{try_step, DbspCircuit, Force, Position, Target, Velocity};
+use crate::dbsp_circuit::{
+    try_step, DamageEvent, DbspCircuit, EntityId, Force, HealthState, Position, Target, Tick,
+    Velocity,
+};
 use crate::world_handle::{init_world_handle_system, DdlogEntity, WorldHandle};
 
 // Compact alias for the per-entity inputs used by the cache system.
 type EntityRow<'w> = (
     Entity,
     &'w DdlogId,
-    &'w Transform, // Switch to &GlobalTransform if world-space is intended.
+    &'w Transform,
     Option<&'w VelocityComp>,
     Option<&'w TargetComp>,
+    Option<&'w Health>,
 );
+
+#[derive(Resource, Default)]
+pub struct DamageInbox {
+    events: Vec<DamageEvent>,
+}
+
+impl DamageInbox {
+    pub fn push(&mut self, event: DamageEvent) {
+        self.events.push(event);
+    }
+
+    pub fn extend<I>(&mut self, events: I)
+    where
+        I: IntoIterator<Item = DamageEvent>,
+    {
+        self.events.extend(events);
+    }
+
+    pub fn drain(&mut self) -> std::vec::Drain<'_, DamageEvent> {
+        self.events.drain(..)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.events.is_empty()
+    }
+}
 
 /// Bevy plugin that wires the DBSP circuit into the app.
 ///
@@ -42,6 +72,7 @@ impl Plugin for DbspPlugin {
             return;
         }
 
+        app.init_resource::<DamageInbox>();
         app.add_systems(Startup, init_world_handle_system);
         app.add_systems(
             Update,
@@ -65,6 +96,7 @@ pub struct DbspState {
     id_map: HashMap<i64, Entity>,
     /// Reverse mapping from Bevy [`Entity`] values to DBSP identifiers.
     rev_map: HashMap<Entity, i64>,
+    applied_health: HashMap<EntityId, (Tick, Option<u32>)>,
 }
 
 #[derive(SystemParam)]
@@ -81,6 +113,7 @@ impl DbspState {
             circuit: DbspCircuit::new()?,
             id_map: HashMap::new(),
             rev_map: HashMap::new(),
+            applied_health: HashMap::new(),
         })
     }
 
@@ -128,6 +161,7 @@ pub fn cache_state_for_dbsp_system(
     force_query: Query<(Entity, &DdlogId, &ForceComp)>,
     block_query: Query<(&Block, Option<&BlockSlope>)>,
     mut id_queries: IdQueries,
+    mut damage_inbox: ResMut<DamageInbox>,
     mut world_handle: ResMut<WorldHandle>,
 ) {
     world_handle.blocks.clear();
@@ -138,6 +172,10 @@ pub fn cache_state_for_dbsp_system(
     sync::id_maps(&mut state, &mut id_queries);
     sync::entities(&mut state.circuit, &entity_query, world_handle.as_mut());
     sync::forces(&mut state, &force_query);
+
+    for event in damage_inbox.drain() {
+        state.circuit.damage_in().push(event, 1);
+    }
 }
 
 mod sync {
@@ -208,7 +246,7 @@ mod sync {
         query: &Query<EntityRow<'_>>,
         world: &mut WorldHandle,
     ) {
-        for (_, id, transform, vel, target) in query.iter() {
+        for (_, id, transform, vel, target, health) in query.iter() {
             circuit.position_in().push(
                 Position {
                     entity: id.0,
@@ -241,11 +279,34 @@ mod sync {
                 );
             }
 
+            let (health_current, health_max) = if let Some(h) = health {
+                match u64::try_from(id.0) {
+                    Ok(entity_id) => {
+                        circuit.health_state_in().push(
+                            HealthState {
+                                entity: entity_id,
+                                current: h.current,
+                                max: h.max,
+                            },
+                            1,
+                        );
+                    }
+                    Err(_) => {
+                        warn!("health component for negative id {} skipped", id.0);
+                    }
+                }
+                (h.current, h.max)
+            } else {
+                (0, 0)
+            };
+
             world.entities.insert(
                 id.0,
                 DdlogEntity {
                     position: transform.translation,
                     target: target.map(|t| t.0),
+                    health_current,
+                    health_max,
                     ..DdlogEntity::default()
                 },
             );
@@ -280,9 +341,18 @@ mod sync {
 ///
 /// Outputs are drained after application to prevent reapplying stale deltas on
 /// subsequent frames.
+#[expect(clippy::type_complexity, reason = "Bevy query tuples are idiomatic")]
 pub fn apply_dbsp_outputs_system(
     mut state: NonSendMut<DbspState>,
-    mut write_query: Query<(Entity, &mut Transform, Option<&mut VelocityComp>), With<DdlogId>>,
+    mut write_query: Query<
+        (
+            Entity,
+            &mut Transform,
+            Option<&mut VelocityComp>,
+            Option<&mut Health>,
+        ),
+        With<DdlogId>,
+    >,
     mut world_handle: ResMut<WorldHandle>,
 ) {
     if let Err(e) = try_step(&mut state.circuit) {
@@ -293,7 +363,7 @@ pub fn apply_dbsp_outputs_system(
     let positions = state.circuit.new_position_out().consolidate();
     for (pos, _, _) in positions.iter() {
         if let Some(&entity) = state.id_map.get(&pos.entity) {
-            if let Ok((_, mut transform, _)) = write_query.get_mut(entity) {
+            if let Ok((_, mut transform, _, _)) = write_query.get_mut(entity) {
                 transform.translation.x = pos.x.into_inner() as f32;
                 transform.translation.y = pos.y.into_inner() as f32;
                 transform.translation.z = pos.z.into_inner() as f32;
@@ -307,13 +377,48 @@ pub fn apply_dbsp_outputs_system(
     let velocities = state.circuit.new_velocity_out().consolidate();
     for (vel, _, _) in velocities.iter() {
         if let Some(&entity) = state.id_map.get(&vel.entity) {
-            if let Ok((_, _, Some(mut v))) = write_query.get_mut(entity) {
-                v.vx = vel.vx.into_inner() as f32;
-                v.vy = vel.vy.into_inner() as f32;
-                v.vz = vel.vz.into_inner() as f32;
+            if let Ok((_, _, Some(mut velocity), _)) = write_query.get_mut(entity) {
+                velocity.vx = vel.vx.into_inner() as f32;
+                velocity.vy = vel.vy.into_inner() as f32;
+                velocity.vz = vel.vz.into_inner() as f32;
             }
         }
     }
+
+    let health_deltas = state.circuit.health_delta_out().consolidate();
+    for (delta, _, _) in health_deltas.iter() {
+        let Ok(entity_key) = i64::try_from(delta.entity) else {
+            warn!("health delta for unmappable entity {}", delta.entity);
+            continue;
+        };
+        let Some(&entity) = state.id_map.get(&entity_key) else {
+            warn!("health delta for unknown entity id {}", delta.entity);
+            continue;
+        };
+        if let Ok((_, _, _, maybe_health)) = write_query.get_mut(entity) {
+            if let Some(mut health) = maybe_health {
+                let key = (delta.at_tick, delta.seq);
+                if state.applied_health.get(&delta.entity) == Some(&key) {
+                    continue;
+                }
+                let current = i32::from(health.current);
+                let max = i32::from(health.max);
+                let new_value = (current + delta.delta).clamp(0, max);
+                health.current = new_value as u16;
+                state.applied_health.insert(delta.entity, key);
+                if let Some(entry) = world_handle.entities.get_mut(&entity_key) {
+                    entry.health_current = health.current;
+                    entry.health_max = health.max;
+                }
+                if delta.death {
+                    // Future hook: notify AI about deaths if needed.
+                }
+            } else {
+                warn!("health delta received for entity without Health component");
+            }
+        }
+    }
+    let _ = state.circuit.health_delta_out().take_from_all();
 
     // Drain any remaining output so stale values are not reused.
     let _ = state.circuit.new_position_out().take_from_all();

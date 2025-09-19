@@ -15,6 +15,69 @@
 
 use ordered_float::OrderedFloat;
 
+pub type EntityId = u64;
+/// Authoritative simulation tick counter propagated with health deltas.
+pub type Tick = u64;
+
+#[derive(
+    ::rkyv::Archive,
+    ::rkyv::Serialize,
+    ::rkyv::Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Default,
+    ::size_of::SizeOf,
+)]
+#[archive_attr(derive(Ord, PartialOrd, Eq, PartialEq, Hash))]
+pub enum DamageSource {
+    /// Damage originating from gameplay systems outside the circuit.
+    #[default]
+    External,
+    /// Fall damage inferred by the physics pipeline.
+    Fall,
+    /// Script-driven healing or scripted damage applied upstream.
+    Script,
+    /// Placeholder for bespoke downstream discriminators.
+    Other(u16),
+}
+
+crate::dbsp_copy_record! {
+    /// Snapshot of an entity's health at the start of a tick.
+    pub struct HealthState {
+        pub entity: EntityId,
+        pub current: u16,
+        pub max: u16,
+    }
+}
+
+crate::dbsp_copy_record! {
+    /// Damage or healing event entering the circuit.
+    pub struct DamageEvent {
+        pub entity: EntityId,
+        pub amount: u16,
+        pub source: DamageSource,
+        pub at_tick: Tick,
+        pub seq: Option<u32>,
+    }
+}
+
+crate::dbsp_copy_record! {
+    /// Authoritative health delta emitted by the circuit for a tick.
+    pub struct HealthDelta {
+        pub entity: EntityId,
+        pub at_tick: Tick,
+        pub seq: Option<u32>,
+        pub delta: i32,
+        pub death: bool,
+    }
+}
+
 crate::dbsp_copy_record! {
     /// Public data type for entity positions.
     pub struct Position {
@@ -52,6 +115,7 @@ pub type NewVelocity = Velocity;
 /// ```rust,no_run
 /// # use lille::prelude::*;
 /// use ordered_float::OrderedFloat;
+///
 /// let f = Force {
 ///     entity: 42,
 ///     fx: OrderedFloat(5.0),
@@ -130,6 +194,7 @@ crate::dbsp_record! {
     /// # Examples
     /// ```rust
     /// use ordered_float::OrderedFloat;
+    ///
     /// use lille::dbsp_circuit::FearLevel;
     ///
     /// let fear = FearLevel { entity: 1, level: OrderedFloat(0.5) };

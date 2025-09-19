@@ -7,8 +7,11 @@ use serde::{Deserialize, Serialize};
 #[derive(Component, Debug, Serialize)]
 pub struct DdlogId(pub i64);
 
-#[derive(Component, Default, Serialize)]
-pub struct Health(pub i32);
+#[derive(Component, Debug, Clone, Default, Serialize, Deserialize)]
+pub struct Health {
+    pub current: u16,
+    pub max: u16,
+}
 
 #[derive(Component, Debug, Clone, Serialize)]
 pub enum UnitType {
