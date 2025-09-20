@@ -25,37 +25,62 @@ use crate::dbsp_circuit::{DamageEvent, DamageSource, HealthDelta, HealthState};
 )]
 #[archive_attr(derive(Ord, PartialOrd, Eq, PartialEq, Hash))]
 struct HealthAccumulator {
-    entries: Vec<(Option<u32>, i32)>,
+    sequenced: Vec<(u32, i32)>,
+    unsequenced: Vec<DamageEvent>,
     has_event: bool,
 }
 
 impl HealthAccumulator {
-    fn insert(&mut self, seq: Option<u32>, signed: i32) {
-        match self
-            .entries
-            .binary_search_by(|(existing, _)| existing.cmp(&seq))
-        {
-            Ok(_) => {}
-            Err(pos) => {
-                self.entries.insert(pos, (seq, signed));
-                self.has_event = true;
+    fn insert(&mut self, event: &DamageEvent) {
+        self.has_event = true;
+        if let Some(seq) = event.seq {
+            let signed = signed_amount(event);
+            match self
+                .sequenced
+                .binary_search_by(|(existing, _)| existing.cmp(&seq))
+            {
+                Ok(_) => {}
+                Err(pos) => self.sequenced.insert(pos, (seq, signed)),
             }
+        } else if !self.unsequenced.iter().any(|existing| existing == event) {
+            self.unsequenced.push(*event);
         }
     }
 
+    fn remove(&mut self, event: &DamageEvent) {
+        if let Some(seq) = event.seq {
+            if let Ok(pos) = self
+                .sequenced
+                .binary_search_by(|(existing, _)| existing.cmp(&seq))
+            {
+                self.sequenced.remove(pos);
+            }
+        } else if let Some(pos) = self
+            .unsequenced
+            .iter()
+            .position(|existing| existing == event)
+        {
+            self.unsequenced.swap_remove(pos);
+        }
+        self.has_event = !self.sequenced.is_empty() || !self.unsequenced.is_empty();
+    }
+
     fn merge(&mut self, other: &Self) {
-        for (seq, signed) in &other.entries {
+        for (seq, signed) in &other.sequenced {
             match self
-                .entries
+                .sequenced
                 .binary_search_by(|(existing, _)| existing.cmp(seq))
             {
                 Ok(_) => {}
-                Err(pos) => {
-                    self.entries.insert(pos, (*seq, *signed));
-                }
+                Err(pos) => self.sequenced.insert(pos, (*seq, *signed)),
             }
         }
-        self.has_event |= other.has_event;
+        for event in &other.unsequenced {
+            if !self.unsequenced.iter().any(|existing| existing == event) {
+                self.unsequenced.push(*event);
+            }
+        }
+        self.has_event = !self.sequenced.is_empty() || !self.unsequenced.is_empty();
     }
 }
 
@@ -117,23 +142,28 @@ pub fn health_delta_stream(
         >::with_output(
             HealthAccumulator::default(),
             |acc: &mut HealthAccumulator, event: &DamageEvent, weight: i64| {
-                if weight <= 0 {
-                    return;
+                if weight > 0 {
+                    for _ in 0..weight.unsigned_abs() {
+                        acc.insert(event);
+                    }
+                } else if weight < 0 {
+                    for _ in 0..weight.unsigned_abs() {
+                        acc.remove(event);
+                    }
                 }
-                let signed = signed_amount(event);
-                acc.insert(event.seq, signed);
             },
             |acc: HealthAccumulator| {
                 let mut net = 0;
                 let mut max_seq = None;
-                for (seq, signed) in &acc.entries {
+                for (seq, signed) in &acc.sequenced {
                     net += *signed;
-                    if let Some(value) = seq {
-                        max_seq = Some(match max_seq {
-                            Some(existing) => max(existing, *value),
-                            None => *value,
-                        });
-                    }
+                    max_seq = Some(match max_seq {
+                        Some(existing) => max(existing, *seq),
+                        None => *seq,
+                    });
+                }
+                for event in &acc.unsequenced {
+                    net += signed_amount(event);
                 }
                 HealthAggregate {
                     net,

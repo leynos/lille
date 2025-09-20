@@ -169,29 +169,30 @@ physical properties and agent behaviours.
 
 3. **Health and Damage**:
 
-    - [ ] Introduce a `Health` component and a corresponding `Damage` input
+    - [x] Introduce a `Health` component and a corresponding `Damage` input
       stream.
 
-      - [ ] Specify the ECS `Health` component fields (e.g., current and maximum
+      - [x] Specify the ECS `Health` component fields (e.g., current and maximum
         hit points) and mirror the structure for a DBSP input collection.
 
-        - Field types: `entity: EntityId`, `current: u16`, `max: u16`.
+        - [x] Field types: `entity: EntityId`, `current: u16`, `max: u16`.
           Enforce `0 ≤ current ≤ max` at all times.
 
-        - Type aliases: use the [canonical type definitions][health-type-defs]
+        - [x] Type aliases: use the [canonical type
+          definitions][health-type-defs]
           (`type EntityId = u64; type Tick = u64`). `Tick` counts simulation
           ticks and advances monotonically.
 
-        - Arithmetic: apply saturating add/sub inside the circuit so health
+        - [x] Arithmetic: apply saturating add/sub inside the circuit so health
           never underflows below `0` or overflows above `max`.
 
-        - Serialisation: mirror the component layout into a `HealthState` input
-          collection for the circuit.
+        - [x] Serialisation: mirror the component layout into a `HealthState`
+          input collection for the circuit.
 
-        - Rounding: if non-integer sources emerge, round damage down and round
-          healing down before applying deltas.
+        - [x] Rounding: if non-integer sources emerge, round damage down and
+          round healing down before applying deltas.
 
-      - [ ] Extend the DBSP circuit schema with health state and damage event
+      - [x] Extend the DBSP circuit schema with health state and damage event
         streams so the circuit remains the canonical interpreter of health
         changes.
 
@@ -202,32 +203,32 @@ physical properties and agent behaviours.
               at_tick: Tick, seq: u32 }` (`seq` optional but recommended).
           - `HealthDelta { entity: EntityId, delta: i32, death: bool }`.
 
-        - Ordering: reduce multiple `DamageEvent`s for an entity
+        - [x] Ordering: reduce multiple `DamageEvent`s for an entity
           deterministically within a tick.
 
-      - [ ] Update the Bevy → DBSP → Bevy marshalling layer to publish health
+      - [x] Update the Bevy → DBSP → Bevy marshalling layer to publish health
         snapshots into the circuit and apply circuit-emitted health deltas back
         onto ECS components.
 
-        - Snapshot cadence: publish the full `HealthState` at the start of each
-          tick and apply `HealthDelta` after `circuit.step()`.
+        - [x] Snapshot cadence: publish the full `HealthState` at the start of
+          each tick and apply `HealthDelta` after `circuit.step()`.
 
-        - Authority: treat DBSP as the single writer and prohibit out-of-band
-          ECS health mutation.
+        - [x] Authority: treat DBSP as the single writer and prohibit
+          out-of-band ECS health mutation.
 
-        - Idempotency: apply each `HealthDelta` at most once per
+        - [x] Idempotency: apply each `HealthDelta` at most once per
           `(entity, at_tick, seq)` triple; ignore duplicates and log at debug
           with a counter. On missing deltas, carry forward last applied state
           (no-op) and emit a resynchronisation metric.
 
-      - [ ] Add data-driven tests—`rstest` fixtures and headless Bevy BDD
+      - [x] Add data-driven tests—`rstest` fixtures and headless Bevy BDD
         scenarios—covering health synchronisation across the circuit boundary.
 
-        - Acceptance: achieve tick-bounded convergence where ECS and circuit
+        - [x] Acceptance: achieve tick-bounded convergence where ECS and circuit
           health match within one tick.
 
-        - Edge cases: cover max-health clamps, zero-health death flags, large
-          burst damage, and concurrent external plus derived damage.
+        - [x] Edge cases: cover max-health clamps, zero-health death flags,
+          large burst damage, and concurrent external plus derived damage.
 
     - [ ] Implement a simple damage model (e.g., falling damage calculated from
      velocity upon landing).

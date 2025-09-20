@@ -277,6 +277,37 @@ Semantics:
   gameplay rules (documented in AI/agent sections if applicable).
 - Round fractional damage and healing magnitudes down before applying deltas.
 
+The Bevy synchronisation layer clamps snapshot data before handing it to the
+DBSP circuit. `Health.current` values greater than `max` are reduced to the
+ceiling and the clamp is logged at debug level so drift can be investigated.
+This keeps the ECS authoritative state within the documented invariant while
+avoiding surprises inside the circuit. Duplicate `HealthDelta` events emitted
+by the circuit are tracked with a monotonic counter on `DbspState`; repeated
+applications for the same `(entity, at_tick, seq)` triple bump the counter and
+are ignored. Tests assert the counter increments as duplicates arrive so any
+future change that breaks idempotency is caught immediately. The Bevy → DBSP
+marshalling layer also filters duplicate `DamageEvent`s within a frame before
+they reach the circuit, using `(entity, at_tick, seq)` for sequenced events and
+the full record for unsequenced events. Filtered events increment the same
+counter, providing a single telemetry surface that reports discarded work
+irrespective of whether the duplicate was spotted at ingress or egress.
+
+To prevent stale data from compounding, the synchronisation system retracts the
+prior frame's health snapshots and damage events before ingesting new records.
+`DbspState` caches the last `HealthState` per entity alongside the batch of
+pushed `DamageEvent`s, draining both collections with negative weights at the
+start of the next tick. This keeps the circuit's view of the world aligned with
+the ECS source of truth and ensures replay detection remains deterministic.
+
+Inside the circuit, the `HealthAccumulator` separates sequenced and unsequenced
+events. Sequenced events are stored as `(seq, delta)` pairs so idempotent
+replays drop naturally, while unsequenced events retain the entire
+`DamageEvent` record to ensure distinct sources (for example, external damage
+and script-driven healing) accumulate even when they share a tick. During the
+fold the accumulator sums sequenced deltas directly and recomputes signed
+amounts for unsequenced entries, ensuring the output `HealthDelta` reflects the
+net effect of every unique event in the batch.
+
 The health system follows the same DBSP-first approach as motion. Entities
 carry a `Health` component with `current` and `max` values; the component is
 mirrored into the circuit as an input collection so damage and regeneration can
