@@ -1,4 +1,4 @@
-//! Tests for the DBSP circuit's grace distance.
+//! Tests for DBSP circuit behaviour, including grace distance and health aggregation.
 use super::*;
 use crate::dbsp_circuit::streams::health_delta_stream;
 use crate::dbsp_circuit::{DamageEvent, DamageSource, HealthDelta, HealthState};
@@ -126,4 +126,107 @@ fn duplicate_damage_events_idempotent(#[case] seq: Option<u32>) {
     assert_eq!(delta.delta, -30);
     assert!(!delta.death);
     assert_eq!(delta.seq, seq);
+}
+
+#[rstest]
+fn unsequenced_events_with_distinct_sources_accumulate() {
+    let health = HealthState {
+        entity: 6,
+        current: 40,
+        max: 100,
+    };
+    let damage = DamageEvent {
+        entity: 6,
+        amount: 15,
+        source: DamageSource::External,
+        at_tick: 4,
+        seq: None,
+    };
+    let heal = DamageEvent {
+        entity: 6,
+        amount: 25,
+        source: DamageSource::Script,
+        at_tick: 4,
+        seq: None,
+    };
+
+    let deltas = run_health_delta(health, &[(damage, 1), (heal, 1)]);
+    assert_eq!(deltas.len(), 1);
+    let delta = deltas[0];
+    assert_eq!(delta.delta, 10);
+    assert!(!delta.death);
+    assert_eq!(delta.seq, None);
+}
+
+#[rstest]
+fn lethal_damage_sets_death_flag() {
+    let health = HealthState {
+        entity: 3,
+        current: 20,
+        max: 50,
+    };
+    let event = DamageEvent {
+        entity: 3,
+        amount: 40,
+        source: DamageSource::External,
+        at_tick: 2,
+        seq: Some(7),
+    };
+    let deltas = run_health_delta(health, &[(event, 1)]);
+    assert_eq!(deltas.len(), 1);
+    let delta = deltas[0];
+    assert_eq!(delta.delta, -20);
+    assert!(delta.death);
+    assert_eq!(delta.seq, Some(7));
+}
+
+#[rstest]
+fn healing_from_zero_produces_positive_delta() {
+    let health = HealthState {
+        entity: 4,
+        current: 0,
+        max: 80,
+    };
+    let event = DamageEvent {
+        entity: 4,
+        amount: 30,
+        source: DamageSource::Script,
+        at_tick: 3,
+        seq: None,
+    };
+    let deltas = run_health_delta(health, &[(event, 1)]);
+    assert_eq!(deltas.len(), 1);
+    let delta = deltas[0];
+    assert_eq!(delta.delta, 30);
+    assert!(!delta.death);
+    assert_eq!(delta.seq, None);
+}
+
+#[rstest]
+fn multiple_events_same_tick_accumulate_and_pick_max_seq() {
+    let health = HealthState {
+        entity: 5,
+        current: 100,
+        max: 120,
+    };
+    let damage = DamageEvent {
+        entity: 5,
+        amount: 60,
+        source: DamageSource::External,
+        at_tick: 10,
+        seq: Some(1),
+    };
+    let heal = DamageEvent {
+        entity: 5,
+        amount: 20,
+        source: DamageSource::Script,
+        at_tick: 10,
+        seq: Some(4),
+    };
+    let deltas = run_health_delta(health, &[(damage, 1), (heal, 1)]);
+    assert_eq!(deltas.len(), 1);
+    let delta = deltas[0];
+    assert_eq!(delta.delta, -40);
+    assert!(!delta.death);
+    assert_eq!(delta.seq, Some(4));
 }

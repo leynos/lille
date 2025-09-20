@@ -6,11 +6,14 @@
 //! the results back to entities. The underlying systems are also exposed for
 //! tests.
 
-use std::{collections::HashMap, convert::TryFrom};
+use std::{
+    collections::{HashMap, HashSet},
+    convert::TryFrom,
+};
 
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
-use log::{error, warn};
+use log::{debug, error, warn};
 
 use crate::components::{
     Block, BlockSlope, DdlogId, ForceComp, Health, Target as TargetComp, VelocityComp,
@@ -97,6 +100,14 @@ pub struct DbspState {
     /// Reverse mapping from Bevy [`Entity`] values to DBSP identifiers.
     rev_map: HashMap<Entity, i64>,
     applied_health: HashMap<EntityId, (Tick, Option<u32>)>,
+    /// Unsequenced events applied in the current tick per entity.
+    applied_unsequenced: HashMap<EntityId, (Tick, HashSet<DamageEvent>)>,
+    health_snapshot: HashMap<EntityId, HealthState>,
+    /// Keys of damage events retracted before the next circuit step.
+    expected_health_retractions: HashSet<(EntityId, Tick, Option<u32>)>,
+    pending_damage_retractions: Vec<DamageEvent>,
+    /// Count of duplicate health events filtered at ingress or egress.
+    health_duplicate_count: u64,
 }
 
 #[derive(SystemParam)]
@@ -114,6 +125,11 @@ impl DbspState {
             id_map: HashMap::new(),
             rev_map: HashMap::new(),
             applied_health: HashMap::new(),
+            applied_unsequenced: HashMap::new(),
+            health_snapshot: HashMap::new(),
+            expected_health_retractions: HashSet::new(),
+            pending_damage_retractions: Vec::new(),
+            health_duplicate_count: 0,
         })
     }
 
@@ -128,6 +144,19 @@ impl DbspState {
     /// ```
     pub fn entity_for_id(&self, id: i64) -> Option<Entity> {
         self.id_map.get(&id).copied()
+    }
+
+    /// Returns the number of duplicate health records the circuit ignored.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use lille::dbsp_sync::DbspState;
+    /// let state = DbspState::new().expect("failed to initialise DbspState");
+    /// assert_eq!(state.applied_health_duplicates(), 0);
+    /// ```
+    pub fn applied_health_duplicates(&self) -> u64 {
+        self.health_duplicate_count
     }
 }
 
@@ -168,13 +197,74 @@ pub fn cache_state_for_dbsp_system(
     world_handle.slopes.clear();
     world_handle.entities.clear();
 
+    for snapshot in state.health_snapshot.values() {
+        state.circuit.health_state_in().push(*snapshot, -1);
+    }
+    state.health_snapshot.clear();
+
+    state.expected_health_retractions.clear();
+    for event in std::mem::take(&mut state.pending_damage_retractions) {
+        state.circuit.damage_in().push(event, -1);
+        state
+            .expected_health_retractions
+            .insert((event.entity, event.at_tick, event.seq));
+    }
+
     sync::blocks(&mut state.circuit, &block_query, world_handle.as_mut());
     sync::id_maps(&mut state, &mut id_queries);
-    sync::entities(&mut state.circuit, &entity_query, world_handle.as_mut());
+    sync::entities(&mut state, &entity_query, world_handle.as_mut());
     sync::forces(&mut state, &force_query);
 
+    let mut sequenced_damage = HashSet::new();
+    let mut unsequenced_damage = HashSet::new();
     for event in damage_inbox.drain() {
+        let duplicate = if let Some(seq) = event.seq {
+            if state.applied_health.get(&event.entity) == Some(&(event.at_tick, Some(seq))) {
+                debug!(
+                    "duplicate damage event ignored for entity {} at tick {} seq {}",
+                    event.entity, event.at_tick, seq
+                );
+                state.health_duplicate_count += 1;
+                true
+            } else {
+                let key = (event.entity, event.at_tick, seq);
+                if !sequenced_damage.insert(key) {
+                    debug!(
+                        "duplicate damage event ignored for entity {} at tick {} seq {}",
+                        event.entity, event.at_tick, seq
+                    );
+                    state.health_duplicate_count += 1;
+                    true
+                } else {
+                    false
+                }
+            }
+        } else {
+            let entry = state
+                .applied_unsequenced
+                .entry(event.entity)
+                .or_insert_with(|| (event.at_tick, HashSet::new()));
+            if entry.0 != event.at_tick {
+                entry.0 = event.at_tick;
+                entry.1.clear();
+            }
+            if entry.1.contains(&event) || !unsequenced_damage.insert(event) {
+                debug!(
+                    "duplicate unsequenced damage event ignored for entity {} at tick {}",
+                    event.entity, event.at_tick
+                );
+                state.health_duplicate_count += 1;
+                true
+            } else {
+                entry.1.insert(event);
+                false
+            }
+        };
+        if duplicate {
+            continue;
+        }
         state.circuit.damage_in().push(event, 1);
+        state.pending_damage_retractions.push(event);
     }
 }
 
@@ -242,10 +332,11 @@ mod sync {
     }
 
     pub(super) fn entities(
-        circuit: &mut DbspCircuit,
+        state: &mut DbspState,
         query: &Query<EntityRow<'_>>,
         world: &mut WorldHandle,
     ) {
+        let circuit = &mut state.circuit;
         for (_, id, transform, vel, target, health) in query.iter() {
             circuit.position_in().push(
                 Position {
@@ -280,22 +371,28 @@ mod sync {
             }
 
             let (health_current, health_max) = if let Some(h) = health {
+                let clamped_current = h.current.min(h.max);
+                if clamped_current != h.current {
+                    debug!(
+                        "health current {} clamped to {} for entity {}",
+                        h.current, clamped_current, id.0
+                    );
+                }
                 match u64::try_from(id.0) {
                     Ok(entity_id) => {
-                        circuit.health_state_in().push(
-                            HealthState {
-                                entity: entity_id,
-                                current: h.current,
-                                max: h.max,
-                            },
-                            1,
-                        );
+                        let snapshot = HealthState {
+                            entity: entity_id,
+                            current: clamped_current,
+                            max: h.max,
+                        };
+                        circuit.health_state_in().push(snapshot, 1);
+                        state.health_snapshot.insert(entity_id, snapshot);
                     }
                     Err(_) => {
                         warn!("health component for negative id {} skipped", id.0);
                     }
                 }
-                (h.current, h.max)
+                (clamped_current, h.max)
             } else {
                 (0, 0)
             };
@@ -398,7 +495,19 @@ pub fn apply_dbsp_outputs_system(
         if let Ok((_, _, _, maybe_health)) = write_query.get_mut(entity) {
             if let Some(mut health) = maybe_health {
                 let key = (delta.at_tick, delta.seq);
+                if state.expected_health_retractions.remove(&(
+                    delta.entity,
+                    delta.at_tick,
+                    delta.seq,
+                )) {
+                    continue;
+                }
                 if state.applied_health.get(&delta.entity) == Some(&key) {
+                    debug!(
+                        "duplicate health delta ignored for entity {} at tick {} seq {:?}",
+                        delta.entity, delta.at_tick, delta.seq
+                    );
+                    state.health_duplicate_count += 1;
                     continue;
                 }
                 let current = i32::from(health.current);
@@ -424,5 +533,6 @@ pub fn apply_dbsp_outputs_system(
     let _ = state.circuit.new_position_out().take_from_all();
     let _ = state.circuit.new_velocity_out().take_from_all();
 
+    state.expected_health_retractions.clear();
     state.circuit.clear_inputs();
 }
