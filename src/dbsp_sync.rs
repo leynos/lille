@@ -100,13 +100,19 @@ pub struct DbspState {
     /// Reverse mapping from Bevy [`Entity`] values to DBSP identifiers.
     rev_map: HashMap<Entity, i64>,
     applied_health: HashMap<EntityId, (Tick, Option<u32>)>,
-    /// Unsequenced events applied in the current tick per entity.
+    /// Tracks unsequenced damage events applied per entity per tick.
+    /// Used to detect and filter duplicate unsequenced events within the same tick.
     applied_unsequenced: HashMap<EntityId, (Tick, HashSet<DamageEvent>)>,
+    /// Caches the last health state pushed to the circuit for each entity.
+    /// Used to generate retractions when health state changes.
     health_snapshot: HashMap<EntityId, HealthState>,
-    /// Keys of damage events retracted before the next circuit step.
+    /// Tracks damage events that were retracted in the current frame.
+    /// Used to filter out corresponding health deltas to avoid double-application.
     expected_health_retractions: HashSet<(EntityId, Tick, Option<u32>)>,
+    /// Damage events pending retraction at the start of the next frame.
     pending_damage_retractions: Vec<DamageEvent>,
-    /// Count of duplicate health events filtered at ingress or egress.
+    /// Running count of duplicate health/damage events filtered.
+    /// Used for diagnostics and monitoring deduplication effectiveness.
     health_duplicate_count: u64,
 }
 

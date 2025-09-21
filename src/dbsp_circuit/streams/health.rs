@@ -3,7 +3,10 @@
 //! These helpers reduce health snapshots and incoming damage events to
 //! authoritative [`HealthDelta`] records emitted by the DBSP circuit.
 
-use std::cmp::max;
+use std::{
+    cmp::max,
+    collections::{BTreeMap, BTreeSet},
+};
 
 use dbsp::{algebra::Semigroup, operator::Fold, typed_batch::OrdZSet, RootCircuit, Stream};
 
@@ -25,8 +28,8 @@ use crate::dbsp_circuit::{DamageEvent, DamageSource, HealthDelta, HealthState};
 )]
 #[archive_attr(derive(Ord, PartialOrd, Eq, PartialEq, Hash))]
 struct HealthAccumulator {
-    sequenced: Vec<(u32, i32)>,
-    unsequenced: Vec<DamageEvent>,
+    sequenced: BTreeMap<u32, i32>,
+    unsequenced: BTreeSet<DamageEvent>,
     has_event: bool,
 }
 
@@ -35,32 +38,17 @@ impl HealthAccumulator {
         self.has_event = true;
         if let Some(seq) = event.seq {
             let signed = signed_amount(event);
-            match self
-                .sequenced
-                .binary_search_by(|(existing, _)| existing.cmp(&seq))
-            {
-                Ok(_) => {}
-                Err(pos) => self.sequenced.insert(pos, (seq, signed)),
-            }
-        } else if !self.unsequenced.iter().any(|existing| existing == event) {
-            self.unsequenced.push(*event);
+            self.sequenced.entry(seq).or_insert(signed);
+        } else {
+            self.unsequenced.insert(*event);
         }
     }
 
     fn remove(&mut self, event: &DamageEvent) {
         if let Some(seq) = event.seq {
-            if let Ok(pos) = self
-                .sequenced
-                .binary_search_by(|(existing, _)| existing.cmp(&seq))
-            {
-                self.sequenced.remove(pos);
-            }
-        } else if let Some(pos) = self
-            .unsequenced
-            .iter()
-            .position(|existing| existing == event)
-        {
-            self.unsequenced.swap_remove(pos);
+            self.sequenced.remove(&seq);
+        } else {
+            self.unsequenced.remove(event);
         }
         self.has_event = !self.sequenced.is_empty() || !self.unsequenced.is_empty();
     }
@@ -71,24 +59,14 @@ impl HealthAccumulator {
         self.has_event = !self.sequenced.is_empty() || !self.unsequenced.is_empty();
     }
 
-    fn merge_sequenced_events(&mut self, sequenced: &[(u32, i32)]) {
+    fn merge_sequenced_events(&mut self, sequenced: &BTreeMap<u32, i32>) {
         for (seq, signed) in sequenced {
-            match self
-                .sequenced
-                .binary_search_by(|(existing, _)| existing.cmp(seq))
-            {
-                Ok(_) => {}
-                Err(pos) => self.sequenced.insert(pos, (*seq, *signed)),
-            }
+            self.sequenced.entry(*seq).or_insert(*signed);
         }
     }
 
-    fn merge_unsequenced_events(&mut self, unsequenced: &[DamageEvent]) {
-        for event in unsequenced {
-            if !self.unsequenced.iter().any(|existing| existing == event) {
-                self.unsequenced.push(*event);
-            }
-        }
+    fn merge_unsequenced_events(&mut self, unsequenced: &BTreeSet<DamageEvent>) {
+        self.unsequenced.extend(unsequenced.iter().copied());
     }
 }
 
