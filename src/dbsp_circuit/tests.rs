@@ -142,9 +142,11 @@ fn sequenced_events_with_same_seq_in_same_tick_are_deduplicated() {
         at_tick: 8,
         seq: Some(11),
     };
+    // Provide the duplicate event with identical payload so debug assertions
+    // enforce the idempotency contract.
     let second = DamageEvent {
         entity: 7,
-        amount: 15,
+        amount: 20,
         source: DamageSource::External,
         at_tick: 8,
         seq: Some(11),
@@ -153,7 +155,7 @@ fn sequenced_events_with_same_seq_in_same_tick_are_deduplicated() {
     let deltas = run_health_delta(health, &[(first, 1), (second, 1)]);
     assert_eq!(deltas.len(), 1);
     let delta = deltas[0];
-    assert_eq!(delta.delta, -15);
+    assert_eq!(delta.delta, -20);
     assert!(!delta.death);
     assert_eq!(delta.seq, Some(11));
 }

@@ -5,7 +5,7 @@
 
 use std::{
     cmp::max,
-    collections::{BTreeMap, BTreeSet},
+    collections::{btree_map::Entry, BTreeMap, BTreeSet},
 };
 
 use dbsp::{algebra::Semigroup, operator::Fold, typed_batch::OrdZSet, RootCircuit, Stream};
@@ -38,7 +38,22 @@ impl HealthAccumulator {
         self.has_event = true;
         if let Some(seq) = event.seq {
             let signed = signed_amount(event);
-            self.sequenced.entry(seq).or_insert(signed);
+            match self.sequenced.entry(seq) {
+                Entry::Vacant(slot) => {
+                    slot.insert(signed);
+                }
+                Entry::Occupied(existing) => {
+                    let existing_signed = *existing.get();
+                    debug_assert_eq!(
+                        existing_signed,
+                        signed,
+                        "sequenced damage event mismatch for seq {seq}: existing {existing_signed}, incoming {signed}",
+                        seq = seq,
+                        existing_signed = existing_signed,
+                        signed = signed,
+                    );
+                }
+            }
         } else {
             self.unsequenced.insert(*event);
         }
@@ -61,7 +76,24 @@ impl HealthAccumulator {
 
     fn merge_sequenced_events(&mut self, sequenced: &BTreeMap<u32, i32>) {
         for (seq, signed) in sequenced {
-            self.sequenced.entry(*seq).or_insert(*signed);
+            let seq_value = *seq;
+            let incoming_signed = *signed;
+            match self.sequenced.entry(seq_value) {
+                Entry::Vacant(slot) => {
+                    slot.insert(incoming_signed);
+                }
+                Entry::Occupied(existing) => {
+                    let existing_signed = *existing.get();
+                    debug_assert_eq!(
+                        existing_signed,
+                        incoming_signed,
+                        "sequenced damage event mismatch for seq {seq}: existing {existing_signed}, incoming {incoming_signed}",
+                        seq = seq_value,
+                        existing_signed = existing_signed,
+                        incoming_signed = incoming_signed,
+                    );
+                }
+            }
         }
     }
 
