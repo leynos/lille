@@ -129,13 +129,9 @@ pub fn health_delta_stream(
             HealthAccumulator::default(),
             |acc: &mut HealthAccumulator, event: &DamageEvent, weight: i64| {
                 if weight > 0 {
-                    for _ in 0..weight.unsigned_abs() {
-                        acc.insert(event);
-                    }
+                    acc.insert(event);
                 } else if weight < 0 {
-                    for _ in 0..weight.unsigned_abs() {
-                        acc.remove(event);
-                    }
+                    acc.remove(event);
                 }
             },
             |acc: HealthAccumulator| {

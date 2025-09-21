@@ -1,17 +1,7 @@
-//! Synchronization systems for integrating DBSP circuits with Bevy ECS.
-//!
-//! This module provides a [`DbspPlugin`] that synchronises Bevy ECS state with
-//! the [`DbspCircuit`]. The plugin inserts a [`DbspState`] resource, feeds
-//! component data into the circuit each frame, steps the circuit, and applies
-//! the results back to entities. The underlying systems are also exposed for
-//! tests.
+//! Systems bridging Bevy ECS with the DBSP circuit.
 
-use std::{
-    collections::{HashMap, HashSet},
-    convert::TryFrom,
-};
+use std::{collections::HashSet, convert::TryFrom, mem};
 
-use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use log::{debug, error, warn};
 
@@ -19,12 +9,12 @@ use crate::components::{
     Block, BlockSlope, DdlogId, ForceComp, Health, Target as TargetComp, VelocityComp,
 };
 use crate::dbsp_circuit::{
-    try_step, DamageEvent, DbspCircuit, EntityId, Force, HealthState, Position, Target, Tick,
-    Velocity,
+    try_step, DamageEvent, DbspCircuit, Force, HealthState, Position, Target, Velocity,
 };
-use crate::world_handle::{init_world_handle_system, DdlogEntity, WorldHandle};
+use crate::world_handle::{DdlogEntity, WorldHandle};
 
-// Compact alias for the per-entity inputs used by the cache system.
+use super::{DamageInbox, DbspState, IdQueries};
+
 type EntityRow<'w> = (
     Entity,
     &'w DdlogId,
@@ -34,197 +24,9 @@ type EntityRow<'w> = (
     Option<&'w mut Health>,
 );
 
-#[derive(Resource, Default)]
-pub struct DamageInbox {
-    events: Vec<DamageEvent>,
-}
-
-impl DamageInbox {
-    pub fn push(&mut self, event: DamageEvent) {
-        self.events.push(event);
-    }
-
-    pub fn extend<I>(&mut self, events: I)
-    where
-        I: IntoIterator<Item = DamageEvent>,
-    {
-        self.events.extend(events);
-    }
-
-    pub fn drain(&mut self) -> std::vec::Drain<'_, DamageEvent> {
-        self.events.drain(..)
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.events.is_empty()
-    }
-}
-
-/// Bevy plugin that wires the DBSP circuit into the app.
-///
-/// Adding this plugin will insert [`DbspState`] as a non-send resource and
-/// register the systems necessary to synchronise entity state with the DBSP
-/// circuit on every frame.
-#[derive(Default)]
-pub struct DbspPlugin;
-
-impl Plugin for DbspPlugin {
-    fn build(&self, app: &mut App) {
-        if let Err(e) = init_dbsp_system(&mut app.world) {
-            error!("failed to init DBSP: {e}");
-            return;
-        }
-
-        app.init_resource::<DamageInbox>();
-        app.add_systems(Startup, init_world_handle_system);
-        app.add_systems(
-            Update,
-            (cache_state_for_dbsp_system, apply_dbsp_outputs_system).chain(),
-        );
-    }
-}
-
-/// Non-send resource wrapping the [`DbspCircuit`].
-///
-/// [`DbspState`] owns the circuit instance that performs all physics and game
-/// logic computations. It is inserted by [`DbspPlugin`] and persists outside the
-/// ECS so the DBSP runtime can maintain state across frames. Systems use this
-/// resource to push inputs and read outputs each tick.
-pub struct DbspState {
-    circuit: DbspCircuit,
-    /// Cached mapping from DBSP entity IDs to Bevy `Entity` values.
-    ///
-    /// The map is maintained incrementally by
-    /// [`cache_state_for_dbsp_system`] to avoid rebuilding it every frame.
-    id_map: HashMap<i64, Entity>,
-    /// Reverse mapping from Bevy [`Entity`] values to DBSP identifiers.
-    rev_map: HashMap<Entity, i64>,
-    applied_health: HashMap<EntityId, (Tick, Option<u32>)>,
-    /// Tracks unsequenced damage events applied per entity per tick.
-    /// Used to detect and filter duplicate unsequenced events within the same tick.
-    applied_unsequenced: HashMap<EntityId, (Tick, HashSet<DamageEvent>)>,
-    /// Caches the last health state pushed to the circuit for each entity.
-    /// Used to generate retractions when health state changes.
-    health_snapshot: HashMap<EntityId, HealthState>,
-    /// Tracks damage events that were retracted in the current frame.
-    /// Used to filter out corresponding health deltas to avoid double-application.
-    expected_health_retractions: HashSet<(EntityId, Tick, Option<u32>)>,
-    /// Damage events pending retraction at the start of the next frame.
-    pending_damage_retractions: Vec<DamageEvent>,
-    /// Running count of duplicate health/damage events filtered.
-    /// Used for diagnostics and monitoring deduplication effectiveness.
-    health_duplicate_count: u64,
-}
-
-#[derive(SystemParam)]
-pub struct IdQueries<'w, 's> {
-    pub added: Query<'w, 's, (Entity, &'static DdlogId), Added<DdlogId>>,
-    pub changed: Query<'w, 's, (Entity, &'static DdlogId), Changed<DdlogId>>,
-    pub removed: RemovedComponents<'w, 's, DdlogId>,
-}
-
-impl DbspState {
-    /// Creates a new [`DbspState`] with an initialized circuit.
-    pub fn new() -> Result<Self, dbsp::Error> {
-        Ok(Self {
-            circuit: DbspCircuit::new()?,
-            id_map: HashMap::new(),
-            rev_map: HashMap::new(),
-            applied_health: HashMap::new(),
-            applied_unsequenced: HashMap::new(),
-            health_snapshot: HashMap::new(),
-            expected_health_retractions: HashSet::new(),
-            pending_damage_retractions: Vec::new(),
-            health_duplicate_count: 0,
-        })
-    }
-
-    /// Looks up the Bevy [`Entity`] for a DBSP identifier.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use lille::dbsp_sync::DbspState;
-    /// let state = DbspState::new().expect("failed to initialise DbspState");
-    /// assert!(state.entity_for_id(42).is_none());
-    /// ```
-    pub fn entity_for_id(&self, id: i64) -> Option<Entity> {
-        self.id_map.get(&id).copied()
-    }
-
-    /// Returns the number of duplicate health or damage events filtered.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use lille::dbsp_sync::DbspState;
-    /// let state = DbspState::new().expect("failed to initialise DbspState");
-    /// assert_eq!(state.applied_health_duplicates(), 0);
-    /// ```
-    pub fn applied_health_duplicates(&self) -> u64 {
-        self.health_duplicate_count
-    }
-
-    fn record_duplicate_sequenced_damage(
-        &mut self,
-        event: &DamageEvent,
-        seen: &mut HashSet<(EntityId, Tick, u32)>,
-    ) -> bool {
-        let Some(seq) = event.seq else {
-            return false;
-        };
-
-        if self.applied_health.get(&event.entity) == Some(&(event.at_tick, Some(seq))) {
-            debug!(
-                "duplicate damage event ignored for entity {} at tick {} seq {}",
-                event.entity, event.at_tick, seq
-            );
-            self.health_duplicate_count += 1;
-            return true;
-        }
-
-        let key = (event.entity, event.at_tick, seq);
-        if !seen.insert(key) {
-            debug!(
-                "duplicate damage event ignored for entity {} at tick {} seq {}",
-                event.entity, event.at_tick, seq
-            );
-            self.health_duplicate_count += 1;
-            return true;
-        }
-
-        false
-    }
-
-    fn record_duplicate_unsequenced_damage(
-        &mut self,
-        event: &DamageEvent,
-        seen: &mut HashSet<DamageEvent>,
-    ) -> bool {
-        let entry = self
-            .applied_unsequenced
-            .entry(event.entity)
-            .or_insert_with(|| (event.at_tick, HashSet::new()));
-        if entry.0 != event.at_tick {
-            entry.0 = event.at_tick;
-            entry.1.clear();
-        }
-        if entry.1.contains(event) || !seen.insert(*event) {
-            debug!(
-                "duplicate unsequenced damage event ignored for entity {} at tick {}",
-                event.entity, event.at_tick
-            );
-            self.health_duplicate_count += 1;
-            return true;
-        }
-        entry.1.insert(*event);
-        false
-    }
-}
-
 /// Initializes the [`DbspState`] resource in the provided [`World`].
 ///
-/// Call this once during Bevy startup before running any DBSP synchronization
+/// Call this once during Bevy startup before running any DBSP synchronisation
 /// systems.
 pub fn init_dbsp_system(world: &mut World) -> Result<(), dbsp::Error> {
     let state = DbspState::new()?;
@@ -241,10 +43,6 @@ pub fn init_dbsp_system(world: &mut World) -> Result<(), dbsp::Error> {
 /// ensuring the lookup is maintained without rebuilding the map each frame. It
 /// also refreshes the [`WorldHandle`] resource with the same cached data for
 /// tests and diagnostics.
-#[expect(
-    clippy::type_complexity,
-    reason = "Bevy Query uses tuple world refs; complexity hidden behind EntityRow alias"
-)]
 pub fn cache_state_for_dbsp_system(
     mut state: NonSendMut<DbspState>,
     mut entity_query: Query<EntityRow<'_>>,
@@ -258,38 +56,46 @@ pub fn cache_state_for_dbsp_system(
     world_handle.slopes.clear();
     world_handle.entities.clear();
 
-    // Keep the tuple layout visible so clippy::type_complexity remains
-    // satisfied despite the alias indirection.
-    let _: std::marker::PhantomData<(
-        Entity,
-        &'static DdlogId,
-        &'static Transform,
-        Option<&'static VelocityComp>,
-        Option<&'static TargetComp>,
-        Option<&'static mut Health>,
-    )> = std::marker::PhantomData;
-
-    for snapshot in state.health_snapshot.values() {
-        state.circuit.health_state_in().push(*snapshot, -1);
-    }
-    state.health_snapshot.clear();
-
+    let previous_snapshots = collect_previous_health_snapshots(&mut state);
+    let pending_damage = mem::take(&mut state.pending_damage_retractions);
     state.expected_health_retractions.clear();
-    for event in std::mem::take(&mut state.pending_damage_retractions) {
-        state.circuit.damage_in().push(event, -1);
-        state
-            .expected_health_retractions
-            .insert((event.entity, event.at_tick, event.seq));
-    }
 
     sync::blocks(&mut state.circuit, &block_query, world_handle.as_mut());
     sync::id_maps(&mut state, &mut id_queries);
     sync::entities(&mut state, &mut entity_query, world_handle.as_mut());
     sync::forces(&mut state, &force_query);
 
+    apply_health_snapshot_retractions(&mut state.circuit, &previous_snapshots);
+    apply_damage_retractions(&mut state, pending_damage);
+
+    ingest_damage_events(&mut state, damage_inbox.as_mut());
+}
+
+fn collect_previous_health_snapshots(state: &mut DbspState) -> Vec<HealthState> {
+    let snapshots: Vec<_> = state.health_snapshot.values().copied().collect();
+    state.health_snapshot.clear();
+    snapshots
+}
+
+fn apply_health_snapshot_retractions(circuit: &mut DbspCircuit, snapshots: &[HealthState]) {
+    for snapshot in snapshots {
+        circuit.health_state_in().push(*snapshot, -1);
+    }
+}
+
+fn apply_damage_retractions(state: &mut DbspState, retractions: Vec<DamageEvent>) {
+    for event in retractions {
+        state.circuit.damage_in().push(event, -1);
+        state
+            .expected_health_retractions
+            .insert((event.entity, event.at_tick, event.seq));
+    }
+}
+
+fn ingest_damage_events(state: &mut DbspState, inbox: &mut DamageInbox) {
     let mut sequenced_damage = HashSet::new();
     let mut unsequenced_damage = HashSet::new();
-    for event in damage_inbox.drain() {
+    for event in inbox.drain() {
         let duplicate = match event.seq {
             Some(_) => state.record_duplicate_sequenced_damage(&event, &mut sequenced_damage),
             None => state.record_duplicate_unsequenced_damage(&event, &mut unsequenced_damage),
@@ -579,8 +385,6 @@ pub fn apply_dbsp_outputs_system(
         if let Ok((_, _, _, maybe_health)) = write_query.get_mut(entity) {
             if let Some(mut health) = maybe_health {
                 let key = (delta.at_tick, delta.seq);
-                // Skip health deltas for retracted damage events to prevent
-                // double application of health changes.
                 if state.expected_health_retractions.remove(&(
                     delta.entity,
                     delta.at_tick,

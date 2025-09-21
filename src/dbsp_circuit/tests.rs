@@ -233,6 +233,28 @@ fn healing_from_zero_produces_positive_delta() {
 }
 
 #[rstest]
+fn over_healing_from_zero_is_clamped_to_max() {
+    let health = HealthState {
+        entity: 5,
+        current: 0,
+        max: 80,
+    };
+    let event = DamageEvent {
+        entity: 5,
+        amount: 150,
+        source: DamageSource::Script,
+        at_tick: 4,
+        seq: None,
+    };
+    let deltas = run_health_delta(health, &[(event, 1)]);
+    assert_eq!(deltas.len(), 1);
+    let delta = deltas[0];
+    assert_eq!(delta.delta, 80);
+    assert!(!delta.death);
+    assert_eq!(delta.seq, None);
+}
+
+#[rstest]
 fn multiple_events_same_tick_accumulate_and_pick_max_seq() {
     let health = HealthState {
         entity: 5,

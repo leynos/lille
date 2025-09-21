@@ -1,0 +1,29 @@
+//! Bevy plugin wiring DBSP systems into the schedule.
+
+use bevy::prelude::*;
+use log::error;
+
+use crate::world_handle::init_world_handle_system;
+
+use super::{
+    apply_dbsp_outputs_system, cache_state_for_dbsp_system, init_dbsp_system, DamageInbox,
+};
+
+#[derive(Default)]
+pub struct DbspPlugin;
+
+impl Plugin for DbspPlugin {
+    fn build(&self, app: &mut App) {
+        if let Err(e) = init_dbsp_system(&mut app.world) {
+            error!("failed to init DBSP: {e}");
+            return;
+        }
+
+        app.init_resource::<DamageInbox>();
+        app.add_systems(Startup, init_world_handle_system);
+        app.add_systems(
+            Update,
+            (cache_state_for_dbsp_system, apply_dbsp_outputs_system).chain(),
+        );
+    }
+}
