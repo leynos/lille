@@ -31,7 +31,7 @@ type EntityRow<'w> = (
     &'w Transform,
     Option<&'w VelocityComp>,
     Option<&'w TargetComp>,
-    Option<&'w Health>,
+    Option<&'w mut Health>,
 );
 
 #[derive(Resource, Default)]
@@ -186,7 +186,7 @@ pub fn init_dbsp_system(world: &mut World) -> Result<(), dbsp::Error> {
 #[allow(unfulfilled_lint_expectations)]
 pub fn cache_state_for_dbsp_system(
     mut state: NonSendMut<DbspState>,
-    entity_query: Query<EntityRow<'_>>,
+    mut entity_query: Query<EntityRow<'_>>,
     force_query: Query<(Entity, &DdlogId, &ForceComp)>,
     block_query: Query<(&Block, Option<&BlockSlope>)>,
     mut id_queries: IdQueries,
@@ -212,7 +212,7 @@ pub fn cache_state_for_dbsp_system(
 
     sync::blocks(&mut state.circuit, &block_query, world_handle.as_mut());
     sync::id_maps(&mut state, &mut id_queries);
-    sync::entities(&mut state, &entity_query, world_handle.as_mut());
+    sync::entities(&mut state, &mut entity_query, world_handle.as_mut());
     sync::forces(&mut state, &force_query);
 
     let mut sequenced_damage = HashSet::new();
@@ -333,7 +333,7 @@ mod sync {
 
     pub(super) fn entities(
         state: &mut DbspState,
-        query: &Query<EntityRow<'_>>,
+        query: &mut Query<EntityRow<'_>>,
         world: &mut WorldHandle,
     ) {
         sync_positions(state, query, world);
@@ -346,11 +346,11 @@ mod sync {
     /// Synchronises entity positions with the DBSP circuit.
     fn sync_positions(
         state: &mut DbspState,
-        query: &Query<EntityRow<'_>>,
+        query: &mut Query<EntityRow<'_>>,
         world: &mut WorldHandle,
     ) {
         let circuit = &mut state.circuit;
-        for (_, id, transform, _, _, _) in query.iter() {
+        for (_, id, transform, _, _, _) in query.iter_mut() {
             circuit.position_in().push(
                 Position {
                     entity: id.0,
@@ -365,9 +365,9 @@ mod sync {
     }
 
     /// Synchronises entity velocities with the DBSP circuit.
-    fn sync_velocities(state: &mut DbspState, query: &Query<EntityRow<'_>>) {
+    fn sync_velocities(state: &mut DbspState, query: &mut Query<EntityRow<'_>>) {
         let circuit = &mut state.circuit;
-        for (_, id, _, vel, _, _) in query.iter() {
+        for (_, id, _, vel, _, _) in query.iter_mut() {
             let v = vel.map(|v| (v.vx, v.vy, v.vz)).unwrap_or_default();
             circuit.velocity_in().push(
                 Velocity {
@@ -382,9 +382,9 @@ mod sync {
     }
 
     /// Synchronises entity targets with the DBSP circuit.
-    fn sync_targets(state: &mut DbspState, query: &Query<EntityRow<'_>>) {
+    fn sync_targets(state: &mut DbspState, query: &mut Query<EntityRow<'_>>) {
         let circuit = &mut state.circuit;
-        for (_, id, _, _, target, _) in query.iter() {
+        for (_, id, _, _, target, _) in query.iter_mut() {
             if let Some(t) = target {
                 circuit.target_in().push(
                     Target {
@@ -399,19 +399,21 @@ mod sync {
     }
 
     /// Mirrors entity health into the circuit, enforcing clamps and logging once.
-    fn sync_health(state: &mut DbspState, query: &Query<EntityRow<'_>>) {
+    fn sync_health(state: &mut DbspState, query: &mut Query<EntityRow<'_>>) {
         let circuit = &mut state.circuit;
-        for (_, id, _, _, _, health) in query.iter() {
-            let Some(h) = health else {
+        for (_, id, _, _, _, health) in query.iter_mut() {
+            let Some(mut health) = health else {
                 continue;
             };
-            let (clamped_current, max_value, was_clamped) = clamp_health_values(h);
+            let original_current = health.current;
+            let (clamped_current, max_value, was_clamped) = clamp_health_values(health.as_ref());
             if was_clamped {
                 debug!(
                     "health current {} clamped to {} for entity {}",
-                    h.current, clamped_current, id.0
+                    original_current, clamped_current, id.0
                 );
             }
+            health.current = clamped_current;
             match u64::try_from(id.0) {
                 Ok(entity_id) => {
                     let snapshot = HealthState {
@@ -430,8 +432,8 @@ mod sync {
     }
 
     /// Rebuilds the cached world representation from the ECS query results.
-    fn update_world_handle(query: &Query<EntityRow<'_>>, world: &mut WorldHandle) {
-        for (_, id, transform, _, target, health) in query.iter() {
+    fn update_world_handle(query: &mut Query<EntityRow<'_>>, world: &mut WorldHandle) {
+        for (_, id, transform, _, target, health) in query.iter_mut() {
             let entry = world
                 .entities
                 .entry(id.0)
@@ -439,7 +441,7 @@ mod sync {
             entry.position = transform.translation;
             entry.target = target.map(|t| t.0);
             if let Some(h) = health {
-                let (clamped_current, max_value, _) = clamp_health_values(h);
+                let (clamped_current, max_value, _) = clamp_health_values(h.as_ref());
                 entry.health_current = clamped_current;
                 entry.health_max = max_value;
             } else {
