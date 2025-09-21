@@ -66,7 +66,13 @@ impl HealthAccumulator {
     }
 
     fn merge(&mut self, other: &Self) {
-        for (seq, signed) in &other.sequenced {
+        self.merge_sequenced_events(&other.sequenced);
+        self.merge_unsequenced_events(&other.unsequenced);
+        self.has_event = !self.sequenced.is_empty() || !self.unsequenced.is_empty();
+    }
+
+    fn merge_sequenced_events(&mut self, sequenced: &[(u32, i32)]) {
+        for (seq, signed) in sequenced {
             match self
                 .sequenced
                 .binary_search_by(|(existing, _)| existing.cmp(seq))
@@ -75,12 +81,14 @@ impl HealthAccumulator {
                 Err(pos) => self.sequenced.insert(pos, (*seq, *signed)),
             }
         }
-        for event in &other.unsequenced {
+    }
+
+    fn merge_unsequenced_events(&mut self, unsequenced: &[DamageEvent]) {
+        for event in unsequenced {
             if !self.unsequenced.iter().any(|existing| existing == event) {
                 self.unsequenced.push(*event);
             }
         }
-        self.has_event = !self.sequenced.is_empty() || !self.unsequenced.is_empty();
     }
 }
 

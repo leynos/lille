@@ -91,88 +91,181 @@ where
     runner.run(suite);
 }
 
+fn sequenced_damage_tick_one() -> DamageEvent {
+    DamageEvent {
+        entity: 1,
+        amount: 30,
+        source: DamageSource::External,
+        at_tick: 1,
+        seq: Some(42),
+    }
+}
+
+fn sequenced_damage_tick_two() -> DamageEvent {
+    DamageEvent {
+        entity: 1,
+        amount: 30,
+        source: DamageSource::External,
+        at_tick: 2,
+        seq: Some(43),
+    }
+}
+
+fn healing_event() -> DamageEvent {
+    DamageEvent {
+        entity: 1,
+        amount: 80,
+        source: DamageSource::Script,
+        at_tick: 3,
+        seq: Some(5),
+    }
+}
+
+fn unsequenced_damage() -> DamageEvent {
+    DamageEvent {
+        entity: 1,
+        amount: 50,
+        source: DamageSource::External,
+        at_tick: 4,
+        seq: None,
+    }
+}
+
 #[test]
-fn duplicate_damage_events_do_not_double_apply() {
+fn duplicate_events_within_tick_apply_once() {
     run_rspec_serial(&rspec::given(
         "duplicate health deltas are idempotent",
         HealthEnv::default(),
         |ctx| {
             ctx.then("duplicate events within a tick apply once", |env| {
-                let damage = DamageEvent {
-                    entity: 1,
-                    amount: 30,
-                    source: DamageSource::External,
-                    at_tick: 1,
-                    seq: Some(42),
-                };
+                let damage = sequenced_damage_tick_one();
                 env.push_damage_twice(damage);
                 env.update();
                 assert_eq!(env.current_health(), 60);
                 assert_eq!(env.duplicate_count(), 1);
             });
+        },
+    ));
+}
+
+#[test]
+fn replaying_same_tick_delta_is_ignored() {
+    run_rspec_serial(&rspec::given(
+        "duplicate health deltas are idempotent",
+        HealthEnv::default(),
+        |ctx| {
             ctx.then("replaying the same tick delta is ignored", |env| {
-                let damage = DamageEvent {
-                    entity: 1,
-                    amount: 30,
-                    source: DamageSource::External,
-                    at_tick: 1,
-                    seq: Some(42),
-                };
+                let damage = sequenced_damage_tick_one();
+                env.push_damage_twice(damage);
+                env.update();
                 env.push_damage(damage);
                 env.update();
                 assert_eq!(env.current_health(), 60);
                 assert_eq!(env.duplicate_count(), 2);
             });
+        },
+    ));
+}
+
+#[test]
+fn new_ticks_consume_damage_once() {
+    run_rspec_serial(&rspec::given(
+        "duplicate health deltas are idempotent",
+        HealthEnv::default(),
+        |ctx| {
             ctx.then("new ticks consume damage once", |env| {
-                let damage = DamageEvent {
-                    entity: 1,
-                    amount: 30,
-                    source: DamageSource::External,
-                    at_tick: 2,
-                    seq: Some(43),
-                };
+                let damage = sequenced_damage_tick_one();
+                env.push_damage_twice(damage);
+                env.update();
                 env.push_damage(damage);
+                env.update();
+                let next_tick = sequenced_damage_tick_two();
+                env.push_damage(next_tick);
                 env.update();
                 assert_eq!(env.current_health(), 30);
                 assert_eq!(env.duplicate_count(), 2);
             });
+        },
+    ));
+}
+
+#[test]
+fn healing_saturates_at_max_health() {
+    run_rspec_serial(&rspec::given(
+        "duplicate health deltas are idempotent",
+        HealthEnv::default(),
+        |ctx| {
             ctx.then("healing saturates at max health", |env| {
-                let heal = DamageEvent {
-                    entity: 1,
-                    amount: 80,
-                    source: DamageSource::Script,
-                    at_tick: 3,
-                    seq: Some(5),
-                };
+                let damage = sequenced_damage_tick_one();
+                env.push_damage_twice(damage);
+                env.update();
+                env.push_damage(damage);
+                env.update();
+                let next_tick = sequenced_damage_tick_two();
+                env.push_damage(next_tick);
+                env.update();
+                let heal = healing_event();
                 env.push_damage(heal);
                 env.update();
                 assert_eq!(env.current_health(), 100);
                 assert_eq!(env.duplicate_count(), 2);
             });
+        },
+    ));
+}
+
+#[test]
+fn unsequenced_duplicates_are_filtered_within_tick() {
+    run_rspec_serial(&rspec::given(
+        "duplicate health deltas are idempotent",
+        HealthEnv::default(),
+        |ctx| {
             ctx.then("unsequenced duplicates are filtered within a tick", |env| {
-                let damage = DamageEvent {
-                    entity: 1,
-                    amount: 50,
-                    source: DamageSource::External,
-                    at_tick: 4,
-                    seq: None,
-                };
+                let damage = sequenced_damage_tick_one();
                 env.push_damage_twice(damage);
+                env.update();
+                env.push_damage(damage);
+                env.update();
+                let next_tick = sequenced_damage_tick_two();
+                env.push_damage(next_tick);
+                env.update();
+                let heal = healing_event();
+                env.push_damage(heal);
+                env.update();
+                let unsequenced = unsequenced_damage();
+                env.push_damage_twice(unsequenced);
                 env.update();
                 assert_eq!(env.current_health(), 50);
                 assert_eq!(env.duplicate_count(), 3);
             });
+        },
+    ));
+}
+
+#[test]
+fn replaying_unsequenced_deltas_for_same_tick_is_ignored() {
+    run_rspec_serial(&rspec::given(
+        "duplicate health deltas are idempotent",
+        HealthEnv::default(),
+        |ctx| {
             ctx.then(
                 "replaying unsequenced deltas for the same tick is ignored",
                 |env| {
-                    let damage = DamageEvent {
-                        entity: 1,
-                        amount: 50,
-                        source: DamageSource::External,
-                        at_tick: 4,
-                        seq: None,
-                    };
+                    let damage = sequenced_damage_tick_one();
+                    env.push_damage_twice(damage);
+                    env.update();
                     env.push_damage(damage);
+                    env.update();
+                    let next_tick = sequenced_damage_tick_two();
+                    env.push_damage(next_tick);
+                    env.update();
+                    let heal = healing_event();
+                    env.push_damage(heal);
+                    env.update();
+                    let unsequenced = unsequenced_damage();
+                    env.push_damage_twice(unsequenced);
+                    env.update();
+                    env.push_damage(unsequenced);
                     env.update();
                     assert_eq!(env.current_health(), 50);
                     assert_eq!(env.duplicate_count(), 4);

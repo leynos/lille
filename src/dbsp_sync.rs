@@ -336,8 +336,21 @@ mod sync {
         query: &Query<EntityRow<'_>>,
         world: &mut WorldHandle,
     ) {
+        sync_positions(state, query, world);
+        sync_velocities(state, query);
+        sync_targets(state, query);
+        sync_health(state, query);
+        update_world_handle(query, world);
+    }
+
+    /// Synchronises entity positions with the DBSP circuit.
+    fn sync_positions(
+        state: &mut DbspState,
+        query: &Query<EntityRow<'_>>,
+        world: &mut WorldHandle,
+    ) {
         let circuit = &mut state.circuit;
-        for (_, id, transform, vel, target, health) in query.iter() {
+        for (_, id, transform, _, _, _) in query.iter() {
             circuit.position_in().push(
                 Position {
                     entity: id.0,
@@ -347,7 +360,14 @@ mod sync {
                 },
                 1,
             );
+            debug_assert!(world.entities.get(&id.0).is_none());
+        }
+    }
 
+    /// Synchronises entity velocities with the DBSP circuit.
+    fn sync_velocities(state: &mut DbspState, query: &Query<EntityRow<'_>>) {
+        let circuit = &mut state.circuit;
+        for (_, id, _, vel, _, _) in query.iter() {
             let v = vel.map(|v| (v.vx, v.vy, v.vz)).unwrap_or_default();
             circuit.velocity_in().push(
                 Velocity {
@@ -358,7 +378,13 @@ mod sync {
                 },
                 1,
             );
+        }
+    }
 
+    /// Synchronises entity targets with the DBSP circuit.
+    fn sync_targets(state: &mut DbspState, query: &Query<EntityRow<'_>>) {
+        let circuit = &mut state.circuit;
+        for (_, id, _, _, target, _) in query.iter() {
             if let Some(t) = target {
                 circuit.target_in().push(
                     Target {
@@ -369,45 +395,67 @@ mod sync {
                     1,
                 );
             }
-
-            let (health_current, health_max) = if let Some(h) = health {
-                let clamped_current = h.current.min(h.max);
-                if clamped_current != h.current {
-                    debug!(
-                        "health current {} clamped to {} for entity {}",
-                        h.current, clamped_current, id.0
-                    );
-                }
-                match u64::try_from(id.0) {
-                    Ok(entity_id) => {
-                        let snapshot = HealthState {
-                            entity: entity_id,
-                            current: clamped_current,
-                            max: h.max,
-                        };
-                        circuit.health_state_in().push(snapshot, 1);
-                        state.health_snapshot.insert(entity_id, snapshot);
-                    }
-                    Err(_) => {
-                        warn!("health component for negative id {} skipped", id.0);
-                    }
-                }
-                (clamped_current, h.max)
-            } else {
-                (0, 0)
-            };
-
-            world.entities.insert(
-                id.0,
-                DdlogEntity {
-                    position: transform.translation,
-                    target: target.map(|t| t.0),
-                    health_current,
-                    health_max,
-                    ..DdlogEntity::default()
-                },
-            );
         }
+    }
+
+    /// Mirrors entity health into the circuit, enforcing clamps and logging once.
+    fn sync_health(state: &mut DbspState, query: &Query<EntityRow<'_>>) {
+        let circuit = &mut state.circuit;
+        for (_, id, _, _, _, health) in query.iter() {
+            let Some(h) = health else {
+                continue;
+            };
+            let (clamped_current, max_value, was_clamped) = clamp_health_values(h);
+            if was_clamped {
+                debug!(
+                    "health current {} clamped to {} for entity {}",
+                    h.current, clamped_current, id.0
+                );
+            }
+            match u64::try_from(id.0) {
+                Ok(entity_id) => {
+                    let snapshot = HealthState {
+                        entity: entity_id,
+                        current: clamped_current,
+                        max: max_value,
+                    };
+                    circuit.health_state_in().push(snapshot, 1);
+                    state.health_snapshot.insert(entity_id, snapshot);
+                }
+                Err(_) => {
+                    warn!("health component for negative id {} skipped", id.0);
+                }
+            }
+        }
+    }
+
+    /// Rebuilds the cached world representation from the ECS query results.
+    fn update_world_handle(query: &Query<EntityRow<'_>>, world: &mut WorldHandle) {
+        for (_, id, transform, _, target, health) in query.iter() {
+            let entry = world
+                .entities
+                .entry(id.0)
+                .or_insert_with(DdlogEntity::default);
+            entry.position = transform.translation;
+            entry.target = target.map(|t| t.0);
+            if let Some(h) = health {
+                let (clamped_current, max_value, _) = clamp_health_values(h);
+                entry.health_current = clamped_current;
+                entry.health_max = max_value;
+            } else {
+                entry.health_current = 0;
+                entry.health_max = 0;
+            }
+        }
+    }
+
+    fn clamp_health_values(health: &Health) -> (u16, u16, bool) {
+        let clamped_current = health.current.min(health.max);
+        (
+            clamped_current,
+            health.max,
+            clamped_current != health.current,
+        )
     }
 
     pub(super) fn forces(state: &mut DbspState, query: &Query<(Entity, &DdlogId, &ForceComp)>) {
