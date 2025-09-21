@@ -129,6 +129,36 @@ fn duplicate_damage_events_idempotent(#[case] seq: Option<u32>) {
 }
 
 #[rstest]
+fn sequenced_events_with_same_seq_in_same_tick_are_deduplicated() {
+    let health = HealthState {
+        entity: 7,
+        current: 70,
+        max: 100,
+    };
+    let first = DamageEvent {
+        entity: 7,
+        amount: 20,
+        source: DamageSource::External,
+        at_tick: 8,
+        seq: Some(11),
+    };
+    let second = DamageEvent {
+        entity: 7,
+        amount: 15,
+        source: DamageSource::External,
+        at_tick: 8,
+        seq: Some(11),
+    };
+
+    let deltas = run_health_delta(health, &[(first, 1), (second, 1)]);
+    assert_eq!(deltas.len(), 1);
+    let delta = deltas[0];
+    assert_eq!(delta.delta, -15);
+    assert!(!delta.death);
+    assert_eq!(delta.seq, Some(11));
+}
+
+#[rstest]
 fn unsequenced_events_with_distinct_sources_accumulate() {
     let health = HealthState {
         entity: 6,

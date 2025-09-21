@@ -146,7 +146,7 @@ impl DbspState {
         self.id_map.get(&id).copied()
     }
 
-    /// Returns the number of duplicate health records the circuit ignored.
+    /// Returns the number of duplicate health or damage events filtered.
     ///
     /// # Examples
     ///
@@ -157,6 +157,62 @@ impl DbspState {
     /// ```
     pub fn applied_health_duplicates(&self) -> u64 {
         self.health_duplicate_count
+    }
+
+    fn record_duplicate_sequenced_damage(
+        &mut self,
+        event: &DamageEvent,
+        seen: &mut HashSet<(EntityId, Tick, u32)>,
+    ) -> bool {
+        let Some(seq) = event.seq else {
+            return false;
+        };
+
+        if self.applied_health.get(&event.entity) == Some(&(event.at_tick, Some(seq))) {
+            debug!(
+                "duplicate damage event ignored for entity {} at tick {} seq {}",
+                event.entity, event.at_tick, seq
+            );
+            self.health_duplicate_count += 1;
+            return true;
+        }
+
+        let key = (event.entity, event.at_tick, seq);
+        if !seen.insert(key) {
+            debug!(
+                "duplicate damage event ignored for entity {} at tick {} seq {}",
+                event.entity, event.at_tick, seq
+            );
+            self.health_duplicate_count += 1;
+            return true;
+        }
+
+        false
+    }
+
+    fn record_duplicate_unsequenced_damage(
+        &mut self,
+        event: &DamageEvent,
+        seen: &mut HashSet<DamageEvent>,
+    ) -> bool {
+        let entry = self
+            .applied_unsequenced
+            .entry(event.entity)
+            .or_insert_with(|| (event.at_tick, HashSet::new()));
+        if entry.0 != event.at_tick {
+            entry.0 = event.at_tick;
+            entry.1.clear();
+        }
+        if entry.1.contains(event) || !seen.insert(*event) {
+            debug!(
+                "duplicate unsequenced damage event ignored for entity {} at tick {}",
+                event.entity, event.at_tick
+            );
+            self.health_duplicate_count += 1;
+            return true;
+        }
+        entry.1.insert(*event);
+        false
     }
 }
 
@@ -183,7 +239,6 @@ pub fn init_dbsp_system(world: &mut World) -> Result<(), dbsp::Error> {
     clippy::type_complexity,
     reason = "Bevy Query uses tuple world refs; complexity hidden behind EntityRow alias"
 )]
-#[allow(unfulfilled_lint_expectations)]
 pub fn cache_state_for_dbsp_system(
     mut state: NonSendMut<DbspState>,
     mut entity_query: Query<EntityRow<'_>>,
@@ -196,6 +251,17 @@ pub fn cache_state_for_dbsp_system(
     world_handle.blocks.clear();
     world_handle.slopes.clear();
     world_handle.entities.clear();
+
+    // Keep the tuple layout visible so clippy::type_complexity remains
+    // satisfied despite the alias indirection.
+    let _: std::marker::PhantomData<(
+        Entity,
+        &'static DdlogId,
+        &'static Transform,
+        Option<&'static VelocityComp>,
+        Option<&'static TargetComp>,
+        Option<&'static mut Health>,
+    )> = std::marker::PhantomData;
 
     for snapshot in state.health_snapshot.values() {
         state.circuit.health_state_in().push(*snapshot, -1);
@@ -218,47 +284,9 @@ pub fn cache_state_for_dbsp_system(
     let mut sequenced_damage = HashSet::new();
     let mut unsequenced_damage = HashSet::new();
     for event in damage_inbox.drain() {
-        let duplicate = if let Some(seq) = event.seq {
-            if state.applied_health.get(&event.entity) == Some(&(event.at_tick, Some(seq))) {
-                debug!(
-                    "duplicate damage event ignored for entity {} at tick {} seq {}",
-                    event.entity, event.at_tick, seq
-                );
-                state.health_duplicate_count += 1;
-                true
-            } else {
-                let key = (event.entity, event.at_tick, seq);
-                if !sequenced_damage.insert(key) {
-                    debug!(
-                        "duplicate damage event ignored for entity {} at tick {} seq {}",
-                        event.entity, event.at_tick, seq
-                    );
-                    state.health_duplicate_count += 1;
-                    true
-                } else {
-                    false
-                }
-            }
-        } else {
-            let entry = state
-                .applied_unsequenced
-                .entry(event.entity)
-                .or_insert_with(|| (event.at_tick, HashSet::new()));
-            if entry.0 != event.at_tick {
-                entry.0 = event.at_tick;
-                entry.1.clear();
-            }
-            if entry.1.contains(&event) || !unsequenced_damage.insert(event) {
-                debug!(
-                    "duplicate unsequenced damage event ignored for entity {} at tick {}",
-                    event.entity, event.at_tick
-                );
-                state.health_duplicate_count += 1;
-                true
-            } else {
-                entry.1.insert(event);
-                false
-            }
+        let duplicate = match event.seq {
+            Some(_) => state.record_duplicate_sequenced_damage(&event, &mut sequenced_damage),
+            None => state.record_duplicate_unsequenced_damage(&event, &mut unsequenced_damage),
         };
         if duplicate {
             continue;
@@ -545,6 +573,8 @@ pub fn apply_dbsp_outputs_system(
         if let Ok((_, _, _, maybe_health)) = write_query.get_mut(entity) {
             if let Some(mut health) = maybe_health {
                 let key = (delta.at_tick, delta.seq);
+                // Skip health deltas for retracted damage events to prevent
+                // double application of health changes.
                 if state.expected_health_retractions.remove(&(
                     delta.entity,
                     delta.at_tick,
