@@ -88,11 +88,7 @@ fn assert_health_delta_test(
     assert_eq!(delta.seq, expected_seq);
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "Test helper mirrors record fields for clarity."
-)]
-fn run_simple_health_test(
+struct HealthTestCase {
     entity: u32,
     current: u16,
     max: u16,
@@ -103,27 +99,31 @@ fn run_simple_health_test(
     expected_delta: i32,
     expected_death: bool,
     expected_seq: Option<u32>,
-) {
-    let entity_id = u64::from(entity);
-    let health = HealthState {
-        entity: entity_id,
-        current,
-        max,
-    };
-    let event = DamageEvent {
-        entity: entity_id,
-        amount: damage_amount,
-        source: damage_source,
-        at_tick: u64::from(at_tick),
-        seq,
-    };
-    assert_health_delta_test(
-        health,
-        &[(event, 1)],
-        expected_delta,
-        expected_death,
-        expected_seq,
-    );
+}
+
+impl HealthTestCase {
+    fn run(self) {
+        let entity_id = u64::from(self.entity);
+        let health = HealthState {
+            entity: entity_id,
+            current: self.current,
+            max: self.max,
+        };
+        let event = DamageEvent {
+            entity: entity_id,
+            amount: self.damage_amount,
+            source: self.damage_source,
+            at_tick: u64::from(self.at_tick),
+            seq: self.seq,
+        };
+        assert_health_delta_test(
+            health,
+            &[(event, 1)],
+            self.expected_delta,
+            self.expected_death,
+            self.expected_seq,
+        );
+    }
 }
 
 #[rstest]
@@ -230,39 +230,53 @@ fn unsequenced_events_with_distinct_sources_accumulate() {
 
 #[rstest]
 fn lethal_damage_sets_death_flag() {
-    run_simple_health_test(
-        3,
-        20,
-        50,
-        40,
-        DamageSource::External,
-        2,
-        Some(7),
-        -20,
-        true,
-        Some(7),
-    );
+    HealthTestCase {
+        entity: 3,
+        current: 20,
+        max: 50,
+        damage_amount: 40,
+        damage_source: DamageSource::External,
+        at_tick: 2,
+        seq: Some(7),
+        expected_delta: -20,
+        expected_death: true,
+        expected_seq: Some(7),
+    }
+    .run();
 }
 
 #[rstest]
 fn healing_from_zero_produces_positive_delta() {
-    run_simple_health_test(4, 0, 80, 30, DamageSource::Script, 3, None, 30, false, None);
+    HealthTestCase {
+        entity: 4,
+        current: 0,
+        max: 80,
+        damage_amount: 30,
+        damage_source: DamageSource::Script,
+        at_tick: 3,
+        seq: None,
+        expected_delta: 30,
+        expected_death: false,
+        expected_seq: None,
+    }
+    .run();
 }
 
 #[rstest]
 fn over_healing_from_zero_is_clamped_to_max() {
-    run_simple_health_test(
-        5,
-        0,
-        80,
-        150,
-        DamageSource::Script,
-        4,
-        None,
-        80,
-        false,
-        None,
-    );
+    HealthTestCase {
+        entity: 5,
+        current: 0,
+        max: 80,
+        damage_amount: 150,
+        damage_source: DamageSource::Script,
+        at_tick: 4,
+        seq: None,
+        expected_delta: 80,
+        expected_death: false,
+        expected_seq: None,
+    }
+    .run();
 }
 
 #[rstest]
