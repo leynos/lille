@@ -126,6 +126,49 @@ impl HealthTestCase {
     }
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "dual-event helper mirrors test expectations without extra structs"
+)]
+fn run_dual_event_health_test(
+    entity: u64,
+    current: u16,
+    max: u16,
+    first_event: (u16, DamageSource, u64, Option<u32>),
+    second_event: (u16, DamageSource, u64, Option<u32>),
+    expected_delta: i32,
+    expected_death: bool,
+    expected_seq: Option<u32>,
+) {
+    let health = HealthState {
+        entity,
+        current,
+        max,
+    };
+    let first = DamageEvent {
+        entity,
+        amount: first_event.0,
+        source: first_event.1,
+        at_tick: first_event.2,
+        seq: first_event.3,
+    };
+    let second = DamageEvent {
+        entity,
+        amount: second_event.0,
+        source: second_event.1,
+        at_tick: second_event.2,
+        seq: second_event.3,
+    };
+
+    assert_health_delta_test(
+        health,
+        &[(first, 1), (second, 1)],
+        expected_delta,
+        expected_death,
+        expected_seq,
+    );
+}
+
 #[rstest]
 #[case(80, 100, 50, 20)]
 #[case(10, 50, 5, 5)]
@@ -206,27 +249,16 @@ fn sequenced_events_with_same_seq_in_same_tick_are_deduplicated() {
 
 #[rstest]
 fn unsequenced_events_with_distinct_sources_accumulate() {
-    let health = HealthState {
-        entity: 6,
-        current: 40,
-        max: 100,
-    };
-    let damage = DamageEvent {
-        entity: 6,
-        amount: 15,
-        source: DamageSource::External,
-        at_tick: 4,
-        seq: None,
-    };
-    let heal = DamageEvent {
-        entity: 6,
-        amount: 25,
-        source: DamageSource::Script,
-        at_tick: 4,
-        seq: None,
-    };
-
-    assert_health_delta_test(health, &[(damage, 1), (heal, 1)], 10, false, None);
+    run_dual_event_health_test(
+        6,
+        40,
+        100,
+        (15, DamageSource::External, 4, None),
+        (25, DamageSource::Script, 4, None),
+        10,
+        false,
+        None,
+    );
 }
 
 #[rstest]
@@ -282,24 +314,14 @@ fn over_healing_from_zero_is_clamped_to_max() {
 
 #[rstest]
 fn multiple_events_same_tick_accumulate_and_pick_max_seq() {
-    let health = HealthState {
-        entity: 5,
-        current: 100,
-        max: 120,
-    };
-    let damage = DamageEvent {
-        entity: 5,
-        amount: 60,
-        source: DamageSource::External,
-        at_tick: 10,
-        seq: Some(1),
-    };
-    let heal = DamageEvent {
-        entity: 5,
-        amount: 20,
-        source: DamageSource::Script,
-        at_tick: 10,
-        seq: Some(4),
-    };
-    assert_health_delta_test(health, &[(damage, 1), (heal, 1)], -40, false, Some(4));
+    run_dual_event_health_test(
+        5,
+        100,
+        120,
+        (60, DamageSource::External, 10, Some(1)),
+        (20, DamageSource::Script, 10, Some(4)),
+        -40,
+        false,
+        Some(4),
+    );
 }
