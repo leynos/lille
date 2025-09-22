@@ -88,6 +88,44 @@ fn assert_health_delta_test(
     assert_eq!(delta.seq, expected_seq);
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Test helper mirrors record fields for clarity."
+)]
+fn run_simple_health_test(
+    entity: u32,
+    current: u16,
+    max: u16,
+    damage_amount: u16,
+    damage_source: DamageSource,
+    at_tick: u32,
+    seq: Option<u32>,
+    expected_delta: i32,
+    expected_death: bool,
+    expected_seq: Option<u32>,
+) {
+    let entity_id = u64::from(entity);
+    let health = HealthState {
+        entity: entity_id,
+        current,
+        max,
+    };
+    let event = DamageEvent {
+        entity: entity_id,
+        amount: damage_amount,
+        source: damage_source,
+        at_tick: u64::from(at_tick),
+        seq,
+    };
+    assert_health_delta_test(
+        health,
+        &[(event, 1)],
+        expected_delta,
+        expected_death,
+        expected_seq,
+    );
+}
+
 #[rstest]
 #[case(80, 100, 50, 20)]
 #[case(10, 50, 5, 5)]
@@ -192,53 +230,39 @@ fn unsequenced_events_with_distinct_sources_accumulate() {
 
 #[rstest]
 fn lethal_damage_sets_death_flag() {
-    let health = HealthState {
-        entity: 3,
-        current: 20,
-        max: 50,
-    };
-    let event = DamageEvent {
-        entity: 3,
-        amount: 40,
-        source: DamageSource::External,
-        at_tick: 2,
-        seq: Some(7),
-    };
-    assert_health_delta_test(health, &[(event, 1)], -20, true, Some(7));
+    run_simple_health_test(
+        3,
+        20,
+        50,
+        40,
+        DamageSource::External,
+        2,
+        Some(7),
+        -20,
+        true,
+        Some(7),
+    );
 }
 
 #[rstest]
 fn healing_from_zero_produces_positive_delta() {
-    let health = HealthState {
-        entity: 4,
-        current: 0,
-        max: 80,
-    };
-    let event = DamageEvent {
-        entity: 4,
-        amount: 30,
-        source: DamageSource::Script,
-        at_tick: 3,
-        seq: None,
-    };
-    assert_health_delta_test(health, &[(event, 1)], 30, false, None);
+    run_simple_health_test(4, 0, 80, 30, DamageSource::Script, 3, None, 30, false, None);
 }
 
 #[rstest]
 fn over_healing_from_zero_is_clamped_to_max() {
-    let health = HealthState {
-        entity: 5,
-        current: 0,
-        max: 80,
-    };
-    let event = DamageEvent {
-        entity: 5,
-        amount: 150,
-        source: DamageSource::Script,
-        at_tick: 4,
-        seq: None,
-    };
-    assert_health_delta_test(health, &[(event, 1)], 80, false, None);
+    run_simple_health_test(
+        5,
+        0,
+        80,
+        150,
+        DamageSource::Script,
+        4,
+        None,
+        80,
+        false,
+        None,
+    );
 }
 
 #[rstest]
