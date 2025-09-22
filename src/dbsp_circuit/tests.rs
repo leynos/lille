@@ -73,6 +73,21 @@ fn run_health_delta(health: HealthState, events: &[(DamageEvent, i32)]) -> Vec<H
         .collect()
 }
 
+fn assert_health_delta_test(
+    health_state: HealthState,
+    events: &[(DamageEvent, i32)],
+    expected_delta: i32,
+    expected_death: bool,
+    expected_seq: Option<u32>,
+) {
+    let deltas = run_health_delta(health_state, events);
+    assert_eq!(deltas.len(), 1);
+    let delta = deltas[0];
+    assert_eq!(delta.delta, expected_delta);
+    assert_eq!(delta.death, expected_death);
+    assert_eq!(delta.seq, expected_seq);
+}
+
 #[rstest]
 #[case(80, 100, 50, 20)]
 #[case(10, 50, 5, 5)]
@@ -120,12 +135,7 @@ fn duplicate_damage_events_idempotent(#[case] seq: Option<u32>) {
         seq,
     };
 
-    let deltas = run_health_delta(health, &[(event, 1), (event, 1)]);
-    assert_eq!(deltas.len(), 1);
-    let delta = deltas[0];
-    assert_eq!(delta.delta, -30);
-    assert!(!delta.death);
-    assert_eq!(delta.seq, seq);
+    assert_health_delta_test(health, &[(event, 1), (event, 1)], -30, false, seq);
 }
 
 #[rstest]
@@ -152,12 +162,7 @@ fn sequenced_events_with_same_seq_in_same_tick_are_deduplicated() {
         seq: Some(11),
     };
 
-    let deltas = run_health_delta(health, &[(first, 1), (second, 1)]);
-    assert_eq!(deltas.len(), 1);
-    let delta = deltas[0];
-    assert_eq!(delta.delta, -20);
-    assert!(!delta.death);
-    assert_eq!(delta.seq, Some(11));
+    assert_health_delta_test(health, &[(first, 1), (second, 1)], -20, false, Some(11));
 }
 
 #[rstest]
@@ -182,12 +187,7 @@ fn unsequenced_events_with_distinct_sources_accumulate() {
         seq: None,
     };
 
-    let deltas = run_health_delta(health, &[(damage, 1), (heal, 1)]);
-    assert_eq!(deltas.len(), 1);
-    let delta = deltas[0];
-    assert_eq!(delta.delta, 10);
-    assert!(!delta.death);
-    assert_eq!(delta.seq, None);
+    assert_health_delta_test(health, &[(damage, 1), (heal, 1)], 10, false, None);
 }
 
 #[rstest]
@@ -204,12 +204,7 @@ fn lethal_damage_sets_death_flag() {
         at_tick: 2,
         seq: Some(7),
     };
-    let deltas = run_health_delta(health, &[(event, 1)]);
-    assert_eq!(deltas.len(), 1);
-    let delta = deltas[0];
-    assert_eq!(delta.delta, -20);
-    assert!(delta.death);
-    assert_eq!(delta.seq, Some(7));
+    assert_health_delta_test(health, &[(event, 1)], -20, true, Some(7));
 }
 
 #[rstest]
@@ -226,12 +221,7 @@ fn healing_from_zero_produces_positive_delta() {
         at_tick: 3,
         seq: None,
     };
-    let deltas = run_health_delta(health, &[(event, 1)]);
-    assert_eq!(deltas.len(), 1);
-    let delta = deltas[0];
-    assert_eq!(delta.delta, 30);
-    assert!(!delta.death);
-    assert_eq!(delta.seq, None);
+    assert_health_delta_test(health, &[(event, 1)], 30, false, None);
 }
 
 #[rstest]
@@ -248,12 +238,7 @@ fn over_healing_from_zero_is_clamped_to_max() {
         at_tick: 4,
         seq: None,
     };
-    let deltas = run_health_delta(health, &[(event, 1)]);
-    assert_eq!(deltas.len(), 1);
-    let delta = deltas[0];
-    assert_eq!(delta.delta, 80);
-    assert!(!delta.death);
-    assert_eq!(delta.seq, None);
+    assert_health_delta_test(health, &[(event, 1)], 80, false, None);
 }
 
 #[rstest]
@@ -277,10 +262,5 @@ fn multiple_events_same_tick_accumulate_and_pick_max_seq() {
         at_tick: 10,
         seq: Some(4),
     };
-    let deltas = run_health_delta(health, &[(damage, 1), (heal, 1)]);
-    assert_eq!(deltas.len(), 1);
-    let delta = deltas[0];
-    assert_eq!(delta.delta, -40);
-    assert!(!delta.death);
-    assert_eq!(delta.seq, Some(4));
+    assert_health_delta_test(health, &[(damage, 1), (heal, 1)], -40, false, Some(4));
 }

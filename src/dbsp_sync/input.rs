@@ -12,6 +12,7 @@ use crate::dbsp_circuit::{
     DamageEvent, DbspCircuit, Force, HealthState, Position, Target, Velocity,
 };
 use crate::world_handle::{DdlogEntity, WorldHandle};
+use dbsp::operator::input::ZSetHandle;
 
 use super::{DamageInbox, DbspState, IdQueries};
 
@@ -189,7 +190,7 @@ mod sync {
         query: &mut Query<EntityRow<'_>>,
         world: &mut WorldHandle,
     ) {
-        let circuit = &mut state.circuit;
+        let circuit = &state.circuit;
         for (_, id, transform, _, _, _) in query.iter_mut() {
             circuit.position_in().push(
                 Position {
@@ -206,41 +207,38 @@ mod sync {
 
     /// Synchronises entity velocities with the DBSP circuit.
     fn sync_velocities(state: &mut DbspState, query: &mut Query<EntityRow<'_>>) {
-        let circuit = &mut state.circuit;
-        for (_, id, _, vel, _, _) in query.iter_mut() {
-            let v = vel.map(|v| (v.vx, v.vy, v.vz)).unwrap_or_default();
-            circuit.velocity_in().push(
-                Velocity {
-                    entity: id.0,
-                    vx: (v.0 as f64).into(),
-                    vy: (v.1 as f64).into(),
-                    vz: (v.2 as f64).into(),
-                },
-                1,
-            );
-        }
+        sync_component(
+            state,
+            query,
+            |row| Some(row.3.map(|v| (v.vx, v.vy, v.vz)).unwrap_or_default()),
+            |entity, (vx, vy, vz)| Velocity {
+                entity,
+                vx: (vx as f64).into(),
+                vy: (vy as f64).into(),
+                vz: (vz as f64).into(),
+            },
+            |circuit: &DbspCircuit| circuit.velocity_in(),
+        );
     }
 
     /// Synchronises entity targets with the DBSP circuit.
     fn sync_targets(state: &mut DbspState, query: &mut Query<EntityRow<'_>>) {
-        let circuit = &mut state.circuit;
-        for (_, id, _, _, target, _) in query.iter_mut() {
-            if let Some(t) = target {
-                circuit.target_in().push(
-                    Target {
-                        entity: id.0,
-                        x: (t.x as f64).into(),
-                        y: (t.y as f64).into(),
-                    },
-                    1,
-                );
-            }
-        }
+        sync_component(
+            state,
+            query,
+            |row| row.4.map(|t| (t.x, t.y)),
+            |entity, (x, y)| Target {
+                entity,
+                x: (x as f64).into(),
+                y: (y as f64).into(),
+            },
+            |circuit: &DbspCircuit| circuit.target_in(),
+        );
     }
 
     /// Mirrors entity health into the circuit, enforcing clamps and logging once.
     fn sync_health(state: &mut DbspState, query: &mut Query<EntityRow<'_>>) {
-        let circuit = &mut state.circuit;
+        let circuit = &state.circuit;
         for (_, id, _, _, _, health) in query.iter_mut() {
             let Some(mut health) = health else {
                 continue;
@@ -267,6 +265,37 @@ mod sync {
                 Err(_) => {
                     warn!("health component for negative id {} skipped", id.0);
                 }
+            }
+        }
+    }
+
+    /// Generic helper for syncing entity components to DBSP circuit inputs.
+    fn sync_component<T, S, F, G, H>(
+        state: &mut DbspState,
+        query: &mut Query<EntityRow<'_>>,
+        extract_component: F,
+        create_struct: G,
+        get_input_handle: H,
+    ) where
+        F: Fn(&EntityRow<'_>) -> Option<T>,
+        G: Fn(i64, T) -> S,
+        H: Fn(&DbspCircuit) -> &ZSetHandle<S>,
+        S: Clone + dbsp::DBData,
+    {
+        let circuit = &state.circuit;
+        for (entity, id, transform, velocity, target, mut health) in query.iter_mut() {
+            let entity_key = id.0;
+            let row_view = (
+                entity,
+                id,
+                transform,
+                velocity,
+                target,
+                health.as_deref_mut(),
+            );
+            if let Some(component_data) = extract_component(&row_view) {
+                let input_struct = create_struct(entity_key, component_data);
+                get_input_handle(circuit).push(input_struct, 1);
             }
         }
     }
