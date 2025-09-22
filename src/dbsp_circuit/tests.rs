@@ -190,8 +190,9 @@ fn sequenced_events_with_same_seq_in_same_tick_are_deduplicated() {
         at_tick: 8,
         seq: Some(11),
     };
-    // Provide the duplicate event with identical payload so debug assertions
-    // enforce the idempotency contract.
+    // Provide the duplicate event with an identical payload to mirror the ingress
+    // first-write-wins policy: later `(entity, tick, seq)` writes are ignored, and
+    // the matching payload ensures the circuit's debug assertions are satisfied.
     let second = DamageEvent {
         entity: 7,
         amount: 20,

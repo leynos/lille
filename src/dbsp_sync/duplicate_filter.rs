@@ -9,6 +9,9 @@ use crate::dbsp_circuit::{DamageEvent, EntityId, Tick};
 use super::DbspState;
 
 impl DbspState {
+    /// Sequenced damage ingestion uses first-write-wins, so later events with
+    /// the same `(entity, tick, seq)` are ignored and the circuit only processes
+    /// the earliest payload.
     pub(crate) fn record_duplicate_sequenced_damage(
         &mut self,
         event: &DamageEvent,

@@ -226,27 +226,21 @@ fn healing_saturates_at_max_health() {
 
 #[test]
 fn healing_when_already_at_max_health_does_not_overflow() {
-    run_rspec_serial(&rspec::given(
-        "duplicate health deltas are idempotent",
-        HealthEnv::default(),
-        |ctx| {
-            ctx.then(
-                "healing when already at max health does not overflow",
-                |env| {
-                    let initial_heal = healing_event();
-                    env.push_damage(initial_heal);
-                    env.update();
-                    assert_eq!(env.current_health(), 100);
+    run_health_test(
+        "healing when already at max health does not overflow",
+        |env| {
+            let initial_heal = healing_event();
+            env.push_damage(initial_heal);
+            env.update();
+            assert_eq!(env.current_health(), 100);
 
-                    let extra_heal = healing_at_max_event();
-                    env.push_damage(extra_heal);
-                    env.update();
-                    assert_eq!(env.current_health(), 100);
-                    assert_eq!(env.duplicate_count(), 0);
-                },
-            );
+            let extra_heal = healing_at_max_event();
+            env.push_damage(extra_heal);
+            env.update();
+            assert_eq!(env.current_health(), 100);
+            assert_eq!(env.duplicate_count(), 0);
         },
-    ));
+    );
 }
 
 #[test]
