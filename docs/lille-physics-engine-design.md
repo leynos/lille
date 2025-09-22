@@ -299,6 +299,50 @@ pushed `DamageEvent`s, draining both collections with negative weights at the
 start of the next tick. This keeps the circuit's view of the world aligned with
 the ECS source of truth and ensures replay detection remains deterministic.
 
+The ingress, circuit aggregation, and egress responsibilities interact as shown
+below.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant ECS as Bevy ECS
+  participant Sync as DbspState Sync Layer
+  participant DBSP as DBSP Circuit
+  participant World as World Cache
+
+  rect rgb(245,250,255)
+  note over ECS,Sync: Ingress & dedupe
+  ECS->>Sync: Send HealthState snapshot
+  Sync->>Sync: Clamp health.current to max, record snapshot
+  ECS->>Sync: Send DamageEvent(s)
+  Sync->>Sync: Deduplicate (sequenced / unsequenced), log, increment counter
+  alt Not duplicate
+    Sync->>DBSP: Push DamageEvent
+    Sync->>Sync: Record expected retraction
+  else Duplicate
+    Sync--xDBSP: Skip push (increment duplicate counter)
+  end
+  end
+
+  rect rgb(245,255,245)
+  note over DBSP: Aggregate
+  DBSP->>DBSP: Accumulate sequenced (ordered) and unique unsequenced
+  DBSP-->>Sync: Emit HealthDelta(s) with net and max_seq
+  end
+
+  rect rgb(255,250,240)
+  note over Sync,ECS: Egress & apply
+  Sync->>Sync: Match deltas against expected retractions
+  alt Apply
+    Sync->>ECS: Apply delta (update health, death)
+    Sync->>World: Update cache snapshot
+  else Skip duplicate
+    Sync->>Sync: Increment duplicate counter, skip apply
+  end
+  Sync->>Sync: Clear processed retractions/inputs
+  end
+```
+
 Inside the circuit, the `HealthAccumulator` separates sequenced and unsequenced
 events. Sequenced events are stored as `(seq, delta)` pairs so idempotent
 replays drop naturally, while unsequenced events retain the entire

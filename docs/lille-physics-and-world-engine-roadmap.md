@@ -167,7 +167,7 @@ physical properties and agent behaviours.
 
    - [x] Implement a simple priority system (e.g., fear overrides targeting).
 
-3. **Health and Damage**:
+3. **Health and Damage** *(done)*:
 
     - [x] Introduce a `Health` component and a corresponding `Damage` input
       stream.
