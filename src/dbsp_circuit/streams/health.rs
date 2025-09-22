@@ -3,10 +3,7 @@
 //! These helpers reduce health snapshots and incoming damage events to
 //! authoritative [`HealthDelta`] records emitted by the DBSP circuit.
 
-use std::{
-    cmp::max,
-    collections::{btree_map::Entry, BTreeMap, BTreeSet},
-};
+use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 
 use dbsp::{algebra::Semigroup, operator::Fold, typed_batch::OrdZSet, RootCircuit, Stream};
 
@@ -167,20 +164,11 @@ pub fn health_delta_stream(
                 }
             },
             |acc: HealthAccumulator| {
-                let mut net = 0;
-                let mut max_seq = None;
-                for (seq, signed) in &acc.sequenced {
-                    net += *signed;
-                    max_seq = Some(match max_seq {
-                        Some(existing) => max(existing, *seq),
-                        None => *seq,
-                    });
-                }
-                for event in &acc.unsequenced {
-                    net += signed_amount(event);
-                }
+                let net_seq: i32 = acc.sequenced.values().copied().sum();
+                let net_unseq: i32 = acc.unsequenced.iter().map(signed_amount).sum();
+                let max_seq = acc.sequenced.keys().next_back().copied();
                 HealthAggregate {
-                    net,
+                    net: net_seq + net_unseq,
                     max_seq,
                     has_event: acc.has_event,
                 }

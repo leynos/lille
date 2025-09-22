@@ -4,11 +4,14 @@
 //! systems that bridge Bevy ECS with the DBSP circuit.
 
 mod damage_inbox;
+mod duplicate_filter;
+mod input;
+mod output;
 mod plugin;
 mod state;
-mod systems;
 
 pub use damage_inbox::DamageInbox;
+pub use input::{cache_state_for_dbsp_system, init_dbsp_system};
+pub use output::apply_dbsp_outputs_system;
 pub use plugin::DbspPlugin;
 pub use state::{DbspState, IdQueries};
-pub use systems::{apply_dbsp_outputs_system, cache_state_for_dbsp_system, init_dbsp_system};
