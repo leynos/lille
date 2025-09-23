@@ -88,55 +88,11 @@ fn assert_health_delta_test(
     assert_eq!(delta.seq, expected_seq);
 }
 
-#[derive(Clone, Copy, Debug)]
-struct HealthTestCase {
-    entity: u32,
-    current: u16,
-    max: u16,
-    damage_amount: u16,
-    damage_source: DamageSource,
-    at_tick: u32,
-    seq: Option<u32>,
-    expected_delta: i32,
-    expected_death: bool,
-    expected_seq: Option<u32>,
-}
-
-impl HealthTestCase {
-    fn run(self) {
-        let entity_id = u64::from(self.entity);
-        let health = HealthState {
-            entity: entity_id,
-            current: self.current,
-            max: self.max,
-        };
-        let event = DamageEvent {
-            entity: entity_id,
-            amount: self.damage_amount,
-            source: self.damage_source,
-            at_tick: u64::from(self.at_tick),
-            seq: self.seq,
-        };
-        assert_health_delta_test(
-            health,
-            &[(event, 1)],
-            self.expected_delta,
-            self.expected_death,
-            self.expected_seq,
-        );
-    }
-}
-
-#[expect(
-    clippy::too_many_arguments,
-    reason = "dual-event helper mirrors test expectations without extra structs"
-)]
-fn run_dual_event_health_test(
+fn run_health_delta_test(
     entity: u64,
     current: u16,
     max: u16,
-    first_event: (u16, DamageSource, u64, Option<u32>),
-    second_event: (u16, DamageSource, u64, Option<u32>),
+    events: Vec<(u16, DamageSource, u64, Option<u32>)>,
     expected_delta: i32,
     expected_death: bool,
     expected_seq: Option<u32>,
@@ -146,55 +102,29 @@ fn run_dual_event_health_test(
         current,
         max,
     };
-    let first = DamageEvent {
-        entity,
-        amount: first_event.0,
-        source: first_event.1,
-        at_tick: first_event.2,
-        seq: first_event.3,
-    };
-    let second = DamageEvent {
-        entity,
-        amount: second_event.0,
-        source: second_event.1,
-        at_tick: second_event.2,
-        seq: second_event.3,
-    };
+    let damage_events: Vec<(DamageEvent, i32)> = events
+        .into_iter()
+        .map(|(amount, source, at_tick, seq)| {
+            (
+                DamageEvent {
+                    entity,
+                    amount,
+                    source,
+                    at_tick,
+                    seq,
+                },
+                1,
+            )
+        })
+        .collect();
 
     assert_health_delta_test(
         health,
-        &[(first, 1), (second, 1)],
+        &damage_events,
         expected_delta,
         expected_death,
         expected_seq,
     );
-}
-
-#[derive(Clone, Copy, Debug)]
-struct DualEventHealthTestCase {
-    entity: u64,
-    current: u16,
-    max: u16,
-    first_event: (u16, DamageSource, u64, Option<u32>),
-    second_event: (u16, DamageSource, u64, Option<u32>),
-    expected_delta: i32,
-    expected_death: bool,
-    expected_seq: Option<u32>,
-}
-
-impl DualEventHealthTestCase {
-    fn run(self) {
-        run_dual_event_health_test(
-            self.entity,
-            self.current,
-            self.max,
-            self.first_event,
-            self.second_event,
-            self.expected_delta,
-            self.expected_death,
-            self.expected_seq,
-        );
-    }
 }
 
 #[rstest]
@@ -276,77 +206,72 @@ fn sequenced_events_with_same_seq_in_same_tick_are_deduplicated() {
 }
 
 #[rstest]
-#[case::unsequenced(
-    DualEventHealthTestCase {
-        entity: 6,
-        current: 40,
-        max: 100,
-        first_event: (15, DamageSource::External, 4, None),
-        second_event: (25, DamageSource::Script, 4, None),
-        expected_delta: 10,
-        expected_death: false,
-        expected_seq: None,
-    }
-)]
-#[case::max_seq(
-    DualEventHealthTestCase {
-        entity: 5,
-        current: 100,
-        max: 120,
-        first_event: (60, DamageSource::External, 10, Some(1)),
-        second_event: (20, DamageSource::Script, 10, Some(4)),
-        expected_delta: -40,
-        expected_death: false,
-        expected_seq: Some(4),
-    }
-)]
-fn dual_event_health_deltas(#[case] case: DualEventHealthTestCase) {
-    case.run();
+fn unsequenced_events_with_distinct_sources_accumulate() {
+    run_health_delta_test(
+        6,
+        40,
+        100,
+        vec![
+            (15, DamageSource::External, 4, None),
+            (25, DamageSource::Script, 4, None),
+        ],
+        10,
+        false,
+        None,
+    );
 }
 
 #[rstest]
-#[case::lethal(
-    HealthTestCase {
-        entity: 3,
-        current: 20,
-        max: 50,
-        damage_amount: 40,
-        damage_source: DamageSource::External,
-        at_tick: 2,
-        seq: Some(7),
-        expected_delta: -20,
-        expected_death: true,
-        expected_seq: Some(7),
-    }
-)]
-#[case::healing_from_zero(
-    HealthTestCase {
-        entity: 4,
-        current: 0,
-        max: 80,
-        damage_amount: 30,
-        damage_source: DamageSource::Script,
-        at_tick: 3,
-        seq: None,
-        expected_delta: 30,
-        expected_death: false,
-        expected_seq: None,
-    }
-)]
-#[case::over_healing_from_zero(
-    HealthTestCase {
-        entity: 5,
-        current: 0,
-        max: 80,
-        damage_amount: 150,
-        damage_source: DamageSource::Script,
-        at_tick: 4,
-        seq: None,
-        expected_delta: 80,
-        expected_death: false,
-        expected_seq: None,
-    }
-)]
-fn single_event_health_deltas(#[case] case: HealthTestCase) {
-    case.run();
+fn multiple_events_same_tick_accumulate_and_pick_max_seq() {
+    run_health_delta_test(
+        5,
+        100,
+        120,
+        vec![
+            (60, DamageSource::External, 10, Some(1)),
+            (20, DamageSource::Script, 10, Some(4)),
+        ],
+        -40,
+        false,
+        Some(4),
+    );
+}
+
+#[rstest]
+fn lethal_damage_sets_death_flag() {
+    run_health_delta_test(
+        3,
+        20,
+        50,
+        vec![(40, DamageSource::External, 2, Some(7))],
+        -20,
+        true,
+        Some(7),
+    );
+}
+
+#[rstest]
+fn healing_from_zero_produces_positive_delta() {
+    run_health_delta_test(
+        4,
+        0,
+        80,
+        vec![(30, DamageSource::Script, 3, None)],
+        30,
+        false,
+        None,
+    );
+}
+
+#[rstest]
+fn over_healing_from_zero_is_clamped_to_max() {
+    run_health_delta_test(
+        5,
+        0,
+        80,
+        vec![(150, DamageSource::Script, 4, None)],
+        80,
+        false,
+        None,
+    );
 }
