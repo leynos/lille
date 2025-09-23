@@ -88,6 +88,7 @@ fn assert_health_delta_test(
     assert_eq!(delta.seq, expected_seq);
 }
 
+#[derive(Clone, Copy, Debug)]
 struct HealthTestCase {
     entity: u32,
     current: u16,
@@ -169,6 +170,33 @@ fn run_dual_event_health_test(
     );
 }
 
+#[derive(Clone, Copy, Debug)]
+struct DualEventHealthTestCase {
+    entity: u64,
+    current: u16,
+    max: u16,
+    first_event: (u16, DamageSource, u64, Option<u32>),
+    second_event: (u16, DamageSource, u64, Option<u32>),
+    expected_delta: i32,
+    expected_death: bool,
+    expected_seq: Option<u32>,
+}
+
+impl DualEventHealthTestCase {
+    fn run(self) {
+        run_dual_event_health_test(
+            self.entity,
+            self.current,
+            self.max,
+            self.first_event,
+            self.second_event,
+            self.expected_delta,
+            self.expected_death,
+            self.expected_seq,
+        );
+    }
+}
+
 #[rstest]
 #[case(80, 100, 50, 20)]
 #[case(10, 50, 5, 5)]
@@ -248,21 +276,36 @@ fn sequenced_events_with_same_seq_in_same_tick_are_deduplicated() {
 }
 
 #[rstest]
-fn unsequenced_events_with_distinct_sources_accumulate() {
-    run_dual_event_health_test(
-        6,
-        40,
-        100,
-        (15, DamageSource::External, 4, None),
-        (25, DamageSource::Script, 4, None),
-        10,
-        false,
-        None,
-    );
+#[case::unsequenced(
+    DualEventHealthTestCase {
+        entity: 6,
+        current: 40,
+        max: 100,
+        first_event: (15, DamageSource::External, 4, None),
+        second_event: (25, DamageSource::Script, 4, None),
+        expected_delta: 10,
+        expected_death: false,
+        expected_seq: None,
+    }
+)]
+#[case::max_seq(
+    DualEventHealthTestCase {
+        entity: 5,
+        current: 100,
+        max: 120,
+        first_event: (60, DamageSource::External, 10, Some(1)),
+        second_event: (20, DamageSource::Script, 10, Some(4)),
+        expected_delta: -40,
+        expected_death: false,
+        expected_seq: Some(4),
+    }
+)]
+fn dual_event_health_deltas(#[case] case: DualEventHealthTestCase) {
+    case.run();
 }
 
 #[rstest]
-fn lethal_damage_sets_death_flag() {
+#[case::lethal(
     HealthTestCase {
         entity: 3,
         current: 20,
@@ -275,11 +318,8 @@ fn lethal_damage_sets_death_flag() {
         expected_death: true,
         expected_seq: Some(7),
     }
-    .run();
-}
-
-#[rstest]
-fn healing_from_zero_produces_positive_delta() {
+)]
+#[case::healing_from_zero(
     HealthTestCase {
         entity: 4,
         current: 0,
@@ -292,11 +332,8 @@ fn healing_from_zero_produces_positive_delta() {
         expected_death: false,
         expected_seq: None,
     }
-    .run();
-}
-
-#[rstest]
-fn over_healing_from_zero_is_clamped_to_max() {
+)]
+#[case::over_healing_from_zero(
     HealthTestCase {
         entity: 5,
         current: 0,
@@ -309,19 +346,7 @@ fn over_healing_from_zero_is_clamped_to_max() {
         expected_death: false,
         expected_seq: None,
     }
-    .run();
-}
-
-#[rstest]
-fn multiple_events_same_tick_accumulate_and_pick_max_seq() {
-    run_dual_event_health_test(
-        5,
-        100,
-        120,
-        (60, DamageSource::External, 10, Some(1)),
-        (20, DamageSource::Script, 10, Some(4)),
-        -40,
-        false,
-        Some(4),
-    );
+)]
+fn single_event_health_deltas(#[case] case: HealthTestCase) {
+    case.run();
 }

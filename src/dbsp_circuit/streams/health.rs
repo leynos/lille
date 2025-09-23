@@ -136,7 +136,6 @@ impl Hash for HealthAccumulator {
     }
 }
 
-
 impl PartialOrd for ArchivedHealthAccumulator {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
