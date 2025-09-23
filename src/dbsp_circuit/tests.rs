@@ -1,4 +1,4 @@
-//! Tests for the DBSP circuit's grace distance.
+//! Tests for DBSP circuit behaviour, including grace distance and health aggregation.
 use super::*;
 use crate::dbsp_circuit::streams::health_delta_stream;
 use crate::dbsp_circuit::{DamageEvent, DamageSource, HealthDelta, HealthState};
@@ -73,6 +73,60 @@ fn run_health_delta(health: HealthState, events: &[(DamageEvent, i32)]) -> Vec<H
         .collect()
 }
 
+fn assert_health_delta_test(
+    health_state: HealthState,
+    events: &[(DamageEvent, i32)],
+    expected_delta: i32,
+    expected_death: bool,
+    expected_seq: Option<u32>,
+) {
+    let deltas = run_health_delta(health_state, events);
+    assert_eq!(deltas.len(), 1);
+    let delta = deltas[0];
+    assert_eq!(delta.delta, expected_delta);
+    assert_eq!(delta.death, expected_death);
+    assert_eq!(delta.seq, expected_seq);
+}
+
+fn run_health_delta_test(
+    entity: u64,
+    current: u16,
+    max: u16,
+    events: Vec<(u16, DamageSource, u64, Option<u32>)>,
+    expected_delta: i32,
+    expected_death: bool,
+    expected_seq: Option<u32>,
+) {
+    let health = HealthState {
+        entity,
+        current,
+        max,
+    };
+    let damage_events: Vec<(DamageEvent, i32)> = events
+        .into_iter()
+        .map(|(amount, source, at_tick, seq)| {
+            (
+                DamageEvent {
+                    entity,
+                    amount,
+                    source,
+                    at_tick,
+                    seq,
+                },
+                1,
+            )
+        })
+        .collect();
+
+    assert_health_delta_test(
+        health,
+        &damage_events,
+        expected_delta,
+        expected_death,
+        expected_seq,
+    );
+}
+
 #[rstest]
 #[case(80, 100, 50, 20)]
 #[case(10, 50, 5, 5)]
@@ -120,10 +174,72 @@ fn duplicate_damage_events_idempotent(#[case] seq: Option<u32>) {
         seq,
     };
 
-    let deltas = run_health_delta(health, &[(event, 1), (event, 1)]);
-    assert_eq!(deltas.len(), 1);
-    let delta = deltas[0];
-    assert_eq!(delta.delta, -30);
-    assert!(!delta.death);
-    assert_eq!(delta.seq, seq);
+    assert_health_delta_test(health, &[(event, 1), (event, 1)], -30, false, seq);
+}
+
+#[rstest]
+fn sequenced_events_with_same_seq_in_same_tick_are_deduplicated() {
+    let health = HealthState {
+        entity: 7,
+        current: 70,
+        max: 100,
+    };
+    let first = DamageEvent {
+        entity: 7,
+        amount: 20,
+        source: DamageSource::External,
+        at_tick: 8,
+        seq: Some(11),
+    };
+    // Provide the duplicate event with an identical payload to mirror the ingress
+    // first-write-wins policy: later `(entity, tick, seq)` writes are ignored, and
+    // the matching payload ensures the circuit's debug assertions are satisfied.
+    let second = DamageEvent {
+        entity: 7,
+        amount: 20,
+        source: DamageSource::External,
+        at_tick: 8,
+        seq: Some(11),
+    };
+
+    assert_health_delta_test(health, &[(first, 1), (second, 1)], -20, false, Some(11));
+}
+
+#[rstest]
+#[case::unsequenced_distinct_sources(6, 40, 100, vec![(15, DamageSource::External, 4, None), (25, DamageSource::Script, 4, None)], 10, false, None)]
+#[case::unsequenced_duplicate_payloads_filtered(6, 40, 100, vec![(15, DamageSource::External, 4, None), (15, DamageSource::External, 4, None)], -15, false, None)]
+#[case::multiple_events_max_seq(5, 100, 120, vec![(60, DamageSource::External, 10, Some(1)), (20, DamageSource::Script, 10, Some(4))], -40, false, Some(4))]
+#[case::healing_from_zero(4, 0, 80, vec![(30, DamageSource::Script, 3, None)], 30, false, None)]
+#[case::over_healing_clamped(5, 0, 80, vec![(150, DamageSource::Script, 4, None)], 80, false, None)]
+fn health_delta_scenarios(
+    #[case] entity: u64,
+    #[case] current: u16,
+    #[case] max: u16,
+    #[case] events: Vec<(u16, DamageSource, u64, Option<u32>)>,
+    #[case] expected_delta: i32,
+    #[case] expected_death: bool,
+    #[case] expected_seq: Option<u32>,
+) {
+    run_health_delta_test(
+        entity,
+        current,
+        max,
+        events,
+        expected_delta,
+        expected_death,
+        expected_seq,
+    );
+}
+
+#[rstest]
+fn lethal_damage_sets_death_flag() {
+    run_health_delta_test(
+        3,
+        20,
+        50,
+        vec![(40, DamageSource::External, 2, Some(7))],
+        -20,
+        true,
+        Some(7),
+    );
 }

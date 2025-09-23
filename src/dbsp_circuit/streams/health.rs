@@ -3,7 +3,7 @@
 //! These helpers reduce health snapshots and incoming damage events to
 //! authoritative [`HealthDelta`] records emitted by the DBSP circuit.
 
-use std::cmp::max;
+use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 
 use dbsp::{algebra::Semigroup, operator::Fold, typed_batch::OrdZSet, RootCircuit, Stream};
 
@@ -23,39 +23,81 @@ use crate::dbsp_circuit::{DamageEvent, DamageSource, HealthDelta, HealthState};
     Hash,
     ::size_of::SizeOf,
 )]
-#[archive_attr(derive(Ord, PartialOrd, Eq, PartialEq, Hash))]
+#[archive_attr(derive(Eq, PartialEq, Ord, PartialOrd, Hash))]
 struct HealthAccumulator {
-    entries: Vec<(Option<u32>, i32)>,
+    sequenced: BTreeMap<u32, i32>,
+    // BTreeSet keeps iteration deterministic while deduplicating identical
+    // payloads, satisfying DBSP's archive stability requirements.
+    unsequenced: BTreeSet<DamageEvent>,
     has_event: bool,
 }
 
 impl HealthAccumulator {
-    fn insert(&mut self, seq: Option<u32>, signed: i32) {
-        match self
-            .entries
-            .binary_search_by(|(existing, _)| existing.cmp(&seq))
-        {
-            Ok(_) => {}
-            Err(pos) => {
-                self.entries.insert(pos, (seq, signed));
-                self.has_event = true;
+    fn insert(&mut self, event: &DamageEvent) {
+        self.has_event = true;
+        if let Some(seq) = event.seq {
+            let signed = signed_amount(event);
+            match self.sequenced.entry(seq) {
+                Entry::Vacant(slot) => {
+                    slot.insert(signed);
+                }
+                Entry::Occupied(existing) => {
+                    let existing_signed = *existing.get();
+                    debug_assert_eq!(
+                        existing_signed,
+                        signed,
+                        "sequenced damage event mismatch for seq {seq}: existing {existing_signed}, incoming {signed}",
+                        seq = seq,
+                        existing_signed = existing_signed,
+                        signed = signed,
+                    );
+                }
+            }
+        } else {
+            self.unsequenced.insert(*event);
+        }
+    }
+
+    fn remove(&mut self, event: &DamageEvent) {
+        if let Some(seq) = event.seq {
+            self.sequenced.remove(&seq);
+        } else {
+            self.unsequenced.remove(event);
+        }
+        self.has_event = !self.sequenced.is_empty() || !self.unsequenced.is_empty();
+    }
+
+    fn merge(&mut self, other: &Self) {
+        self.merge_sequenced_events(&other.sequenced);
+        self.merge_unsequenced_events(&other.unsequenced);
+        self.has_event = !self.sequenced.is_empty() || !self.unsequenced.is_empty();
+    }
+
+    fn merge_sequenced_events(&mut self, sequenced: &BTreeMap<u32, i32>) {
+        for (seq, signed) in sequenced {
+            let seq_value = *seq;
+            let incoming_signed = *signed;
+            match self.sequenced.entry(seq_value) {
+                Entry::Vacant(slot) => {
+                    slot.insert(incoming_signed);
+                }
+                Entry::Occupied(existing) => {
+                    let existing_signed = *existing.get();
+                    debug_assert_eq!(
+                        existing_signed,
+                        incoming_signed,
+                        "sequenced damage event mismatch for seq {seq}: existing {existing_signed}, incoming {incoming_signed}",
+                        seq = seq_value,
+                        existing_signed = existing_signed,
+                        incoming_signed = incoming_signed,
+                    );
+                }
             }
         }
     }
 
-    fn merge(&mut self, other: &Self) {
-        for (seq, signed) in &other.entries {
-            match self
-                .entries
-                .binary_search_by(|(existing, _)| existing.cmp(seq))
-            {
-                Ok(_) => {}
-                Err(pos) => {
-                    self.entries.insert(pos, (*seq, *signed));
-                }
-            }
-        }
-        self.has_event |= other.has_event;
+    fn merge_unsequenced_events(&mut self, unsequenced: &BTreeSet<DamageEvent>) {
+        self.unsequenced.extend(unsequenced.iter().copied());
     }
 }
 
@@ -117,26 +159,18 @@ pub fn health_delta_stream(
         >::with_output(
             HealthAccumulator::default(),
             |acc: &mut HealthAccumulator, event: &DamageEvent, weight: i64| {
-                if weight <= 0 {
-                    return;
+                if weight > 0 {
+                    acc.insert(event);
+                } else if weight < 0 {
+                    acc.remove(event);
                 }
-                let signed = signed_amount(event);
-                acc.insert(event.seq, signed);
             },
             |acc: HealthAccumulator| {
-                let mut net = 0;
-                let mut max_seq = None;
-                for (seq, signed) in &acc.entries {
-                    net += *signed;
-                    if let Some(value) = seq {
-                        max_seq = Some(match max_seq {
-                            Some(existing) => max(existing, *value),
-                            None => *value,
-                        });
-                    }
-                }
+                let net_seq: i32 = acc.sequenced.values().copied().sum();
+                let net_unseq: i32 = acc.unsequenced.iter().map(signed_amount).sum();
+                let max_seq = acc.sequenced.keys().next_back().copied();
                 HealthAggregate {
-                    net,
+                    net: net_seq + net_unseq,
                     max_seq,
                     has_event: acc.has_event,
                 }

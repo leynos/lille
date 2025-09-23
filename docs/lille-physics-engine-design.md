@@ -277,6 +277,81 @@ Semantics:
   gameplay rules (documented in AI/agent sections if applicable).
 - Round fractional damage and healing magnitudes down before applying deltas.
 
+The Bevy synchronisation layer clamps snapshot data before handing it to the
+DBSP circuit. `Health.current` values greater than `max` are reduced to the
+ceiling and the clamp is logged at debug level so drift can be investigated.
+This keeps the ECS authoritative state within the documented invariant while
+avoiding surprises inside the circuit. Duplicate `HealthDelta` events emitted
+by the circuit are tracked with a monotonic counter on `DbspState`; repeated
+applications for the same `(entity, at_tick, seq)` triple bump the counter and
+are ignored. Tests assert the counter increments as duplicates arrive so any
+future change that breaks idempotency is caught immediately. The Bevy → DBSP
+marshalling layer also filters duplicate `DamageEvent`s within a frame before
+they reach the circuit, using `(entity, at_tick, seq)` for sequenced events and
+the full record for unsequenced events. Filtered events increment the same
+counter, providing a single telemetry surface that reports discarded work
+irrespective of whether the duplicate was spotted at ingress or egress.
+
+To prevent stale data from compounding, the synchronisation system retracts the
+prior frame's health snapshots and damage events before ingesting new records.
+`DbspState` caches the last `HealthState` per entity alongside the batch of
+pushed `DamageEvent`s, draining both collections with negative weights at the
+start of the next tick. This keeps the circuit's view of the world aligned with
+the ECS source of truth and ensures replay detection remains deterministic.
+
+The ingress, circuit aggregation, and egress responsibilities interact as shown
+below.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant ECS as Bevy ECS
+  participant Sync as DbspState Sync Layer
+  participant DBSP as DBSP Circuit
+  participant World as World Cache
+
+  rect rgb(245,250,255)
+  note over ECS,Sync: Ingress & dedupe
+  ECS->>Sync: Send HealthState snapshot
+  Sync->>Sync: Clamp health.current to max, record snapshot
+  ECS->>Sync: Send DamageEvent(s)
+  Sync->>Sync: Deduplicate (sequenced / unsequenced), log, increment counter
+  alt Not duplicate
+    Sync->>DBSP: Push DamageEvent
+    Sync->>Sync: Record expected retraction
+  else Duplicate
+    Sync--xDBSP: Skip push (increment duplicate counter)
+  end
+  end
+
+  rect rgb(245,255,245)
+  note over DBSP: Aggregate
+  DBSP->>DBSP: Accumulate sequenced (ordered) and unique unsequenced
+  DBSP-->>Sync: Emit HealthDelta(s) with net and max_seq
+  end
+
+  rect rgb(255,250,240)
+  note over Sync,ECS: Egress & apply
+  Sync->>Sync: Match deltas against expected retractions
+  alt Apply
+    Sync->>ECS: Apply delta (update health, death)
+    Sync->>World: Update cache snapshot
+  else Skip duplicate
+    Sync->>Sync: Increment duplicate counter, skip apply
+  end
+  Sync->>Sync: Clear processed retractions/inputs
+  end
+```
+
+Inside the circuit, the `HealthAccumulator` separates sequenced and unsequenced
+events. Sequenced events are stored as `(seq, delta)` pairs so idempotent
+replays drop naturally, while unsequenced events retain the entire
+`DamageEvent` record to ensure distinct sources (for example, external damage
+and script-driven healing) accumulate even when they share a tick. During the
+fold the accumulator sums sequenced deltas directly and recomputes signed
+amounts for unsequenced entries, ensuring the output `HealthDelta` reflects the
+net effect of every unique event in the batch.
+
 The health system follows the same DBSP-first approach as motion. Entities
 carry a `Health` component with `current` and `max` values; the component is
 mirrored into the circuit as an input collection so damage and regeneration can
