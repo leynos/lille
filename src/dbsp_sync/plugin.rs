@@ -31,10 +31,9 @@ impl Plugin for DbspPlugin {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::world_handle::WorldHandle;
     use crate::dbsp_sync::DbspState;
+    use crate::world_handle::WorldHandle;
     use rstest::rstest;
-
 
     #[rstest]
     fn plugin_initialises_resources() {

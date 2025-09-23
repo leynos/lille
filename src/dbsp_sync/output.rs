@@ -127,7 +127,6 @@ mod tests {
     use bevy_ecs::system::RunSystemOnce;
     use rstest::rstest;
 
-
     fn setup_app() -> App {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins);
