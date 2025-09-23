@@ -348,3 +348,74 @@ mod sync {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::dbsp_circuit::DamageSource;
+    use rstest::rstest;
+
+    fn make_state() -> DbspState {
+        DbspState::new().expect("failed to initialise DbspState for tests")
+    }
+
+    fn sequenced_event(seq: u32) -> DamageEvent {
+        DamageEvent {
+            entity: 1,
+            amount: 20,
+            source: DamageSource::External,
+            at_tick: 1,
+            seq: Some(seq),
+        }
+    }
+
+    fn unsequenced_event(amount: u16) -> DamageEvent {
+        DamageEvent {
+            entity: 1,
+            amount,
+            source: DamageSource::External,
+            at_tick: 1,
+            seq: None,
+        }
+    }
+
+    #[rstest]
+    fn sequenced_duplicates_are_dropped() {
+        let mut state = make_state();
+        let mut inbox = DamageInbox::default();
+        let event = sequenced_event(3);
+        inbox.extend(vec![event, event]);
+        ingest_damage_events(&mut state, &mut inbox);
+        assert!(inbox.is_empty());
+        assert_eq!(state.pending_damage_retractions, vec![event]);
+        assert_eq!(state.applied_health_duplicates(), 1);
+    }
+
+    #[rstest]
+    fn unsequenced_duplicates_are_dropped() {
+        let mut state = make_state();
+        let mut inbox = DamageInbox::default();
+        let event = unsequenced_event(15);
+        inbox.extend(vec![event, event]);
+        ingest_damage_events(&mut state, &mut inbox);
+        assert!(inbox.is_empty());
+        assert_eq!(state.pending_damage_retractions, vec![event]);
+        assert_eq!(state.applied_health_duplicates(), 1);
+    }
+
+    #[rstest]
+    fn unique_events_are_ingested() {
+        let mut state = make_state();
+        let mut inbox = DamageInbox::default();
+        let sequenced = sequenced_event(4);
+        let unsequenced = unsequenced_event(12);
+        inbox.extend(vec![sequenced, unsequenced]);
+        ingest_damage_events(&mut state, &mut inbox);
+        assert!(inbox.is_empty());
+        assert_eq!(
+            state.pending_damage_retractions,
+            vec![sequenced, unsequenced]
+        );
+        assert_eq!(state.applied_health_duplicates(), 0);
+    }
+}

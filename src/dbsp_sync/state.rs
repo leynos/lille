@@ -84,3 +84,40 @@ impl DbspState {
         self.health_duplicate_count
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bevy::prelude::Entity;
+    use rstest::rstest;
+
+    #[rstest]
+    fn new_state_starts_empty() {
+        let state = DbspState::new().expect("failed to initialise DbspState for tests");
+        assert!(state.id_map.is_empty());
+        assert!(state.rev_map.is_empty());
+        assert!(state.applied_health.is_empty());
+        assert!(state.applied_unsequenced.is_empty());
+        assert!(state.health_snapshot.is_empty());
+        assert!(state.expected_health_retractions.is_empty());
+        assert!(state.pending_damage_retractions.is_empty());
+        assert_eq!(state.applied_health_duplicates(), 0);
+    }
+
+    #[rstest]
+    fn entity_lookup_uses_mapping() {
+        let mut state = DbspState::new().expect("failed to initialise DbspState for tests");
+        let entity = Entity::from_raw(42);
+        state.id_map.insert(7, entity);
+        state.rev_map.insert(entity, 7);
+        assert_eq!(state.entity_for_id(7), Some(entity));
+        assert!(state.entity_for_id(8).is_none());
+    }
+
+    #[rstest]
+    fn duplicate_counter_reports_value() {
+        let mut state = DbspState::new().expect("failed to initialise DbspState for tests");
+        state.health_duplicate_count = 3;
+        assert_eq!(state.applied_health_duplicates(), 3);
+    }
+}

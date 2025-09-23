@@ -207,6 +207,7 @@ fn sequenced_events_with_same_seq_in_same_tick_are_deduplicated() {
 
 #[rstest]
 #[case::unsequenced_distinct_sources(6, 40, 100, vec![(15, DamageSource::External, 4, None), (25, DamageSource::Script, 4, None)], 10, false, None)]
+#[case::unsequenced_duplicate_payloads_filtered(6, 40, 100, vec![(15, DamageSource::External, 4, None), (15, DamageSource::External, 4, None)], -15, false, None)]
 #[case::multiple_events_max_seq(5, 100, 120, vec![(60, DamageSource::External, 10, Some(1)), (20, DamageSource::Script, 10, Some(4))], -40, false, Some(4))]
 #[case::healing_from_zero(4, 0, 80, vec![(30, DamageSource::Script, 3, None)], 30, false, None)]
 #[case::over_healing_clamped(5, 0, 80, vec![(150, DamageSource::Script, 4, None)], 80, false, None)]

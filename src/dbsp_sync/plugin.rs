@@ -27,3 +27,23 @@ impl Plugin for DbspPlugin {
         );
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::world_handle::WorldHandle;
+    use crate::dbsp_sync::DbspState;
+    use rstest::rstest;
+
+
+    #[rstest]
+    fn plugin_initialises_resources() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.add_plugins(DbspPlugin);
+        assert!(app.world.contains_resource::<DamageInbox>());
+        assert!(app.world.get_non_send_resource::<DbspState>().is_some());
+        app.update();
+        assert!(app.world.contains_resource::<WorldHandle>());
+    }
+}

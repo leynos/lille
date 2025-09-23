@@ -68,3 +68,80 @@ impl DbspState {
         false
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::dbsp_circuit::DamageSource;
+    use rstest::rstest;
+    use std::collections::HashSet;
+
+    fn fresh_state() -> DbspState {
+        DbspState::new().expect("failed to initialise DbspState for tests")
+    }
+
+    fn sequenced_event(seq: u32) -> DamageEvent {
+        DamageEvent {
+            entity: 1,
+            amount: 10,
+            source: DamageSource::External,
+            at_tick: 1,
+            seq: Some(seq),
+        }
+    }
+
+    fn unsequenced_event(at_tick: u64, amount: u16) -> DamageEvent {
+        DamageEvent {
+            entity: 1,
+            amount,
+            source: DamageSource::External,
+            at_tick,
+            seq: None,
+        }
+    }
+
+    #[rstest]
+    fn sequenced_duplicate_is_counted() {
+        let mut state = fresh_state();
+        let mut seen = HashSet::new();
+        let event = sequenced_event(5);
+        assert!(!state.record_duplicate_sequenced_damage(&event, &mut seen));
+        assert_eq!(state.applied_health_duplicates(), 0);
+        assert!(state.record_duplicate_sequenced_damage(&event, &mut seen));
+        assert_eq!(state.applied_health_duplicates(), 1);
+    }
+
+    #[rstest]
+    fn sequenced_event_reapplied_in_next_frame_is_ignored() {
+        let mut state = fresh_state();
+        let mut seen = HashSet::new();
+        let event = sequenced_event(7);
+        state
+            .applied_health
+            .insert(event.entity, (event.at_tick, event.seq));
+        assert!(state.record_duplicate_sequenced_damage(&event, &mut seen));
+        assert_eq!(state.applied_health_duplicates(), 1);
+    }
+
+    #[rstest]
+    fn unsequenced_duplicate_is_counted() {
+        let mut state = fresh_state();
+        let mut seen = HashSet::new();
+        let event = unsequenced_event(2, 12);
+        assert!(!state.record_duplicate_unsequenced_damage(&event, &mut seen));
+        assert!(state.record_duplicate_unsequenced_damage(&event, &mut seen));
+        assert_eq!(state.applied_health_duplicates(), 1);
+    }
+
+    #[rstest]
+    fn unsequenced_events_reset_each_tick() {
+        let mut state = fresh_state();
+        let mut first_seen = HashSet::new();
+        let mut second_seen = HashSet::new();
+        let first = unsequenced_event(3, 5);
+        let second = unsequenced_event(4, 5);
+        assert!(!state.record_duplicate_unsequenced_damage(&first, &mut first_seen));
+        assert!(!state.record_duplicate_unsequenced_damage(&second, &mut second_seen));
+        assert_eq!(state.applied_health_duplicates(), 0);
+    }
+}

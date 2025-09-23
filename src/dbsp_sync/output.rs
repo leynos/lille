@@ -117,3 +117,151 @@ pub fn apply_dbsp_outputs_system(
     state.expected_health_retractions.clear();
     state.circuit.clear_inputs();
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::components::{Block, DdlogId, Health, UnitType};
+    use crate::dbsp_circuit::{DamageEvent, DamageSource, HealthState, Position, Velocity};
+    use crate::world_handle::DdlogEntity;
+    use bevy_ecs::system::RunSystemOnce;
+    use rstest::rstest;
+
+
+    fn setup_app() -> App {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.insert_resource(WorldHandle::default());
+        app.world.insert_non_send_resource(
+            DbspState::new().expect("failed to init DbspState for tests"),
+        );
+        app
+    }
+
+    fn spawn_entity(app: &mut App) -> Entity {
+        app.world
+            .spawn((
+                DdlogId(1),
+                Transform::default(),
+                VelocityComp::default(),
+                Health {
+                    current: 90,
+                    max: 100,
+                },
+            ))
+            .id()
+    }
+
+    fn prime_state(app: &mut App, entity: Entity) {
+        {
+            let mut world_handle = app.world.resource_mut::<WorldHandle>();
+            world_handle.entities.insert(
+                1,
+                DdlogEntity {
+                    position: Vec3::ZERO,
+                    unit: UnitType::Civvy { fraidiness: 0.0 },
+                    health_current: 90,
+                    health_max: 100,
+                    target: None,
+                },
+            );
+        }
+
+        let mut state = app.world.non_send_resource_mut::<DbspState>();
+        state.id_map.insert(1, entity);
+        state.rev_map.insert(entity, 1);
+        state.circuit.block_in().push(
+            Block {
+                id: 1,
+                x: 0,
+                y: 0,
+                z: 0,
+            },
+            1,
+        );
+        state.circuit.position_in().push(
+            Position {
+                entity: 1,
+                x: 0.0.into(),
+                y: 0.0.into(),
+                z: 1.0.into(),
+            },
+            1,
+        );
+        state.circuit.velocity_in().push(
+            Velocity {
+                entity: 1,
+                vx: 1.0.into(),
+                vy: 0.0.into(),
+                vz: 0.0.into(),
+            },
+            1,
+        );
+    }
+
+    fn push_health_inputs(app: &mut App, current: u16, amount: u16) {
+        let state = app.world.non_send_resource_mut::<DbspState>();
+        state.circuit.health_state_in().push(
+            HealthState {
+                entity: 1,
+                current,
+                max: 100,
+            },
+            1,
+        );
+        state.circuit.damage_in().push(
+            DamageEvent {
+                entity: 1,
+                amount,
+                source: DamageSource::External,
+                at_tick: 1,
+                seq: Some(1),
+            },
+            1,
+        );
+    }
+
+    #[rstest]
+    fn applies_outputs_updates_components() {
+        let mut app = setup_app();
+        let entity = spawn_entity(&mut app);
+        prime_state(&mut app, entity);
+        push_health_inputs(&mut app, 90, 50);
+
+        app.world.run_system_once(apply_dbsp_outputs_system);
+
+        let health = app.world.entity(entity).get::<Health>().unwrap();
+        assert_eq!(health.current, 40);
+        let velocity = app.world.entity(entity).get::<VelocityComp>().unwrap();
+        assert!(velocity.vx < 1.0);
+        let transform = app.world.entity(entity).get::<Transform>().unwrap();
+        assert!(transform.translation.x.abs() > f32::EPSILON);
+        let world_handle = app.world.resource::<WorldHandle>();
+        let entry = world_handle.entities.get(&1).unwrap();
+        assert_eq!(entry.health_current, 40);
+    }
+
+    #[rstest]
+    fn duplicate_health_delta_is_ignored() {
+        let mut app = setup_app();
+        let entity = spawn_entity(&mut app);
+        prime_state(&mut app, entity);
+        push_health_inputs(&mut app, 90, 50);
+
+        app.world.run_system_once(apply_dbsp_outputs_system);
+        assert_eq!(
+            app.world.entity(entity).get::<Health>().unwrap().current,
+            40
+        );
+
+        push_health_inputs(&mut app, 90, 50);
+        app.world.run_system_once(apply_dbsp_outputs_system);
+
+        let state = app.world.non_send_resource::<DbspState>();
+        assert_eq!(state.applied_health_duplicates(), 1);
+        assert_eq!(
+            app.world.entity(entity).get::<Health>().unwrap().current,
+            40
+        );
+    }
+}

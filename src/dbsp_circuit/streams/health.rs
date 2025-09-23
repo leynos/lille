@@ -3,11 +3,7 @@
 //! These helpers reduce health snapshots and incoming damage events to
 //! authoritative [`HealthDelta`] records emitted by the DBSP circuit.
 
-use std::{
-    cmp::Ordering,
-    collections::{btree_map::Entry, BTreeMap, HashSet},
-    hash::{Hash, Hasher},
-};
+use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 
 use dbsp::{algebra::Semigroup, operator::Fold, typed_batch::OrdZSet, RootCircuit, Stream};
 
@@ -22,14 +18,17 @@ use crate::dbsp_circuit::{DamageEvent, DamageSource, HealthDelta, HealthState};
     Default,
     PartialEq,
     Eq,
+    PartialOrd,
+    Ord,
+    Hash,
     ::size_of::SizeOf,
 )]
-#[archive_attr(derive(Eq, PartialEq))]
+#[archive_attr(derive(Eq, PartialEq, Ord, PartialOrd, Hash))]
 struct HealthAccumulator {
     sequenced: BTreeMap<u32, i32>,
-    // HashSet keeps duplicate checks O(1); ordering and hashing sort the contents
-    // so DBSP sees a stable archive despite the inherent iteration order.
-    unsequenced: HashSet<DamageEvent>,
+    // BTreeSet keeps iteration deterministic while deduplicating identical
+    // payloads, satisfying DBSP's archive stability requirements.
+    unsequenced: BTreeSet<DamageEvent>,
     has_event: bool,
 }
 
@@ -97,7 +96,7 @@ impl HealthAccumulator {
         }
     }
 
-    fn merge_unsequenced_events(&mut self, unsequenced: &HashSet<DamageEvent>) {
+    fn merge_unsequenced_events(&mut self, unsequenced: &BTreeSet<DamageEvent>) {
         self.unsequenced.extend(unsequenced.iter().copied());
     }
 }
@@ -110,78 +109,6 @@ impl Semigroup<HealthAccumulator> for HealthAccumulatorSemigroup {
         let mut combined = left.clone();
         combined.merge(right);
         combined
-    }
-}
-
-impl PartialOrd for HealthAccumulator {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for HealthAccumulator {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.sequenced
-            .cmp(&other.sequenced)
-            .then_with(|| compare_sorted_iter(self.unsequenced.iter(), other.unsequenced.iter()))
-            .then_with(|| self.has_event.cmp(&other.has_event))
-    }
-}
-
-impl Hash for HealthAccumulator {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.sequenced.hash(state);
-        hash_sorted_iter(self.unsequenced.iter(), state);
-        self.has_event.hash(state);
-    }
-}
-
-impl PartialOrd for ArchivedHealthAccumulator {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for ArchivedHealthAccumulator {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.sequenced
-            .cmp(&other.sequenced)
-            .then_with(|| compare_sorted_iter(self.unsequenced.iter(), other.unsequenced.iter()))
-            .then_with(|| self.has_event.cmp(&other.has_event))
-    }
-}
-
-impl Hash for ArchivedHealthAccumulator {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.sequenced.hash(state);
-        hash_sorted_iter(self.unsequenced.iter(), state);
-        self.has_event.hash(state);
-    }
-}
-
-fn compare_sorted_iter<L, R>(left: L, right: R) -> Ordering
-where
-    L: Iterator,
-    R: Iterator<Item = L::Item>,
-    L::Item: Ord,
-{
-    let mut left_items: Vec<_> = left.collect();
-    let mut right_items: Vec<_> = right.collect();
-    left_items.sort_unstable();
-    right_items.sort_unstable();
-    left_items.cmp(&right_items)
-}
-
-fn hash_sorted_iter<I, H>(iter: I, state: &mut H)
-where
-    I: Iterator,
-    I::Item: Ord + Hash,
-    H: Hasher,
-{
-    let mut items: Vec<_> = iter.collect();
-    items.sort_unstable();
-    for item in items {
-        item.hash(state);
     }
 }
 

@@ -178,8 +178,8 @@ physical properties and agent behaviours.
         - [x] Field types: `entity: EntityId`, `current: u16`, `max: u16`.
           Enforce `0 ≤ current ≤ max` at all times.
 
-        - [x] Type aliases: use the [canonical type
-          definitions][health-type-defs]
+        - [x] Type aliases: use the
+          [canonical type definitions][health-type-defs]
           (`type EntityId = u64; type Tick = u64`). `Tick` counts simulation
           ticks and advances monotonically.
 
