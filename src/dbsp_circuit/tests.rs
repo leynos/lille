@@ -206,34 +206,27 @@ fn sequenced_events_with_same_seq_in_same_tick_are_deduplicated() {
 }
 
 #[rstest]
-fn unsequenced_events_with_distinct_sources_accumulate() {
+#[case::unsequenced_distinct_sources(6, 40, 100, vec![(15, DamageSource::External, 4, None), (25, DamageSource::Script, 4, None)], 10, false, None)]
+#[case::multiple_events_max_seq(5, 100, 120, vec![(60, DamageSource::External, 10, Some(1)), (20, DamageSource::Script, 10, Some(4))], -40, false, Some(4))]
+#[case::healing_from_zero(4, 0, 80, vec![(30, DamageSource::Script, 3, None)], 30, false, None)]
+#[case::over_healing_clamped(5, 0, 80, vec![(150, DamageSource::Script, 4, None)], 80, false, None)]
+fn health_delta_scenarios(
+    #[case] entity: u64,
+    #[case] current: u16,
+    #[case] max: u16,
+    #[case] events: Vec<(u16, DamageSource, u64, Option<u32>)>,
+    #[case] expected_delta: i32,
+    #[case] expected_death: bool,
+    #[case] expected_seq: Option<u32>,
+) {
     run_health_delta_test(
-        6,
-        40,
-        100,
-        vec![
-            (15, DamageSource::External, 4, None),
-            (25, DamageSource::Script, 4, None),
-        ],
-        10,
-        false,
-        None,
-    );
-}
-
-#[rstest]
-fn multiple_events_same_tick_accumulate_and_pick_max_seq() {
-    run_health_delta_test(
-        5,
-        100,
-        120,
-        vec![
-            (60, DamageSource::External, 10, Some(1)),
-            (20, DamageSource::Script, 10, Some(4)),
-        ],
-        -40,
-        false,
-        Some(4),
+        entity,
+        current,
+        max,
+        events,
+        expected_delta,
+        expected_death,
+        expected_seq,
     );
 }
 
@@ -247,31 +240,5 @@ fn lethal_damage_sets_death_flag() {
         -20,
         true,
         Some(7),
-    );
-}
-
-#[rstest]
-fn healing_from_zero_produces_positive_delta() {
-    run_health_delta_test(
-        4,
-        0,
-        80,
-        vec![(30, DamageSource::Script, 3, None)],
-        30,
-        false,
-        None,
-    );
-}
-
-#[rstest]
-fn over_healing_from_zero_is_clamped_to_max() {
-    run_health_delta_test(
-        5,
-        0,
-        80,
-        vec![(150, DamageSource::Script, 4, None)],
-        80,
-        false,
-        None,
     );
 }
