@@ -9,7 +9,8 @@ use bevy::prelude::*;
 use lille::{
     apply_ground_friction,
     components::{Block, BlockSlope, ForceComp},
-    DbspPlugin, DdlogId, VelocityComp, GRAVITY_PULL, GROUND_FRICTION, TERMINAL_VELOCITY,
+    DbspPlugin, DdlogId, Health, VelocityComp, FALL_DAMAGE_SCALE, GRAVITY_PULL, GROUND_FRICTION,
+    SAFE_LANDING_SPEED, TERMINAL_VELOCITY,
 };
 use rstest::{fixture, rstest};
 use std::fmt;
@@ -20,6 +21,7 @@ struct TestWorld {
     /// Shared Bevy app; `rspec` fixtures must implement `Clone + Send + Sync`.
     app: Arc<Mutex<App>>,
     entity: Option<Entity>,
+    expected_damage: Arc<Mutex<Option<u16>>>,
 }
 
 impl fmt::Debug for TestWorld {
@@ -37,6 +39,7 @@ impl Default for TestWorld {
         Self {
             app: Arc::new(Mutex::new(app)),
             entity: None,
+            expected_damage: Arc::new(Mutex::new(None)),
         }
     }
 }
@@ -68,6 +71,58 @@ impl TestWorld {
     /// Spawns an entity without an external force.
     fn spawn_entity_without_force(&mut self, transform: Transform, vel: VelocityComp) {
         self.spawn_entity(transform, vel, None);
+    }
+
+    /// Spawns an entity with an attached health component.
+    fn spawn_entity_with_health(
+        &mut self,
+        transform: Transform,
+        vel: VelocityComp,
+        health: Health,
+    ) {
+        let mut app = self.app.lock().expect("app lock");
+        let entity = app.world.spawn((DdlogId(1), transform, vel, health));
+        let id = entity.id();
+        self.entity = Some(id);
+    }
+
+    fn health(&self) -> Health {
+        let app = self.app.lock().expect("app lock");
+        let entity = self.entity.expect("entity not spawned");
+        app.world
+            .get::<Health>(entity)
+            .cloned()
+            .expect("missing Health component")
+    }
+
+    fn set_position_z(&self, z: f32) {
+        let mut app = self.app.lock().expect("app lock");
+        let entity = self.entity.expect("entity not spawned");
+        let mut transform = app
+            .world
+            .get_mut::<Transform>(entity)
+            .expect("missing Transform component");
+        transform.translation.z = z;
+    }
+
+    fn set_velocity_z(&self, vz: f32) {
+        let mut app = self.app.lock().expect("app lock");
+        let entity = self.entity.expect("entity not spawned");
+        let mut velocity = app
+            .world
+            .get_mut::<VelocityComp>(entity)
+            .expect("missing VelocityComp component");
+        velocity.vz = vz;
+    }
+
+    fn set_expected_damage(&self, damage: u16) {
+        let mut expected = self.expected_damage.lock().expect("expected damage lock");
+        *expected = Some(damage);
+    }
+
+    fn take_expected_damage(&self) -> u16 {
+        let mut expected = self.expected_damage.lock().expect("expected damage lock");
+        expected.take().expect("expected damage should be recorded")
     }
 
     /// Advances the simulation by one tick.
@@ -288,8 +343,11 @@ macro_rules! physics_spec {
               Some(ForceComp { force_x: 0.0, force_y: 0.0, force_z: -100.0, mass: Some(5.0) }),
           );
       },
-    (0.0, 0.0, 3.0),
-    (0.0, 0.0, -TERMINAL_VELOCITY as f32)
+    (0.0, 0.0, 5.0
+        + (-20.0 + GRAVITY_PULL as f32)
+            .clamp(-TERMINAL_VELOCITY as f32, TERMINAL_VELOCITY as f32)),
+    (0.0, 0.0, (-20.0 + GRAVITY_PULL as f32)
+        .clamp(-TERMINAL_VELOCITY as f32, TERMINAL_VELOCITY as f32))
 )]
 #[case::unsupported_velocity_capped(
     "an unsupported entity's fall speed is capped",
@@ -300,8 +358,11 @@ macro_rules! physics_spec {
               VelocityComp { vx: 0.0, vy: 0.0, vz: -5.0 },
           );
       },
-    (0.0, 0.0, 3.0),
-    (0.0, 0.0, -TERMINAL_VELOCITY as f32)
+    (0.0, 0.0, 5.0
+        + (-5.0 + GRAVITY_PULL as f32)
+            .clamp(-TERMINAL_VELOCITY as f32, TERMINAL_VELOCITY as f32)),
+    (0.0, 0.0, (-5.0 + GRAVITY_PULL as f32)
+        .clamp(-TERMINAL_VELOCITY as f32, TERMINAL_VELOCITY as f32))
 )]
 fn physics_scenarios(
     world: TestWorld,
@@ -311,4 +372,59 @@ fn physics_scenarios(
     #[case] expected_vel: (f32, f32, f32),
 ) {
     physics_spec!(world, description, setup, expected_pos, expected_vel);
+}
+
+#[rstest]
+fn falling_inflicts_health_damage(world: TestWorld) {
+    rspec::run(&rspec::given(
+        "an entity falling onto level ground",
+        world,
+        |ctx| {
+            ctx.before_each(|world| {
+                world.spawn_block(Block {
+                    id: 99,
+                    x: 0,
+                    y: 0,
+                    z: 0,
+                });
+                world.spawn_entity_with_health(
+                    Transform::from_xyz(0.0, 0.0, 10.0),
+                    VelocityComp::default(),
+                    Health {
+                        current: 100,
+                        max: 100,
+                    },
+                );
+            });
+            ctx.when("the simulation runs until the entity lands", |ctx| {
+                ctx.before_each(|world| {
+                    let fall_speed = -(SAFE_LANDING_SPEED as f32 + 4.0);
+                    world.set_velocity_z(fall_speed);
+                    world.tick();
+
+                    world.set_velocity_z(0.0);
+                    world.set_position_z(1.0);
+                    world.tick();
+
+                    let impact_speed = f64::from(-(fall_speed + GRAVITY_PULL as f32))
+                        .clamp(0.0, TERMINAL_VELOCITY);
+                    let excess = impact_speed - SAFE_LANDING_SPEED;
+                    let expected_damage = if excess <= 0.0 {
+                        0
+                    } else {
+                        (excess * FALL_DAMAGE_SCALE)
+                            .min(f64::from(u16::MAX))
+                            .round() as u16
+                    };
+                    world.set_expected_damage(expected_damage);
+                });
+                ctx.then("the expected fall damage is applied", |world| {
+                    let expected = world.take_expected_damage();
+                    let health = world.health();
+                    let lost = 100u16.saturating_sub(health.current);
+                    assert_eq!(lost, expected);
+                });
+            });
+        },
+    ));
 }

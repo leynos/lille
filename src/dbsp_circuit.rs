@@ -19,7 +19,10 @@
 //! ```
 
 use anyhow::Error as AnyError;
-use dbsp::{typed_batch::OrdZSet, CircuitHandle, OutputHandle, RootCircuit, ZSetHandle};
+use dbsp::circuit::Circuit;
+use dbsp::{
+    operator::Generator, typed_batch::OrdZSet, CircuitHandle, OutputHandle, RootCircuit, ZSetHandle,
+};
 
 use crate::components::{Block, BlockSlope};
 use crate::GRACE_DISTANCE;
@@ -184,6 +187,16 @@ impl DbspCircuit {
         let (blocks, block_in) = circuit.add_input_zset::<Block>();
         let (slopes, block_slope_in) = circuit.add_input_zset::<BlockSlope>();
 
+        let tick_source = circuit.add_source(Generator::new({
+            let mut tick: Tick = 0;
+            move || {
+                let current = tick;
+                tick = tick.checked_add(1).expect("tick counter overflowed u64");
+                current
+            }
+        }));
+        let current_tick = tick_source;
+
         let highest_pair = highest_block_pair(&blocks);
         let highest = highest_pair.map(|(hb, _)| *hb);
         let floor_height = floor_height_stream(&highest_pair, &slopes);
@@ -208,6 +221,14 @@ impl DbspCircuit {
         let (new_pos_standing, new_vel_standing) =
             standing_motion_stream(&standing, &floor_height, &all_new_vel);
 
+        let fall_damage = streams::fall_damage_stream(
+            &standing,
+            &unsupported,
+            &unsupported_velocities,
+            &current_tick,
+        );
+        let damage_with_fall = damage_events.plus(&fall_damage);
+
         let base_pos = new_pos_unsupported.plus(&new_pos_standing);
         let new_vel = unsupported_velocities.plus(&new_vel_standing);
 
@@ -216,7 +237,7 @@ impl DbspCircuit {
 
         let moved_pos = apply_movement(&base_pos, &decisions);
 
-        let health_deltas = health_delta_stream(&health_states, &damage_events);
+        let health_deltas = health_delta_stream(&health_states, &damage_with_fall);
 
         Ok(BuildHandles {
             position_in,

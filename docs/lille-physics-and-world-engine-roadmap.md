@@ -230,10 +230,10 @@ physical properties and agent behaviours.
         - [x] Edge cases: cover max-health clamps, zero-health death flags,
           large burst damage, and concurrent external plus derived damage.
 
-    - [ ] Implement a simple damage model (e.g., falling damage calculated from
+    - [x] Implement a simple damage model (e.g., falling damage calculated from
      velocity upon landing).
 
-      - [ ] Detect landing events inside the circuit by tracking transitions
+      - [x] Detect landing events inside the circuit by tracking transitions
         from `Unsupported` to `Standing` alongside vertical velocity.
 
         - Edge detection: fire once on the boolean edge
@@ -245,7 +245,7 @@ physical properties and agent behaviours.
         - Hysteresis: reuse the motion system's `z_floor` grace band to avoid
           chatter-induced re-triggers.
 
-      - [ ] Define a fall-damage operator that applies a safe-velocity threshold
+      - [x] Define a fall-damage operator that applies a safe-velocity threshold
         and scaling factor entirely within DBSP.
 
         - Units: velocity in world units per second; derive impact speed as
@@ -260,13 +260,13 @@ physical properties and agent behaviours.
           Clamp `vz_before_contact` by `TERMINAL_VELOCITY` before computing
           impact.
 
-      - [ ] Emit derived damage events into the `Damage` stream and reduce
+      - [x] Emit derived damage events into the `Damage` stream and reduce
         entity health through the circuit's health accumulator.
 
         - Determinism: ensure a stable per-tick ordering for multiple derived
           `DamageEvent`s targeting one entity.
 
-      - [ ] Cover the damage flow with DBSP unit tests and headless Bevy
+      - [x] Cover the damage flow with DBSP unit tests and headless Bevy
         simulations demonstrating falling damage.
 
         - Tests: cover stair-step jitter (single hit), terminal-velocity caps,

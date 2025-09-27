@@ -378,6 +378,16 @@ impact speed from `vz_before_contact`, clamps it against the default
 `DamageEvent` is emitted only when the clamped impact exceeds the safe
 threshold.
 
+The implementation materialises an internal tick counter entirely within the
+DBSP circuit. A `Generator` emits a `1_u64` each cycle; integrating the stream
+and delaying it by one step yields the zero-based tick used for
+`DamageEvent::at_tick`. Because each simulation tick equals `DELTA_TIME`
+seconds (currently `1.0`), the six-tick landing cooldown equates to six seconds
+of wall time. Cooldown state lives wholly inside the circuit by integrating
+landing events and applying delayed retractions `N` ticks later, ensuring the
+authoritative DBSP dataflow remains the single source of truth for damage
+gating.
+
 Short description: The diagram shows the authoritative health dataflow. ECS
 snapshots and external damage enter the circuit, which emits deltas that are
 applied back to ECS.

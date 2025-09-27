@@ -190,7 +190,7 @@ fn airborne_preserves_velocity() {
 
 #[rstest]
 #[case::at_limit(-TERMINAL_VELOCITY, -TERMINAL_VELOCITY)]
-#[case::beyond_limit(-5.0, -TERMINAL_VELOCITY)]
+#[case::beyond_limit(-(TERMINAL_VELOCITY + 1.0), -TERMINAL_VELOCITY)]
 #[case::upward_limit(TERMINAL_VELOCITY, TERMINAL_VELOCITY + GRAVITY_PULL)]
 #[case::upward_beyond_limit(5.0, 5.0 + GRAVITY_PULL)]
 #[case::near_zero_negative(-0.0001, -0.0001 + GRAVITY_PULL)]
