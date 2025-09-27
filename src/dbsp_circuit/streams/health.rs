@@ -147,48 +147,54 @@ fn signed_amount(event: &DamageEvent) -> i32 {
 }
 
 /// Derives fall damage events from landing transitions.
-pub fn fall_damage_stream(
+fn detect_landings(
     standing: &Stream<RootCircuit, OrdZSet<PositionFloor>>,
     unsupported: &Stream<RootCircuit, OrdZSet<PositionFloor>>,
-    unsupported_velocities: &Stream<RootCircuit, OrdZSet<Velocity>>,
-    ticks: &Stream<RootCircuit, Tick>,
-) -> Stream<RootCircuit, OrdZSet<DamageEvent>> {
+) -> Stream<RootCircuit, OrdZSet<i64>> {
     let standing_entities = standing.map(|pf| pf.position.entity);
-    let unsupported_entities = unsupported.map(|pf| pf.position.entity);
-    let prev_unsupported_entities = unsupported_entities.delay();
+    let prev_unsupported = unsupported.map(|pf| pf.position.entity).delay();
 
-    let landing_candidates = prev_unsupported_entities
-        .map_index(|entity| (*entity, ()))
-        .join(
-            &standing_entities.map_index(|entity| (*entity, ())),
-            |entity, _, _| *entity,
-        );
+    prev_unsupported.map_index(|entity| (*entity, ())).join(
+        &standing_entities.map_index(|entity| (*entity, ())),
+        |entity, _, _| *entity,
+    )
+}
 
-    let mut cooldown_end = landing_candidates.clone();
+fn apply_landing_cooldown(
+    landings: &Stream<RootCircuit, OrdZSet<i64>>,
+) -> Stream<RootCircuit, OrdZSet<i64>> {
+    let mut cooldown_end = landings.clone();
     for _ in 0..LANDING_COOLDOWN_TICKS {
         cooldown_end = cooldown_end.delay();
     }
 
-    let cooldown_updates = landing_candidates.clone().plus(&cooldown_end.neg());
+    let cooldown_updates = landings.clone().plus(&cooldown_end.neg());
     let active_cooldown = cooldown_updates.integrate();
-    let cooldown_before = active_cooldown.delay();
-    let cooling_entities = cooldown_before.map_index(|entity| (*entity, ()));
+    let cooling_entities = active_cooldown.delay().map_index(|entity| (*entity, ()));
 
-    let landing_allowed = landing_candidates
+    landings
         .map_index(|entity| (*entity, ()))
         .antijoin(&cooling_entities)
-        .map(|(entity, _)| *entity);
+        .map(|(entity, _)| *entity)
+}
 
+fn calculate_fall_damage(
+    allowed_landings: &Stream<RootCircuit, OrdZSet<i64>>,
+    unsupported_velocities: &Stream<RootCircuit, OrdZSet<Velocity>>,
+    ticks: &Stream<RootCircuit, Tick>,
+) -> Stream<RootCircuit, OrdZSet<DamageEvent>> {
     let prev_velocities = unsupported_velocities.delay();
-    let landing_impacts = landing_allowed.map_index(|entity| (*entity, *entity)).join(
-        &prev_velocities.map_index(|vel| (vel.entity, vel.vz)),
-        |_entity, &entity, &vz| (entity, vz),
-    );
+    let landing_impacts = allowed_landings
+        .map_index(|entity| (*entity, *entity))
+        .join(
+            &prev_velocities.map_index(|vel| (vel.entity, vel.vz)),
+            |_entity, &landing_entity, &vz| (landing_entity, vz),
+        );
 
-    let downward_impacts = landing_impacts.flat_map(|(entity, vz)| {
+    let downward_impacts = landing_impacts.flat_map(|&(entity, vz)| {
         let speed = -vz.into_inner();
         (speed > 0.0)
-            .then_some((*entity, OrderedFloat(speed)))
+            .then_some((entity, OrderedFloat(speed)))
             .into_iter()
     });
 
@@ -229,6 +235,18 @@ pub fn fall_damage_stream(
         }
         OrdZSet::from_tuples((), tuples)
     })
+}
+
+/// Derives fall damage events from landing transitions.
+pub fn fall_damage_stream(
+    standing: &Stream<RootCircuit, OrdZSet<PositionFloor>>,
+    unsupported: &Stream<RootCircuit, OrdZSet<PositionFloor>>,
+    unsupported_velocities: &Stream<RootCircuit, OrdZSet<Velocity>>,
+    ticks: &Stream<RootCircuit, Tick>,
+) -> Stream<RootCircuit, OrdZSet<DamageEvent>> {
+    let landings = detect_landings(standing, unsupported);
+    let allowed_landings = apply_landing_cooldown(&landings);
+    calculate_fall_damage(&allowed_landings, unsupported_velocities, ticks)
 }
 
 pub fn health_delta_stream(
@@ -420,6 +438,53 @@ mod tests {
             .round() as u16;
         assert_eq!(event.amount, expected_amount);
         assert_eq!(event.at_tick, 1);
+    }
+
+    #[rstest]
+    fn multiple_entities_land_without_interference() {
+        let (circuit, standing_in, unsupported_in, velocity_in, output) = build_circuit();
+
+        let unsupported_pf_a = pf(1, 5.0, 0.0);
+        let unsupported_pf_b = pf(2, 8.0, 0.0);
+        let standing_pf_a = pf(1, 1.0, 1.0);
+        let standing_pf_b = pf(2, 1.0, 1.0);
+        let falling_vel_a = vel(1, -8.0);
+        let falling_vel_b = vel(2, -12.0);
+
+        unsupported_in.push(unsupported_pf_a.clone(), 1);
+        unsupported_in.push(unsupported_pf_b.clone(), 1);
+        velocity_in.push(falling_vel_a, 1);
+        velocity_in.push(falling_vel_b, 1);
+        circuit.step().expect("step unsupported phase");
+        assert!(read_events(&output).is_empty());
+
+        unsupported_in.push(unsupported_pf_a.clone(), -1);
+        unsupported_in.push(unsupported_pf_b.clone(), -1);
+        standing_in.push(standing_pf_a.clone(), 1);
+        standing_in.push(standing_pf_b.clone(), 1);
+        circuit.step().expect("step landing phase");
+
+        let mut events = read_events(&output);
+        events.sort_by_key(|event| event.entity);
+        assert_eq!(events.len(), 2);
+
+        let expected_a = ((8.0_f64.min(TERMINAL_VELOCITY) - SAFE_LANDING_SPEED) * FALL_DAMAGE_SCALE)
+            .min(f64::from(u16::MAX))
+            .round() as u16;
+        let expected_b = ((12.0_f64.min(TERMINAL_VELOCITY) - SAFE_LANDING_SPEED)
+            * FALL_DAMAGE_SCALE)
+            .min(f64::from(u16::MAX))
+            .round() as u16;
+
+        assert_eq!(events[0].entity, 1);
+        assert_eq!(events[0].source, DamageSource::Fall);
+        assert_eq!(events[0].amount, expected_a);
+        assert_eq!(events[0].at_tick, 1);
+
+        assert_eq!(events[1].entity, 2);
+        assert_eq!(events[1].source, DamageSource::Fall);
+        assert_eq!(events[1].amount, expected_b);
+        assert_eq!(events[1].at_tick, 1);
     }
 
     #[rstest]
