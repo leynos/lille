@@ -220,7 +220,7 @@ fn calculate_fall_damage(
             if scaled <= 0.0 {
                 continue;
             }
-            let damage = scaled.min(f64::from(u16::MAX)).round() as u16;
+            let damage = scaled.min(f64::from(u16::MAX)).floor() as u16;
             if damage == 0 {
                 continue;
             }
@@ -435,7 +435,7 @@ mod tests {
         let expected_amount = ((8.0_f64.min(TERMINAL_VELOCITY) - SAFE_LANDING_SPEED)
             * FALL_DAMAGE_SCALE)
             .min(f64::from(u16::MAX))
-            .round() as u16;
+            .floor() as u16;
         assert_eq!(event.amount, expected_amount);
         assert_eq!(event.at_tick, 1);
     }
@@ -470,11 +470,11 @@ mod tests {
 
         let expected_a = ((8.0_f64.min(TERMINAL_VELOCITY) - SAFE_LANDING_SPEED) * FALL_DAMAGE_SCALE)
             .min(f64::from(u16::MAX))
-            .round() as u16;
+            .floor() as u16;
         let expected_b = ((12.0_f64.min(TERMINAL_VELOCITY) - SAFE_LANDING_SPEED)
             * FALL_DAMAGE_SCALE)
             .min(f64::from(u16::MAX))
-            .round() as u16;
+            .floor() as u16;
 
         assert_eq!(events[0].entity, 1);
         assert_eq!(events[0].source, DamageSource::Fall);

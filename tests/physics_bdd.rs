@@ -414,7 +414,7 @@ fn falling_inflicts_health_damage(world: TestWorld) {
                     } else {
                         (excess * FALL_DAMAGE_SCALE)
                             .min(f64::from(u16::MAX))
-                            .round() as u16
+                            .floor() as u16
                     };
                     world.set_expected_damage(expected_damage);
                 });
