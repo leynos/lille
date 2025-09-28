@@ -242,6 +242,13 @@ physical properties and agent behaviours.
         - Debounce: add a per-entity cooldown of `LANDING_COOLDOWN_TICKS: u32`
           (default: 6 ticks). Document how ticks map to wall time in the engine.
 
+### Tick timing
+
+The fixed-step simulation runs at 1 Hz, as configured by `DELTA_TIME = 1.0` in
+`src/constants.rs`. Each tick therefore spans 1,000 milliseconds of wall time.
+With `LANDING_COOLDOWN_TICKS` defaulting to six ticks, landing suppression
+lasts for 6,000 milliseconds before another fall-damage event may trigger.
+
         - Hysteresis: reuse the motion system's `z_floor` grace band to avoid
           chatter-induced re-triggers.
 
@@ -256,9 +263,9 @@ physical properties and agent behaviours.
           `FALL_DAMAGE_SCALE = 4.0`. State that tuning may change but tests pin
           current values.
 
-        - Clamp: never emit negative damage; round down before casting to `u16`.
-          Clamp `vz_before_contact` by `TERMINAL_VELOCITY` before computing
-          impact.
+        - Clamp: never emit negative damage; apply `.floor()` before casting to
+          `u16`. Clamp `vz_before_contact` by `TERMINAL_VELOCITY` before
+          computing impact.
 
       - [x] Emit derived damage events into the `Damage` stream and reduce
         entity health through the circuit's health accumulator.
