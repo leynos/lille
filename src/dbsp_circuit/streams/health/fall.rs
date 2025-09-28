@@ -104,13 +104,16 @@ fn calculate_fall_damage(
 /// # Examples
 /// ```rust,no_run
 /// use dbsp::{operator::Generator, Circuit, RootCircuit};
-/// use lille::dbsp_circuit::{fall_damage_stream, PositionFloor, Tick, Velocity};
+/// use lille::dbsp_circuit::{
+///     fall_damage_stream, DamageEvent, DamageSource, Position, PositionFloor, Tick, Velocity,
+/// };
+/// use lille::{FALL_DAMAGE_SCALE, SAFE_LANDING_SPEED, TERMINAL_VELOCITY};
+/// use ordered_float::OrderedFloat;
 ///
-/// let (_circuit, (_standing_in, _unsupported_in, _velocity_in, _fall_output)) =
+/// let (circuit, (standing_in, unsupported_in, velocity_in, fall_output)) =
 ///     RootCircuit::build(|circuit| {
 ///         let (standing_stream, standing_in) = circuit.add_input_zset::<PositionFloor>();
-///         let (unsupported_stream, unsupported_in) =
-///             circuit.add_input_zset::<PositionFloor>();
+///         let (unsupported_stream, unsupported_in) = circuit.add_input_zset::<PositionFloor>();
 ///         let (velocity_stream, velocity_in) = circuit.add_input_zset::<Velocity>();
 ///         let ticks = circuit.add_source(Generator::new({
 ///             let mut tick: Tick = 0;
@@ -129,7 +132,58 @@ fn calculate_fall_damage(
 ///         Ok((standing_in, unsupported_in, velocity_in, fall.output()))
 ///     })
 ///     .expect("build fall damage stream");
-/// ```
+///
+/// let unsupported = PositionFloor {
+///     position: Position {
+///         entity: 1,
+///         x: OrderedFloat(0.0),
+///         y: OrderedFloat(0.0),
+///         z: OrderedFloat(5.0),
+///     },
+///     z_floor: OrderedFloat(0.0),
+/// };
+/// let landing = PositionFloor {
+///     position: Position {
+///         entity: 1,
+///         x: OrderedFloat(0.0),
+///         y: OrderedFloat(0.0),
+///         z: OrderedFloat(1.0),
+///     },
+///     z_floor: OrderedFloat(1.0),
+/// };
+/// let velocity = Velocity {
+///     entity: 1,
+///     vx: OrderedFloat(0.0),
+///     vy: OrderedFloat(0.0),
+///     vz: OrderedFloat(-8.0),
+/// };
+///
+/// unsupported_in.push(unsupported.clone(), 1);
+/// velocity_in.push(velocity, 1);
+/// circuit.step().expect("falling phase");
+///
+/// unsupported_in.push(unsupported, -1);
+/// standing_in.push(landing, 1);
+/// circuit.step().expect("landing phase");
+///
+/// let mut events: Vec<DamageEvent> = fall_output
+///     .consolidate()
+///     .iter()
+///     .map(|(event, _, weight)| {
+///         assert_eq!(weight, 1);
+///         event
+///     })
+///     .collect();
+/// assert_eq!(events.len(), 1);
+/// let event = events.pop().unwrap();
+/// assert_eq!(event.entity, 1);
+/// assert_eq!(event.source, DamageSource::Fall);
+///
+/// let expected_damage = ((8.0_f64.min(TERMINAL_VELOCITY) - SAFE_LANDING_SPEED)
+///     * FALL_DAMAGE_SCALE)
+///     .floor() as u16;
+/// assert_eq!(event.amount, expected_damage);
+/// assert_eq!(event.at_tick, 1);
 pub fn fall_damage_stream(
     standing: &Stream<RootCircuit, OrdZSet<PositionFloor>>,
     unsupported: &Stream<RootCircuit, OrdZSet<PositionFloor>>,

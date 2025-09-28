@@ -30,9 +30,9 @@ use crate::GRACE_DISTANCE;
 mod streams;
 mod types;
 pub use streams::{
-    apply_movement, fear_level_stream, floor_height_stream, fall_damage_stream, health_delta_stream,
-    highest_block_pair, movement_decision_stream, new_position_stream, new_velocity_stream,
-    position_floor_stream, standing_motion_stream, PositionFloor,
+    apply_movement, fall_damage_stream, fear_level_stream, floor_height_stream,
+    health_delta_stream, highest_block_pair, movement_decision_stream, new_position_stream,
+    new_velocity_stream, position_floor_stream, standing_motion_stream, PositionFloor,
 };
 
 pub use types::{
