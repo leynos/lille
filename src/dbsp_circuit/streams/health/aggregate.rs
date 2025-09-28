@@ -1,13 +1,12 @@
-//! Health aggregation streams.
+//! Health delta aggregation streams.
 //!
-//! These helpers reduce health snapshots and incoming damage events to
-//! authoritative [`HealthDelta`] records emitted by the DBSP circuit.
+//! Collapses incoming damage events and health snapshots into consolidated
+//! [`HealthDelta`] records for each entity.
 
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 
-use dbsp::{algebra::Semigroup, operator::Fold, typed_batch::OrdZSet, RootCircuit, Stream};
-
 use crate::dbsp_circuit::{DamageEvent, DamageSource, HealthDelta, HealthState};
+use dbsp::{algebra::Semigroup, operator::Fold, typed_batch::OrdZSet, RootCircuit, Stream};
 
 #[derive(
     ::rkyv::Archive,
@@ -142,6 +141,8 @@ fn signed_amount(event: &DamageEvent) -> i32 {
     }
 }
 
+/// Aggregates health state and damage inputs into canonical [`HealthDelta`]
+/// records.
 pub fn health_delta_stream(
     health_states: &Stream<RootCircuit, OrdZSet<HealthState>>,
     damage_events: &Stream<RootCircuit, OrdZSet<DamageEvent>>,
