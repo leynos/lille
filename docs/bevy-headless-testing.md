@@ -260,8 +260,7 @@ is active.
   components.10 Entities spawned with such a component are automatically
   despawned when the application exits the specified state. This greatly
   simplifies cleanup logic in tests. For example:
-  `commands.spawn((Name::new("TestPlayer"), StateScoped(GameState::InGame),
-  PlayerComponent));`
+  `commands.spawn((Name::new("TestPlayer"), StateScoped(GameState::InGame), PlayerComponent));`
 
 - **Programmatic State Transitions:** Tests can trigger state changes by
   modifying the `NextState<MyTestState>` resource:
