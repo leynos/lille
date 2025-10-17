@@ -7,16 +7,16 @@ these rules to keep the documentation clear and consistent for developers.
 
 - Use British English based on the
   [Oxford English Dictionary](https://public.oed.com/) (en-GB-oxendict):
-   - suffix -ize in words like _realize_ and _organization_ instead of
+  - suffix -ize in words like _realize_ and _organization_ instead of
      -ise endings,
-   - suffix ‑lyse in words not traced to the Greek ‑izo, ‑izein suffixes,
+  - suffix ‑lyse in words not traced to the Greek ‑izo, ‑izein suffixes,
      such as _analyse_, _paralyse_ and _catalyse_,
-   - suffix -our in words such as _colour_, _behaviour_ and _neighbour_,
-   - suffix -re in words such as _calibre_, _centre_ and fibre,
-   - double "l" in words such as _cancelled_, _counsellor_ and _cruellest_,
-   - maintain the "e" in words such as _likeable_, _liveable_ and _rateable_,
-   - suffix -ogue in words such as _analogue_ and _catalogue_,
-   - and so forth.
+  - suffix -our in words such as _colour_, _behaviour_ and _neighbour_,
+  - suffix -re in words such as _calibre_, _centre_ and fibre,
+  - double "l" in words such as _cancelled_, _counsellor_ and _cruellest_,
+  - maintain the "e" in words such as _likeable_, _liveable_ and _rateable_,
+  - suffix -ogue in words such as _analogue_ and _catalogue_,
+  - and so forth.
 - The word **"outwith"** is acceptable.
 - Keep US spelling when used in an API, for example `color`.
 - The project licence file is spelled `LICENSE` for community consistency.
@@ -122,31 +122,31 @@ flowchart TD
 ## Roadmap Task Writing Guidelines
 
 When documenting development roadmap items, write them so that they are
-achievable, measurable, and structured. This ensures the roadmap functions as
-a practical planning tool rather than a vague wishlist. Do not commit to
-timeframes in the roadmap. Development effort should be roughly consistent
-from task to task.
+achievable, measurable, and structured. This ensures the roadmap functions as a
+practical planning tool rather than a vague wishlist. Do not commit to
+timeframes in the roadmap. Development effort should be roughly consistent from
+task to task.
 
 ### Principles for Roadmap Tasks
 
 - Define outcomes, not intentions: Phrase tasks in terms of the capability
-  delivered (e.g. “Implement role-based access control for API endpoints”),
-  not aspirations like “Improve security”.
+  delivered (e.g. “Implement role-based access control for API endpoints”), not
+  aspirations like “Improve security”.
 - Quantify completion criteria: Attach measurable finish lines (e.g. “90%
   test coverage for new modules”, “response times under 200ms”, “all endpoints
   migrated”).
 - Break into atomic increments: Ensure tasks can be completed in weeks, not
   quarters. Large goals should be decomposed into clear, deliverable units.
 - Tie to dependencies and sequencing: Document prerequisites so tasks can be
-  scheduled realistically (e.g. “Introduce central logging service” before
-  “Add error dashboards”).
+  scheduled realistically (e.g. “Introduce central logging service” before “Add
+  error dashboards”).
 - Bound scope explicitly: Note both in-scope and out-of-scope elements (e.g.
   “Build analytics dashboard (excluding churn prediction)”).
 
 ### Hierarchy of Scope
 
-Roadmaps should be expressed in three layers of scope to maintain clarity
-and navigability:
+Roadmaps should be expressed in three layers of scope to maintain clarity and
+navigability:
 
 - Phases (strategic milestones) – Broad outcome-driven stages that represent
   significant capability shifts. Why the work matters.
@@ -155,6 +155,6 @@ and navigability:
 - Tasks (execution units) – Small, measurable pieces of work with clear
   acceptance criteria. How it gets done.
 
----
+______________________________________________________________________
 
 [^markdownlint]: A linter that enforces consistent Markdown formatting.
