@@ -29,7 +29,7 @@ fn apply_positions(
     world_handle: &mut WorldHandle,
 ) {
     let positions = state.circuit.new_position_out().consolidate();
-    for (pos, (), ()) in positions.iter() {
+    for (pos, (), _) in positions.iter() {
         let Some(&entity) = state.id_map.get(&pos.entity) else {
             continue;
         };
@@ -47,7 +47,7 @@ fn apply_positions(
 
 fn apply_velocities(state: &DbspState, write_query: &mut DbspWriteQuery<'_, '_>) {
     let velocities = state.circuit.new_velocity_out().consolidate();
-    for (vel, (), ()) in velocities.iter() {
+    for (vel, (), _) in velocities.iter() {
         let Some(&entity) = state.id_map.get(&vel.entity) else {
             continue;
         };
@@ -66,7 +66,7 @@ fn apply_health_deltas(
     world_handle: &mut WorldHandle,
 ) {
     let health_deltas = state.circuit.health_delta_out().consolidate();
-    for (delta, (), ()) in health_deltas.iter() {
+    for (delta, (), _) in health_deltas.iter() {
         let Ok(entity_key) = i64::try_from(delta.entity) else {
             warn!("health delta for unmappable entity {}", delta.entity);
             continue;
