@@ -10,6 +10,7 @@ use glam::Vec3;
 /// let magnitude = vec_mag(3.0, 4.0, 12.0);
 /// assert!((magnitude - 13.0).abs() < f32::EPSILON);
 /// ```
+#[must_use]
 pub fn vec_mag(component_x: f32, component_y: f32, component_z: f32) -> f32 {
     Vec3::new(component_x, component_y, component_z).length()
 }
@@ -32,6 +33,7 @@ pub fn vec_mag(component_x: f32, component_y: f32, component_z: f32) -> f32 {
 /// let zero = vec_normalize(0.0, 0.0, 0.0);
 /// assert_eq!(zero, (0.0, 0.0, 0.0));
 /// ```
+#[must_use]
 pub fn vec_normalize(component_x: f32, component_y: f32, component_z: f32) -> (f32, f32, f32) {
     let vector = Vec3::new(component_x, component_y, component_z);
     if !vector.is_finite() {
