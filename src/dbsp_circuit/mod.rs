@@ -46,13 +46,13 @@ fn within_grace(pf: &PositionFloor) -> bool {
 
 fn advance_tick(tick: &mut Tick) -> Tick {
     let current = *tick;
-    *tick = match current.checked_add(1) {
-        Some(next) => next,
-        None => {
+    *tick = current.checked_add(1).map_or_else(
+        || {
             debug_assert!(false, "tick counter overflowed u64");
             0
-        }
-    };
+        },
+        |next| next,
+    );
     current
 }
 
@@ -524,7 +524,7 @@ impl DbspCircuit {
 
     /// Clears all input collections to remove accumulated records.
     ///
-    /// Input ZSets retain data across [`DbspCircuit::step`] calls. Invoke this method after
+    /// Input `ZSets` retain data across [`DbspCircuit::step`] calls. Invoke this method after
     /// processing outputs each frame to ensure that stale input data does not affect future
     /// computations.
     ///
@@ -561,10 +561,15 @@ impl DbspCircuit {
 /// ```
 #[track_caller]
 pub fn step(circuit: &mut DbspCircuit) {
-    circuit.step().expect("DbspCircuit::step failed");
+    if let Err(err) = circuit.step() {
+        panic!("DbspCircuit::step failed: {err}");
+    }
 }
 
 /// Advances the circuit and includes context in panic messages.
+///
+/// # Panics
+/// Panics if the circuit evaluation fails.
 ///
 /// # Examples
 /// ```rust
@@ -574,14 +579,17 @@ pub fn step(circuit: &mut DbspCircuit) {
 /// ```
 #[track_caller]
 pub fn step_named(circuit: &mut DbspCircuit, ctx: &str) {
-    circuit
-        .step()
-        .unwrap_or_else(|e| panic!("DbspCircuit::step failed: {ctx}: {e}"));
+    if let Err(err) = circuit.step() {
+        panic!("DbspCircuit::step failed: {ctx}: {err}");
+    }
 }
 
 /// Attempts to advance the circuit by one tick.
 ///
 /// Returns an error if evaluation fails.
+///
+/// # Errors
+/// Returns any error produced by the underlying DBSP circuit evaluation.
 ///
 /// # Examples
 /// ```rust
