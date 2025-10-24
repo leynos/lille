@@ -5,15 +5,50 @@ use bevy::prelude::Resource;
 use crate::dbsp_circuit::DamageEvent;
 
 #[derive(Resource, Default)]
+/// Buffer collecting [`DamageEvent`] values before they are sent to DBSP.
 pub struct DamageInbox {
     events: Vec<DamageEvent>,
 }
 
 impl DamageInbox {
+    /// Queue a single [`DamageEvent`] for the next DBSP tick.
+    ///
+    /// # Examples
+    /// ```
+    /// use lille::dbsp_sync::DamageInbox;
+    /// use lille::DamageEvent;
+    ///
+    /// let mut inbox = DamageInbox::default();
+    /// inbox.push(DamageEvent {
+    ///     entity: 1,
+    ///     amount: 5,
+    ///     source: lille::DamageSource::External,
+    ///     at_tick: 42,
+    ///     seq: None,
+    /// });
+    /// ```
     pub fn push(&mut self, event: DamageEvent) {
         self.events.push(event);
     }
 
+    /// Extend the inbox with an iterable of events.
+    ///
+    /// # Examples
+    /// ```
+    /// use lille::dbsp_sync::DamageInbox;
+    /// use lille::{DamageEvent, DamageSource};
+    ///
+    /// let mut inbox = DamageInbox::default();
+    /// inbox.extend([
+    ///     DamageEvent {
+    ///         entity: 1,
+    ///         amount: 5,
+    ///         source: DamageSource::External,
+    ///         at_tick: 42,
+    ///         seq: None,
+    ///     },
+    /// ]);
+    /// ```
     pub fn extend<I>(&mut self, events: I)
     where
         I: IntoIterator<Item = DamageEvent>,
@@ -21,10 +56,38 @@ impl DamageInbox {
         self.events.extend(events);
     }
 
+    /// Drain all pending events, leaving the inbox empty.
+    ///
+    /// # Examples
+    /// ```
+    /// use lille::dbsp_sync::DamageInbox;
+    /// use lille::{DamageEvent, DamageSource};
+    ///
+    /// let mut inbox = DamageInbox::default();
+    /// inbox.push(DamageEvent {
+    ///     entity: 1,
+    ///     amount: 5,
+    ///     source: DamageSource::External,
+    ///     at_tick: 42,
+    ///     seq: None,
+    /// });
+    /// let drained: Vec<_> = inbox.drain().collect();
+    /// assert_eq!(drained.len(), 1);
+    /// assert!(inbox.is_empty());
+    /// ```
+    #[must_use]
     pub fn drain(&mut self) -> std::vec::Drain<'_, DamageEvent> {
         self.events.drain(..)
     }
 
+    /// Determine whether there are queued events awaiting processing.
+    ///
+    /// # Examples
+    /// ```
+    /// use lille::dbsp_sync::DamageInbox;
+    /// assert!(DamageInbox::default().is_empty());
+    /// ```
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.events.is_empty()
     }
