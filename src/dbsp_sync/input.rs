@@ -2,7 +2,6 @@
 
 use std::{collections::HashSet, convert::TryFrom, mem};
 
-use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use log::{debug, warn};
 
@@ -17,22 +16,14 @@ use dbsp::operator::input::ZSetHandle;
 
 use super::{DamageInbox, DbspState, IdQueries};
 
-type EntityRow = (
+type EntityRow<'w> = (
     Entity,
-    &'static DdlogId,
-    &'static Transform,
-    Option<&'static VelocityComp>,
-    Option<&'static TargetComp>,
-    Option<&'static mut Health>,
+    &'w DdlogId,
+    &'w Transform,
+    Option<&'w VelocityComp>,
+    Option<&'w TargetComp>,
+    Option<&'w mut Health>,
 );
-
-#[derive(SystemParam)]
-pub struct CacheQueries<'w, 's> {
-    entity_query: Query<'w, 's, EntityRow>,
-    force_query: Query<'w, 's, (Entity, &'static DdlogId, &'static ForceComp)>,
-    block_query: Query<'w, 's, (&'static Block, Option<&'static BlockSlope>)>,
-    id_queries: IdQueries<'w, 's>,
-}
 
 /// Initializes the [`DbspState`] resource in the provided [`World`].
 ///
@@ -53,9 +44,16 @@ pub fn init_dbsp_system(world: &mut World) -> Result<(), dbsp::Error> {
 /// ensuring the lookup is maintained without rebuilding the map each frame. It
 /// also refreshes the [`WorldHandle`] resource with the same cached data for
 /// tests and diagnostics.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "System boundary requires multiple Bevy resources."
+)]
 pub fn cache_state_for_dbsp_system(
     mut state: NonSendMut<DbspState>,
-    mut queries: CacheQueries,
+    mut entity_query: Query<EntityRow<'_>>,
+    force_query: Query<(Entity, &DdlogId, &ForceComp)>,
+    block_query: Query<(&Block, Option<&BlockSlope>)>,
+    mut id_queries: IdQueries,
     mut damage_inbox: ResMut<DamageInbox>,
     mut world_handle: ResMut<WorldHandle>,
 ) {
@@ -67,14 +65,10 @@ pub fn cache_state_for_dbsp_system(
     let pending_damage = mem::take(&mut state.pending_damage_retractions);
     state.expected_health_retractions.clear();
 
-    sync::blocks(
-        &mut state.circuit,
-        &queries.block_query,
-        world_handle.as_mut(),
-    );
-    sync::id_maps(&mut state, &mut queries.id_queries);
-    sync::entities(&mut state, &mut queries.entity_query, world_handle.as_mut());
-    sync::forces(&mut state, &queries.force_query);
+    sync::blocks(&mut state.circuit, &block_query, world_handle.as_mut());
+    sync::id_maps(&mut state, &mut id_queries);
+    sync::entities(&mut state, &mut entity_query, world_handle.as_mut());
+    sync::forces(&mut state, &force_query);
 
     apply_health_snapshot_retractions(&mut state.circuit, &previous_snapshots);
     apply_damage_retractions(&mut state, pending_damage);
@@ -184,7 +178,7 @@ mod sync {
 
     pub(super) fn entities(
         state: &mut DbspState,
-        query: &mut Query<EntityRow>,
+        query: &mut Query<EntityRow<'_>>,
         world: &mut WorldHandle,
     ) {
         sync_positions(state, query, world);
@@ -197,7 +191,7 @@ mod sync {
     /// Synchronises entity positions with the DBSP circuit.
     fn sync_positions(
         state: &mut DbspState,
-        query: &mut Query<EntityRow>,
+        query: &mut Query<EntityRow<'_>>,
         world: &mut WorldHandle,
     ) {
         let circuit = &state.circuit;
@@ -216,7 +210,7 @@ mod sync {
     }
 
     /// Synchronises entity velocities with the DBSP circuit.
-    fn sync_velocities(state: &mut DbspState, query: &mut Query<EntityRow>) {
+    fn sync_velocities(state: &mut DbspState, query: &mut Query<EntityRow<'_>>) {
         sync_component(
             state,
             query,
@@ -232,7 +226,7 @@ mod sync {
     }
 
     /// Synchronises entity targets with the DBSP circuit.
-    fn sync_targets(state: &mut DbspState, query: &mut Query<EntityRow>) {
+    fn sync_targets(state: &mut DbspState, query: &mut Query<EntityRow<'_>>) {
         sync_component(
             state,
             query,
@@ -247,7 +241,7 @@ mod sync {
     }
 
     /// Mirrors entity health into the circuit, enforcing clamps and logging once.
-    fn sync_health(state: &mut DbspState, query: &mut Query<EntityRow>) {
+    fn sync_health(state: &mut DbspState, query: &mut Query<EntityRow<'_>>) {
         let circuit = &state.circuit;
         for (_, id, _, _, _, health) in query.iter_mut() {
             let Some(mut health) = health else {
@@ -282,12 +276,12 @@ mod sync {
     /// Generic helper for syncing entity components to DBSP circuit inputs.
     fn sync_component<T, S, F, G, H>(
         state: &mut DbspState,
-        query: &mut Query<EntityRow>,
+        query: &mut Query<EntityRow<'_>>,
         extract_component: F,
         create_struct: G,
         get_input_handle: H,
     ) where
-        F: Fn(&EntityRow) -> Option<T>,
+        F: Fn(&EntityRow<'_>) -> Option<T>,
         G: Fn(i64, T) -> S,
         H: Fn(&DbspCircuit) -> &ZSetHandle<S>,
         S: Clone + dbsp::DBData,
@@ -311,7 +305,7 @@ mod sync {
     }
 
     /// Rebuilds the cached world representation from the ECS query results.
-    fn update_world_handle(query: &mut Query<EntityRow>, world: &mut WorldHandle) {
+    fn update_world_handle(query: &mut Query<EntityRow<'_>>, world: &mut WorldHandle) {
         for (_, id, transform, _, target, health) in query.iter_mut() {
             let entry = world
                 .entities
