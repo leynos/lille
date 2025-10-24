@@ -9,6 +9,18 @@ use dbsp::utils::Tup2;
 use dbsp::{typed_batch::OrdZSet, RootCircuit, Stream};
 use ordered_float::OrderedFloat;
 
+#[expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "Value is clamped to the `u16` domain before conversion."
+)]
+fn floored_to_u16(value: f64) -> Option<u16> {
+    if !(0.0..=f64::from(u16::MAX)).contains(&value) {
+        return None;
+    }
+    Some(value as u16)
+}
+
 fn detect_landings(
     standing: &Stream<RootCircuit, OrdZSet<PositionFloor>>,
     unsupported: &Stream<RootCircuit, OrdZSet<PositionFloor>>,
@@ -18,7 +30,7 @@ fn detect_landings(
 
     prev_unsupported.map_index(|entity| (*entity, ())).join(
         &standing_entities.map_index(|entity| (*entity, ())),
-        |entity, _, _| *entity,
+        |entity, (), ()| *entity,
     )
 }
 
@@ -37,7 +49,7 @@ fn apply_landing_cooldown(
     landings
         .map_index(|entity| (*entity, ()))
         .antijoin(&cooling_entities)
-        .map(|(entity, _)| *entity)
+        .map(|(entity, ())| *entity)
 }
 
 fn calculate_fall_damage(
@@ -66,12 +78,9 @@ fn calculate_fall_damage(
             if weight == 0 {
                 continue;
             }
-            let entity_id = match u64::try_from(entity) {
-                Ok(id) => id,
-                Err(_) => {
-                    debug_assert!(false, "negative entity id {entity}");
-                    continue;
-                }
+            let Ok(entity_id) = u64::try_from(entity) else {
+                debug_assert!(false, "negative entity id {entity}");
+                continue;
             };
             let clamped_speed = speed.into_inner().min(TERMINAL_VELOCITY);
             let excess = clamped_speed - SAFE_LANDING_SPEED;
@@ -79,13 +88,10 @@ fn calculate_fall_damage(
                 continue;
             }
             let scaled = excess * FALL_DAMAGE_SCALE;
-            if scaled <= 0.0 {
+            let floored = scaled.min(f64::from(u16::MAX)).floor();
+            let Some(damage) = floored_to_u16(floored) else {
                 continue;
-            }
-            let damage = scaled.min(f64::from(u16::MAX)).floor() as u16;
-            if damage == 0 {
-                continue;
-            }
+            };
             let event = DamageEvent {
                 entity: entity_id,
                 amount: damage,
@@ -184,6 +190,7 @@ fn calculate_fall_damage(
 ///     .floor() as u16;
 /// assert_eq!(event.amount, expected_damage);
 /// assert_eq!(event.at_tick, 1);
+#[must_use]
 pub fn fall_damage_stream(
     standing: &Stream<RootCircuit, OrdZSet<PositionFloor>>,
     unsupported: &Stream<RootCircuit, OrdZSet<PositionFloor>>,
