@@ -30,6 +30,7 @@ const MIN_MASS: f64 = 1e-12;
     clippy::assertions_on_constants,
     reason = "debug-time validation of default mass"
 )]
+#[must_use]
 pub fn applied_acceleration(force: (f64, f64, f64), mass: Option<f64>) -> Option<(f64, f64, f64)> {
     debug_assert!(
         DEFAULT_MASS > MIN_MASS,
@@ -67,6 +68,7 @@ pub fn applied_acceleration(force: (f64, f64, f64), mass: Option<f64>) -> Option
     clippy::assertions_on_constants,
     reason = "debug-time validation of ground friction"
 )]
+#[must_use]
 pub fn apply_ground_friction(v: f64) -> f64 {
     use crate::GROUND_FRICTION;
 
