@@ -18,20 +18,18 @@ use crate::dbsp_circuit::{FloorHeightAt, HighestBlockAt};
 /// block id so that subsequent joins can access slope information.
 ///
 /// # Examples
-///
 /// ```rust,no_run
-/// # fn main() -> Result<(), dbsp::Error> {
-/// # use lille::prelude::*;
-/// # use dbsp::{RootCircuit, typed_batch::OrdZSet};
-/// # use lille::dbsp_circuit::highest_block_pair;
-/// RootCircuit::build(|circuit| {
-///     let (stream, _handle) = circuit.add_input_zset::<Block>();
-///     let _highest = lille::dbsp_circuit::highest_block_pair(&stream);
-///     Ok(())
-/// })?;
-/// # Ok::<(), dbsp::Error>(())
-/// # }
+/// # use anyhow::Error;
+/// # use dbsp::RootCircuit;
+/// # use lille::components::Block;
+/// # use lille::dbsp_circuit::streams::floor::highest_block_pair;
+/// # let _ = RootCircuit::build(|circuit| -> Result<(), Error> {
+/// #     let (blocks, _) = circuit.add_input_zset::<Block>();
+/// #     let _ = highest_block_pair(&blocks);
+/// #     Ok(())
+/// # });
 /// ```
+#[must_use]
 pub fn highest_block_pair(
     blocks: &Stream<RootCircuit, OrdZSet<Block>>,
 ) -> Stream<RootCircuit, OrdZSet<(HighestBlockAt, i64)>> {
@@ -56,6 +54,22 @@ pub fn highest_block_pair(
 /// [`BlockSlope`] record. When slope data is present the returned
 /// [`FloorHeightAt`] accounts for the block's gradient, producing a smooth
 /// surface. Missing slope data falls back to a flat top.
+///
+/// # Examples
+/// ```rust,no_run
+/// # use anyhow::Error;
+/// # use dbsp::RootCircuit;
+/// # use lille::components::{Block, BlockSlope};
+/// # use lille::dbsp_circuit::streams::floor::{floor_height_stream, highest_block_pair};
+/// # let _ = RootCircuit::build(|circuit| -> Result<(), Error> {
+/// #     let (blocks, _) = circuit.add_input_zset::<Block>();
+/// #     let highest = highest_block_pair(&blocks);
+/// #     let (slopes, _) = circuit.add_input_zset::<BlockSlope>();
+/// #     let _ = floor_height_stream(&highest, &slopes);
+/// #     Ok(())
+/// # });
+/// ```
+#[must_use]
 pub fn floor_height_stream(
     highest_pair: &Stream<RootCircuit, OrdZSet<(HighestBlockAt, i64)>>,
     slopes: &Stream<RootCircuit, OrdZSet<BlockSlope>>,
@@ -65,7 +79,7 @@ pub fn floor_height_stream(
         .outer_join(
             &slopes.map_index(|bs| (bs.block_id, (bs.grad_x, bs.grad_y))),
             |_, &(x, y, z), &(gx, gy)| {
-                let base = z as f64 + BLOCK_TOP_OFFSET;
+                let base = f64::from(z) + BLOCK_TOP_OFFSET;
                 let gradient = BLOCK_CENTRE_OFFSET * (gx.into_inner() + gy.into_inner());
                 Some(FloorHeightAt {
                     x,
@@ -77,7 +91,7 @@ pub fn floor_height_stream(
                 Some(FloorHeightAt {
                     x,
                     y,
-                    z: OrderedFloat(z as f64 + BLOCK_TOP_OFFSET),
+                    z: OrderedFloat(f64::from(z) + BLOCK_TOP_OFFSET),
                 })
             },
             |_, _| None,
