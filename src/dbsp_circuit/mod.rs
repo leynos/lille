@@ -44,6 +44,18 @@ fn within_grace(pf: &PositionFloor) -> bool {
     pf.position.z.into_inner() <= pf.z_floor.into_inner() + GRACE_DISTANCE
 }
 
+fn advance_tick(tick: &mut Tick) -> Tick {
+    let current = *tick;
+    *tick = match current.checked_add(1) {
+        Some(next) => next,
+        None => {
+            debug_assert!(false, "tick counter overflowed u64");
+            0
+        }
+    };
+    current
+}
+
 /// Authoritative DBSP dataflow for Lille's world simulation.
 ///
 /// `DbspCircuit` owns the underlying [`RootCircuit`] and exposes typed
@@ -200,17 +212,7 @@ impl DbspCircuit {
 
         let tick_source = circuit.add_source(Generator::new({
             let mut tick: Tick = 0;
-            move || {
-                let current = tick;
-                tick = match tick.checked_add(1) {
-                    Some(next) => next,
-                    None => {
-                        debug_assert!(false, "tick counter overflowed u64");
-                        0
-                    }
-                };
-                current
-            }
+            move || advance_tick(&mut tick)
         }));
         let current_tick = tick_source;
 
