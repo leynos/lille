@@ -1,18 +1,14 @@
 //! Input synchronisation systems bridging Bevy ECS into the DBSP circuit.
 
-use std::{collections::HashSet, convert::TryFrom, mem};
+use std::{collections::HashSet, mem};
 
 use bevy::prelude::*;
-use log::{debug, warn};
 
 use crate::components::{
     Block, BlockSlope, DdlogId, ForceComp, Health, Target as TargetComp, VelocityComp,
 };
-use crate::dbsp_circuit::{
-    DamageEvent, DbspCircuit, Force, HealthState, Position, Target, Velocity,
-};
-use crate::world_handle::{DdlogEntity, WorldHandle};
-use dbsp::operator::input::ZSetHandle;
+use crate::dbsp_circuit::{DamageEvent, DbspCircuit, HealthState};
+use crate::world_handle::WorldHandle;
 
 use super::{DamageInbox, DbspState, IdQueries};
 
@@ -121,7 +117,17 @@ fn ingest_damage_events(state: &mut DbspState, inbox: &mut DamageInbox) {
 }
 
 mod sync {
-    use super::*;
+    use std::convert::TryFrom;
+
+    use bevy::prelude::{Entity, Query};
+    use dbsp::operator::input::ZSetHandle;
+    use log::{debug, warn};
+
+    use crate::components::{Block, BlockSlope, DdlogId, ForceComp, Health};
+    use crate::dbsp_circuit::{DbspCircuit, Force, HealthState, Position, Target, Velocity};
+    use crate::world_handle::{DdlogEntity, WorldHandle};
+
+    use super::{DbspState, EntityRow, IdQueries};
 
     pub(super) fn blocks(
         circuit: &mut DbspCircuit,
@@ -250,12 +256,12 @@ mod sync {
     /// Mirrors entity health into the circuit, enforcing clamps and logging once.
     fn sync_health(state: &mut DbspState, query: &mut Query<EntityRow<'_>>) {
         let circuit = &state.circuit;
-        for (_, id, _, _, _, health_opt) in query.iter_mut() {
-            let Some(health) = health_opt else {
+        for (_, id, _, _, _, mut health_opt) in query.iter_mut() {
+            let Some(health) = health_opt.as_deref_mut() else {
                 continue;
             };
             let original_current = health.current;
-            let (clamped_current, max_value, was_clamped) = clamp_health_values(health.as_ref());
+            let (clamped_current, max_value, was_clamped) = clamp_health_values(health);
             if was_clamped {
                 debug!(
                     "health current {} clamped to {} for entity {}",
@@ -298,7 +304,7 @@ mod sync {
         S: Clone + dbsp::DBData,
     {
         let circuit = &state.circuit;
-        for (entity, id, transform, velocity, target, health_opt) in query.iter_mut() {
+        for (entity, id, transform, velocity, target, mut health_opt) in query.iter_mut() {
             let entity_key = id.0;
             let row_view = (
                 entity,

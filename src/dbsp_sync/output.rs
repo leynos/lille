@@ -60,6 +60,10 @@ fn apply_velocities(state: &DbspState, write_query: &mut DbspWriteQuery<'_, '_>)
     }
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "Health delta processing requires multiple early exits for data validation."
+)]
 fn apply_health_deltas(
     state: &mut DbspState,
     write_query: &mut DbspWriteQuery<'_, '_>,
@@ -83,7 +87,7 @@ fn apply_health_deltas(
             continue;
         };
         let key = (delta.at_tick, delta.seq);
-        if !should_apply_health_delta(state, delta, key) {
+        if !should_apply_health_delta(state, &delta, key) {
             continue;
         }
         let current = i32::from(health.current);
@@ -152,7 +156,6 @@ fn f32_from_f64(value: f64) -> f32 {
 ///
 /// Outputs are drained after application to prevent reapplying stale deltas on
 /// subsequent frames.
-#[allow(clippy::type_complexity)]
 pub fn apply_dbsp_outputs_system(
     mut state: NonSendMut<DbspState>,
     mut write_query: DbspWriteQuery<'_, '_>,
