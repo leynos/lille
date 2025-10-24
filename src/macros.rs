@@ -51,6 +51,24 @@
 //! ```
 //!
 //! A `Copy` bound on the generic parameter is required: `dbsp_record! { pub struct G<T: Copy> { pub t: T }, Copy,, }`
+/// Define a DBSP record struct with consistent derives for archiving and
+/// ordering.
+///
+/// Prefer this macro when declaring types that flow through DBSP streams so
+/// they automatically derive the traits expected by the circuit. Extra derive
+/// paths can be passed after the struct definition.
+///
+/// # Examples
+/// ```
+/// use lille::dbsp_record;
+/// dbsp_record! {
+///     /// Record describing a position update.
+///     pub struct Position {
+///         pub x: i32,
+///         pub y: i32,
+///     }
+/// }
+/// ```
 #[macro_export]
 macro_rules! dbsp_record {
     ($(#[$meta:meta])* $vis:vis struct $name:ident { $($fields:tt)* } $(, $extra:tt)* $(,)? ) => {
@@ -75,8 +93,11 @@ macro_rules! dbsp_record {
     };
 }
 
-/// Convenience wrapper around `dbsp_record!` that also derives `Copy`.
-/// Do not include `Copy` in extras to avoid duplicate derives.
+/// Convenience wrapper around [`dbsp_record!`] that additionally derives
+/// [`Copy`].
+///
+/// Use this macro when all fields are trivially copyable and you want to avoid
+/// cloning at call sites. Do not include `Copy` in the extra derive list.
 #[macro_export]
 macro_rules! dbsp_copy_record {
     ($(#[$meta:meta])* $vis:vis struct $name:ident { $($fields:tt)* } $(, $extra:tt)* $(,)? ) => {
