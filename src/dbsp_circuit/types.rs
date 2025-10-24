@@ -46,7 +46,10 @@ pub enum DamageSource {
     /// Script-driven healing or scripted damage applied upstream.
     Script,
     /// Placeholder for bespoke downstream discriminators.
-    Other { code: u16 },
+    Other {
+        /// User-defined discriminator.
+        code: u16,
+    },
 }
 
 crate::dbsp_copy_record! {
