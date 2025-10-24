@@ -6,7 +6,7 @@ use bevy::prelude::*;
 use log::{debug, error, warn};
 
 use crate::components::{DdlogId, Health, VelocityComp};
-use crate::dbsp_circuit::try_step;
+use crate::dbsp_circuit::{try_step, HealthDelta, Tick};
 use crate::world_handle::WorldHandle;
 
 use super::DbspState;
@@ -83,18 +83,7 @@ fn apply_health_deltas(
             continue;
         };
         let key = (delta.at_tick, delta.seq);
-        if state
-            .expected_health_retractions
-            .remove(&(delta.entity, delta.at_tick, delta.seq))
-        {
-            continue;
-        }
-        if state.applied_health.get(&delta.entity) == Some(&key) {
-            debug!(
-                "duplicate health delta ignored for entity {} at tick {} seq {:?}",
-                delta.entity, delta.at_tick, delta.seq
-            );
-            state.health_duplicate_count += 1;
+        if !should_apply_health_delta(state, delta, key) {
             continue;
         }
         let current = i32::from(health.current);
@@ -119,6 +108,28 @@ fn apply_health_deltas(
     }
 }
 
+fn should_apply_health_delta(
+    state: &mut DbspState,
+    delta: &HealthDelta,
+    key: (Tick, Option<u32>),
+) -> bool {
+    if state
+        .expected_health_retractions
+        .remove(&(delta.entity, delta.at_tick, delta.seq))
+    {
+        return false;
+    }
+    if state.applied_health.get(&delta.entity) == Some(&key) {
+        debug!(
+            "duplicate health delta ignored for entity {} at tick {} seq {:?}",
+            delta.entity, delta.at_tick, delta.seq
+        );
+        state.health_duplicate_count += 1;
+        return false;
+    }
+    true
+}
+
 #[expect(
     clippy::cast_possible_truncation,
     reason = "Transforms require f32; inputs validated to remain within f32 range."
@@ -141,7 +152,7 @@ fn f32_from_f64(value: f64) -> f32 {
 ///
 /// Outputs are drained after application to prevent reapplying stale deltas on
 /// subsequent frames.
-#[expect(clippy::type_complexity, reason = "Bevy query tuples are idiomatic")]
+#[allow(clippy::type_complexity)]
 pub fn apply_dbsp_outputs_system(
     mut state: NonSendMut<DbspState>,
     mut write_query: DbspWriteQuery<'_, '_>,
