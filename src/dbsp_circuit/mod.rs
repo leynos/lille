@@ -18,7 +18,6 @@
 //! # use lille::dbsp_circuit::step as _;
 //! ```
 
-use anyhow::Error as AnyError;
 use dbsp::circuit::Circuit;
 use dbsp::{
     operator::Generator, typed_batch::OrdZSet, CircuitHandle, OutputHandle, RootCircuit, ZSetHandle,
@@ -39,6 +38,10 @@ pub use types::{
     DamageEvent, DamageSource, EntityId, FearLevel, FloorHeightAt, Force, HealthDelta, HealthState,
     HighestBlockAt, MovementDecision, NewPosition, NewVelocity, Position, Target, Tick, Velocity,
 };
+
+fn within_grace(pf: &PositionFloor) -> bool {
+    pf.position.z.into_inner() <= pf.z_floor.into_inner() + GRACE_DISTANCE
+}
 
 /// Authoritative DBSP dataflow for Lille's world simulation.
 ///
@@ -122,6 +125,9 @@ impl DbspCircuit {
     ///
     /// A new `DbspCircuit` instance on success, or a DBSP error if circuit construction fails.
     ///
+    /// # Errors
+    /// Returns a DBSP error if the underlying circuit fails to build.
+    ///
     /// # Examples
     ///
     /// ```rust,no_run
@@ -176,7 +182,7 @@ impl DbspCircuit {
         self.circuit.step()
     }
 
-    fn build_streams(circuit: &mut RootCircuit) -> Result<BuildHandles, AnyError> {
+    fn build_streams(circuit: &mut RootCircuit) -> BuildHandles {
         let (positions, position_in) = circuit.add_input_zset::<Position>();
         let (velocities, velocity_in) = circuit.add_input_zset::<Velocity>();
         let (forces, force_in) = circuit.add_input_zset::<Force>();
@@ -191,7 +197,10 @@ impl DbspCircuit {
             let mut tick: Tick = 0;
             move || {
                 let current = tick;
-                tick = tick.checked_add(1).expect("tick counter overflowed u64");
+                tick = tick.checked_add(1).unwrap_or_else(|| {
+                    debug_assert!(false, "tick counter overflowed u64");
+                    0
+                });
                 current
             }
         }));
@@ -203,9 +212,6 @@ impl DbspCircuit {
 
         let pos_floor = position_floor_stream(&positions, &floor_height);
 
-        fn within_grace(pf: &PositionFloor) -> bool {
-            pf.position.z.into_inner() <= pf.z_floor.into_inner() + GRACE_DISTANCE
-        }
         let unsupported = pos_floor.filter(|pf| !within_grace(pf));
         let standing = pos_floor.filter(within_grace);
 
@@ -213,7 +219,7 @@ impl DbspCircuit {
         let all_new_vel = new_velocity_stream(&velocities, &forces);
         let unsupported_velocities = all_new_vel.map_index(|v| (v.entity, *v)).join(
             &unsupported.map_index(|pf| (pf.position.entity, ())),
-            |_, vel, _| *vel,
+            |_, vel, ()| *vel,
         );
         let new_pos_unsupported =
             new_position_stream(&unsupported_positions, &unsupported_velocities);
@@ -239,7 +245,7 @@ impl DbspCircuit {
 
         let health_deltas = health_delta_stream(&health_states, &damage_with_fall);
 
-        Ok(BuildHandles {
+        BuildHandles {
             position_in,
             velocity_in,
             force_in,
@@ -255,7 +261,7 @@ impl DbspCircuit {
             floor_height_out: floor_height.output(),
             position_floor_out: pos_floor.output(),
             health_delta_out: health_deltas.output(),
-        })
+        }
     }
 
     /// Returns a reference to the input handle for feeding position records into the circuit.
@@ -271,7 +277,7 @@ impl DbspCircuit {
     /// let position_handle = circuit.position_in();
     /// // Feed positions into the circuit using `position_handle`
     /// ```
-    pub fn position_in(&self) -> &ZSetHandle<Position> {
+    pub const fn position_in(&self) -> &ZSetHandle<Position> {
         &self.position_in
     }
 
@@ -296,7 +302,7 @@ impl DbspCircuit {
     ///     1,
     /// );
     /// ```
-    pub fn velocity_in(&self) -> &ZSetHandle<Velocity> {
+    pub const fn velocity_in(&self) -> &ZSetHandle<Velocity> {
         &self.velocity_in
     }
 
@@ -324,7 +330,7 @@ impl DbspCircuit {
     ///     1,
     /// );
     /// ```
-    pub fn force_in(&self) -> &ZSetHandle<Force> {
+    pub const fn force_in(&self) -> &ZSetHandle<Force> {
         &self.force_in
     }
 
@@ -342,7 +348,7 @@ impl DbspCircuit {
     /// let handle = circuit.fear_in();
     /// handle.push(FearLevel { entity: 1, level: OrderedFloat(0.5) }, 1);
     /// ```
-    pub fn fear_in(&self) -> &ZSetHandle<FearLevel> {
+    pub const fn fear_in(&self) -> &ZSetHandle<FearLevel> {
         &self.fear_in
     }
 
@@ -360,17 +366,17 @@ impl DbspCircuit {
     ///     1,
     /// );
     /// ```
-    pub fn target_in(&self) -> &ZSetHandle<Target> {
+    pub const fn target_in(&self) -> &ZSetHandle<Target> {
         &self.target_in
     }
 
     /// Returns a reference to the input handle for entity health snapshots.
-    pub fn health_state_in(&self) -> &ZSetHandle<HealthState> {
+    pub const fn health_state_in(&self) -> &ZSetHandle<HealthState> {
         &self.health_state_in
     }
 
     /// Returns a reference to the damage/healing input stream.
-    pub fn damage_in(&self) -> &ZSetHandle<DamageEvent> {
+    pub const fn damage_in(&self) -> &ZSetHandle<DamageEvent> {
         &self.damage_in
     }
 
@@ -387,7 +393,7 @@ impl DbspCircuit {
     /// let block_handle = circuit.block_in();
     /// // Feed block data into the circuit using `block_handle`
     /// ```
-    pub fn block_in(&self) -> &ZSetHandle<Block> {
+    pub const fn block_in(&self) -> &ZSetHandle<Block> {
         &self.block_in
     }
 
@@ -405,7 +411,7 @@ impl DbspCircuit {
     /// let slope_handle = circuit.block_slope_in();
     /// // Feed block slope data into the circuit using `slope_handle`
     /// ```
-    pub fn block_slope_in(&self) -> &ZSetHandle<BlockSlope> {
+    pub const fn block_slope_in(&self) -> &ZSetHandle<BlockSlope> {
         &self.block_slope_in
     }
 
@@ -422,7 +428,7 @@ impl DbspCircuit {
     /// let new_positions = circuit.new_position_out();
     /// // Read new positions from the output handle
     /// ```
-    pub fn new_position_out(&self) -> &OutputHandle<OrdZSet<NewPosition>> {
+    pub const fn new_position_out(&self) -> &OutputHandle<OrdZSet<NewPosition>> {
         &self.new_position_out
     }
 
@@ -440,7 +446,7 @@ impl DbspCircuit {
     /// let velocities = circuit.new_velocity_out();
     /// // Use `velocities` to read updated velocity data.
     /// ```
-    pub fn new_velocity_out(&self) -> &OutputHandle<OrdZSet<NewVelocity>> {
+    pub const fn new_velocity_out(&self) -> &OutputHandle<OrdZSet<NewVelocity>> {
         &self.new_velocity_out
     }
 
@@ -458,7 +464,7 @@ impl DbspCircuit {
     /// let highest_block_handle = circuit.highest_block_out();
     /// // Use `highest_block_handle` to read aggregated highest block data.
     /// ```
-    pub fn highest_block_out(&self) -> &OutputHandle<OrdZSet<HighestBlockAt>> {
+    pub const fn highest_block_out(&self) -> &OutputHandle<OrdZSet<HighestBlockAt>> {
         &self.highest_block_out
     }
 
@@ -477,7 +483,7 @@ impl DbspCircuit {
     /// let floor_heights = circuit.floor_height_out();
     /// // Read computed floor heights from the output handle
     /// ```
-    pub fn floor_height_out(&self) -> &OutputHandle<OrdZSet<FloorHeightAt>> {
+    pub const fn floor_height_out(&self) -> &OutputHandle<OrdZSet<FloorHeightAt>> {
         &self.floor_height_out
     }
 
@@ -497,12 +503,12 @@ impl DbspCircuit {
     /// let joined = circuit.position_floor_out();
     /// // Read joined records from `joined`
     /// ```
-    pub fn position_floor_out(&self) -> &OutputHandle<OrdZSet<PositionFloor>> {
+    pub const fn position_floor_out(&self) -> &OutputHandle<OrdZSet<PositionFloor>> {
         &self.position_floor_out
     }
 
     /// Returns a reference to the health delta output handle.
-    pub fn health_delta_out(&self) -> &OutputHandle<OrdZSet<HealthDelta>> {
+    pub const fn health_delta_out(&self) -> &OutputHandle<OrdZSet<HealthDelta>> {
         &self.health_delta_out
     }
 
