@@ -29,6 +29,9 @@ type EntityRow<'w> = (
 ///
 /// Call this once during Bevy startup before running any DBSP synchronisation
 /// systems.
+///
+/// # Errors
+/// Returns any error produced while constructing the DBSP circuit.
 pub fn init_dbsp_system(world: &mut World) -> Result<(), dbsp::Error> {
     let state = DbspState::new()?;
     world.insert_non_send_resource(state);
@@ -44,6 +47,10 @@ pub fn init_dbsp_system(world: &mut World) -> Result<(), dbsp::Error> {
 /// ensuring the lookup is maintained without rebuilding the map each frame. It
 /// also refreshes the [`WorldHandle`] resource with the same cached data for
 /// tests and diagnostics.
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Bevy systems receive queries by value."
+)]
 #[expect(
     clippy::too_many_arguments,
     reason = "System boundary requires multiple Bevy resources."
@@ -199,9 +206,9 @@ mod sync {
             circuit.position_in().push(
                 Position {
                     entity: id.0,
-                    x: (transform.translation.x as f64).into(),
-                    y: (transform.translation.y as f64).into(),
-                    z: (transform.translation.z as f64).into(),
+                    x: f64::from(transform.translation.x).into(),
+                    y: f64::from(transform.translation.y).into(),
+                    z: f64::from(transform.translation.z).into(),
                 },
                 1,
             );
@@ -217,9 +224,9 @@ mod sync {
             |row| Some(row.3.map(|v| (v.vx, v.vy, v.vz)).unwrap_or_default()),
             |entity, (vx, vy, vz)| Velocity {
                 entity,
-                vx: (vx as f64).into(),
-                vy: (vy as f64).into(),
-                vz: (vz as f64).into(),
+                vx: f64::from(vx).into(),
+                vy: f64::from(vy).into(),
+                vz: f64::from(vz).into(),
             },
             |circuit: &DbspCircuit| circuit.velocity_in(),
         );
@@ -233,8 +240,8 @@ mod sync {
             |row| row.4.map(|t| (t.x, t.y)),
             |entity, (x, y)| Target {
                 entity,
-                x: (x as f64).into(),
-                y: (y as f64).into(),
+                x: f64::from(x).into(),
+                y: f64::from(y).into(),
             },
             |circuit: &DbspCircuit| circuit.target_in(),
         );
@@ -243,8 +250,8 @@ mod sync {
     /// Mirrors entity health into the circuit, enforcing clamps and logging once.
     fn sync_health(state: &mut DbspState, query: &mut Query<EntityRow<'_>>) {
         let circuit = &state.circuit;
-        for (_, id, _, _, _, health) in query.iter_mut() {
-            let Some(mut health) = health else {
+        for (_, id, _, _, _, health_opt) in query.iter_mut() {
+            let Some(health) = health_opt else {
                 continue;
             };
             let original_current = health.current;
@@ -274,6 +281,10 @@ mod sync {
     }
 
     /// Generic helper for syncing entity components to DBSP circuit inputs.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "Helper coordinates multiple callback parameters for flexibility."
+    )]
     fn sync_component<T, S, F, G, H>(
         state: &mut DbspState,
         query: &mut Query<EntityRow<'_>>,
@@ -287,7 +298,7 @@ mod sync {
         S: Clone + dbsp::DBData,
     {
         let circuit = &state.circuit;
-        for (entity, id, transform, velocity, target, mut health) in query.iter_mut() {
+        for (entity, id, transform, velocity, target, health_opt) in query.iter_mut() {
             let entity_key = id.0;
             let row_view = (
                 entity,
@@ -295,7 +306,7 @@ mod sync {
                 transform,
                 velocity,
                 target,
-                health.as_deref_mut(),
+                health_opt.as_deref_mut(),
             );
             if let Some(component_data) = extract_component(&row_view) {
                 let input_struct = create_struct(entity_key, component_data);
