@@ -10,6 +10,7 @@ use super::{
 };
 
 #[derive(Default)]
+/// Bevy plugin installing systems that synchronise DBSP with the ECS world.
 pub struct DbspPlugin;
 
 impl Plugin for DbspPlugin {
