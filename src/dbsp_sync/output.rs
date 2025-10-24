@@ -11,6 +11,20 @@ use crate::world_handle::WorldHandle;
 
 use super::DbspState;
 
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "Transforms require f32; inputs validated to remain within f32 range."
+)]
+fn f32_from_f64(value: f64) -> f32 {
+    debug_assert!(value.is_finite(), "non-finite translation value");
+    debug_assert!(
+        value <= f64::from(f32::MAX),
+        "translation exceeds f32 range"
+    );
+    debug_assert!(value >= f64::from(f32::MIN), "translation below f32 range");
+    value as f32
+}
+
 /// Applies DBSP outputs back to ECS components.
 ///
 /// Steps the circuit, consolidates new positions and velocities, and updates
@@ -40,27 +54,31 @@ pub fn apply_dbsp_outputs_system(
 
     let positions = state.circuit.new_position_out().consolidate();
     for (pos, _, _) in positions.iter() {
-        if let Some(&entity) = state.id_map.get(&pos.entity) {
-            if let Ok((_, mut transform, _, _)) = write_query.get_mut(entity) {
-                transform.translation.x = pos.x.into_inner() as f32;
-                transform.translation.y = pos.y.into_inner() as f32;
-                transform.translation.z = pos.z.into_inner() as f32;
-                if let Some(entry) = world_handle.entities.get_mut(&pos.entity) {
-                    entry.position = transform.translation;
-                }
-            }
+        let Some(&entity) = state.id_map.get(&pos.entity) else {
+            continue;
+        };
+        let Ok((_, mut transform, _, _)) = write_query.get_mut(entity) else {
+            continue;
+        };
+        transform.translation.x = f32_from_f64(pos.x.into_inner());
+        transform.translation.y = f32_from_f64(pos.y.into_inner());
+        transform.translation.z = f32_from_f64(pos.z.into_inner());
+        if let Some(entry) = world_handle.entities.get_mut(&pos.entity) {
+            entry.position = transform.translation;
         }
     }
 
     let velocities = state.circuit.new_velocity_out().consolidate();
     for (vel, _, _) in velocities.iter() {
-        if let Some(&entity) = state.id_map.get(&vel.entity) {
-            if let Ok((_, _, Some(mut velocity), _)) = write_query.get_mut(entity) {
-                velocity.vx = vel.vx.into_inner() as f32;
-                velocity.vy = vel.vy.into_inner() as f32;
-                velocity.vz = vel.vz.into_inner() as f32;
-            }
-        }
+        let Some(&entity) = state.id_map.get(&vel.entity) else {
+            continue;
+        };
+        let Ok((_, _, Some(mut velocity), _)) = write_query.get_mut(entity) else {
+            continue;
+        };
+        velocity.vx = f32_from_f64(vel.vx.into_inner());
+        velocity.vy = f32_from_f64(vel.vy.into_inner());
+        velocity.vz = f32_from_f64(vel.vz.into_inner());
     }
 
     let health_deltas = state.circuit.health_delta_out().consolidate();
@@ -73,39 +91,46 @@ pub fn apply_dbsp_outputs_system(
             warn!("health delta for unknown entity id {}", delta.entity);
             continue;
         };
-        if let Ok((_, _, _, maybe_health)) = write_query.get_mut(entity) {
-            if let Some(mut health) = maybe_health {
-                let key = (delta.at_tick, delta.seq);
-                if state.expected_health_retractions.remove(&(
-                    delta.entity,
-                    delta.at_tick,
-                    delta.seq,
-                )) {
-                    continue;
-                }
-                if state.applied_health.get(&delta.entity) == Some(&key) {
-                    debug!(
-                        "duplicate health delta ignored for entity {} at tick {} seq {:?}",
-                        delta.entity, delta.at_tick, delta.seq
-                    );
-                    state.health_duplicate_count += 1;
-                    continue;
-                }
-                let current = i32::from(health.current);
-                let max = i32::from(health.max);
-                let new_value = (current + delta.delta).clamp(0, max);
-                health.current = new_value as u16;
-                state.applied_health.insert(delta.entity, key);
-                if let Some(entry) = world_handle.entities.get_mut(&entity_key) {
-                    entry.health_current = health.current;
-                    entry.health_max = health.max;
-                }
-                if delta.death {
-                    // Future hook: notify AI about deaths if needed.
-                }
-            } else {
-                warn!("health delta received for entity without Health component");
-            }
+        let Ok((_, _, _, maybe_health)) = write_query.get_mut(entity) else {
+            continue;
+        };
+        let Some(mut health) = maybe_health else {
+            warn!("health delta received for entity without Health component");
+            continue;
+        };
+        let key = (delta.at_tick, delta.seq);
+        if state
+            .expected_health_retractions
+            .remove(&(delta.entity, delta.at_tick, delta.seq))
+        {
+            continue;
+        }
+        if state.applied_health.get(&delta.entity) == Some(&key) {
+            debug!(
+                "duplicate health delta ignored for entity {} at tick {} seq {:?}",
+                delta.entity, delta.at_tick, delta.seq
+            );
+            state.health_duplicate_count += 1;
+            continue;
+        }
+        let current = i32::from(health.current);
+        let max = i32::from(health.max);
+        let new_value = (current + delta.delta).clamp(0, max);
+        let Ok(new_u16) = u16::try_from(new_value) else {
+            debug_assert!(
+                false,
+                "clamped health value {new_value} exceeds u16 capacity"
+            );
+            continue;
+        };
+        health.current = new_u16;
+        state.applied_health.insert(delta.entity, key);
+        if let Some(entry) = world_handle.entities.get_mut(&entity_key) {
+            entry.health_current = health.current;
+            entry.health_max = health.max;
+        }
+        if delta.death {
+            // Future hook: notify AI about deaths if needed.
         }
     }
     let _ = state.circuit.health_delta_out().take_from_all();
