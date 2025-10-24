@@ -18,6 +18,7 @@
 //! # use lille::dbsp_circuit::step as _;
 //! ```
 
+use anyhow::Error as AnyError;
 use dbsp::circuit::Circuit;
 use dbsp::{
     operator::Generator, typed_batch::OrdZSet, CircuitHandle, OutputHandle, RootCircuit, ZSetHandle,
@@ -182,7 +183,11 @@ impl DbspCircuit {
         self.circuit.step()
     }
 
-    fn build_streams(circuit: &mut RootCircuit) -> BuildHandles {
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "RootCircuit::build expects constructors that return Result."
+    )]
+    fn build_streams(circuit: &mut RootCircuit) -> Result<BuildHandles, AnyError> {
         let (positions, position_in) = circuit.add_input_zset::<Position>();
         let (velocities, velocity_in) = circuit.add_input_zset::<Velocity>();
         let (forces, force_in) = circuit.add_input_zset::<Force>();
@@ -197,10 +202,13 @@ impl DbspCircuit {
             let mut tick: Tick = 0;
             move || {
                 let current = tick;
-                tick = tick.checked_add(1).unwrap_or_else(|| {
-                    debug_assert!(false, "tick counter overflowed u64");
-                    0
-                });
+                tick = match tick.checked_add(1) {
+                    Some(next) => next,
+                    None => {
+                        debug_assert!(false, "tick counter overflowed u64");
+                        0
+                    }
+                };
                 current
             }
         }));
@@ -245,7 +253,7 @@ impl DbspCircuit {
 
         let health_deltas = health_delta_stream(&health_states, &damage_with_fall);
 
-        BuildHandles {
+        Ok(BuildHandles {
             position_in,
             velocity_in,
             force_in,
@@ -261,7 +269,7 @@ impl DbspCircuit {
             floor_height_out: floor_height.output(),
             position_floor_out: pos_floor.output(),
             health_delta_out: health_deltas.output(),
-        }
+        })
     }
 
     /// Returns a reference to the input handle for feeding position records into the circuit.
