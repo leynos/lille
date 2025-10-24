@@ -21,7 +21,6 @@ fn clamp_terminal_velocity(vz: f64) -> OrderedFloat<f64> {
 
 #[expect(
     clippy::cast_possible_truncation,
-    clippy::cast_possible_wrap,
     reason = "Value is clamped into the `i32` domain before conversion."
 )]
 fn floor_to_i32(value: OrderedFloat<f64>) -> i32 {
