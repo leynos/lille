@@ -25,6 +25,14 @@ type EntityRow<'w> = (
     Option<&'w mut Health>,
 );
 
+#[derive(SystemParam)]
+pub struct CacheQueries<'w, 's> {
+    entity_query: Query<'w, 's, EntityRow<'w>>,
+    force_query: Query<'w, 's, (Entity, &'static DdlogId, &'static ForceComp)>,
+    block_query: Query<'w, 's, (&'static Block, Option<&'static BlockSlope>)>,
+    id_queries: IdQueries<'w, 's>,
+}
+
 /// Initializes the [`DbspState`] resource in the provided [`World`].
 ///
 /// Call this once during Bevy startup before running any DBSP synchronisation
@@ -46,10 +54,7 @@ pub fn init_dbsp_system(world: &mut World) -> Result<(), dbsp::Error> {
 /// tests and diagnostics.
 pub fn cache_state_for_dbsp_system(
     mut state: NonSendMut<DbspState>,
-    mut entity_query: Query<EntityRow<'_>>,
-    force_query: Query<(Entity, &DdlogId, &ForceComp)>,
-    block_query: Query<(&Block, Option<&BlockSlope>)>,
-    mut id_queries: IdQueries,
+    mut queries: CacheQueries,
     mut damage_inbox: ResMut<DamageInbox>,
     mut world_handle: ResMut<WorldHandle>,
 ) {
@@ -61,10 +66,14 @@ pub fn cache_state_for_dbsp_system(
     let pending_damage = mem::take(&mut state.pending_damage_retractions);
     state.expected_health_retractions.clear();
 
-    sync::blocks(&mut state.circuit, &block_query, world_handle.as_mut());
-    sync::id_maps(&mut state, &mut id_queries);
-    sync::entities(&mut state, &mut entity_query, world_handle.as_mut());
-    sync::forces(&mut state, &force_query);
+    sync::blocks(
+        &mut state.circuit,
+        &queries.block_query,
+        world_handle.as_mut(),
+    );
+    sync::id_maps(&mut state, &mut queries.id_queries);
+    sync::entities(&mut state, &mut queries.entity_query, world_handle.as_mut());
+    sync::forces(&mut state, &queries.force_query);
 
     apply_health_snapshot_retractions(&mut state.circuit, &previous_snapshots);
     apply_damage_retractions(&mut state, pending_damage);
@@ -338,7 +347,7 @@ mod sync {
                         fx: f.force_x.into(),
                         fy: f.force_y.into(),
                         fz: f.force_z.into(),
-                        mass: f.mass.map(|m| m.into()),
+                        mass: f.mass.map(Into::into),
                     },
                     1,
                 );
