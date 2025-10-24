@@ -11,49 +11,25 @@ use crate::world_handle::WorldHandle;
 
 use super::DbspState;
 
-#[expect(
-    clippy::cast_possible_truncation,
-    reason = "Transforms require f32; inputs validated to remain within f32 range."
-)]
-fn f32_from_f64(value: f64) -> f32 {
-    debug_assert!(value.is_finite(), "non-finite translation value");
-    debug_assert!(
-        value <= f64::from(f32::MAX),
-        "translation exceeds f32 range"
-    );
-    debug_assert!(value >= f64::from(f32::MIN), "translation below f32 range");
-    value as f32
-}
+type DbspWriteQuery<'w, 's> = Query<
+    'w,
+    's,
+    (
+        Entity,
+        &'static mut Transform,
+        Option<&'static mut VelocityComp>,
+        Option<&'static mut Health>,
+    ),
+    With<DdlogId>,
+>;
 
-/// Applies DBSP outputs back to ECS components.
-///
-/// Steps the circuit, consolidates new positions and velocities, and updates
-/// the corresponding entities. The [`WorldHandle`] resource is updated with the
-/// latest positions for diagnostics.
-///
-/// Outputs are drained after application to prevent reapplying stale deltas on
-/// subsequent frames.
-#[expect(clippy::type_complexity, reason = "Bevy query tuples are idiomatic")]
-pub fn apply_dbsp_outputs_system(
-    mut state: NonSendMut<DbspState>,
-    mut write_query: Query<
-        (
-            Entity,
-            &mut Transform,
-            Option<&mut VelocityComp>,
-            Option<&mut Health>,
-        ),
-        With<DdlogId>,
-    >,
-    mut world_handle: ResMut<WorldHandle>,
+fn apply_positions(
+    state: &DbspState,
+    write_query: &mut DbspWriteQuery<'_, '_>,
+    world_handle: &mut WorldHandle,
 ) {
-    if let Err(e) = try_step(&mut state.circuit) {
-        error!("DbspCircuit::step failed: {e}");
-        return;
-    }
-
     let positions = state.circuit.new_position_out().consolidate();
-    for (pos, _, _) in positions.iter() {
+    for (pos, (), ()) in positions.iter() {
         let Some(&entity) = state.id_map.get(&pos.entity) else {
             continue;
         };
@@ -67,9 +43,11 @@ pub fn apply_dbsp_outputs_system(
             entry.position = transform.translation;
         }
     }
+}
 
+fn apply_velocities(state: &DbspState, write_query: &mut DbspWriteQuery<'_, '_>) {
     let velocities = state.circuit.new_velocity_out().consolidate();
-    for (vel, _, _) in velocities.iter() {
+    for (vel, (), ()) in velocities.iter() {
         let Some(&entity) = state.id_map.get(&vel.entity) else {
             continue;
         };
@@ -80,9 +58,15 @@ pub fn apply_dbsp_outputs_system(
         velocity.vy = f32_from_f64(vel.vy.into_inner());
         velocity.vz = f32_from_f64(vel.vz.into_inner());
     }
+}
 
+fn apply_health_deltas(
+    state: &mut DbspState,
+    write_query: &mut DbspWriteQuery<'_, '_>,
+    world_handle: &mut WorldHandle,
+) {
     let health_deltas = state.circuit.health_delta_out().consolidate();
-    for (delta, _, _) in health_deltas.iter() {
+    for (delta, (), ()) in health_deltas.iter() {
         let Ok(entity_key) = i64::try_from(delta.entity) else {
             warn!("health delta for unmappable entity {}", delta.entity);
             continue;
@@ -133,6 +117,44 @@ pub fn apply_dbsp_outputs_system(
             // Future hook: notify AI about deaths if needed.
         }
     }
+}
+
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "Transforms require f32; inputs validated to remain within f32 range."
+)]
+fn f32_from_f64(value: f64) -> f32 {
+    debug_assert!(value.is_finite(), "non-finite translation value");
+    debug_assert!(
+        value <= f64::from(f32::MAX),
+        "translation exceeds f32 range"
+    );
+    debug_assert!(value >= f64::from(f32::MIN), "translation below f32 range");
+    value as f32
+}
+
+/// Applies DBSP outputs back to ECS components.
+///
+/// Steps the circuit, consolidates new positions and velocities, and updates
+/// the corresponding entities. The [`WorldHandle`] resource is updated with the
+/// latest positions for diagnostics.
+///
+/// Outputs are drained after application to prevent reapplying stale deltas on
+/// subsequent frames.
+#[expect(clippy::type_complexity, reason = "Bevy query tuples are idiomatic")]
+pub fn apply_dbsp_outputs_system(
+    mut state: NonSendMut<DbspState>,
+    mut write_query: DbspWriteQuery<'_, '_>,
+    mut world_handle: ResMut<WorldHandle>,
+) {
+    if let Err(e) = try_step(&mut state.circuit) {
+        error!("DbspCircuit::step failed: {e}");
+        return;
+    }
+
+    apply_positions(&state, &mut write_query, &mut world_handle);
+    apply_velocities(&state, &mut write_query);
+    apply_health_deltas(&mut state, &mut write_query, &mut world_handle);
     let _ = state.circuit.health_delta_out().take_from_all();
 
     // Drain any remaining output so stale values are not reused.
