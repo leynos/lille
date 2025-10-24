@@ -88,7 +88,7 @@ impl DamageInbox {
     /// assert!(DamageInbox::default().is_empty());
     /// ```
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.events.is_empty()
     }
 }
