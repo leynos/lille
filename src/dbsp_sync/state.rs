@@ -89,7 +89,7 @@ impl DbspState {
     /// assert_eq!(state.applied_health_duplicates(), 0);
     /// ```
     #[must_use]
-    pub fn applied_health_duplicates(&self) -> u64 {
+    pub const fn applied_health_duplicates(&self) -> u64 {
         self.health_duplicate_count
     }
 }
