@@ -30,7 +30,7 @@ pub use dbsp_sync::{
     apply_dbsp_outputs_system, cache_state_for_dbsp_system, init_dbsp_system, DamageInbox,
     DbspPlugin,
 };
-pub use entity::{BadGuy, Entity};
+pub use entity::{BadGuy, WorldEntity};
 pub use logging::init as init_logging;
 pub use physics::{applied_acceleration, apply_ground_friction};
 #[cfg(feature = "render")]

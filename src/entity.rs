@@ -2,15 +2,15 @@
 //! Contains lightweight structs for generic entities and adversaries.
 use glam::Vec3;
 
-#[derive(Clone, Debug)]
 /// Minimal representation of any world entity tracked outside Bevy.
-pub struct Entity {
+#[derive(Clone, Debug)]
+pub struct WorldEntity {
     /// World position used by AI and DBSP synchronisation.
     pub position: Vec3,
 }
 
-#[derive(Clone, Debug)]
 /// Specialised entity describing hostile actors.
+#[derive(Clone, Debug)]
 pub struct BadGuy {
     /// The baddie's world position.
     pub position: Vec3,
