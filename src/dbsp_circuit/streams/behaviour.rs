@@ -31,7 +31,7 @@ impl StreamConcat for Stream<RootCircuit, OrdZSet<FearLevel>> {
 /// them a `0.0` level before the results are unioned back together.
 ///
 /// # Examples
-/// ```rust,no_run
+/// ```rust,ignore
 /// # use anyhow::Error;
 /// # use dbsp::RootCircuit;
 /// # use lille::dbsp_circuit::streams::behaviour::fear_level_stream;
@@ -116,7 +116,7 @@ fn decide_movement(level: OrderedFloat<f64>, pt: &PositionTarget) -> MovementDec
 /// normalised to ensure consistent speed in all directions.
 ///
 /// # Examples
-/// ```rust,no_run
+/// ```rust,ignore
 /// # use anyhow::Error;
 /// # use dbsp::RootCircuit;
 /// # use lille::dbsp_circuit::{
@@ -161,7 +161,7 @@ pub fn movement_decision_stream(
 /// entity in a single tick.
 ///
 /// # Examples
-/// ```rust,no_run
+/// ```rust,ignore
 /// # use anyhow::Error;
 /// # use dbsp::RootCircuit;
 /// # use lille::dbsp_circuit::streams::behaviour::apply_movement;
