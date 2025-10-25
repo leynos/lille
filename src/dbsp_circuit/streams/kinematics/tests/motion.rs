@@ -182,10 +182,12 @@ fn airborne_preserves_velocity() {
         .iter()
         .map(|t| t.0)
         .collect();
-    assert_eq!(vel_out.len(), 1);
-    assert_relative_eq!(vel_out[0].vx.into_inner(), 1.0);
-    assert_relative_eq!(vel_out[0].vy.into_inner(), 0.0);
-    assert_relative_eq!(vel_out[0].vz.into_inner(), GRAVITY_PULL);
+    let Some(velocity) = vel_out.first() else {
+        panic!("expected a single velocity output");
+    };
+    assert_relative_eq!(velocity.vx.into_inner(), 1.0);
+    assert_relative_eq!(velocity.vy.into_inner(), 0.0);
+    assert_relative_eq!(velocity.vz.into_inner(), GRAVITY_PULL);
 }
 
 #[rstest]
@@ -218,8 +220,10 @@ fn terminal_velocity_clamping(#[case] start_vz: f64, #[case] expected_vz: f64) {
         .iter()
         .map(|t| t.0)
         .collect();
-    assert_eq!(pos_out.len(), 1);
-    assert_relative_eq!(pos_out[0].z.into_inner(), 5.0 + expected_vz);
+    let Some(position) = pos_out.first() else {
+        panic!("expected a single position output");
+    };
+    assert_relative_eq!(position.z.into_inner(), 5.0 + expected_vz);
 
     let vel_out: Vec<NewVelocity> = circuit
         .new_velocity_out()
@@ -227,8 +231,10 @@ fn terminal_velocity_clamping(#[case] start_vz: f64, #[case] expected_vz: f64) {
         .iter()
         .map(|t| t.0)
         .collect();
-    assert_eq!(vel_out.len(), 1);
-    assert_relative_eq!(vel_out[0].vz.into_inner(), expected_vz);
+    let Some(velocity) = vel_out.first() else {
+        panic!("expected a single velocity output");
+    };
+    assert_relative_eq!(velocity.vz.into_inner(), expected_vz);
 }
 
 #[test]
