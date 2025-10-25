@@ -244,12 +244,16 @@ fn non_finite_horizontal_velocity_propagates(
         return;
     }
 
-    let position = positions
-        .first()
-        .expect("expected a position output for NaN velocity");
-    let velocity = velocities
-        .first()
-        .expect("expected a velocity output for NaN velocity");
+    let position = match positions.as_slice() {
+        [p] => p,
+        [] => panic!("expected one position output"),
+        many => panic!("expected one position, observed {}", many.len()),
+    };
+    let velocity = match velocities.as_slice() {
+        [v] => v,
+        [] => panic!("expected one velocity output"),
+        many => panic!("expected one velocity, observed {}", many.len()),
+    };
 
     let pos_x = position.x.into_inner();
     let vel_x = velocity.vx.into_inner();
@@ -347,8 +351,10 @@ fn airborne_preserves_velocity() {
         .iter()
         .map(|t| t.0)
         .collect();
-    let Some(velocity) = vel_out.first() else {
-        panic!("expected a single velocity output");
+    let velocity = match vel_out.as_slice() {
+        [v] => v,
+        [] => panic!("expected one velocity output"),
+        many => panic!("expected one velocity, observed {}", many.len()),
     };
     assert_relative_eq!(velocity.vx.into_inner(), 1.0);
     assert_relative_eq!(velocity.vy.into_inner(), 0.0);
@@ -385,8 +391,10 @@ fn terminal_velocity_clamping(#[case] start_vz: f64, #[case] expected_vz: f64) {
         .iter()
         .map(|t| t.0)
         .collect();
-    let Some(position) = pos_out.first() else {
-        panic!("expected a single position output");
+    let position = match pos_out.as_slice() {
+        [p] => p,
+        [] => panic!("expected one position output"),
+        many => panic!("expected one position, observed {}", many.len()),
     };
     assert_relative_eq!(position.z.into_inner(), 5.0 + expected_vz);
 
@@ -396,8 +404,10 @@ fn terminal_velocity_clamping(#[case] start_vz: f64, #[case] expected_vz: f64) {
         .iter()
         .map(|t| t.0)
         .collect();
-    let Some(velocity) = vel_out.first() else {
-        panic!("expected a single velocity output");
+    let velocity = match vel_out.as_slice() {
+        [v] => v,
+        [] => panic!("expected one velocity output"),
+        many => panic!("expected one velocity, observed {}", many.len()),
     };
     assert_relative_eq!(velocity.vz.into_inner(), expected_vz);
 }
