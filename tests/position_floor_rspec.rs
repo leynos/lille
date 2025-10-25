@@ -1,10 +1,8 @@
 //! Behaviour-driven tests for position and floor height joins in DBSP circuits.
 //!
-//! This module exercises the DBSP pipeline using the `rust-rspec` framework. It
-//! verifies that entity positions are correctly paired with floor height
-//! information when processed through `DbspCircuit`. The tests use a shared
-//! circuit environment to mimic real application usage and cover both
-//! successful joins and edge cases.
+//! This module exercises the DBSP pipeline using a lightweight `Env` harness.
+//! Tests push inputs directly into `DbspCircuit`, step it, and assert outputs,
+//! returning `anyhow::Result` for clear failure context.
 use anyhow::{ensure, Context, Result};
 use lille::{
     components::{Block, BlockSlope},
