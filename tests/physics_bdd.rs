@@ -6,6 +6,7 @@
 
 use approx::assert_relative_eq;
 use bevy::prelude::*;
+use lille::numeric::{expect_f32, expect_u16};
 use lille::{
     apply_ground_friction,
     components::{Block, BlockSlope, ForceComp},
@@ -15,23 +16,6 @@ use lille::{
 use rstest::{fixture, rstest};
 use std::fmt;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
-
-#[expect(
-    clippy::cast_possible_truncation,
-    reason = "Test expectations operate on bounded physics values that fit into f32."
-)]
-const fn to_f32(value: f64) -> f32 {
-    value as f32
-}
-
-#[expect(
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    reason = "Test expectations clamp damage magnitudes within u16 range."
-)]
-const fn to_u16(value: f64) -> u16 {
-    value as u16
-}
 
 #[derive(Clone)]
 struct TestWorld {
@@ -224,14 +208,14 @@ fn physics_scenario(
     PhysicsScenario {
         setup,
         expected_position: (
-            to_f32(expected_position.0),
-            to_f32(expected_position.1),
-            to_f32(expected_position.2),
+            expect_f32(expected_position.0),
+            expect_f32(expected_position.1),
+            expect_f32(expected_position.2),
         ),
         expected_velocity: (
-            to_f32(expected_velocity.0),
-            to_f32(expected_velocity.1),
-            to_f32(expected_velocity.2),
+            expect_f32(expected_velocity.0),
+            expect_f32(expected_velocity.1),
+            expect_f32(expected_velocity.2),
         ),
     }
 }
@@ -295,7 +279,7 @@ fn setup_move_heights(world: &mut TestWorld) {
         y: 0,
         z: 1,
     });
-    let vx = to_f32(1.0 / (1.0 - GROUND_FRICTION));
+    let vx = expect_f32(1.0 / (1.0 - GROUND_FRICTION));
     world.spawn_entity_without_force(
         Transform::from_xyz(0.0, 0.0, 1.0),
         VelocityComp {
@@ -539,7 +523,7 @@ fn falling_inflicts_health_damage(world: TestWorld) {
             });
             scenario.when("the simulation runs until the entity lands", |phase| {
                 phase.before_each(|state| {
-                    let fall_speed = -(to_f32(SAFE_LANDING_SPEED) + 4.0);
+                    let fall_speed = -(expect_f32(SAFE_LANDING_SPEED) + 4.0);
                     state.set_velocity_z(fall_speed);
                     state.tick();
 
@@ -554,7 +538,7 @@ fn falling_inflicts_health_damage(world: TestWorld) {
                     let expected_damage = if excess <= 0.0 {
                         0
                     } else {
-                        to_u16(
+                        expect_u16(
                             (excess * FALL_DAMAGE_SCALE)
                                 .min(f64::from(u16::MAX))
                                 .floor(),
