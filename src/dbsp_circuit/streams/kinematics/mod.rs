@@ -9,6 +9,7 @@ use ordered_float::OrderedFloat;
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 use size_of::SizeOf;
 
+use crate::numeric::floor_to_i32;
 use crate::{applied_acceleration, apply_ground_friction, GRAVITY_PULL, TERMINAL_VELOCITY};
 
 use crate::dbsp_circuit::{FloorHeightAt, Force, Position, Velocity};
@@ -17,16 +18,6 @@ use crate::dbsp_circuit::{FloorHeightAt, Force, Position, Velocity};
 fn clamp_terminal_velocity(vz: f64) -> OrderedFloat<f64> {
     // Prevent unbounded acceleration by enforcing a maximum fall speed.
     OrderedFloat(vz.max(-TERMINAL_VELOCITY))
-}
-
-#[expect(
-    clippy::cast_possible_truncation,
-    reason = "Value is clamped into the `i32` domain before conversion."
-)]
-fn floor_to_i32(value: OrderedFloat<f64>) -> i32 {
-    let floored = value.into_inner().floor();
-    let clamped = floored.clamp(f64::from(i32::MIN), f64::from(i32::MAX));
-    clamped as i32
 }
 
 /// Applies gravity and a single external force to each velocity record (dt = 1).
