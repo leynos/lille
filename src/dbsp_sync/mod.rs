@@ -44,6 +44,6 @@ mod tests {
 
     #[rstest]
     fn plugin_is_default_constructible() {
-        let _plugin = DbspPlugin;
+        let _: DbspPlugin = DbspPlugin;
     }
 }
