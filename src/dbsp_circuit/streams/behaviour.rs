@@ -313,7 +313,7 @@ mod tests {
         let decisions: Vec<MovementDecision> = decisions_handle
             .consolidate()
             .iter()
-            .map(|(decision, (), _timestamp)| decision)
+            .map(|(decision, (), _timestamp)| decision.clone())
             .collect();
         let decision = test_utils::expect_single(&decisions, "movement decision result");
         assert_relative_eq!(decision.dx.into_inner(), expected_dx);
@@ -354,7 +354,7 @@ mod tests {
         let decisions: Vec<MovementDecision> = decisions_handle
             .consolidate()
             .iter()
-            .map(|(decision, (), _timestamp)| decision)
+            .map(|(decision, (), _timestamp)| decision.clone())
             .collect();
         assert!(decisions.is_empty());
     }
