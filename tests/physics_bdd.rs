@@ -408,8 +408,8 @@ fn falling_inflicts_health_damage(world: TestWorld) {
     rspec::run(&rspec::given(
         "an entity falling onto level ground",
         world,
-        |ctx| {
-            ctx.before_each(|world| {
+        |scenario| {
+            scenario.before_each(|world| {
                 world.spawn_block(Block {
                     id: 99,
                     x: 0,
@@ -425,31 +425,29 @@ fn falling_inflicts_health_damage(world: TestWorld) {
                     },
                 );
             });
-            ctx.when("the simulation runs until the entity lands", |ctx| {
-                ctx.before_each(|world| {
-                    let fall_speed = -(SAFE_LANDING_SPEED as f32 + 4.0);
-                    world.set_velocity_z(fall_speed);
-                    world.tick();
+            scenario.when("the simulation runs until the entity lands", |phase| {
+                phase.before_each(|world_state| {
+                    let fall_speed = -(as_f32(SAFE_LANDING_SPEED) + 4.0);
+                    world_state.set_velocity_z(fall_speed);
+                    world_state.tick();
 
-                    world.set_velocity_z(0.0);
-                    world.set_position_z(1.0);
-                    world.tick();
+                    world_state.set_velocity_z(0.0);
+                    world_state.set_position_z(1.0);
+                    world_state.tick();
 
-                    let impact_speed = f64::from(-(fall_speed + GRAVITY_PULL as f32))
+                    let impact_speed = f64::from(-(fall_speed + as_f32(GRAVITY_PULL)))
                         .clamp(0.0, TERMINAL_VELOCITY);
                     let excess = impact_speed - SAFE_LANDING_SPEED;
                     let expected_damage = if excess <= 0.0 {
                         0
                     } else {
-                        (excess * FALL_DAMAGE_SCALE)
-                            .min(f64::from(u16::MAX))
-                            .floor() as u16
+                        as_u16((excess * FALL_DAMAGE_SCALE).min(f64::from(u16::MAX)).floor())
                     };
-                    world.set_expected_damage(expected_damage);
+                    world_state.set_expected_damage(expected_damage);
                 });
-                ctx.then("the expected fall damage is applied", |world| {
-                    let expected = world.take_expected_damage();
-                    let health = world.health();
+                phase.then("the expected fall damage is applied", |world_state| {
+                    let expected = world_state.take_expected_damage();
+                    let health = world_state.health();
                     let lost = 100u16.saturating_sub(health.current);
                     assert_eq!(lost, expected);
                 });
