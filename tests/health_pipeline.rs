@@ -1,6 +1,6 @@
 //! Behavioural tests for DBSP health integration.
 
-use anyhow::{Context, Result};
+use anyhow::{ensure, Context, Result};
 
 use bevy::prelude::*;
 use lille::dbsp_circuit::{DamageEvent, DamageSource};
@@ -53,6 +53,10 @@ impl HealthEnv {
         self.push_damage_repeated(event, 2)
     }
 
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "Test helpers uniformly return Result to propagate setup failures."
+    )]
     fn update(&mut self) -> Result<()> {
         self.app.update();
         Ok(())
@@ -83,7 +87,7 @@ impl Default for HealthEnv {
     }
 }
 
-fn sequenced_damage_tick_one() -> DamageEvent {
+const fn sequenced_damage_tick_one() -> DamageEvent {
     DamageEvent {
         entity: 1,
         amount: 30,
@@ -93,7 +97,7 @@ fn sequenced_damage_tick_one() -> DamageEvent {
     }
 }
 
-fn sequenced_damage_tick_two() -> DamageEvent {
+const fn sequenced_damage_tick_two() -> DamageEvent {
     DamageEvent {
         entity: 1,
         amount: 30,
@@ -103,7 +107,7 @@ fn sequenced_damage_tick_two() -> DamageEvent {
     }
 }
 
-fn healing_event() -> DamageEvent {
+const fn healing_event() -> DamageEvent {
     DamageEvent {
         entity: 1,
         amount: 80,
@@ -113,7 +117,7 @@ fn healing_event() -> DamageEvent {
     }
 }
 
-fn healing_at_max_event() -> DamageEvent {
+const fn healing_at_max_event() -> DamageEvent {
     DamageEvent {
         entity: 1,
         amount: 50,
@@ -123,7 +127,7 @@ fn healing_at_max_event() -> DamageEvent {
     }
 }
 
-fn unsequenced_damage() -> DamageEvent {
+const fn unsequenced_damage() -> DamageEvent {
     DamageEvent {
         entity: 1,
         amount: 50,
@@ -139,8 +143,14 @@ fn duplicate_events_within_tick_apply_once() -> Result<()> {
     let damage = sequenced_damage_tick_one();
     env.push_damage_twice(damage)?;
     env.update()?;
-    assert_eq!(env.current_health()?, 60);
-    assert_eq!(env.duplicate_count()?, 1);
+    ensure!(
+        env.current_health()? == 60,
+        "health should drop to 60 after consuming duplicate damage"
+    );
+    ensure!(
+        env.duplicate_count()? == 1,
+        "duplicate counter should record a single entry"
+    );
     Ok(())
 }
 
@@ -152,8 +162,14 @@ fn replaying_same_tick_delta_is_ignored() -> Result<()> {
     env.update()?;
     env.push_damage(damage)?;
     env.update()?;
-    assert_eq!(env.current_health()?, 60);
-    assert_eq!(env.duplicate_count()?, 2);
+    ensure!(
+        env.current_health()? == 60,
+        "health should stay at 60 when replaying the same tick"
+    );
+    ensure!(
+        env.duplicate_count()? == 2,
+        "duplicate counter should record both replays"
+    );
     Ok(())
 }
 
@@ -168,8 +184,14 @@ fn new_ticks_consume_damage_once() -> Result<()> {
     let next_tick = sequenced_damage_tick_two();
     env.push_damage(next_tick)?;
     env.update()?;
-    assert_eq!(env.current_health()?, 30);
-    assert_eq!(env.duplicate_count()?, 2);
+    ensure!(
+        env.current_health()? == 30,
+        "health should drop to 30 after consuming new tick damage once"
+    );
+    ensure!(
+        env.duplicate_count()? == 2,
+        "duplicate counter should ignore unique tick"
+    );
     Ok(())
 }
 
@@ -187,8 +209,14 @@ fn healing_saturates_at_max_health() -> Result<()> {
     let heal = healing_event();
     env.push_damage(heal)?;
     env.update()?;
-    assert_eq!(env.current_health()?, 100);
-    assert_eq!(env.duplicate_count()?, 2);
+    ensure!(
+        env.current_health()? == 100,
+        "healing should saturate at maximum health"
+    );
+    ensure!(
+        env.duplicate_count()? == 2,
+        "duplicate counter should remain unchanged after healing"
+    );
     Ok(())
 }
 
@@ -198,13 +226,22 @@ fn healing_when_already_at_max_health_does_not_overflow() -> Result<()> {
     let initial_heal = healing_event();
     env.push_damage(initial_heal)?;
     env.update()?;
-    assert_eq!(env.current_health()?, 100);
+    ensure!(
+        env.current_health()? == 100,
+        "initial healing should cap at maximum health"
+    );
 
     let extra_heal = healing_at_max_event();
     env.push_damage(extra_heal)?;
     env.update()?;
-    assert_eq!(env.current_health()?, 100);
-    assert_eq!(env.duplicate_count()?, 0);
+    ensure!(
+        env.current_health()? == 100,
+        "additional healing should not overflow maximum health"
+    );
+    ensure!(
+        env.duplicate_count()? == 0,
+        "duplicate counter should remain zero without replayed events"
+    );
     Ok(())
 }
 
@@ -225,8 +262,14 @@ fn unsequenced_duplicates_are_filtered_within_tick() -> Result<()> {
     let unsequenced = unsequenced_damage();
     env.push_damage_twice(unsequenced)?;
     env.update()?;
-    assert_eq!(env.current_health()?, 50);
-    assert_eq!(env.duplicate_count()?, 3);
+    ensure!(
+        env.current_health()? == 50,
+        "unsequenced duplicates within a tick should only apply once"
+    );
+    ensure!(
+        env.duplicate_count()? == 3,
+        "duplicate counter should include unsequenced duplicates"
+    );
     Ok(())
 }
 
@@ -249,7 +292,13 @@ fn replaying_unsequenced_deltas_for_same_tick_is_ignored() -> Result<()> {
     env.update()?;
     env.push_damage(unsequenced)?;
     env.update()?;
-    assert_eq!(env.current_health()?, 50);
-    assert_eq!(env.duplicate_count()?, 4);
+    ensure!(
+        env.current_health()? == 50,
+        "replayed unsequenced deltas should not further change health"
+    );
+    ensure!(
+        env.duplicate_count()? == 4,
+        "duplicate counter should reflect the additional replayed delta"
+    );
     Ok(())
 }
