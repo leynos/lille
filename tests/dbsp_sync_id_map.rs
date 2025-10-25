@@ -1,7 +1,8 @@
 //! Tests for incremental maintenance of the entity ID mapping.
 
+use anyhow::{ensure, Context, Result};
 use bevy::prelude::*;
-use rstest::{fixture, rstest};
+use rstest::rstest;
 
 use lille::components::DdlogId;
 use lille::dbsp_sync::{cache_state_for_dbsp_system, init_dbsp_system, DamageInbox, DbspState};
@@ -14,35 +15,43 @@ use lille::init_world_handle_system;
 /// ```
 /// let mut app = app();
 /// ```
-#[fixture]
-fn app() -> App {
+fn build_app() -> Result<App> {
     let mut app = App::new();
-    init_dbsp_system(&mut app.world).expect("failed to initialise DbspState");
+    init_dbsp_system(&mut app.world).context("failed to initialise DbspState")?;
     app.world.init_resource::<DamageInbox>();
     app.add_systems(Startup, init_world_handle_system);
     app.add_systems(Update, cache_state_for_dbsp_system);
-    app
+    Ok(app)
 }
 
 #[rstest]
-fn removes_entity_from_id_map_when_ddlog_id_removed(mut app: App) {
+fn removes_entity_from_id_map_when_ddlog_id_removed() -> Result<()> {
+    let mut app = build_app()?;
     let entity = app.world.spawn((DdlogId(1), Transform::default())).id();
 
     app.update();
     {
         let state = app.world.non_send_resource::<DbspState>();
-        assert_eq!(state.entity_for_id(1), Some(entity));
+        ensure!(
+            state.entity_for_id(1) == Some(entity),
+            "expected entity 1 to be registered"
+        );
     }
 
     app.world.entity_mut(entity).remove::<DdlogId>();
     app.update();
 
     let state = app.world.non_send_resource::<DbspState>();
-    assert!(state.entity_for_id(1).is_none());
+    ensure!(
+        state.entity_for_id(1).is_none(),
+        "expected entity 1 to be removed from map"
+    );
+    Ok(())
 }
 
 #[rstest]
-fn updates_id_map_when_ddlog_id_changed(mut app: App) {
+fn updates_id_map_when_ddlog_id_changed() -> Result<()> {
+    let mut app = build_app()?;
     let entity = app.world.spawn((DdlogId(1), Transform::default())).id();
 
     app.update();
@@ -52,6 +61,13 @@ fn updates_id_map_when_ddlog_id_changed(mut app: App) {
     app.update();
 
     let state = app.world.non_send_resource::<DbspState>();
-    assert!(state.entity_for_id(1).is_none());
-    assert_eq!(state.entity_for_id(2), Some(entity));
+    ensure!(
+        state.entity_for_id(1).is_none(),
+        "old identifier should be removed"
+    );
+    ensure!(
+        state.entity_for_id(2) == Some(entity),
+        "updated identifier should map to entity"
+    );
+    Ok(())
 }
