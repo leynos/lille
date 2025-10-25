@@ -53,9 +53,9 @@ impl Env {
             .consolidate()
             .iter()
             .map(|(p, weight, timestamp)| {
-                let _ = weight;
-                let _ = timestamp;
-                *p
+                drop(weight);
+                drop(timestamp);
+                p.clone()
             })
             .collect();
         self.circuit.clear_inputs();
