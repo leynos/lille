@@ -67,8 +67,8 @@ fn calculate_fall_damage(
             if weight == 0 {
                 continue;
             }
+            debug_assert!(entity >= 0, "negative entity id {entity}");
             let Ok(entity_id) = u64::try_from(entity) else {
-                debug_assert!(false, "negative entity id {entity}");
                 continue;
             };
             let clamped_speed = speed.into_inner().min(TERMINAL_VELOCITY);
