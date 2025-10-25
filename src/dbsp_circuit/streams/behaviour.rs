@@ -314,14 +314,9 @@ mod tests {
             .iter()
             .map(|(decision, (), _timestamp)| decision)
             .collect();
-        match decisions.as_slice() {
-            [decision] => {
-                assert_relative_eq!(decision.dx.into_inner(), expected_dx);
-                assert_relative_eq!(decision.dy.into_inner(), expected_dy);
-            }
-            [] => panic!("expected a movement decision"),
-            many => panic!("expected one decision, observed {}", many.len()),
-        }
+        let decision = test_utils::expect_single(&decisions, "movement decision result");
+        assert_relative_eq!(decision.dx.into_inner(), expected_dx);
+        assert_relative_eq!(decision.dy.into_inner(), expected_dy);
     }
 
     #[test]

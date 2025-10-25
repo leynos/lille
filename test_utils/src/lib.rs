@@ -18,6 +18,16 @@ pub mod prelude {
     };
 }
 
+/// Extract a single item from a slice, panicking with a contextual message when
+/// the slice is empty or contains multiple entries.
+pub fn expect_single<'a, T>(items: &'a [T], context: &str) -> &'a T {
+    match items {
+        [item] => item,
+        [] => panic!("{context}: expected one item, found none"),
+        many => panic!("{context}: expected one item, found {}", many.len()),
+    }
+}
+
 /// Assert that all strings in `keys` are present in `code`.
 ///
 /// # Panics
