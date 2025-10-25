@@ -161,6 +161,14 @@ impl TestWorld {
         let actual = extract(component);
         let tolerance = 1e-3;
 
+        assert_eq!(
+            actual.len(),
+            expected.len(),
+            "mismatched component arity for {name}: actual={}, expected={}",
+            actual.len(),
+            expected.len()
+        );
+
         for (a, e) in actual.iter().zip(expected.iter()) {
             assert_relative_eq!(*a, *e, epsilon = tolerance);
         }
