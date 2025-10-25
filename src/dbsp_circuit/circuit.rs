@@ -15,7 +15,7 @@ use super::streams::{
 };
 use super::types::{
     DamageEvent, FearLevel, FloorHeightAt, Force, HealthDelta, HealthState, HighestBlockAt,
-    MovementDecision, NewPosition, NewVelocity, Position, PositionFloor, Target, Tick, Velocity,
+    NewPosition, NewVelocity, Position, PositionFloor, Target, Tick, Velocity,
 };
 
 /// Authoritative DBSP dataflow for Lille's world simulation.
