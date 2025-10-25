@@ -64,9 +64,7 @@ impl Default for TestWorld {
 
 impl TestWorld {
     fn app_guard(&self) -> MutexGuard<'_, App> {
-        self.app
-            .lock()
-            .unwrap_or_else(|poison| poison.into_inner())
+        self.app.lock().unwrap_or_else(|poison| poison.into_inner())
     }
 
     fn expected_damage_guard(&self) -> MutexGuard<'_, Option<u16>> {
@@ -91,12 +89,15 @@ impl TestWorld {
 
     /// Spawns an entity at `transform` with the supplied velocity.
     fn spawn_entity(&mut self, transform: Transform, vel: VelocityComp, force: Option<ForceComp>) {
-        let mut app = self.app_guard();
-        let mut entity = app.world.spawn((DdlogId(1), transform, vel));
-        if let Some(force_comp) = force {
-            entity.insert(force_comp);
-        }
-        self.entity = Some(entity.id());
+        let entity_id = {
+            let mut app = self.app_guard();
+            let mut entity = app.world.spawn((DdlogId(1), transform, vel));
+            if let Some(force_comp) = force {
+                entity.insert(force_comp);
+            }
+            entity.id()
+        };
+        self.entity = Some(entity_id);
     }
 
     /// Spawns an entity without an external force.
@@ -111,9 +112,12 @@ impl TestWorld {
         vel: VelocityComp,
         health: Health,
     ) {
-        let mut app = self.app_guard();
-        let entity = app.world.spawn((DdlogId(1), transform, vel, health));
-        self.entity = Some(entity.id());
+        let entity_id = {
+            let mut app = self.app_guard();
+            let entity = app.world.spawn((DdlogId(1), transform, vel, health));
+            entity.id()
+        };
+        self.entity = Some(entity_id);
     }
 
     fn health(&self) -> Health {
@@ -212,10 +216,16 @@ macro_rules! physics_spec {
             scenario.when("the simulation ticks once", |phase| {
                 phase.before_each(|world_state| world_state.tick());
                 phase.then("the expected outcome occurs", move |world_state| {
-                    world_state
-                        .assert_position(($expected_pos).0, ($expected_pos).1, ($expected_pos).2);
-                    world_state
-                        .assert_velocity(($expected_vel).0, ($expected_vel).1, ($expected_vel).2);
+                    world_state.assert_position(
+                        ($expected_pos).0,
+                        ($expected_pos).1,
+                        ($expected_pos).2,
+                    );
+                    world_state.assert_velocity(
+                        ($expected_vel).0,
+                        ($expected_vel).1,
+                        ($expected_vel).2,
+                    );
                 });
             });
         }));
@@ -441,7 +451,11 @@ fn falling_inflicts_health_damage(world: TestWorld) {
                     let expected_damage = if excess <= 0.0 {
                         0
                     } else {
-                        as_u16((excess * FALL_DAMAGE_SCALE).min(f64::from(u16::MAX)).floor())
+                        as_u16(
+                            (excess * FALL_DAMAGE_SCALE)
+                                .min(f64::from(u16::MAX))
+                                .floor(),
+                        )
                     };
                     world_state.set_expected_damage(expected_damage);
                 });
