@@ -24,41 +24,48 @@ type DbspWriteQuery<'w, 's> = Query<
     With<DdlogId>,
 >;
 
+macro_rules! apply_output_records {
+    ($state:expr, $query:expr, $records:expr, |$record:ident| $pattern:pat => $body:block) => {
+        for ($record, (), _) in $records.iter() {
+            let Some(&entity) = $state.id_map.get(&$record.entity) else {
+                continue;
+            };
+            let Ok($pattern) = $query.get_mut(entity) else {
+                continue;
+            };
+            $body
+        }
+    };
+}
+
 fn apply_positions(
     state: &DbspState,
     write_query: &mut DbspWriteQuery<'_, '_>,
     world_handle: &mut WorldHandle,
 ) {
     let positions = state.circuit.new_position_out().consolidate();
-    for (pos, (), _) in positions.iter() {
-        let Some(&entity) = state.id_map.get(&pos.entity) else {
-            continue;
-        };
-        let Ok((_, mut transform, _, _)) = write_query.get_mut(entity) else {
-            continue;
-        };
+    apply_output_records!(state, write_query, positions, |pos| (_, mut transform, _, _) => {
         transform.translation.x = expect_f32(pos.x.into_inner());
         transform.translation.y = expect_f32(pos.y.into_inner());
         transform.translation.z = expect_f32(pos.z.into_inner());
         if let Some(entry) = world_handle.entities.get_mut(&pos.entity) {
             entry.position = transform.translation;
         }
-    }
+    });
 }
 
 fn apply_velocities(state: &DbspState, write_query: &mut DbspWriteQuery<'_, '_>) {
     let velocities = state.circuit.new_velocity_out().consolidate();
-    for (vel, (), _) in velocities.iter() {
-        let Some(&entity) = state.id_map.get(&vel.entity) else {
-            continue;
-        };
-        let Ok((_, _, Some(mut velocity), _)) = write_query.get_mut(entity) else {
-            continue;
-        };
-        velocity.vx = expect_f32(vel.vx.into_inner());
-        velocity.vy = expect_f32(vel.vy.into_inner());
-        velocity.vz = expect_f32(vel.vz.into_inner());
-    }
+    apply_output_records!(
+        state,
+        write_query,
+        velocities,
+        |vel| (_, _, Some(mut velocity), _) => {
+            velocity.vx = expect_f32(vel.vx.into_inner());
+            velocity.vy = expect_f32(vel.vy.into_inner());
+            velocity.vz = expect_f32(vel.vz.into_inner());
+        }
+    );
 }
 
 #[expect(
