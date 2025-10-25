@@ -7,7 +7,6 @@ use log::{debug, error, warn};
 
 use crate::components::{DdlogId, Health, VelocityComp};
 use crate::dbsp_circuit::{try_step, HealthDelta, Tick};
-use crate::numeric::expect_f32;
 use crate::world_handle::WorldHandle;
 
 use super::DbspState;
@@ -38,6 +37,13 @@ macro_rules! apply_output_records {
     };
 }
 
+fn f32_from_f64(value: f64) -> Option<f32> {
+    if !value.is_finite() || value > f64::from(f32::MAX) || value < f64::from(f32::MIN) {
+        return None;
+    }
+    Some(value as f32)
+}
+
 fn apply_positions(
     state: &DbspState,
     write_query: &mut DbspWriteQuery<'_, '_>,
@@ -45,9 +51,21 @@ fn apply_positions(
 ) {
     let positions = state.circuit.new_position_out().consolidate();
     apply_output_records!(state, write_query, positions, |pos| (_, mut transform, _, _) => {
-        transform.translation.x = expect_f32(pos.x.into_inner());
-        transform.translation.y = expect_f32(pos.y.into_inner());
-        transform.translation.z = expect_f32(pos.z.into_inner());
+        if let Some(x) = f32_from_f64(pos.x.into_inner()) {
+            transform.translation.x = x;
+        } else {
+            warn!("position.x out of range for entity {}", pos.entity);
+        }
+        if let Some(y) = f32_from_f64(pos.y.into_inner()) {
+            transform.translation.y = y;
+        } else {
+            warn!("position.y out of range for entity {}", pos.entity);
+        }
+        if let Some(z) = f32_from_f64(pos.z.into_inner()) {
+            transform.translation.z = z;
+        } else {
+            warn!("position.z out of range for entity {}", pos.entity);
+        }
         if let Some(entry) = world_handle.entities.get_mut(&pos.entity) {
             entry.position = transform.translation;
         }
@@ -61,9 +79,21 @@ fn apply_velocities(state: &DbspState, write_query: &mut DbspWriteQuery<'_, '_>)
         write_query,
         velocities,
         |vel| (_, _, Some(mut velocity), _) => {
-            velocity.vx = expect_f32(vel.vx.into_inner());
-            velocity.vy = expect_f32(vel.vy.into_inner());
-            velocity.vz = expect_f32(vel.vz.into_inner());
+            if let Some(vx) = f32_from_f64(vel.vx.into_inner()) {
+                velocity.vx = vx;
+            } else {
+                warn!("velocity.vx out of range for entity {}", vel.entity);
+            }
+            if let Some(vy) = f32_from_f64(vel.vy.into_inner()) {
+                velocity.vy = vy;
+            } else {
+                warn!("velocity.vy out of range for entity {}", vel.entity);
+            }
+            if let Some(vz) = f32_from_f64(vel.vz.into_inner()) {
+                velocity.vz = vz;
+            } else {
+                warn!("velocity.vz out of range for entity {}", vel.entity);
+            }
         }
     );
 }
