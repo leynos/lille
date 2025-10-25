@@ -1,5 +1,6 @@
 //! Core DBSP circuit construction and handle accessors.
 
+use anyhow::Error as AnyError;
 use dbsp::circuit::Circuit;
 use dbsp::{
     operator::Generator, typed_batch::OrdZSet, CircuitHandle, OutputHandle, RootCircuit, ZSetHandle,
@@ -11,11 +12,11 @@ use super::helpers::{advance_tick, within_grace};
 use super::streams::{
     apply_movement, fall_damage_stream, fear_level_stream, floor_height_stream,
     health_delta_stream, highest_block_pair, movement_decision_stream, new_position_stream,
-    new_velocity_stream, position_floor_stream, standing_motion_stream,
+    new_velocity_stream, position_floor_stream, standing_motion_stream, PositionFloor,
 };
 use super::types::{
     DamageEvent, FearLevel, FloorHeightAt, Force, HealthDelta, HealthState, HighestBlockAt,
-    NewPosition, NewVelocity, Position, PositionFloor, Target, Tick, Velocity,
+    NewPosition, NewVelocity, Position, Target, Tick, Velocity,
 };
 
 /// Authoritative DBSP dataflow for Lille's world simulation.
@@ -111,7 +112,8 @@ impl DbspCircuit {
     /// let circuit = DbspCircuit::new().expect("circuit construction failed");
     /// ```
     pub fn new() -> Result<Self, dbsp::Error> {
-        let (circuit, handles) = RootCircuit::build(Self::build_streams)?;
+        let (circuit, handles) =
+            RootCircuit::build(|circuit| Self::build_streams(circuit).map_err(AnyError::from))?;
 
         Ok(Self {
             circuit,
