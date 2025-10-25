@@ -63,14 +63,21 @@ pub fn floor_to_u16(value: f64) -> Option<u16> {
     Some(floored as u16)
 }
 
-/// Floor an `OrderedFloat<f64>` and clamp it into the `i32` domain.
+/// Floors an `OrderedFloat<f64>` into the `i32` domain.
+///
+/// Non-finite values (NaN or ±∞) yield `0`. Finite inputs are floored and then
+/// clamped to `i32::MIN..=i32::MAX` before casting.
 #[expect(
     clippy::cast_possible_truncation,
     reason = "The value is clamped to the i32 bounds before casting."
 )]
 #[must_use]
 pub fn floor_to_i32(value: OrderedFloat<f64>) -> i32 {
-    let floored = value.into_inner().floor();
+    let raw = value.into_inner();
+    if !raw.is_finite() {
+        return 0;
+    }
+    let floored = raw.floor();
     let clamped = floored.clamp(f64::from(i32::MIN), f64::from(i32::MAX));
     clamped as i32
 }
