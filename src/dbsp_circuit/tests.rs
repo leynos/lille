@@ -191,6 +191,25 @@ fn duplicate_damage_events_idempotent(#[case] seq: Option<u32>) {
     );
 }
 
+#[test]
+fn damage_exceeding_current_health_triggers_death() {
+    let case = HealthDeltaTestCase::new(
+        3,
+        10,
+        100,
+        vec![DamageEventSpec::new(15, DamageSource::External, 4, Some(2))],
+    );
+
+    assert_health_delta(
+        &case,
+        HealthDeltaExpectation {
+            delta: -10,
+            death: true,
+            seq: Some(2),
+        },
+    );
+}
+
 #[rstest]
 fn sequenced_events_with_same_seq_in_same_tick_are_deduplicated() {
     let event = DamageEventSpec::new(20, DamageSource::External, 8, Some(11));
