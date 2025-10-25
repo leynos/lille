@@ -4,22 +4,11 @@
 //! fall damage entirely within the DBSP circuit.
 
 use crate::dbsp_circuit::{DamageEvent, DamageSource, PositionFloor, Tick, Velocity};
+use crate::numeric::floor_to_u16;
 use crate::{FALL_DAMAGE_SCALE, LANDING_COOLDOWN_TICKS, SAFE_LANDING_SPEED, TERMINAL_VELOCITY};
 use dbsp::utils::Tup2;
 use dbsp::{typed_batch::OrdZSet, RootCircuit, Stream};
 use ordered_float::OrderedFloat;
-
-#[expect(
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    reason = "Value is clamped to the `u16` domain before conversion."
-)]
-fn floored_to_u16(value: f64) -> Option<u16> {
-    if !(0.0..=f64::from(u16::MAX)).contains(&value) {
-        return None;
-    }
-    Some(value as u16)
-}
 
 fn detect_landings(
     standing: &Stream<RootCircuit, OrdZSet<PositionFloor>>,
@@ -89,7 +78,7 @@ fn calculate_fall_damage(
             }
             let scaled = excess * FALL_DAMAGE_SCALE;
             let floored = scaled.min(f64::from(u16::MAX)).floor();
-            let Some(damage) = floored_to_u16(floored) else {
+            let Some(damage) = floor_to_u16(floored) else {
                 continue;
             };
             let event = DamageEvent {
