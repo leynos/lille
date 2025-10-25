@@ -3,6 +3,7 @@
 use super::fall_damage_stream;
 use crate::dbsp_circuit::Position;
 use crate::dbsp_circuit::{DamageEvent, DamageSource, PositionFloor, Tick, Velocity};
+use crate::numeric::expect_u16;
 use crate::{FALL_DAMAGE_SCALE, LANDING_COOLDOWN_TICKS, SAFE_LANDING_SPEED, TERMINAL_VELOCITY};
 use dbsp::{operator::Generator, typed_batch::OrdZSet, Circuit, RootCircuit};
 use ordered_float::OrderedFloat;
@@ -16,15 +17,6 @@ type FallDamageHarness = (
     dbsp::ZSetHandle<Velocity>,
     dbsp::OutputHandle<OrdZSet<DamageEvent>>,
 );
-
-#[expect(
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    reason = "Tests clamp fall damage within the u16 domain."
-)]
-const fn to_u16(value: f64) -> u16 {
-    value as u16
-}
 
 fn pf(entity: i64, z: f64, floor: f64) -> PositionFloor {
     PositionFloor {
@@ -138,7 +130,7 @@ fn fall_damage_emits_event() {
         * FALL_DAMAGE_SCALE)
         .min(f64::from(u16::MAX))
         .floor();
-    let expected_amount = to_u16(expected_amount_raw);
+    let expected_amount = expect_u16(expected_amount_raw);
     assert_eq!(event.amount, expected_amount);
     assert_eq!(event.at_tick, 1);
 }
@@ -181,13 +173,13 @@ fn multiple_entities_land_without_interference() {
     let first = events.first().expect("expected first fall damage event");
     assert_eq!(first.entity, 1);
     assert_eq!(first.source, DamageSource::Fall);
-    assert_eq!(first.amount, to_u16(expected_a));
+    assert_eq!(first.amount, expect_u16(expected_a));
     assert_eq!(first.at_tick, 1);
 
     let second = events.get(1).expect("expected second fall damage event");
     assert_eq!(second.entity, 2);
     assert_eq!(second.source, DamageSource::Fall);
-    assert_eq!(second.amount, to_u16(expected_b));
+    assert_eq!(second.amount, expect_u16(expected_b));
     assert_eq!(second.at_tick, 1);
 }
 
