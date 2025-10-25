@@ -34,12 +34,11 @@ impl StreamConcat for Stream<RootCircuit, OrdZSet<FearLevel>> {
 /// ```rust,ignore
 /// # use anyhow::Error;
 /// # use dbsp::RootCircuit;
-/// # use lille::dbsp_circuit::streams::behaviour::fear_level_stream;
 /// # use lille::dbsp_circuit::{FearLevel, Position};
 /// # let _ = RootCircuit::build(|circuit| -> Result<(), Error> {
 /// #     let (positions, _) = circuit.add_input_zset::<Position>();
 /// #     let (fears, _) = circuit.add_input_zset::<FearLevel>();
-/// #     let _ = fear_level_stream(&positions, &fears);
+/// #     // Combine the inputs with `fear_level_stream(&positions, &fears)`.
 /// #     Ok(())
 /// # });
 /// ```
@@ -119,14 +118,12 @@ fn decide_movement(level: OrderedFloat<f64>, pt: &PositionTarget) -> MovementDec
 /// ```rust,ignore
 /// # use anyhow::Error;
 /// # use dbsp::RootCircuit;
-/// # use lille::dbsp_circuit::{
-/// #     streams::behaviour::movement_decision_stream, FearLevel, Position, Target,
-/// # };
+/// # use lille::dbsp_circuit::{FearLevel, Position, Target};
 /// # let _ = RootCircuit::build(|circuit| -> Result<(), Error> {
 /// #     let (fears, _) = circuit.add_input_zset::<FearLevel>();
 /// #     let (targets, _) = circuit.add_input_zset::<Target>();
 /// #     let (positions, _) = circuit.add_input_zset::<Position>();
-/// #     let _ = movement_decision_stream(&fears, &targets, &positions);
+/// #     // Feed the streams into `movement_decision_stream`.
 /// #     Ok(())
 /// # });
 /// ```
@@ -164,12 +161,11 @@ pub fn movement_decision_stream(
 /// ```rust,ignore
 /// # use anyhow::Error;
 /// # use dbsp::RootCircuit;
-/// # use lille::dbsp_circuit::streams::behaviour::apply_movement;
 /// # use lille::dbsp_circuit::{MovementDecision, Position};
 /// # let _ = RootCircuit::build(|circuit| -> Result<(), Error> {
 /// #     let (positions, _) = circuit.add_input_zset::<Position>();
 /// #     let (decisions, _) = circuit.add_input_zset::<MovementDecision>();
-/// #     let _ = apply_movement(&positions, &decisions);
+/// #     // Apply decisions to positions via `apply_movement`.
 /// #     Ok(())
 /// # });
 /// ```
@@ -274,13 +270,13 @@ mod tests {
         #[case] expected_dx: f64,
         #[case] expected_dy: f64,
     ) {
-        let (circuit, (fear_in, target_in, pos_in, out)) = RootCircuit::build(|c| {
+        let (circuit, (fear_in, target_in, pos_in, decisions_handle)) = RootCircuit::build(|c| {
             let (fear_input, fi) = c.add_input_zset::<FearLevel>();
             let (targets, ti) = c.add_input_zset::<Target>();
             let (pos_s, pi) = c.add_input_zset::<Position>();
-            let fear = fear_level_stream(&pos_s, &fear_input);
-            let out = movement_decision_stream(&fear, &targets, &pos_s).output();
-            Ok((fi, ti, pi, out))
+            let fear_stream = fear_level_stream(&pos_s, &fear_input);
+            let output_handle = movement_decision_stream(&fear_stream, &targets, &pos_s).output();
+            Ok((fi, ti, pi, output_handle))
         })
         .expect("failed to build circuit for movement_decision_join");
 
@@ -313,21 +309,30 @@ mod tests {
 
         circuit.step().expect("dbsp step");
 
-        let out: Vec<MovementDecision> = out.consolidate().iter().map(|(m, _, _)| m).collect();
-        assert_eq!(out.len(), 1);
-        assert_relative_eq!(out[0].dx.into_inner(), expected_dx);
-        assert_relative_eq!(out[0].dy.into_inner(), expected_dy);
+        let decisions: Vec<MovementDecision> = decisions_handle
+            .consolidate()
+            .iter()
+            .map(|(decision, (), _timestamp)| decision)
+            .collect();
+        match decisions.as_slice() {
+            [decision] => {
+                assert_relative_eq!(decision.dx.into_inner(), expected_dx);
+                assert_relative_eq!(decision.dy.into_inner(), expected_dy);
+            }
+            [] => panic!("expected a movement decision"),
+            many => panic!("expected one decision, observed {}", many.len()),
+        }
     }
 
     #[test]
     fn no_decision_without_target() {
-        let (circuit, (fear_in, pos_in, out)) = RootCircuit::build(|c| {
+        let (circuit, (fear_in, pos_in, decisions_handle)) = RootCircuit::build(|c| {
             let (fear_input, fi) = c.add_input_zset::<FearLevel>();
             let (pos_s, pi) = c.add_input_zset::<Position>();
             let targets = c.add_input_zset::<Target>().0;
-            let fear = fear_level_stream(&pos_s, &fear_input);
-            let out = movement_decision_stream(&fear, &targets, &pos_s).output();
-            Ok((fi, pi, out))
+            let fear_stream = fear_level_stream(&pos_s, &fear_input);
+            let output_handle = movement_decision_stream(&fear_stream, &targets, &pos_s).output();
+            Ok((fi, pi, output_handle))
         })
         .expect("failed to build circuit for no_decision_without_target");
 
@@ -350,7 +355,11 @@ mod tests {
 
         circuit.step().expect("dbsp step");
 
-        let out: Vec<MovementDecision> = out.consolidate().iter().map(|(m, _, _)| m).collect();
-        assert!(out.is_empty());
+        let decisions: Vec<MovementDecision> = decisions_handle
+            .consolidate()
+            .iter()
+            .map(|(decision, (), _timestamp)| decision)
+            .collect();
+        assert!(decisions.is_empty());
     }
 }
