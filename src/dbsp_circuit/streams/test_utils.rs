@@ -38,13 +38,13 @@ where
     I: Into<BlockId>,
     C: Into<BlockCoords>,
 {
-    let id: BlockId = id.into();
-    let coords: BlockCoords = coords.into();
+    let block_id: BlockId = id.into();
+    let block_coords: BlockCoords = coords.into();
     Block {
-        id: id.0,
-        x: coords.x,
-        y: coords.y,
-        z: coords.z,
+        id: block_id.0,
+        x: block_coords.x,
+        y: block_coords.y,
+        z: block_coords.z,
     }
 }
 
@@ -54,12 +54,12 @@ where
     I: Into<BlockId>,
     G: Into<Gradient>,
 {
-    let block_id: BlockId = block_id.into();
-    let gradient: Gradient = gradient.into();
+    let slope_block_id: BlockId = block_id.into();
+    let slope_gradient: Gradient = gradient.into();
     BlockSlope {
-        block_id: block_id.0,
-        grad_x: gradient.x.into(),
-        grad_y: gradient.y.into(),
+        block_id: slope_block_id.0,
+        grad_x: slope_gradient.x.into(),
+        grad_y: slope_gradient.y.into(),
     }
 }
 
