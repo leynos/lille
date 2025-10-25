@@ -54,7 +54,7 @@ fn position_floor_cases(
         .position_floor_out()
         .consolidate()
         .iter()
-        .map(|(pf, _, _)| pf.clone())
+        .map(|(pf, (), ())| pf.clone())
         .collect();
     vals.sort_by_key(|pf| pf.position.entity);
     let mut exp = expected;
@@ -74,7 +74,7 @@ fn multiple_positions_same_grid_cell() {
         .position_floor_out()
         .consolidate()
         .iter()
-        .map(|(pf, _, _)| pf.clone())
+        .map(|(pf, (), ())| pf.clone())
         .collect();
     vals.sort_by_key(|pf| pf.position.entity);
     let mut exp = vec![
