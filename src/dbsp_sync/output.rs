@@ -7,6 +7,7 @@ use log::{debug, error, warn};
 
 use crate::components::{DdlogId, Health, VelocityComp};
 use crate::dbsp_circuit::{try_step, HealthDelta, Tick};
+use crate::numeric::expect_f32;
 use crate::world_handle::WorldHandle;
 
 use super::DbspState;
@@ -36,9 +37,9 @@ fn apply_positions(
         let Ok((_, mut transform, _, _)) = write_query.get_mut(entity) else {
             continue;
         };
-        transform.translation.x = f32_from_f64(pos.x.into_inner());
-        transform.translation.y = f32_from_f64(pos.y.into_inner());
-        transform.translation.z = f32_from_f64(pos.z.into_inner());
+        transform.translation.x = expect_f32(pos.x.into_inner());
+        transform.translation.y = expect_f32(pos.y.into_inner());
+        transform.translation.z = expect_f32(pos.z.into_inner());
         if let Some(entry) = world_handle.entities.get_mut(&pos.entity) {
             entry.position = transform.translation;
         }
@@ -54,9 +55,9 @@ fn apply_velocities(state: &DbspState, write_query: &mut DbspWriteQuery<'_, '_>)
         let Ok((_, _, Some(mut velocity), _)) = write_query.get_mut(entity) else {
             continue;
         };
-        velocity.vx = f32_from_f64(vel.vx.into_inner());
-        velocity.vy = f32_from_f64(vel.vy.into_inner());
-        velocity.vz = f32_from_f64(vel.vz.into_inner());
+        velocity.vx = expect_f32(vel.vx.into_inner());
+        velocity.vy = expect_f32(vel.vy.into_inner());
+        velocity.vz = expect_f32(vel.vz.into_inner());
     }
 }
 
@@ -132,20 +133,6 @@ fn should_apply_health_delta(
         return false;
     }
     true
-}
-
-#[expect(
-    clippy::cast_possible_truncation,
-    reason = "Transforms require f32; inputs validated to remain within f32 range."
-)]
-fn f32_from_f64(value: f64) -> f32 {
-    debug_assert!(value.is_finite(), "non-finite translation value");
-    debug_assert!(
-        value <= f64::from(f32::MAX),
-        "translation exceeds f32 range"
-    );
-    debug_assert!(value >= f64::from(f32::MIN), "translation below f32 range");
-    value as f32
 }
 
 /// Applies DBSP outputs back to ECS components.
