@@ -137,10 +137,6 @@ struct HealthDeltaExpectation {
     seq: Option<u32>,
 }
 
-#[expect(
-    clippy::ignored_unit_patterns,
-    reason = "DBSP batches include weight/time metadata that tests intentionally skip"
-)]
 fn assert_health_delta(case: &HealthDeltaTestCase, expected: HealthDeltaExpectation) {
     let events = case.event_records();
     let deltas = run_health_delta(case.state, &events);

@@ -38,10 +38,6 @@ impl Env {
         step(&mut self.circuit);
     }
 
-    #[expect(
-        clippy::ignored_unit_patterns,
-        reason = "DBSP batches include weight/time metadata that tests intentionally skip"
-    )]
     fn output(&mut self) -> Vec<PositionFloor> {
         let vals: Vec<_> = self
             .circuit
