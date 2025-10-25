@@ -15,14 +15,14 @@ impl DamageInbox {
     ///
     /// # Examples
     /// ```
+    /// use lille::dbsp_circuit::{DamageEvent, DamageSource};
     /// use lille::dbsp_sync::DamageInbox;
-    /// use lille::DamageEvent;
     ///
     /// let mut inbox = DamageInbox::default();
     /// inbox.push(DamageEvent {
     ///     entity: 1,
     ///     amount: 5,
-    ///     source: lille::DamageSource::External,
+    ///     source: DamageSource::External,
     ///     at_tick: 42,
     ///     seq: None,
     /// });
@@ -35,8 +35,8 @@ impl DamageInbox {
     ///
     /// # Examples
     /// ```
+    /// use lille::dbsp_circuit::{DamageEvent, DamageSource};
     /// use lille::dbsp_sync::DamageInbox;
-    /// use lille::{DamageEvent, DamageSource};
     ///
     /// let mut inbox = DamageInbox::default();
     /// inbox.extend([
@@ -60,8 +60,8 @@ impl DamageInbox {
     ///
     /// # Examples
     /// ```
+    /// use lille::dbsp_circuit::{DamageEvent, DamageSource};
     /// use lille::dbsp_sync::DamageInbox;
-    /// use lille::{DamageEvent, DamageSource};
     ///
     /// let mut inbox = DamageInbox::default();
     /// inbox.push(DamageEvent {
