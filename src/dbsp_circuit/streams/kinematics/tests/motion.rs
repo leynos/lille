@@ -8,73 +8,102 @@ use crate::{apply_ground_friction, GRAVITY_PULL, TERMINAL_VELOCITY};
 use approx::assert_relative_eq;
 use rstest::rstest;
 
+struct MotionScenario {
+    position: Position,
+    velocity: Velocity,
+    blocks: Vec<Block>,
+    force: Option<Force>,
+    expected: MotionExpectation,
+}
+
+struct MotionExpectation {
+    position: Option<NewPosition>,
+    velocity: Option<NewVelocity>,
+}
+
 #[rstest]
-#[case::standing_moves(
-    Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 1.0.into() },
-    vel(1, (1.0, 0.0, 0.0)),
-    vec![block(1, (0, 0, 0)), block(2, (1, 0, 1))],
-    None,
-    Some(Position { entity: 1, x: apply_ground_friction(1.0).into(), y: 0.0.into(), z: 1.0.into() }),
-    Some(vel(1, (apply_ground_friction(1.0), 0.0, 0.0))),
-)]
-#[case::unsupported_falls(
-    Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 2.1.into() },
-    vel(1, (0.0, 0.0, 0.0)),
-    vec![block(1, (0, 0, 0))],
-    None,
-    Some(Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 1.1.into() }),
-    Some(vel(1, (0.0, 0.0, GRAVITY_PULL))),
-)]
-#[case::boundary_snaps_to_floor(
-    Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 1.1.into() },
-    vel(1, (0.0, 0.0, 0.0)),
-    vec![block(1, (0, 0, 0))],
-    None,
-    Some(Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 1.0.into() }),
-    Some(vel(1, (0.0, 0.0, 0.0))),
-)]
-#[case::force_accelerates(
-    Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 1.0.into() },
-    vel(1, (0.0, 0.0, 0.0)),
-    vec![block(1, (0, 0, 0)), block(2, (1, 0, 1))],
-    Some(force_with_mass(1, (5.0, 0.0, 0.0), 5.0)),
-    Some(Position { entity: 1, x: apply_ground_friction(1.0).into(), y: 0.0.into(), z: 1.0.into() }),
-    Some(vel(1, (apply_ground_friction(1.0), 0.0, 0.0))),
-)]
-#[case::invalid_mass_ignores_force(
-    Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 2.1.into() },
-    vel(1, (0.0, 0.0, 0.0)),
-    vec![block(1, (0, 0, 0))],
-    Some(force_with_mass(1, (0.0, 0.0, 10.0), 0.0)),
-    Some(Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 1.1.into() }),
-    Some(vel(1, (0.0, 0.0, GRAVITY_PULL))),
-)]
-#[case::force_with_default_mass(
-    Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 1.0.into() },
-    vel(1, (0.0, 0.0, 0.0)),
-    vec![block(1, (0, 0, 0))],
-    Some(force(1, (1.0, 0.0, 0.0))),
-    Some(Position { entity: 1, x: apply_ground_friction(1.0 / crate::DEFAULT_MASS).into(), y: 0.0.into(), z: 1.0.into() }),
-    Some(vel(1, (apply_ground_friction(1.0 / crate::DEFAULT_MASS), 0.0, 0.0))),
-)]
-fn motion_cases(
-    #[case] position: Position,
-    #[case] velocity: Velocity,
-    #[case] blocks: Vec<Block>,
-    #[case] force_rec: Option<Force>,
-    #[case] expected_pos: Option<NewPosition>,
-    #[case] expected_vel: Option<NewVelocity>,
-) {
+#[case::standing_moves(MotionScenario {
+    position: Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 1.0.into() },
+    velocity: vel(1, (1.0, 0.0, 0.0)),
+    blocks: vec![block(1, (0, 0, 0)), block(2, (1, 0, 1))],
+    force: None,
+    expected: MotionExpectation {
+        position: Some(Position { entity: 1, x: apply_ground_friction(1.0).into(), y: 0.0.into(), z: 1.0.into() }),
+        velocity: Some(vel(1, (apply_ground_friction(1.0), 0.0, 0.0))),
+    },
+})]
+#[case::unsupported_falls(MotionScenario {
+    position: Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 2.1.into() },
+    velocity: vel(1, (0.0, 0.0, 0.0)),
+    blocks: vec![block(1, (0, 0, 0))],
+    force: None,
+    expected: MotionExpectation {
+        position: Some(Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 1.1.into() }),
+        velocity: Some(vel(1, (0.0, 0.0, GRAVITY_PULL))),
+    },
+})]
+#[case::boundary_snaps_to_floor(MotionScenario {
+    position: Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 1.1.into() },
+    velocity: vel(1, (0.0, 0.0, 0.0)),
+    blocks: vec![block(1, (0, 0, 0))],
+    force: None,
+    expected: MotionExpectation {
+        position: Some(Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 1.0.into() }),
+        velocity: Some(vel(1, (0.0, 0.0, 0.0))),
+    },
+})]
+#[case::force_accelerates(MotionScenario {
+    position: Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 1.0.into() },
+    velocity: vel(1, (0.0, 0.0, 0.0)),
+    blocks: vec![block(1, (0, 0, 0)), block(2, (1, 0, 1))],
+    force: Some(force_with_mass(1, (5.0, 0.0, 0.0), 5.0)),
+    expected: MotionExpectation {
+        position: Some(Position { entity: 1, x: apply_ground_friction(1.0).into(), y: 0.0.into(), z: 1.0.into() }),
+        velocity: Some(vel(1, (apply_ground_friction(1.0), 0.0, 0.0))),
+    },
+})]
+#[case::invalid_mass_ignores_force(MotionScenario {
+    position: Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 2.1.into() },
+    velocity: vel(1, (0.0, 0.0, 0.0)),
+    blocks: vec![block(1, (0, 0, 0))],
+    force: Some(force_with_mass(1, (0.0, 0.0, 10.0), 0.0)),
+    expected: MotionExpectation {
+        position: Some(Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 1.1.into() }),
+        velocity: Some(vel(1, (0.0, 0.0, GRAVITY_PULL))),
+    },
+})]
+#[case::force_with_default_mass(MotionScenario {
+    position: Position { entity: 1, x: 0.0.into(), y: 0.0.into(), z: 1.0.into() },
+    velocity: vel(1, (0.0, 0.0, 0.0)),
+    blocks: vec![block(1, (0, 0, 0))],
+    force: Some(force(1, (1.0, 0.0, 0.0))),
+    expected: MotionExpectation {
+        position: Some(Position { entity: 1, x: apply_ground_friction(1.0 / crate::DEFAULT_MASS).into(), y: 0.0.into(), z: 1.0.into() }),
+        velocity: Some(vel(1, (apply_ground_friction(1.0 / crate::DEFAULT_MASS), 0.0, 0.0))),
+    },
+})]
+fn motion_cases(#[case] scenario: MotionScenario) {
+    let MotionScenario {
+        position,
+        velocity,
+        blocks,
+        force,
+        expected:
+            MotionExpectation {
+                position: expected_pos,
+                velocity: expected_vel,
+            },
+    } = scenario;
     // DEFAULT_MASS is validated in `default_mass_is_positive`.
     let mut circuit = new_circuit();
 
-    for b in blocks {
-        circuit.block_in().push(b, 1);
+    for block_record in blocks {
+        circuit.block_in().push(block_record, 1);
     }
     circuit.position_in().push(position, 1);
     circuit.velocity_in().push(velocity, 1);
-    if let Some(f) = force_rec {
-        circuit.force_in().push(f, 1);
+    if let Some(force_record) = force {
+        circuit.force_in().push(force_record, 1);
     }
 
     step_named(&mut circuit, "motion_cases");
@@ -85,18 +114,16 @@ fn motion_cases(
         .map(|t| t.0)
         .collect();
     match expected_pos {
-        Some(expected) => {
-            match pos_out.as_slice() {
-                [actual] => {
-                    assert_eq!(actual.entity, expected.entity);
-                    assert_relative_eq!(actual.x.into_inner(), expected.x.into_inner());
-                    assert_relative_eq!(actual.y.into_inner(), expected.y.into_inner());
-                    assert_relative_eq!(actual.z.into_inner(), expected.z.into_inner());
-                }
-                [] => panic!("expected a position output"),
-                many => panic!("expected one position, observed {}", many.len()),
+        Some(expected) => match pos_out.as_slice() {
+            [actual] => {
+                assert_eq!(actual.entity, expected.entity);
+                assert_relative_eq!(actual.x.into_inner(), expected.x.into_inner());
+                assert_relative_eq!(actual.y.into_inner(), expected.y.into_inner());
+                assert_relative_eq!(actual.z.into_inner(), expected.z.into_inner());
             }
-        }
+            [] => panic!("expected a position output"),
+            many => panic!("expected one position, observed {}", many.len()),
+        },
         None => assert!(pos_out.is_empty()),
     }
 
@@ -107,18 +134,16 @@ fn motion_cases(
         .map(|t| t.0)
         .collect();
     match expected_vel {
-        Some(expected) => {
-            match vel_out.as_slice() {
-                [actual] => {
-                    assert_eq!(actual.entity, expected.entity);
-                    assert_relative_eq!(actual.vx.into_inner(), expected.vx.into_inner());
-                    assert_relative_eq!(actual.vy.into_inner(), expected.vy.into_inner());
-                    assert_relative_eq!(actual.vz.into_inner(), expected.vz.into_inner());
-                }
-                [] => panic!("expected a velocity output"),
-                many => panic!("expected one velocity, observed {}", many.len()),
+        Some(expected) => match vel_out.as_slice() {
+            [actual] => {
+                assert_eq!(actual.entity, expected.entity);
+                assert_relative_eq!(actual.vx.into_inner(), expected.vx.into_inner());
+                assert_relative_eq!(actual.vy.into_inner(), expected.vy.into_inner());
+                assert_relative_eq!(actual.vz.into_inner(), expected.vz.into_inner());
             }
-        }
+            [] => panic!("expected a velocity output"),
+            many => panic!("expected one velocity, observed {}", many.len()),
+        },
         None => assert!(vel_out.is_empty()),
     }
 }
