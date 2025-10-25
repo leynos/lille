@@ -79,6 +79,10 @@ fn calculate_fall_damage(
             let scaled = excess * FALL_DAMAGE_SCALE;
             let floored = scaled.min(f64::from(u16::MAX)).floor();
             let Some(damage) = floor_to_u16(floored) else {
+                // When the scaled damage escapes the `u16` range we treat the
+                // landing as invalid and drop the event. This mirrors the
+                // accumulator logic, which only processes bounded health
+                // deltas, so the None here intentionally skips emission.
                 continue;
             };
             let event = DamageEvent {
