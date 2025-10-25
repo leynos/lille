@@ -9,6 +9,7 @@ pub mod dbsp_sync;
 pub mod entity;
 pub mod logging;
 mod macros;
+pub mod numeric;
 pub mod physics;
 #[cfg(feature = "render")]
 #[cfg_attr(docsrs, doc(cfg(feature = "render")))]
