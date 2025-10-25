@@ -1,8 +1,17 @@
+#![cfg_attr(
+    feature = "render",
+    doc = "Integration tests covering the world-spawning Bevy system."
+)]
+#![cfg_attr(
+    not(feature = "render"),
+    doc = "Integration tests require the `render` feature."
+)]
 #![cfg(feature = "render")]
 //! Unit tests for the world-spawning system.
 //! Verifies entity counts and component assignments after system execution.
 use bevy::prelude::*;
-use lille::{spawn_world_system, DdlogId, Health, Target, UnitType};
+use lille::spawn_world_system;
+use lille::{DdlogId, Health, Target, UnitType};
 
 /// Tracks entity categories observed during `spawn_world_system` execution.
 #[derive(Default)]
