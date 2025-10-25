@@ -51,7 +51,7 @@ impl DbspState {
     ///
     /// # Errors
     /// Returns a DBSP error if the underlying circuit fails to construct.
-    #[must_use]
+    #[must_use = "DbspState initialisation may fail; handle the Result"]
     pub fn new() -> Result<Self, dbsp::Error> {
         Ok(Self {
             circuit: DbspCircuit::new()?,
