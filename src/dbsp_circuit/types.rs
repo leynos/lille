@@ -37,6 +37,7 @@ pub type Tick = u64;
 )]
 #[archive_attr(derive(Ord, PartialOrd, Eq, PartialEq, Hash))]
 /// Classification of damage event origins.
+#[non_exhaustive]
 pub enum DamageSource {
     /// Damage originating from gameplay systems outside the circuit.
     #[default]
