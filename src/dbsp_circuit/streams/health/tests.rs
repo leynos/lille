@@ -168,15 +168,21 @@ fn multiple_entities_land_without_interference() {
         .min(f64::from(u16::MAX))
         .floor() as u16;
 
-    assert_eq!(events[0].entity, 1);
-    assert_eq!(events[0].source, DamageSource::Fall);
-    assert_eq!(events[0].amount, expected_a);
-    assert_eq!(events[0].at_tick, 1);
+    let Some(first) = events.get(0) else {
+        panic!("expected first fall damage event");
+    };
+    assert_eq!(first.entity, 1);
+    assert_eq!(first.source, DamageSource::Fall);
+    assert_eq!(first.amount, expected_a);
+    assert_eq!(first.at_tick, 1);
 
-    assert_eq!(events[1].entity, 2);
-    assert_eq!(events[1].source, DamageSource::Fall);
-    assert_eq!(events[1].amount, expected_b);
-    assert_eq!(events[1].at_tick, 1);
+    let Some(second) = events.get(1) else {
+        panic!("expected second fall damage event");
+    };
+    assert_eq!(second.entity, 2);
+    assert_eq!(second.source, DamageSource::Fall);
+    assert_eq!(second.amount, expected_b);
+    assert_eq!(second.at_tick, 1);
 }
 
 #[rstest]
@@ -214,8 +220,11 @@ fn cooldown_prevents_rapid_retrigger() {
     circuit.step().expect("initial landing");
     let initial_events = delta_events(&output, &mut cumulative);
     assert_eq!(initial_events.len(), 1);
-    assert_eq!(initial_events[0].1, 1);
-    let first_event = initial_events[0].0;
+    let Some((first_event, count)) = initial_events.first() else {
+        panic!("expected initial landing event");
+    };
+    assert_eq!(*count, 1);
+    let first_event = *first_event;
 
     standing_in.push(standing_pf.clone(), -1);
     unsupported_in.push(unsupported_pf.clone(), 1);
@@ -242,8 +251,11 @@ fn cooldown_prevents_rapid_retrigger() {
     circuit.step().expect("post-cooldown landing");
     let final_events = delta_events(&output, &mut cumulative);
     assert_eq!(final_events.len(), 1);
-    assert_eq!(final_events[0].1, 1);
-    let final_event = final_events[0].0;
+    let Some((final_event, count)) = final_events.first() else {
+        panic!("expected final landing event");
+    };
+    assert_eq!(*count, 1);
+    let final_event = *final_event;
 
     assert!(final_event.at_tick > first_event.at_tick);
     assert_eq!(cumulative.len(), 2);
