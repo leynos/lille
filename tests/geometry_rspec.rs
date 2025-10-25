@@ -10,6 +10,10 @@ use lille::{
 };
 use test_utils::step;
 
+struct Env {
+    circuit: DbspCircuit,
+}
+
 impl Env {
     fn new() -> Result<Self> {
         let circuit = DbspCircuit::new().context("failed to create DbspCircuit")?;
@@ -34,9 +38,9 @@ impl Env {
             .consolidate()
             .iter()
             .map(|(fh, weight, timestamp)| {
-                let _ = weight;
-                let _ = timestamp;
-                *fh
+                drop(weight);
+                drop(timestamp);
+                fh.clone()
             })
             .collect();
         self.circuit.clear_inputs();
