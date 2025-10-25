@@ -74,3 +74,57 @@ pub fn floor_to_i32(value: OrderedFloat<f64>) -> i32 {
     let clamped = floored.clamp(f64::from(i32::MIN), f64::from(i32::MAX));
     clamped as i32
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn expect_f32_converts_in_range_values() {
+        let value = 123.5_f64;
+
+        let result = expect_f32(value);
+
+        assert!((result - 123.5_f32).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn expect_u16_converts_in_range_values() {
+        let value = 512.0_f64;
+
+        let result = expect_u16(value);
+
+        assert_eq!(result, 512_u16);
+    }
+
+    #[test]
+    fn floor_to_u16_returns_none_for_negative_values() {
+        assert_eq!(floor_to_u16(-1.0_f64), None);
+    }
+
+    #[test]
+    fn floor_to_u16_returns_none_for_overflow_values() {
+        assert_eq!(floor_to_u16(f64::from(u16::MAX) + 1.0), None);
+    }
+
+    #[test]
+    fn floor_to_u16_returns_none_for_non_finite_values() {
+        assert_eq!(floor_to_u16(f64::INFINITY), None);
+        assert_eq!(floor_to_u16(f64::NEG_INFINITY), None);
+        assert_eq!(floor_to_u16(f64::NAN), None);
+    }
+
+    #[test]
+    fn floor_to_u16_floors_valid_values() {
+        assert_eq!(floor_to_u16(123.9_f64), Some(123_u16));
+    }
+
+    #[test]
+    fn floor_to_i32_clamps_to_bounds() {
+        let min = floor_to_i32(OrderedFloat::from(f64::from(i32::MIN) - 10.0));
+        let max = floor_to_i32(OrderedFloat::from(f64::from(i32::MAX) + 10.0));
+
+        assert_eq!(min, i32::MIN);
+        assert_eq!(max, i32::MAX);
+    }
+}
