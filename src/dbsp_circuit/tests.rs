@@ -44,10 +44,12 @@ fn within_grace(#[case] z: f64, #[case] z_floor: f64) {
 #[case(10.0 + GRACE_DISTANCE, 10.0)]
 fn beyond_grace_or_at_boundary(#[case] z: f64, #[case] z_floor: f64) {
     let pf = make_pf(z, z_floor);
-    if pf.position.z.into_inner() == pf.z_floor.into_inner() + GRACE_DISTANCE {
-        assert!(pf.position.z.into_inner() <= pf.z_floor.into_inner() + GRACE_DISTANCE);
+    let position_z = pf.position.z.into_inner();
+    let boundary = pf.z_floor.into_inner() + GRACE_DISTANCE;
+    if (position_z - boundary).abs() <= f64::EPSILON {
+        assert!(position_z <= boundary);
     } else {
-        assert!(pf.position.z.into_inner() > pf.z_floor.into_inner() + GRACE_DISTANCE);
+        assert!(position_z > boundary);
     }
 }
 
@@ -69,7 +71,7 @@ fn run_health_delta(health: HealthState, events: &[(DamageEvent, i32)]) -> Vec<H
     output
         .consolidate()
         .iter()
-        .map(|(delta, _, _)| delta)
+        .map(|(delta, (), ())| delta)
         .collect()
 }
 
@@ -135,7 +137,7 @@ struct HealthDeltaExpectation {
     seq: Option<u32>,
 }
 
-fn assert_health_delta(case: HealthDeltaTestCase, expected: HealthDeltaExpectation) {
+fn assert_health_delta(case: &HealthDeltaTestCase, expected: HealthDeltaExpectation) {
     let events = case.event_records();
     let deltas = run_health_delta(case.state, &events);
     match deltas.as_slice() {
@@ -164,7 +166,7 @@ fn healing_clamped_to_max(
         vec![DamageEventSpec::new(heal, DamageSource::Script, 5, Some(1))],
     );
     assert_health_delta(
-        case,
+        &case,
         HealthDeltaExpectation {
             delta: expected_delta,
             death: false,
@@ -180,7 +182,7 @@ fn duplicate_damage_events_idempotent(#[case] seq: Option<u32>) {
     let event = DamageEventSpec::new(30, DamageSource::External, 9, seq);
     let case = HealthDeltaTestCase::new(2, 90, 100, vec![event, event]);
     assert_health_delta(
-        case,
+        &case,
         HealthDeltaExpectation {
             delta: -30,
             death: false,
@@ -197,7 +199,7 @@ fn sequenced_events_with_same_seq_in_same_tick_are_deduplicated() {
     // the matching payload ensures the circuit's debug assertions are satisfied.
     let case = HealthDeltaTestCase::new(7, 70, 100, vec![event, event]);
     assert_health_delta(
-        case,
+        &case,
         HealthDeltaExpectation {
             delta: -20,
             death: false,
@@ -285,7 +287,7 @@ fn health_delta_scenarios(
     #[case] case: HealthDeltaTestCase,
     #[case] expected: HealthDeltaExpectation,
 ) {
-    assert_health_delta(case, expected);
+    assert_health_delta(&case, expected);
 }
 
 #[rstest]
@@ -297,7 +299,7 @@ fn lethal_damage_sets_death_flag() {
         vec![DamageEventSpec::new(40, DamageSource::External, 2, Some(7))],
     );
     assert_health_delta(
-        case,
+        &case,
         HealthDeltaExpectation {
             delta: -20,
             death: true,
