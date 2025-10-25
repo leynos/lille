@@ -28,6 +28,10 @@ macro_rules! impl_test_helper {
 }
 
 /// Builds a new [`DbspCircuit`] for tests.
+///
+/// # Panics
+/// Panics if the underlying [`DbspCircuit::new`] call fails to construct the circuit.
+#[must_use]
 pub fn new_circuit() -> DbspCircuit {
     DbspCircuit::new().expect("failed to build DBSP circuit")
 }
