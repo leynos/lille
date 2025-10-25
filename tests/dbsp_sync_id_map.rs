@@ -13,7 +13,11 @@ use lille::init_world_handle_system;
 /// # Examples
 ///
 /// ```
-/// let mut app = app();
+/// # use anyhow::Result;
+/// # fn demo() -> Result<()> {
+/// let mut app = build_app()?;
+/// # Ok(())
+/// # }
 /// ```
 fn build_app() -> Result<App> {
     let mut app = App::new();
