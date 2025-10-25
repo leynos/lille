@@ -17,6 +17,15 @@ type FallDamageHarness = (
     dbsp::OutputHandle<OrdZSet<DamageEvent>>,
 );
 
+#[expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "Tests clamp fall damage within the u16 domain."
+)]
+const fn to_u16(value: f64) -> u16 {
+    value as u16
+}
+
 fn pf(entity: i64, z: f64, floor: f64) -> PositionFloor {
     PositionFloor {
         position: Position {
@@ -75,7 +84,7 @@ fn read_events(output: &dbsp::OutputHandle<OrdZSet<DamageEvent>>) -> Vec<DamageE
     output
         .consolidate()
         .iter()
-        .map(|(event, _, weight)| {
+        .map(|(event, (), weight)| {
             assert_eq!(weight, 1, "expected single-weight damage events");
             event
         })
@@ -88,7 +97,7 @@ fn delta_events(
 ) -> Vec<(DamageEvent, i64)> {
     let mut deltas = Vec::new();
 
-    for (event, _, weight) in output.consolidate().iter() {
+    for (event, (), weight) in output.consolidate().iter() {
         if weight <= 0 {
             continue;
         }
@@ -122,13 +131,14 @@ fn fall_damage_emits_event() {
 
     let events = read_events(&output);
     assert_eq!(events.len(), 1);
-    let event = events[0];
+    let event = events.first().expect("expected single fall damage event");
     assert_eq!(event.entity, 1);
     assert_eq!(event.source, DamageSource::Fall);
-    let expected_amount = ((8.0_f64.min(TERMINAL_VELOCITY) - SAFE_LANDING_SPEED)
+    let expected_amount_raw = ((8.0_f64.min(TERMINAL_VELOCITY) - SAFE_LANDING_SPEED)
         * FALL_DAMAGE_SCALE)
         .min(f64::from(u16::MAX))
-        .floor() as u16;
+        .floor();
+    let expected_amount = to_u16(expected_amount_raw);
     assert_eq!(event.amount, expected_amount);
     assert_eq!(event.at_tick, 1);
 }
@@ -163,25 +173,21 @@ fn multiple_entities_land_without_interference() {
 
     let expected_a = ((8.0_f64.min(TERMINAL_VELOCITY) - SAFE_LANDING_SPEED) * FALL_DAMAGE_SCALE)
         .min(f64::from(u16::MAX))
-        .floor() as u16;
+        .floor();
     let expected_b = ((12.0_f64.min(TERMINAL_VELOCITY) - SAFE_LANDING_SPEED) * FALL_DAMAGE_SCALE)
         .min(f64::from(u16::MAX))
-        .floor() as u16;
+        .floor();
 
-    let Some(first) = events.get(0) else {
-        panic!("expected first fall damage event");
-    };
+    let first = events.first().expect("expected first fall damage event");
     assert_eq!(first.entity, 1);
     assert_eq!(first.source, DamageSource::Fall);
-    assert_eq!(first.amount, expected_a);
+    assert_eq!(first.amount, to_u16(expected_a));
     assert_eq!(first.at_tick, 1);
 
-    let Some(second) = events.get(1) else {
-        panic!("expected second fall damage event");
-    };
+    let second = events.get(1).expect("expected second fall damage event");
     assert_eq!(second.entity, 2);
     assert_eq!(second.source, DamageSource::Fall);
-    assert_eq!(second.amount, expected_b);
+    assert_eq!(second.amount, to_u16(expected_b));
     assert_eq!(second.at_tick, 1);
 }
 
@@ -220,11 +226,10 @@ fn cooldown_prevents_rapid_retrigger() {
     circuit.step().expect("initial landing");
     let initial_events = delta_events(&output, &mut cumulative);
     assert_eq!(initial_events.len(), 1);
-    let Some((first_event, count)) = initial_events.first() else {
-        panic!("expected initial landing event");
-    };
-    assert_eq!(*count, 1);
-    let first_event = *first_event;
+    let &(ref first_event_record, first_count) = initial_events
+        .first()
+        .expect("expected initial landing event");
+    assert_eq!(first_count, 1);
 
     standing_in.push(standing_pf.clone(), -1);
     unsupported_in.push(unsupported_pf.clone(), 1);
@@ -251,12 +256,10 @@ fn cooldown_prevents_rapid_retrigger() {
     circuit.step().expect("post-cooldown landing");
     let final_events = delta_events(&output, &mut cumulative);
     assert_eq!(final_events.len(), 1);
-    let Some((final_event, count)) = final_events.first() else {
-        panic!("expected final landing event");
-    };
-    assert_eq!(*count, 1);
-    let final_event = *final_event;
+    let &(ref final_event_record, final_count) =
+        final_events.first().expect("expected final landing event");
+    assert_eq!(final_count, 1);
 
-    assert!(final_event.at_tick > first_event.at_tick);
+    assert!(final_event_record.at_tick > first_event_record.at_tick);
     assert_eq!(cumulative.len(), 2);
 }
