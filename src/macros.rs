@@ -45,12 +45,12 @@
 //! use lille::dbsp_record;
 //!
 //! dbsp_record! {
-//!     pub struct G<T> { pub t: T }, Copy,,
+//!     pub struct G<T> { pub t: T }, Copy,
 //! }
 //! // error: `T` does not implement `Copy`
 //! ```
 //!
-//! A `Copy` bound on the generic parameter is required: `dbsp_record! { pub struct G<T: Copy> { pub t: T }, Copy,, }`
+//! A `Copy` bound on the generic parameter is required: `dbsp_record! { pub struct G<T: Copy> { pub t: T }, Copy, }`
 /// Define a DBSP record struct with consistent derives for archiving and
 /// ordering.
 ///
