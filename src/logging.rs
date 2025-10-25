@@ -63,6 +63,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::ensure;
     use std::fmt;
     use std::sync::Mutex;
 
@@ -88,18 +89,26 @@ mod tests {
         let _guard = TEST_LOCK.lock().expect("poisoned test lock");
         reset_logger_flag();
         let mut called = false;
+        let mut observed_level = None;
 
         init_with(true, |level| {
             called = true;
-            assert_eq!(level, LevelFilter::Trace);
+            observed_level = Some(level);
             Ok::<(), TestError>(())
         })?;
 
-        assert!(
+        ensure!(
             called,
             "installer should be invoked on first initialisation"
         );
-        assert!(LOGGER_INITIALISED.load(Ordering::SeqCst));
+        ensure!(
+            LOGGER_INITIALISED.load(Ordering::SeqCst),
+            "logger flag should remain set after success"
+        );
+        ensure!(
+            observed_level == Some(LevelFilter::Trace),
+            "expected trace level when verbose initialises"
+        );
         reset_logger_flag();
         Ok(())
     }
@@ -110,16 +119,21 @@ mod tests {
         reset_logger_flag();
         LOGGER_INITIALISED.store(true, Ordering::SeqCst);
         let mut called = false;
+        let mut observed_level = None;
 
         init_with(false, |level| {
             called = true;
-            assert_eq!(level, LevelFilter::Info);
+            observed_level = Some(level);
             Ok::<(), TestError>(())
         })?;
 
-        assert!(
+        ensure!(
             !called,
             "installer must not run when logger already initialised"
+        );
+        ensure!(
+            observed_level.is_none(),
+            "installer closure must not run when logger already initialised"
         );
         reset_logger_flag();
         Ok(())
