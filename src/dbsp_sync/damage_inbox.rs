@@ -4,8 +4,8 @@ use bevy::prelude::Resource;
 
 use crate::dbsp_circuit::DamageEvent;
 
-#[derive(Resource, Default)]
 /// Buffer collecting [`DamageEvent`] values before they are sent to DBSP.
+#[derive(Resource, Default)]
 pub struct DamageInbox {
     events: Vec<DamageEvent>,
 }
