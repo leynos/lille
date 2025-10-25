@@ -14,23 +14,22 @@ use lille::{
 };
 use rstest::{fixture, rstest};
 use std::fmt;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 #[expect(
     clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    reason = "Physics test values remain within f32 representable range"
+    reason = "Test expectations operate on bounded physics values that fit into f32."
 )]
-fn as_f32(value: f64) -> f32 {
+const fn to_f32(value: f64) -> f32 {
     value as f32
 }
 
 #[expect(
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss,
-    reason = "Physics damage calculations clamp to u16 bounds"
+    reason = "Test expectations clamp damage magnitudes within u16 range."
 )]
-fn as_u16(value: f64) -> u16 {
+const fn to_u16(value: f64) -> u16 {
     value as u16
 }
 
@@ -64,13 +63,13 @@ impl Default for TestWorld {
 
 impl TestWorld {
     fn app_guard(&self) -> MutexGuard<'_, App> {
-        self.app.lock().unwrap_or_else(|poison| poison.into_inner())
+        self.app.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
     fn expected_damage_guard(&self) -> MutexGuard<'_, Option<u16>> {
         self.expected_damage
             .lock()
-            .unwrap_or_else(|poison| poison.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
     }
 
     fn entity_or_panic(&self) -> Entity {
@@ -208,209 +207,312 @@ fn world() -> TestWorld {
     TestWorld::default()
 }
 
-/// Runs a physics scenario using `rspec` with the provided parameters.
-macro_rules! physics_spec {
-    ($world:expr, $description:expr, $setup:expr, $expected_pos:expr, $expected_vel:expr) => {
-        rspec::run(&rspec::given($description, ($world), |scenario| {
-            scenario.before_each($setup);
-            scenario.when("the simulation ticks once", |phase| {
-                phase.before_each(|world_state| world_state.tick());
-                phase.then("the expected outcome occurs", move |world_state| {
-                    world_state.assert_position(
-                        ($expected_pos).0,
-                        ($expected_pos).1,
-                        ($expected_pos).2,
-                    );
-                    world_state.assert_velocity(
-                        ($expected_vel).0,
-                        ($expected_vel).1,
-                        ($expected_vel).2,
-                    );
-                });
-            });
-        }));
-    };
+type SetupFn = fn(&mut TestWorld);
+
+#[derive(Clone, Copy)]
+struct PhysicsScenario {
+    setup: SetupFn,
+    expected_position: (f32, f32, f32),
+    expected_velocity: (f32, f32, f32),
+}
+
+fn physics_scenario(
+    setup: SetupFn,
+    expected_position: (f64, f64, f64),
+    expected_velocity: (f64, f64, f64),
+) -> PhysicsScenario {
+    PhysicsScenario {
+        setup,
+        expected_position: (
+            to_f32(expected_position.0),
+            to_f32(expected_position.1),
+            to_f32(expected_position.2),
+        ),
+        expected_velocity: (
+            to_f32(expected_velocity.0),
+            to_f32(expected_velocity.1),
+            to_f32(expected_velocity.2),
+        ),
+    }
+}
+
+fn run_physics_scenario(mut world: TestWorld, scenario: PhysicsScenario) {
+    (scenario.setup)(&mut world);
+    world.tick();
+    let (px, py, pz) = scenario.expected_position;
+    world.assert_position(px, py, pz);
+    let (vx, vy, vz) = scenario.expected_velocity;
+    world.assert_velocity(vx, vy, vz);
+}
+
+fn setup_falling(world: &mut TestWorld) {
+    world.spawn_block(Block {
+        id: 1,
+        x: 0,
+        y: 0,
+        z: -2,
+    });
+    world.spawn_entity_without_force(Transform::from_xyz(0.0, 0.0, 2.0), VelocityComp::default());
+}
+
+fn setup_standing_flat(world: &mut TestWorld) {
+    world.spawn_block(Block {
+        id: 1,
+        x: 0,
+        y: 0,
+        z: 0,
+    });
+    world.spawn_entity_without_force(Transform::from_xyz(0.0, 0.0, 1.0), VelocityComp::default());
+}
+
+fn setup_standing_sloped(world: &mut TestWorld) {
+    world.spawn_sloped_block(
+        Block {
+            id: 1,
+            x: 0,
+            y: 0,
+            z: 0,
+        },
+        BlockSlope {
+            block_id: 1,
+            grad_x: 1.0.into(),
+            grad_y: 0.0.into(),
+        },
+    );
+    world.spawn_entity_without_force(Transform::from_xyz(0.0, 0.0, 1.5), VelocityComp::default());
+}
+
+fn setup_move_heights(world: &mut TestWorld) {
+    world.spawn_block(Block {
+        id: 1,
+        x: 0,
+        y: 0,
+        z: 0,
+    });
+    world.spawn_block(Block {
+        id: 2,
+        x: 1,
+        y: 0,
+        z: 1,
+    });
+    let vx = to_f32(1.0 / (1.0 - GROUND_FRICTION));
+    world.spawn_entity_without_force(
+        Transform::from_xyz(0.0, 0.0, 1.0),
+        VelocityComp {
+            vx,
+            vy: 0.0,
+            vz: 0.0,
+        },
+    );
+}
+
+fn setup_force_acceleration(world: &mut TestWorld) {
+    world.spawn_block(Block {
+        id: 1,
+        x: 0,
+        y: 0,
+        z: 0,
+    });
+    world.spawn_block(Block {
+        id: 2,
+        x: 1,
+        y: 0,
+        z: 1,
+    });
+    world.spawn_entity(
+        Transform::from_xyz(0.0, 0.0, 1.0),
+        VelocityComp::default(),
+        Some(ForceComp {
+            force_x: 5.0 / (1.0 - GROUND_FRICTION),
+            force_y: 0.0,
+            force_z: 0.0,
+            mass: Some(5.0),
+        }),
+    );
+}
+
+fn setup_force_mass_z(world: &mut TestWorld) {
+    world.spawn_block(Block {
+        id: 1,
+        x: 0,
+        y: 0,
+        z: -2,
+    });
+    world.spawn_entity(
+        Transform::from_xyz(0.0, 0.0, 2.0),
+        VelocityComp::default(),
+        Some(ForceComp {
+            force_x: 0.0,
+            force_y: 0.0,
+            force_z: 10.0,
+            mass: Some(5.0),
+        }),
+    );
+}
+
+fn setup_invalid_mass(world: &mut TestWorld) {
+    world.spawn_block(Block {
+        id: 1,
+        x: 0,
+        y: 0,
+        z: -2,
+    });
+    world.spawn_entity(
+        Transform::from_xyz(0.0, 0.0, 2.0),
+        VelocityComp::default(),
+        Some(ForceComp {
+            force_x: 0.0,
+            force_y: 0.0,
+            force_z: 10.0,
+            mass: Some(0.0),
+        }),
+    );
+}
+
+fn setup_standing_friction(world: &mut TestWorld) {
+    world.spawn_block(Block {
+        id: 1,
+        x: 0,
+        y: 0,
+        z: 0,
+    });
+    world.spawn_entity_without_force(
+        Transform::from_xyz(0.0, 0.0, 1.0),
+        VelocityComp {
+            vx: 1.0,
+            vy: 0.0,
+            vz: 0.0,
+        },
+    );
+}
+
+fn setup_diagonal_friction(world: &mut TestWorld) {
+    world.spawn_block(Block {
+        id: 1,
+        x: 0,
+        y: 0,
+        z: 0,
+    });
+    world.spawn_entity_without_force(
+        Transform::from_xyz(0.0, 0.0, 1.0),
+        VelocityComp {
+            vx: 1.0,
+            vy: 1.0,
+            vz: 0.0,
+        },
+    );
+}
+
+fn setup_force_respects_terminal_velocity(world: &mut TestWorld) {
+    world.spawn_block(Block {
+        id: 1,
+        x: 0,
+        y: 0,
+        z: -10,
+    });
+    world.spawn_entity(
+        Transform::from_xyz(0.0, 0.0, 5.0),
+        VelocityComp::default(),
+        Some(ForceComp {
+            force_x: 0.0,
+            force_y: 0.0,
+            force_z: -100.0,
+            mass: Some(5.0),
+        }),
+    );
+}
+
+fn setup_unsupported_velocity_capped(world: &mut TestWorld) {
+    world.spawn_block(Block {
+        id: 1,
+        x: 0,
+        y: 0,
+        z: -10,
+    });
+    world.spawn_entity_without_force(
+        Transform::from_xyz(0.0, 0.0, 5.0),
+        VelocityComp {
+            vx: 0.0,
+            vy: 0.0,
+            vz: -5.0,
+        },
+    );
 }
 
 #[rstest]
-#[case::falling(
-    "an unsupported entity",
-      |world: &mut TestWorld| {
-          world.spawn_block(Block { id: 1, x: 0, y: 0, z: -2 });
-          world.spawn_entity_without_force(Transform::from_xyz(0.0, 0.0, 2.0), VelocityComp::default());
-      },
+#[case::falling(physics_scenario(
+    setup_falling,
     (0.0, 0.0, 1.0),
-    (0.0, 0.0, GRAVITY_PULL as f32)
-)]
-#[case::standing_flat(
-    "an entity on a flat block",
-      |world: &mut TestWorld| {
-          world.spawn_block(Block { id: 1, x: 0, y: 0, z: 0 });
-          world.spawn_entity_without_force(Transform::from_xyz(0.0, 0.0, 1.0), VelocityComp::default());
-      },
+    (0.0, 0.0, GRAVITY_PULL),
+))]
+#[case::standing_flat(physics_scenario(
+    setup_standing_flat,
     (0.0, 0.0, 1.0),
-    (0.0, 0.0, 0.0)
-)]
-#[case::standing_sloped(
-    "an entity on a sloped block",
-      |world: &mut TestWorld| {
-          world.spawn_sloped_block(
-              Block { id: 1, x: 0, y: 0, z: 0 },
-              BlockSlope { block_id: 1, grad_x: 1.0.into(), grad_y: 0.0.into() },
-          );
-          world.spawn_entity_without_force(Transform::from_xyz(0.0, 0.0, 1.5), VelocityComp::default());
-      },
+    (0.0, 0.0, 0.0),
+))]
+#[case::standing_sloped(physics_scenario(
+    setup_standing_sloped,
     (0.0, 0.0, 1.5),
-    (0.0, 0.0, 0.0)
-)]
-#[case::move_heights(
-    "an entity moving across blocks of different heights",
-      |world: &mut TestWorld| {
-          world.spawn_block(Block { id: 1, x: 0, y: 0, z: 0 });
-          world.spawn_block(Block { id: 2, x: 1, y: 0, z: 1 });
-          world.spawn_entity_without_force(
-              Transform::from_xyz(0.0, 0.0, 1.0),
-              VelocityComp { vx: 1.0 / (1.0 - GROUND_FRICTION as f32), vy: 0.0, vz: 0.0 },
-          );
-      },
-    (
-        apply_ground_friction(1.0 / (1.0 - GROUND_FRICTION)) as f32,
-        0.0,
-        2.0,
-    ),
-    (
-        apply_ground_friction(1.0 / (1.0 - GROUND_FRICTION)) as f32,
-        0.0,
-        0.0,
-    )
-)]
-#[case::force_acceleration(
-    "an entity accelerates under force",
-      |world: &mut TestWorld| {
-          world.spawn_block(Block { id: 1, x: 0, y: 0, z: 0 });
-          world.spawn_block(Block { id: 2, x: 1, y: 0, z: 1 });
-          world.spawn_entity(
-              Transform::from_xyz(0.0, 0.0, 1.0),
-              VelocityComp::default(),
-              Some(ForceComp { force_x: 5.0 / (1.0 - GROUND_FRICTION), force_y: 0.0, force_z: 0.0, mass: Some(5.0) }),
-          );
-      },
-    (
-        apply_ground_friction(1.0 / (1.0 - GROUND_FRICTION)) as f32,
-        0.0,
-        2.0,
-    ),
-    (
-        apply_ground_friction(1.0 / (1.0 - GROUND_FRICTION)) as f32,
-        0.0,
-        0.0,
-    )
-)]
-#[case::force_mass_z(
-    "an unsupported entity accelerates along Z",
-      |world: &mut TestWorld| {
-          world.spawn_block(Block { id: 1, x: 0, y: 0, z: -2 });
-          world.spawn_entity(
-              Transform::from_xyz(0.0, 0.0, 2.0),
-              VelocityComp::default(),
-              Some(ForceComp { force_x: 0.0, force_y: 0.0, force_z: 10.0, mass: Some(5.0) }),
-          );
-      },
+    (0.0, 0.0, 0.0),
+))]
+#[case::move_heights(physics_scenario(
+    setup_move_heights,
+    (apply_ground_friction(1.0 / (1.0 - GROUND_FRICTION)), 0.0, 2.0),
+    (apply_ground_friction(1.0 / (1.0 - GROUND_FRICTION)), 0.0, 0.0),
+))]
+#[case::force_acceleration(physics_scenario(
+    setup_force_acceleration,
+    (apply_ground_friction(1.0 / (1.0 - GROUND_FRICTION)), 0.0, 2.0),
+    (apply_ground_friction(1.0 / (1.0 - GROUND_FRICTION)), 0.0, 0.0),
+))]
+#[case::force_mass_z(physics_scenario(
+    setup_force_mass_z,
     (0.0, 0.0, 3.0),
-    (0.0, 0.0, 1.0)
-)]
-#[case::invalid_mass(
-    "a force with invalid mass is ignored",
-      |world: &mut TestWorld| {
-          world.spawn_block(Block { id: 1, x: 0, y: 0, z: -2 });
-          world.spawn_entity(
-              Transform::from_xyz(0.0, 0.0, 2.0),
-              VelocityComp::default(),
-              Some(ForceComp { force_x: 0.0, force_y: 0.0, force_z: 10.0, mass: Some(0.0) }),
-          );
-      },
     (0.0, 0.0, 1.0),
-    (0.0, 0.0, GRAVITY_PULL as f32)
-)]
-#[case::standing_friction(
-    "a standing entity slows due to friction",
-      |world: &mut TestWorld| {
-          world.spawn_block(Block { id: 1, x: 0, y: 0, z: 0 });
-          world.spawn_entity_without_force(
-              Transform::from_xyz(0.0, 0.0, 1.0),
-              VelocityComp { vx: 1.0, vy: 0.0, vz: 0.0 },
-          );
-      },
+))]
+#[case::invalid_mass(physics_scenario(
+    setup_invalid_mass,
+    (0.0, 0.0, 1.0),
+    (0.0, 0.0, GRAVITY_PULL),
+))]
+#[case::standing_friction(physics_scenario(
+    setup_standing_friction,
+    (apply_ground_friction(1.0), 0.0, 1.0),
+    (apply_ground_friction(1.0), 0.0, 0.0),
+))]
+#[case::diagonal_friction(physics_scenario(
+    setup_diagonal_friction,
+    (apply_ground_friction(1.0), apply_ground_friction(1.0), 1.0),
+    (apply_ground_friction(1.0), apply_ground_friction(1.0), 0.0),
+))]
+#[case::force_respects_terminal_velocity(physics_scenario(
+    setup_force_respects_terminal_velocity,
     (
-        apply_ground_friction(1.0) as f32,
         0.0,
-        1.0,
+        0.0,
+        5.0 + (-20.0 + GRAVITY_PULL).clamp(-TERMINAL_VELOCITY, TERMINAL_VELOCITY),
     ),
     (
-        apply_ground_friction(1.0) as f32,
         0.0,
         0.0,
-    )
-)]
-#[case::diagonal_friction(
-    "a standing entity with diagonal movement slows due to friction",
-      |world: &mut TestWorld| {
-          world.spawn_block(Block { id: 1, x: 0, y: 0, z: 0 });
-          world.spawn_entity_without_force(
-              Transform::from_xyz(0.0, 0.0, 1.0),
-              VelocityComp { vx: 1.0, vy: 1.0, vz: 0.0 },
-          );
-      },
+        (-20.0 + GRAVITY_PULL).clamp(-TERMINAL_VELOCITY, TERMINAL_VELOCITY),
+    ),
+))]
+#[case::unsupported_velocity_capped(physics_scenario(
+    setup_unsupported_velocity_capped,
     (
-        apply_ground_friction(1.0) as f32,
-        apply_ground_friction(1.0) as f32,
-        1.0,
+        0.0,
+        0.0,
+        5.0 + (-5.0 + GRAVITY_PULL).clamp(-TERMINAL_VELOCITY, TERMINAL_VELOCITY),
     ),
     (
-        apply_ground_friction(1.0) as f32,
-        apply_ground_friction(1.0) as f32,
         0.0,
-    )
-)]
-#[case::force_respects_terminal_velocity(
-    "a downward force cannot exceed terminal velocity",
-      |world: &mut TestWorld| {
-          world.spawn_block(Block { id: 1, x: 0, y: 0, z: -10 });
-          world.spawn_entity(
-              Transform::from_xyz(0.0, 0.0, 5.0),
-              VelocityComp::default(),
-              Some(ForceComp { force_x: 0.0, force_y: 0.0, force_z: -100.0, mass: Some(5.0) }),
-          );
-      },
-    (0.0, 0.0, 5.0
-        + (-20.0 + GRAVITY_PULL as f32)
-            .clamp(-TERMINAL_VELOCITY as f32, TERMINAL_VELOCITY as f32)),
-    (0.0, 0.0, (-20.0 + GRAVITY_PULL as f32)
-        .clamp(-TERMINAL_VELOCITY as f32, TERMINAL_VELOCITY as f32))
-)]
-#[case::unsupported_velocity_capped(
-    "an unsupported entity's fall speed is capped",
-      |world: &mut TestWorld| {
-          world.spawn_block(Block { id: 1, x: 0, y: 0, z: -10 });
-          world.spawn_entity_without_force(
-              Transform::from_xyz(0.0, 0.0, 5.0),
-              VelocityComp { vx: 0.0, vy: 0.0, vz: -5.0 },
-          );
-      },
-    (0.0, 0.0, 5.0
-        + (-5.0 + GRAVITY_PULL as f32)
-            .clamp(-TERMINAL_VELOCITY as f32, TERMINAL_VELOCITY as f32)),
-    (0.0, 0.0, (-5.0 + GRAVITY_PULL as f32)
-        .clamp(-TERMINAL_VELOCITY as f32, TERMINAL_VELOCITY as f32))
-)]
-fn physics_scenarios(
-    world: TestWorld,
-    #[case] description: &'static str,
-    #[case] setup: fn(&mut TestWorld),
-    #[case] expected_pos: (f32, f32, f32),
-    #[case] expected_vel: (f32, f32, f32),
-) {
-    physics_spec!(world, description, setup, expected_pos, expected_vel);
+        0.0,
+        (-5.0 + GRAVITY_PULL).clamp(-TERMINAL_VELOCITY, TERMINAL_VELOCITY),
+    ),
+))]
+fn physics_scenarios(world: TestWorld, #[case] scenario: PhysicsScenario) {
+    run_physics_scenario(world, scenario);
 }
 
 #[rstest]
@@ -419,14 +521,14 @@ fn falling_inflicts_health_damage(world: TestWorld) {
         "an entity falling onto level ground",
         world,
         |scenario| {
-            scenario.before_each(|world| {
-                world.spawn_block(Block {
+            scenario.before_each(|state| {
+                state.spawn_block(Block {
                     id: 99,
                     x: 0,
                     y: 0,
                     z: 0,
                 });
-                world.spawn_entity_with_health(
+                state.spawn_entity_with_health(
                     Transform::from_xyz(0.0, 0.0, 10.0),
                     VelocityComp::default(),
                     Health {
@@ -436,32 +538,33 @@ fn falling_inflicts_health_damage(world: TestWorld) {
                 );
             });
             scenario.when("the simulation runs until the entity lands", |phase| {
-                phase.before_each(|world_state| {
-                    let fall_speed = -(as_f32(SAFE_LANDING_SPEED) + 4.0);
-                    world_state.set_velocity_z(fall_speed);
-                    world_state.tick();
+                phase.before_each(|state| {
+                    let fall_speed = -(to_f32(SAFE_LANDING_SPEED) + 4.0);
+                    state.set_velocity_z(fall_speed);
+                    state.tick();
 
-                    world_state.set_velocity_z(0.0);
-                    world_state.set_position_z(1.0);
-                    world_state.tick();
+                    state.set_velocity_z(0.0);
+                    state.set_position_z(1.0);
+                    state.tick();
 
-                    let impact_speed = f64::from(-(fall_speed + as_f32(GRAVITY_PULL)))
-                        .clamp(0.0, TERMINAL_VELOCITY);
+                    let fall_speed_f64 = f64::from(fall_speed);
+                    let impact_speed =
+                        (-(fall_speed_f64 + GRAVITY_PULL)).clamp(0.0, TERMINAL_VELOCITY);
                     let excess = impact_speed - SAFE_LANDING_SPEED;
                     let expected_damage = if excess <= 0.0 {
                         0
                     } else {
-                        as_u16(
+                        to_u16(
                             (excess * FALL_DAMAGE_SCALE)
                                 .min(f64::from(u16::MAX))
                                 .floor(),
                         )
                     };
-                    world_state.set_expected_damage(expected_damage);
+                    state.set_expected_damage(expected_damage);
                 });
-                phase.then("the expected fall damage is applied", |world_state| {
-                    let expected = world_state.take_expected_damage();
-                    let health = world_state.health();
+                phase.then("the expected fall damage is applied", |state| {
+                    let expected = state.take_expected_damage();
+                    let health = state.health();
                     let lost = 100u16.saturating_sub(health.current);
                     assert_eq!(lost, expected);
                 });
