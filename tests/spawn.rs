@@ -83,6 +83,7 @@ fn assert_positive_health(entity: Entity, health: Option<&Health>) {
     }
 }
 
+#[derive(Copy, Clone)]
 struct SpawnInputs<'a> {
     dd_id: Option<&'a DdlogId>,
     unit: Option<&'a UnitType>,
