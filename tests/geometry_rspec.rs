@@ -31,17 +31,13 @@ impl Env {
         step(&mut self.circuit);
     }
 
-    #[expect(
-        clippy::ignored_unit_patterns,
-        reason = "DBSP batches include weight/time metadata that tests intentionally skip"
-    )]
     fn output(&mut self) -> Vec<FloorHeightAt> {
         let vals: Vec<_> = self
             .circuit
             .floor_height_out()
             .consolidate()
             .iter()
-            .map(|(fh, (), _timestamp)| *fh)
+            .map(|(fh, (), _timestamp)| fh)
             .collect();
         self.circuit.clear_inputs();
         vals
