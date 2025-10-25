@@ -14,7 +14,25 @@ use lille::{
 };
 use rstest::{fixture, rstest};
 use std::fmt;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
+
+#[expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "Physics test values remain within f32 representable range"
+)]
+fn as_f32(value: f64) -> f32 {
+    value as f32
+}
+
+#[expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "Physics damage calculations clamp to u16 bounds"
+)]
+fn as_u16(value: f64) -> u16 {
+    value as u16
+}
 
 #[derive(Clone)]
 struct TestWorld {
@@ -28,7 +46,7 @@ impl fmt::Debug for TestWorld {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("TestWorld")
             .field("entity", &self.entity)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -45,27 +63,40 @@ impl Default for TestWorld {
 }
 
 impl TestWorld {
+    fn app_guard(&self) -> MutexGuard<'_, App> {
+        self.app
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner())
+    }
+
+    fn expected_damage_guard(&self) -> MutexGuard<'_, Option<u16>> {
+        self.expected_damage
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner())
+    }
+
+    fn entity_or_panic(&self) -> Entity {
+        self.entity.unwrap_or_else(|| panic!("entity not spawned"))
+    }
+
     /// Spawns a block into the world.
     fn spawn_block(&mut self, block: Block) {
-        let mut app = self.app.lock().expect("app lock");
-        app.world.spawn(block);
+        self.app_guard().world.spawn(block);
     }
 
     /// Spawns a block together with its slope on the same entity.
     fn spawn_sloped_block(&mut self, block: Block, slope: BlockSlope) {
-        let mut app = self.app.lock().expect("app lock");
-        app.world.spawn((block, slope));
+        self.app_guard().world.spawn((block, slope));
     }
 
     /// Spawns an entity at `transform` with the supplied velocity.
     fn spawn_entity(&mut self, transform: Transform, vel: VelocityComp, force: Option<ForceComp>) {
-        let mut app = self.app.lock().expect("app lock");
+        let mut app = self.app_guard();
         let mut entity = app.world.spawn((DdlogId(1), transform, vel));
-        if let Some(f) = force {
-            entity.insert(f);
+        if let Some(force_comp) = force {
+            entity.insert(force_comp);
         }
-        let id = entity.id();
-        self.entity = Some(id);
+        self.entity = Some(entity.id());
     }
 
     /// Spawns an entity without an external force.
@@ -80,55 +111,52 @@ impl TestWorld {
         vel: VelocityComp,
         health: Health,
     ) {
-        let mut app = self.app.lock().expect("app lock");
+        let mut app = self.app_guard();
         let entity = app.world.spawn((DdlogId(1), transform, vel, health));
-        let id = entity.id();
-        self.entity = Some(id);
+        self.entity = Some(entity.id());
     }
 
     fn health(&self) -> Health {
-        let app = self.app.lock().expect("app lock");
-        let entity = self.entity.expect("entity not spawned");
+        let app = self.app_guard();
+        let entity = self.entity_or_panic();
         app.world
             .get::<Health>(entity)
             .cloned()
-            .expect("missing Health component")
+            .unwrap_or_else(|| panic!("missing Health component"))
     }
 
     fn set_position_z(&self, z: f32) {
-        let mut app = self.app.lock().expect("app lock");
-        let entity = self.entity.expect("entity not spawned");
-        let mut transform = app
-            .world
-            .get_mut::<Transform>(entity)
-            .expect("missing Transform component");
+        let mut app = self.app_guard();
+        let entity = self.entity_or_panic();
+        let Some(mut transform) = app.world.get_mut::<Transform>(entity) else {
+            panic!("missing Transform component");
+        };
         transform.translation.z = z;
     }
 
     fn set_velocity_z(&self, vz: f32) {
-        let mut app = self.app.lock().expect("app lock");
-        let entity = self.entity.expect("entity not spawned");
-        let mut velocity = app
-            .world
-            .get_mut::<VelocityComp>(entity)
-            .expect("missing VelocityComp component");
+        let mut app = self.app_guard();
+        let entity = self.entity_or_panic();
+        let Some(mut velocity) = app.world.get_mut::<VelocityComp>(entity) else {
+            panic!("missing VelocityComp component");
+        };
         velocity.vz = vz;
     }
 
     fn set_expected_damage(&self, damage: u16) {
-        let mut expected = self.expected_damage.lock().expect("expected damage lock");
-        *expected = Some(damage);
+        *self.expected_damage_guard() = Some(damage);
     }
 
     fn take_expected_damage(&self) -> u16 {
-        let mut expected = self.expected_damage.lock().expect("expected damage lock");
-        expected.take().expect("expected damage should be recorded")
+        let mut expected = self.expected_damage_guard();
+        expected
+            .take()
+            .unwrap_or_else(|| panic!("expected damage should be recorded"))
     }
 
     /// Advances the simulation by one tick.
     fn tick(&mut self) {
-        let mut app = self.app.lock().expect("app lock");
-        app.update();
+        self.app_guard().update();
     }
 
     /// Generic assertion helper for components with tolerance checking.
@@ -137,12 +165,11 @@ impl TestWorld {
         T: Component,
         F: Fn(&T) -> Vec<f32>,
     {
-        let app = self.app.lock().expect("app lock");
-        let entity = self.entity.expect("entity not spawned");
-        let component = app
-            .world
-            .get::<T>(entity)
-            .unwrap_or_else(|| panic!("missing {name}"));
+        let app = self.app_guard();
+        let entity = self.entity_or_panic();
+        let Some(component) = app.world.get::<T>(entity) else {
+            panic!("missing {name}");
+        };
 
         let actual = extract(component);
         let tolerance = 1e-3;
@@ -180,13 +207,15 @@ fn world() -> TestWorld {
 /// Runs a physics scenario using `rspec` with the provided parameters.
 macro_rules! physics_spec {
     ($world:expr, $description:expr, $setup:expr, $expected_pos:expr, $expected_vel:expr) => {
-        rspec::run(&rspec::given($description, ($world), |ctx| {
-            ctx.before_each($setup);
-            ctx.when("the simulation ticks once", |ctx| {
-                ctx.before_each(|world| world.tick());
-                ctx.then("the expected outcome occurs", move |world| {
-                    world.assert_position(($expected_pos).0, ($expected_pos).1, ($expected_pos).2);
-                    world.assert_velocity(($expected_vel).0, ($expected_vel).1, ($expected_vel).2);
+        rspec::run(&rspec::given($description, ($world), |scenario| {
+            scenario.before_each($setup);
+            scenario.when("the simulation ticks once", |phase| {
+                phase.before_each(|world_state| world_state.tick());
+                phase.then("the expected outcome occurs", move |world_state| {
+                    world_state
+                        .assert_position(($expected_pos).0, ($expected_pos).1, ($expected_pos).2);
+                    world_state
+                        .assert_velocity(($expected_vel).0, ($expected_vel).1, ($expected_vel).2);
                 });
             });
         }));
