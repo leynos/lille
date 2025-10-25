@@ -95,7 +95,8 @@ fn decide_movement(level: OrderedFloat<f64>, pt: &PositionTarget) -> MovementDec
     );
     let scaled = displacement * if should_flee(level) { -1.0 } else { 1.0 };
     let magnitude = scaled.length();
-    let direction = if magnitude > 0.0 {
+    let eps = f64::EPSILON;
+    let direction = if magnitude > eps {
         scaled / magnitude
     } else {
         DVec2::ZERO
