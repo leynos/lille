@@ -227,7 +227,7 @@ mod sync {
         sync_component(
             state,
             query,
-            |row| Some(row.3.map(|v| (v.vx, v.vy, v.vz)).unwrap_or_default()),
+            |row| row.3.map(|v| (v.vx, v.vy, v.vz)),
             |entity, (vx, vy, vz)| Velocity {
                 entity,
                 vx: f64::from(vx).into(),
