@@ -82,6 +82,40 @@ struct MotionExpectation {
         velocity: Some(vel(1, (apply_ground_friction(1.0 / crate::DEFAULT_MASS), 0.0, 0.0))),
     },
 })]
+#[case::large_horizontal_velocity(MotionScenario {
+    position: Position { entity: 2, x: 0.0.into(), y: 0.0.into(), z: 1.0.into() },
+    velocity: vel(2, (100.0, 0.0, 0.0)),
+    blocks: vec![block(1, (0, 0, 0)), block(2, (90, 0, 1))],
+    force: None,
+    expected: MotionExpectation {
+        position: Some(
+            Position {
+                entity: 2,
+                x: apply_ground_friction(100.0).into(),
+                y: 0.0.into(),
+                z: 2.0.into(),
+            },
+        ),
+        velocity: Some(vel(2, (apply_ground_friction(100.0), 0.0, 0.0))),
+    },
+})]
+#[case::negative_horizontal_velocity(MotionScenario {
+    position: Position { entity: 3, x: 0.0.into(), y: 0.0.into(), z: 1.0.into() },
+    velocity: vel(3, (-1.0, 0.0, 0.0)),
+    blocks: vec![block(1, (0, 0, 0)), block(2, (-1, 0, 1))],
+    force: None,
+    expected: MotionExpectation {
+        position: Some(
+            Position {
+                entity: 3,
+                x: apply_ground_friction(-1.0).into(),
+                y: 0.0.into(),
+                z: 2.0.into(),
+            },
+        ),
+        velocity: Some(vel(3, (apply_ground_friction(-1.0), 0.0, 0.0))),
+    },
+})]
 fn motion_cases(#[case] scenario: MotionScenario) {
     let MotionScenario {
         position,
@@ -145,6 +179,96 @@ fn motion_cases(#[case] scenario: MotionScenario) {
             many => panic!("expected one velocity, observed {}", many.len()),
         },
         None => assert!(vel_out.is_empty()),
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+enum NonFiniteVelocity {
+    Nan,
+    PosInf,
+    NegInf,
+}
+
+impl NonFiniteVelocity {
+    const fn expects_output(self) -> bool {
+        matches!(self, Self::Nan)
+    }
+}
+
+#[rstest]
+#[case::nan(f64::NAN, NonFiniteVelocity::Nan)]
+#[case::pos_infinite(f64::INFINITY, NonFiniteVelocity::PosInf)]
+#[case::neg_infinite(f64::NEG_INFINITY, NonFiniteVelocity::NegInf)]
+fn non_finite_horizontal_velocity_propagates(
+    #[case] vx: f64,
+    #[case] expectation: NonFiniteVelocity,
+) {
+    let mut circuit = new_circuit();
+
+    circuit.block_in().push(block(1, (0, 0, 0)), 1);
+    circuit.position_in().push(
+        Position {
+            entity: 42,
+            x: 0.0.into(),
+            y: 0.0.into(),
+            z: 1.0.into(),
+        },
+        1,
+    );
+    circuit.velocity_in().push(vel(42, (vx, 0.0, 0.0)), 1);
+
+    step_named(&mut circuit, "non_finite_horizontal_velocity_propagates");
+
+    let positions: Vec<NewPosition> = circuit
+        .new_position_out()
+        .consolidate()
+        .iter()
+        .map(|record| record.0)
+        .collect();
+    let velocities: Vec<NewVelocity> = circuit
+        .new_velocity_out()
+        .consolidate()
+        .iter()
+        .map(|record| record.0)
+        .collect();
+
+    if !expectation.expects_output() {
+        assert!(
+            positions.is_empty(),
+            "expected no positions for {:?} input",
+            expectation
+        );
+        assert!(
+            velocities.is_empty(),
+            "expected no velocities for {:?} input",
+            expectation
+        );
+        return;
+    }
+
+    let position = positions
+        .first()
+        .expect("expected a position output for NaN velocity");
+    let velocity = velocities
+        .first()
+        .expect("expected a velocity output for NaN velocity");
+
+    let pos_x = position.x.into_inner();
+    let vel_x = velocity.vx.into_inner();
+
+    match expectation {
+        NonFiniteVelocity::Nan => {
+            assert!(pos_x.is_nan(), "position.x should propagate NaN");
+            assert!(vel_x.is_nan(), "velocity.vx should propagate NaN");
+        }
+        NonFiniteVelocity::PosInf => {
+            assert!(pos_x.is_infinite() && pos_x.is_sign_positive());
+            assert!(vel_x.is_infinite() && vel_x.is_sign_positive());
+        }
+        NonFiniteVelocity::NegInf => {
+            assert!(pos_x.is_infinite() && pos_x.is_sign_negative());
+            assert!(vel_x.is_infinite() && vel_x.is_sign_negative());
+        }
     }
 }
 
