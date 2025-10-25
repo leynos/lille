@@ -72,8 +72,8 @@ fn run_health_delta(health: HealthState, events: &[(DamageEvent, i32)]) -> Vec<H
         .consolidate()
         .iter()
         .map(|(delta, weight, time)| {
-            let _ = weight;
-            let _ = time;
+            drop(weight);
+            drop(time);
             delta
         })
         .collect()
