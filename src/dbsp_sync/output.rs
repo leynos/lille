@@ -290,14 +290,29 @@ mod tests {
 
         app.world.run_system_once(apply_dbsp_outputs_system);
 
-        let health = app.world.entity(entity).get::<Health>().unwrap();
+        let health = app
+            .world
+            .entity(entity)
+            .get::<Health>()
+            .expect("Health component should remain after applying DBSP outputs");
         assert_eq!(health.current, 40);
-        let velocity = app.world.entity(entity).get::<VelocityComp>().unwrap();
+        let velocity = app
+            .world
+            .entity(entity)
+            .get::<VelocityComp>()
+            .expect("Velocity component should remain after applying DBSP outputs");
         assert!(velocity.vx < 1.0);
-        let transform = app.world.entity(entity).get::<Transform>().unwrap();
+        let transform = app
+            .world
+            .entity(entity)
+            .get::<Transform>()
+            .expect("Transform component should remain after applying DBSP outputs");
         assert!(transform.translation.x.abs() > f32::EPSILON);
         let world_handle = app.world.resource::<WorldHandle>();
-        let entry = world_handle.entities.get(&1).unwrap();
+        let entry = world_handle
+            .entities
+            .get(&1)
+            .expect("World handle should include entity 1 after outputs apply");
         assert_eq!(entry.health_current, 40);
     }
 
@@ -310,7 +325,11 @@ mod tests {
 
         app.world.run_system_once(apply_dbsp_outputs_system);
         assert_eq!(
-            app.world.entity(entity).get::<Health>().unwrap().current,
+            app.world
+                .entity(entity)
+                .get::<Health>()
+                .expect("Health component should remain after initial DBSP output")
+                .current,
             40
         );
 
@@ -320,7 +339,11 @@ mod tests {
         let state = app.world.non_send_resource::<DbspState>();
         assert_eq!(state.applied_health_duplicates(), 1);
         assert_eq!(
-            app.world.entity(entity).get::<Health>().unwrap().current,
+            app.world
+                .entity(entity)
+                .get::<Health>()
+                .expect("Health component should remain after duplicate DBSP output")
+                .current,
             40
         );
     }
