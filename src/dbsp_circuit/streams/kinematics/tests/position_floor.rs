@@ -55,8 +55,8 @@ fn position_floor_cases(
         .consolidate()
         .iter()
         .map(|(pf, weight, time)| {
-            let _ = weight;
-            let _ = time;
+            drop(weight);
+            drop(time);
             pf.clone()
         })
         .collect();
@@ -79,8 +79,8 @@ fn multiple_positions_same_grid_cell() {
         .consolidate()
         .iter()
         .map(|(pf, weight, time)| {
-            let _ = weight;
-            let _ = time;
+            drop(weight);
+            drop(time);
             pf.clone()
         })
         .collect();
