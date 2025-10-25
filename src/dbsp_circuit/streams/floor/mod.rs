@@ -18,9 +18,31 @@ use crate::dbsp_circuit::{FloorHeightAt, HighestBlockAt};
 /// block id so that subsequent joins can access slope information.
 ///
 /// # Examples
-/// ```text
-/// Construct a DBSP circuit, feed `Block` records into an input stream,
-/// and call `highest_block_pair(&blocks)` to obtain the per-cell maxima.
+/// ```rust,no_run
+/// use dbsp::RootCircuit;
+/// use lille::components::Block;
+/// use lille::dbsp_circuit::streams::floor::highest_block_pair;
+///
+/// let (mut circuit, blocks_in, mut highest_out) = RootCircuit::build(|circuit| {
+///     let (blocks_stream, blocks_input) = circuit.add_input_zset::<Block>();
+///     let highest = highest_block_pair(&blocks_stream).output();
+///     Ok((blocks_input, highest))
+/// })
+/// .expect("failed to build circuit");
+///
+/// blocks_in.push(Block { id: 1, x: 0, y: 0, z: 3 }, 1);
+/// blocks_in.push(Block { id: 2, x: 0, y: 0, z: 5 }, 1);
+/// blocks_in.push(Block { id: 3, x: 1, y: 0, z: 2 }, 1);
+///
+/// circuit.step().expect("evaluation failed");
+///
+/// let maxima: Vec<_> = highest_out
+///     .consolidate()
+///     .iter()
+///     .map(|(highest, (), _)| highest.clone())
+///     .collect();
+/// assert_eq!(maxima.len(), 2);
+/// assert!(maxima.iter().any(|h| h.x == 0 && h.y == 0 && h.z.into_inner() == 5));
 /// ```
 #[must_use]
 pub fn highest_block_pair(
