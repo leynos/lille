@@ -3,9 +3,9 @@
 use anyhow::{Context, Result};
 use env_logger::{Builder, Env};
 use log::LevelFilter;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::OnceLock;
 
-static LOGGER_INITIALISED: AtomicBool = AtomicBool::new(false);
+static LOGGER_INITIALISED: OnceLock<()> = OnceLock::new();
 
 /// Initialises the global logger once for the entire process.
 ///
@@ -38,26 +38,18 @@ where
     F: FnOnce(LevelFilter) -> std::result::Result<(), E>,
     E: std::error::Error + Send + Sync + 'static,
 {
-    if LOGGER_INITIALISED
-        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-        .is_err()
-    {
-        return Ok(());
-    }
+    LOGGER_INITIALISED
+        .get_or_try_init(|| {
+            let level = if verbose {
+                LevelFilter::Trace
+            } else {
+                LevelFilter::Info
+            };
 
-    let level = if verbose {
-        LevelFilter::Trace
-    } else {
-        LevelFilter::Info
-    };
-
-    match install(level).with_context(|| "initialising env_logger") {
-        Ok(()) => Ok(()),
-        Err(err) => {
-            LOGGER_INITIALISED.store(false, Ordering::SeqCst);
-            Err(err)
-        }
-    }
+            install(level).with_context(|| "initialising env_logger")?;
+            Ok(())
+        })
+        .map(|_| ())
 }
 
 #[cfg(test)]
@@ -81,7 +73,7 @@ mod tests {
     impl std::error::Error for TestError {}
 
     fn reset_logger_flag() {
-        LOGGER_INITIALISED.store(false, Ordering::SeqCst);
+        LOGGER_INITIALISED.take();
     }
 
     #[test]
@@ -102,7 +94,7 @@ mod tests {
             "installer should be invoked on first initialisation"
         );
         ensure!(
-            LOGGER_INITIALISED.load(Ordering::SeqCst),
+            LOGGER_INITIALISED.get().is_some(),
             "logger flag should remain set after success"
         );
         ensure!(
@@ -117,7 +109,9 @@ mod tests {
     fn init_is_idempotent_after_success() -> Result<()> {
         let _guard = TEST_LOCK.lock().expect("poisoned test lock");
         reset_logger_flag();
-        LOGGER_INITIALISED.store(true, Ordering::SeqCst);
+        LOGGER_INITIALISED
+            .set(())
+            .expect("failed to seed logger flag");
         let mut called = false;
         let mut observed_level = None;
 
@@ -148,7 +142,7 @@ mod tests {
 
         assert!(result.is_err());
         assert!(
-            !LOGGER_INITIALISED.load(Ordering::SeqCst),
+            LOGGER_INITIALISED.get().is_none(),
             "failed initialisation should release the flag"
         );
     }
