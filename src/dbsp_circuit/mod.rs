@@ -11,8 +11,8 @@
 
 mod circuit;
 mod helpers;
-pub mod streams;
 mod step;
+pub mod streams;
 pub mod types;
 
 pub use circuit::DbspCircuit;
