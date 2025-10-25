@@ -71,11 +71,7 @@ fn run_health_delta(health: HealthState, events: &[(DamageEvent, i32)]) -> Vec<H
     output
         .consolidate()
         .iter()
-        .map(|(delta, weight, time)| {
-            drop(weight);
-            drop(time);
-            delta
-        })
+        .map(|(delta, _, _)| delta)
         .collect()
 }
 
@@ -141,6 +137,10 @@ struct HealthDeltaExpectation {
     seq: Option<u32>,
 }
 
+#[expect(
+    clippy::ignored_unit_patterns,
+    reason = "DBSP batches include weight/time metadata that tests intentionally skip"
+)]
 fn assert_health_delta(case: &HealthDeltaTestCase, expected: HealthDeltaExpectation) {
     let events = case.event_records();
     let deltas = run_health_delta(case.state, &events);
