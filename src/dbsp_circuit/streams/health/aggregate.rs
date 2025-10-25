@@ -142,13 +142,11 @@ fn signed_amount(event: &DamageEvent) -> i32 {
 /// ```rust,ignore
 /// # use anyhow::Error;
 /// # use dbsp::RootCircuit;
-/// # use lille::dbsp_circuit::{
-/// #     streams::health::aggregate::health_delta_stream, DamageEvent, HealthState,
-/// # };
+/// # use lille::dbsp_circuit::{DamageEvent, HealthState};
 /// # let _ = RootCircuit::build(|circuit| -> Result<(), Error> {
 /// #     let (states, _) = circuit.add_input_zset::<HealthState>();
 /// #     let (events, _) = circuit.add_input_zset::<DamageEvent>();
-/// #     let _ = health_delta_stream(&states, &events);
+/// #     // Combine the streams with `health_delta_stream(&states, &events)`.
 /// #     Ok(())
 /// # });
 /// ```
