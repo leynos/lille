@@ -86,11 +86,16 @@ fn motion_cases(
         .collect();
     match expected_pos {
         Some(expected) => {
-            assert_eq!(pos_out.len(), 1);
-            assert_eq!(pos_out[0].entity, expected.entity);
-            assert_relative_eq!(pos_out[0].x.into_inner(), expected.x.into_inner());
-            assert_relative_eq!(pos_out[0].y.into_inner(), expected.y.into_inner());
-            assert_relative_eq!(pos_out[0].z.into_inner(), expected.z.into_inner());
+            match pos_out.as_slice() {
+                [actual] => {
+                    assert_eq!(actual.entity, expected.entity);
+                    assert_relative_eq!(actual.x.into_inner(), expected.x.into_inner());
+                    assert_relative_eq!(actual.y.into_inner(), expected.y.into_inner());
+                    assert_relative_eq!(actual.z.into_inner(), expected.z.into_inner());
+                }
+                [] => panic!("expected a position output"),
+                many => panic!("expected one position, observed {}", many.len()),
+            }
         }
         None => assert!(pos_out.is_empty()),
     }
@@ -103,11 +108,16 @@ fn motion_cases(
         .collect();
     match expected_vel {
         Some(expected) => {
-            assert_eq!(vel_out.len(), 1);
-            assert_eq!(vel_out[0].entity, expected.entity);
-            assert_relative_eq!(vel_out[0].vx.into_inner(), expected.vx.into_inner());
-            assert_relative_eq!(vel_out[0].vy.into_inner(), expected.vy.into_inner());
-            assert_relative_eq!(vel_out[0].vz.into_inner(), expected.vz.into_inner());
+            match vel_out.as_slice() {
+                [actual] => {
+                    assert_eq!(actual.entity, expected.entity);
+                    assert_relative_eq!(actual.vx.into_inner(), expected.vx.into_inner());
+                    assert_relative_eq!(actual.vy.into_inner(), expected.vy.into_inner());
+                    assert_relative_eq!(actual.vz.into_inner(), expected.vz.into_inner());
+                }
+                [] => panic!("expected a velocity output"),
+                many => panic!("expected one velocity, observed {}", many.len()),
+            }
         }
         None => assert!(vel_out.is_empty()),
     }
@@ -141,10 +151,14 @@ fn standing_friction(#[case] vx: f64) {
         .iter()
         .map(|t| t.0)
         .collect();
-    assert_eq!(pos_out.len(), 1);
-    assert_relative_eq!(pos_out[0].x.into_inner(), apply_ground_friction(vx));
-    assert_relative_eq!(pos_out[0].y.into_inner(), 0.0);
-    assert_relative_eq!(pos_out[0].z.into_inner(), 1.0);
+    let position = match pos_out.as_slice() {
+        [position] => position,
+        [] => panic!("expected one position output"),
+        many => panic!("expected one position, observed {}", many.len()),
+    };
+    assert_relative_eq!(position.x.into_inner(), apply_ground_friction(vx));
+    assert_relative_eq!(position.y.into_inner(), 0.0);
+    assert_relative_eq!(position.z.into_inner(), 1.0);
 
     let vel_out: Vec<NewVelocity> = circuit
         .new_velocity_out()
@@ -152,10 +166,14 @@ fn standing_friction(#[case] vx: f64) {
         .iter()
         .map(|t| t.0)
         .collect();
-    assert_eq!(vel_out.len(), 1);
-    assert_relative_eq!(vel_out[0].vx.into_inner(), apply_ground_friction(vx));
-    assert_relative_eq!(vel_out[0].vy.into_inner(), 0.0);
-    assert_relative_eq!(vel_out[0].vz.into_inner(), 0.0);
+    let velocity = match vel_out.as_slice() {
+        [velocity] => velocity,
+        [] => panic!("expected one velocity output"),
+        many => panic!("expected one velocity, observed {}", many.len()),
+    };
+    assert_relative_eq!(velocity.vx.into_inner(), apply_ground_friction(vx));
+    assert_relative_eq!(velocity.vy.into_inner(), 0.0);
+    assert_relative_eq!(velocity.vz.into_inner(), 0.0);
 }
 
 #[test]
