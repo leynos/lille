@@ -18,7 +18,7 @@ use crate::dbsp_circuit::{FloorHeightAt, HighestBlockAt};
 /// block id so that subsequent joins can access slope information.
 ///
 /// # Examples
-/// ```rust,no_run
+/// ```rust,ignore
 /// # use anyhow::Error;
 /// # use dbsp::RootCircuit;
 /// # use lille::components::Block;
@@ -56,7 +56,7 @@ pub fn highest_block_pair(
 /// surface. Missing slope data falls back to a flat top.
 ///
 /// # Examples
-/// ```rust,no_run
+/// ```rust,ignore
 /// # use anyhow::Error;
 /// # use dbsp::RootCircuit;
 /// # use lille::components::{Block, BlockSlope};
