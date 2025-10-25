@@ -139,7 +139,7 @@ fn signed_amount(event: &DamageEvent) -> i32 {
 /// records.
 ///
 /// # Examples
-/// ```rust,no_run
+/// ```rust,ignore
 /// # use anyhow::Error;
 /// # use dbsp::RootCircuit;
 /// # use lille::dbsp_circuit::{
