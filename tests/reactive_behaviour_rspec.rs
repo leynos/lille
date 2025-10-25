@@ -46,17 +46,17 @@ impl Env {
         step(&mut self.circuit);
     }
 
+    #[expect(
+        clippy::ignored_unit_patterns,
+        reason = "DBSP batches include weight/time metadata that tests intentionally skip"
+    )]
     fn drain_output(&mut self) -> Vec<NewPosition> {
         let vals: Vec<NewPosition> = self
             .circuit
             .new_position_out()
             .consolidate()
             .iter()
-            .map(|(p, weight, timestamp)| {
-                drop(weight);
-                drop(timestamp);
-                p.clone()
-            })
+            .map(|(p, (), _timestamp)| *p)
             .collect();
         self.circuit.clear_inputs();
         vals
