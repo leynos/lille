@@ -20,9 +20,9 @@ impl Env {
         Ok(Self { circuit })
     }
 
-    fn push(&mut self, block: Block, slope: Option<BlockSlope>) {
+    fn push(&mut self, block: Block, maybe_slope: Option<BlockSlope>) {
         self.circuit.block_in().push(block, 1);
-        if let Some(slope) = slope {
+        if let Some(slope) = maybe_slope {
             self.circuit.block_slope_in().push(slope, 1);
         }
     }
@@ -31,17 +31,17 @@ impl Env {
         step(&mut self.circuit);
     }
 
+    #[expect(
+        clippy::ignored_unit_patterns,
+        reason = "DBSP batches include weight/time metadata that tests intentionally skip"
+    )]
     fn output(&mut self) -> Vec<FloorHeightAt> {
         let vals: Vec<_> = self
             .circuit
             .floor_height_out()
             .consolidate()
             .iter()
-            .map(|(fh, weight, timestamp)| {
-                drop(weight);
-                drop(timestamp);
-                fh.clone()
-            })
+            .map(|(fh, (), _timestamp)| *fh)
             .collect();
         self.circuit.clear_inputs();
         vals
