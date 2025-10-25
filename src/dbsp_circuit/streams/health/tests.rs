@@ -219,9 +219,9 @@ fn cooldown_prevents_rapid_retrigger() {
     circuit.step().expect("initial landing");
     let initial_events = delta_events(&output, &mut cumulative);
     assert_eq!(initial_events.len(), 1);
-    let (first_event_record, first_count_ref) =
+    let (first_event_record, &first_count) =
         test_utils::expect_single(&initial_events, "initial landing event");
-    assert_eq!(*first_count_ref, 1);
+    assert_eq!(first_count, 1);
 
     standing_in.push(standing_pf.clone(), -1);
     unsupported_in.push(unsupported_pf.clone(), 1);
@@ -247,9 +247,9 @@ fn cooldown_prevents_rapid_retrigger() {
     standing_in.push(standing_pf.clone(), 1);
     circuit.step().expect("post-cooldown landing");
     let final_events = delta_events(&output, &mut cumulative);
-    let (final_event_record, final_count_ref) =
+    let (final_event_record, &final_count) =
         test_utils::expect_single(&final_events, "final landing event");
-    assert_eq!(*final_count_ref, 1);
+    assert_eq!(final_count, 1);
 
     assert!(final_event_record.at_tick > first_event_record.at_tick);
     assert_eq!(cumulative.len(), 2);
