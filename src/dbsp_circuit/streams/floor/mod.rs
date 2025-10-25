@@ -71,9 +71,47 @@ pub fn highest_block_pair(
 /// surface. Missing slope data falls back to a flat top.
 ///
 /// # Examples
-/// ```text
-/// Produce a stream of highest blocks, join it with optional `BlockSlope`
-/// records, and pass both streams to `floor_height_stream` to derive heights.
+/// ```rust,no_run
+/// use dbsp::RootCircuit;
+/// use lille::components::{Block, BlockSlope};
+/// use lille::dbsp_circuit::streams::floor::{floor_height_stream, highest_block_pair};
+/// use ordered_float::OrderedFloat;
+///
+/// let (mut circuit, block_in, slope_in, mut floor_out) = RootCircuit::build(|circuit| {
+///     let (blocks_stream, blocks_input) = circuit.add_input_zset::<Block>();
+///     let (slopes_stream, slopes_input) = circuit.add_input_zset::<BlockSlope>();
+///     let highest = highest_block_pair(&blocks_stream);
+///     let floor = floor_height_stream(&highest, &slopes_stream).output();
+///     Ok((blocks_input, slopes_input, floor))
+/// })
+/// .expect("failed to build circuit");
+///
+/// block_in.push(Block { id: 10, x: 0, y: 0, z: 4 }, 1);
+/// block_in.push(Block { id: 11, x: 0, y: 0, z: 5 }, 1);
+/// block_in.push(Block { id: 12, x: 1, y: 0, z: 3 }, 1);
+///
+/// slope_in.push(
+///     BlockSlope {
+///         block_id: 11,
+///         grad_x: OrderedFloat(0.5),
+///         grad_y: OrderedFloat(-0.25),
+///     },
+///     1,
+/// );
+///
+/// circuit.step().expect("evaluation failed");
+///
+/// let heights: Vec<_> = floor_out
+///     .consolidate()
+///     .iter()
+///     .map(|(height, (), _)| height.clone())
+///     .collect();
+/// assert_eq!(heights.len(), 2);
+/// let origin_height = heights
+///     .iter()
+///     .find(|h| h.x == 0 && h.y == 0)
+///     .expect("origin cell");
+/// assert!(origin_height.z.into_inner() > 5.0, "slope raises the floor height");
 /// ```
 #[must_use]
 pub fn floor_height_stream(
