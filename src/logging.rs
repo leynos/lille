@@ -16,7 +16,7 @@ static LOGGER_INITIALISED: AtomicBool = AtomicBool::new(false);
 /// ```
 /// # use anyhow::Result;
 /// # fn main() -> Result<()> {
-/// lille::init_logging(true)?;
+/// lille::init(true)?;
 /// # Ok(())
 /// # }
 /// ```
