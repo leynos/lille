@@ -235,13 +235,11 @@ fn non_finite_horizontal_velocity_propagates(
     if !expectation.expects_output() {
         assert!(
             positions.is_empty(),
-            "expected no positions for {:?} input",
-            expectation
+            "expected no positions for {expectation:?} input"
         );
         assert!(
             velocities.is_empty(),
-            "expected no velocities for {:?} input",
-            expectation
+            "expected no velocities for {expectation:?} input"
         );
         return;
     }
