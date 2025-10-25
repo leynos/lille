@@ -14,21 +14,15 @@ struct SpawnCounters {
 }
 
 impl SpawnCounters {
-    fn record(
-        &mut self,
-        dd_id: Option<&DdlogId>,
-        unit: Option<&UnitType>,
-        transform: &Transform,
-        target: Option<&Target>,
-    ) {
-        match unit {
+    fn record(&mut self, inputs: SpawnInputs<'_>, transform: &Transform) {
+        match inputs.unit {
             Some(UnitType::Civvy { fraidiness }) => {
                 self.civvy += 1;
                 assert!(
                     (fraidiness - 1.0).abs() < f32::EPSILON,
                     "Unexpected Civvy fraidiness: {fraidiness}"
                 );
-                assert!(target.is_some(), "Civvy missing target");
+                assert!(inputs.target.is_some(), "Civvy missing target");
                 assert!(
                     transform
                         .translation
@@ -43,7 +37,7 @@ impl SpawnCounters {
                     (meanness - 10.0).abs() < f32::EPSILON,
                     "Unexpected Baddie meanness: {meanness}"
                 );
-                assert!(target.is_none(), "Baddie should not have a target");
+                assert!(inputs.target.is_none(), "Baddie should not have a target");
                 assert!(
                     transform
                         .translation
@@ -52,7 +46,7 @@ impl SpawnCounters {
                     transform.translation
                 );
             }
-            None => self.record_without_unit(dd_id, transform),
+            None => self.record_without_unit(inputs.dd_id, transform),
         }
     }
 
@@ -89,6 +83,12 @@ fn assert_positive_health(entity: Entity, health: Option<&Health>) {
     }
 }
 
+struct SpawnInputs<'a> {
+    dd_id: Option<&'a DdlogId>,
+    unit: Option<&'a UnitType>,
+    target: Option<&'a Target>,
+}
+
 /// Tests that the `spawn_world_system` correctly spawns Civvy, Baddie, static, and camera entities with expected properties.
 ///
 /// This test initialises a minimal Bevy app, runs the world-spawning system, and verifies that:
@@ -122,7 +122,14 @@ fn spawns_world_entities() {
 
     for (entity, dd_id, unit, transform, health, target) in query.iter(world) {
         assert_positive_health(entity, health);
-        counters.record(dd_id, unit, transform, target);
+        counters.record(
+            SpawnInputs {
+                dd_id,
+                unit,
+                target,
+            },
+            transform,
+        );
     }
 
     counters.assert_expected_totals();
