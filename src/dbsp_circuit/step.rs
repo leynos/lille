@@ -4,6 +4,9 @@ use super::DbspCircuit;
 
 /// Advances the circuit by one tick, panicking on error.
 ///
+/// This wrapper is convenient for tests but will abort the current task when
+/// evaluation fails; prefer [`try_step`] when you need to handle errors.
+///
 /// # Panics
 /// Panics when [`DbspCircuit::step`] returns an error.
 #[track_caller]
@@ -14,6 +17,9 @@ pub fn step(circuit: &mut DbspCircuit) {
 }
 
 /// Advances the circuit and annotates failures with contextual information.
+///
+/// Like [`step`], this wrapper panics on error. Use [`try_step`] if the caller
+/// needs to propagate failures instead of aborting execution.
 ///
 /// # Panics
 /// Panics when [`DbspCircuit::step`] returns an error for the provided `ctx`.
