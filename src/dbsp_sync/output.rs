@@ -42,7 +42,13 @@ macro_rules! apply_output_records {
     reason = "value bounds are checked before casting to f32"
 )]
 fn f32_from_f64(value: f64) -> Option<f32> {
-    if !value.is_finite() || value > f64::from(f32::MAX) || value < f64::from(f32::MIN) {
+    if !value.is_finite() {
+        return None;
+    }
+    if value > f64::from(f32::MAX) {
+        return None;
+    }
+    if value < f64::from(f32::MIN) {
         return None;
     }
     Some(value as f32)
