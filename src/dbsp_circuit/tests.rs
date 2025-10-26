@@ -191,25 +191,6 @@ fn duplicate_damage_events_idempotent(#[case] seq: Option<u32>) {
     );
 }
 
-#[test]
-fn damage_exceeding_current_health_triggers_death() {
-    let case = HealthDeltaTestCase::new(
-        3,
-        10,
-        100,
-        vec![DamageEventSpec::new(15, DamageSource::External, 4, Some(2))],
-    );
-
-    assert_health_delta(
-        &case,
-        HealthDeltaExpectation {
-            delta: -10,
-            death: true,
-            seq: Some(2),
-        },
-    );
-}
-
 #[rstest]
 fn sequenced_events_with_same_seq_in_same_tick_are_deduplicated() {
     let event = DamageEventSpec::new(20, DamageSource::External, 8, Some(11));
@@ -309,20 +290,60 @@ fn health_delta_scenarios(
     assert_health_delta(&case, expected);
 }
 
+#[derive(Clone, Copy)]
+struct LethalCase {
+    entity: u64,
+    current: u16,
+    max: u16,
+    damage_amount: u16,
+    expected_delta: i32,
+    seq: Option<u32>,
+}
+
 #[rstest]
-fn lethal_damage_sets_death_flag() {
+#[case::moderate_damage(LethalCase {
+    entity: 3,
+    current: 10,
+    max: 100,
+    damage_amount: 15,
+    expected_delta: -10,
+    seq: Some(2),
+})]
+#[case::high_damage(LethalCase {
+    entity: 3,
+    current: 20,
+    max: 50,
+    damage_amount: 40,
+    expected_delta: -20,
+    seq: Some(7),
+})]
+fn lethal_damage_sets_death_flag(#[case] params: LethalCase) {
+    const TICK: u64 = 2;
+    let LethalCase {
+        entity,
+        current,
+        max,
+        damage_amount,
+        expected_delta,
+        seq,
+    } = params;
     let case = HealthDeltaTestCase::new(
-        3,
-        20,
-        50,
-        vec![DamageEventSpec::new(40, DamageSource::External, 2, Some(7))],
+        entity,
+        current,
+        max,
+        vec![DamageEventSpec::new(
+            damage_amount,
+            DamageSource::External,
+            TICK,
+            seq,
+        )],
     );
     assert_health_delta(
         &case,
         HealthDeltaExpectation {
-            delta: -20,
+            delta: expected_delta,
             death: true,
-            seq: Some(7),
+            seq,
         },
     );
 }
