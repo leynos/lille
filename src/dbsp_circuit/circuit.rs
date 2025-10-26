@@ -1,4 +1,19 @@
 //! Core DBSP circuit construction and handle accessors.
+//!
+//! This module owns the primary [`DbspCircuit`] type responsible for building
+//! Lille's DBSP dataflow, exposing typed input/output handles (e.g.,
+//! [`DbspCircuit::position_in`], [`DbspCircuit::new_velocity_out`]) and the
+//! step helpers [`step`], [`step_named`], and [`try_step`]. It is the nexus
+//! between the higher-level stream modules (`streams::*`) and consumers such as
+//! Bevy synchronisation systems interacting via the public handles.
+//!
+//! The circuit is constructed through the private builder in this module,
+//! wiring terrain, physics, and health pipelines together. Other modules feed
+//! entity state into the circuit using the provided handle accessors, then
+//! advance the simulation by calling [`DbspCircuit::step`] (or the step helpers
+//! re-exported in [`crate::dbsp_circuit`]). Refer to `streams::*` for the stream
+//! composition details and to `dbsp_sync::input` / `dbsp_sync::output` for
+//! end-to-end usage examples.
 
 use anyhow::Error as AnyError;
 use dbsp::circuit::Circuit;
