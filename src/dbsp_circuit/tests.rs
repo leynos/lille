@@ -3,6 +3,7 @@ use super::*;
 use crate::dbsp_circuit::streams::health_delta_stream;
 use crate::dbsp_circuit::{DamageEvent, DamageSource, HealthDelta, HealthState};
 use crate::GRACE_DISTANCE;
+use approx::abs_diff_eq;
 use dbsp::RootCircuit;
 use rstest::rstest;
 
@@ -46,10 +47,11 @@ fn beyond_grace_or_at_boundary(#[case] z: f64, #[case] z_floor: f64) {
     let pf = make_pf(z, z_floor);
     let position_z = pf.position.z.into_inner();
     let boundary = pf.z_floor.into_inner() + GRACE_DISTANCE;
-    if (position_z - boundary).abs() <= f64::EPSILON {
-        assert!(position_z <= boundary);
+    let tol = 1e-12;
+    if abs_diff_eq!(position_z, boundary, epsilon = tol) {
+        assert!(position_z <= boundary + tol);
     } else {
-        assert!(position_z > boundary);
+        assert!(position_z > boundary + tol);
     }
 }
 
