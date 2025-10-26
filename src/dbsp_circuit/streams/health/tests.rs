@@ -169,15 +169,13 @@ fn multiple_entities_land_without_interference() {
         .min(f64::from(u16::MAX))
         .floor();
 
-    let first =
-        test_utils::expect_single(events.get(0..1).unwrap_or(&[]), "first fall damage event");
+    let first = test_utils::expect_single(&events[..1], "first fall damage event");
     assert_eq!(first.entity, 1);
     assert_eq!(first.source, DamageSource::Fall);
     assert_eq!(first.amount, expect_u16(expected_a));
     assert_eq!(first.at_tick, 1);
 
-    let second =
-        test_utils::expect_single(events.get(1..).unwrap_or(&[]), "second fall damage event");
+    let second = test_utils::expect_single(&events[1..], "second fall damage event");
     assert_eq!(second.entity, 2);
     assert_eq!(second.source, DamageSource::Fall);
     assert_eq!(second.amount, expect_u16(expected_b));
