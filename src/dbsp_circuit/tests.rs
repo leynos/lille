@@ -140,6 +140,8 @@ impl HealthDeltaTestCase {
     }
 }
 
+/// Expected outcome for a health delta scenario, including the delta amount,
+/// whether the entity should be dead afterwards, and an optional sequence id to match against.
 #[derive(Clone, Copy)]
 struct HealthDeltaExpectation {
     delta: i32,
