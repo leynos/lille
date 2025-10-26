@@ -31,16 +31,49 @@ impl StreamConcat for Stream<RootCircuit, OrdZSet<FearLevel>> {
 /// them a `0.0` level before the results are unioned back together.
 ///
 /// # Examples
-/// ```rust,ignore
-/// # use anyhow::Error;
+/// ```rust,no_run
+/// # use anyhow::Result;
 /// # use dbsp::RootCircuit;
+/// # use ordered_float::OrderedFloat;
 /// # use lille::dbsp_circuit::{FearLevel, Position};
-/// # let _ = RootCircuit::build(|circuit| -> Result<(), Error> {
-/// #     let (positions, _) = circuit.add_input_zset::<Position>();
-/// #     let (fears, _) = circuit.add_input_zset::<FearLevel>();
-/// #     // Combine the inputs with `fear_level_stream(&positions, &fears)`.
-/// #     Ok(())
-/// # });
+/// # use lille::dbsp_circuit::fear_level_stream;
+/// # fn main() -> Result<()> {
+/// let (mut circuit, (positions_in, fears_in, mut level_out)) =
+///     RootCircuit::build(|circuit| {
+///         let (positions_stream, positions_handle) =
+///             circuit.add_input_zset::<Position>();
+///         let (fears_stream, fears_handle) =
+///             circuit.add_input_zset::<FearLevel>();
+///         let handle =
+///             fear_level_stream(&positions_stream, &fears_stream).output();
+///         Ok((positions_handle, fears_handle, handle))
+///     })?;
+///
+/// positions_in.push(
+///     Position {
+///         entity: 7,
+///         x: 0.0.into(),
+///         y: 0.0.into(),
+///         z: 0.0.into(),
+///     },
+///     1,
+/// );
+/// circuit.step()?;
+///
+/// let levels: Vec<FearLevel> = level_out
+///     .consolidate()
+///     .iter()
+///     .map(|(level, (), _)| level.clone())
+///     .collect();
+/// assert_eq!(
+///     levels,
+///     vec![FearLevel {
+///         entity: 7,
+///         level: OrderedFloat(0.0),
+///     }]
+/// );
+/// # Ok(())
+/// # }
 /// ```
 #[must_use]
 pub fn fear_level_stream(
@@ -88,6 +121,11 @@ fn should_flee(level: OrderedFloat<f64>) -> bool {
     level.into_inner() > FEAR_THRESHOLD
 }
 
+/// Threshold below which displacement is treated as zero when normalising.
+///
+/// The value `1e-12` avoids division by near-zero magnitudes. It suppresses
+/// floating-point noise while remaining negligible for typical movement
+/// distances.
 const MIN_DIRECTION_MAGNITUDE: f64 = 1e-12;
 
 fn decide_movement(level: OrderedFloat<f64>, pt: &PositionTarget) -> MovementDecision {
@@ -117,17 +155,71 @@ fn decide_movement(level: OrderedFloat<f64>, pt: &PositionTarget) -> MovementDec
 /// normalised to ensure consistent speed in all directions.
 ///
 /// # Examples
-/// ```rust,ignore
-/// # use anyhow::Error;
+/// ```rust,no_run
+/// # use anyhow::Result;
 /// # use dbsp::RootCircuit;
-/// # use lille::dbsp_circuit::{FearLevel, Position, Target};
-/// # let _ = RootCircuit::build(|circuit| -> Result<(), Error> {
-/// #     let (fears, _) = circuit.add_input_zset::<FearLevel>();
-/// #     let (targets, _) = circuit.add_input_zset::<Target>();
-/// #     let (positions, _) = circuit.add_input_zset::<Position>();
-/// #     // Feed the streams into `movement_decision_stream`.
-/// #     Ok(())
-/// # });
+/// # use ordered_float::OrderedFloat;
+/// # use lille::dbsp_circuit::{FearLevel, MovementDecision, Position, Target};
+/// # use lille::dbsp_circuit::{fear_level_stream, movement_decision_stream};
+/// # use std::f64::consts::FRAC_1_SQRT_2;
+/// # fn main() -> Result<()> {
+/// let (mut circuit, (fear_in, target_in, pos_in, mut decisions_out)) =
+///     RootCircuit::build(|circuit| {
+///         let (fear_stream, fear_handle) =
+///             circuit.add_input_zset::<FearLevel>();
+///         let (target_stream, target_handle) =
+///             circuit.add_input_zset::<Target>();
+///         let (position_stream, position_handle) =
+///             circuit.add_input_zset::<Position>();
+///
+///         let fear = fear_level_stream(&position_stream, &fear_stream);
+///         let output = movement_decision_stream(
+///             &fear,
+///             &target_stream,
+///             &position_stream,
+///         )
+///         .output();
+///         Ok((fear_handle, target_handle, position_handle, output))
+///     })?;
+///
+/// fear_in.push(
+///     FearLevel {
+///         entity: 1,
+///         level: OrderedFloat(0.1),
+///     },
+///     1,
+/// );
+/// target_in.push(
+///     Target {
+///         entity: 1,
+///         x: 1.0.into(),
+///         y: 1.0.into(),
+///     },
+///     1,
+/// );
+/// pos_in.push(
+///     Position {
+///         entity: 1,
+///         x: 0.0.into(),
+///         y: 0.0.into(),
+///         z: 0.0.into(),
+///     },
+///     1,
+/// );
+/// circuit.step()?;
+///
+/// let decisions: Vec<MovementDecision> = decisions_out
+///     .consolidate()
+///     .iter()
+///     .map(|(decision, (), _)| decision.clone())
+///     .collect();
+/// assert_eq!(decisions.len(), 1);
+/// let decision = &decisions[0];
+/// assert_eq!(decision.entity, 1);
+/// assert_eq!(decision.dx, OrderedFloat(FRAC_1_SQRT_2));
+/// assert_eq!(decision.dy, OrderedFloat(FRAC_1_SQRT_2));
+/// # Ok(())
+/// # }
 /// ```
 #[must_use]
 pub fn movement_decision_stream(
@@ -160,16 +252,54 @@ pub fn movement_decision_stream(
 /// entity in a single tick.
 ///
 /// # Examples
-/// ```rust,ignore
-/// # use anyhow::Error;
+/// ```rust,no_run
+/// # use anyhow::Result;
 /// # use dbsp::RootCircuit;
+/// # use ordered_float::OrderedFloat;
 /// # use lille::dbsp_circuit::{MovementDecision, Position};
-/// # let _ = RootCircuit::build(|circuit| -> Result<(), Error> {
-/// #     let (positions, _) = circuit.add_input_zset::<Position>();
-/// #     let (decisions, _) = circuit.add_input_zset::<MovementDecision>();
-/// #     // Apply decisions to positions via `apply_movement`.
-/// #     Ok(())
-/// # });
+/// # use lille::dbsp_circuit::apply_movement;
+/// # fn main() -> Result<()> {
+/// let (mut circuit, (base_in, movement_in, mut moved_out)) =
+///     RootCircuit::build(|circuit| {
+///         let (base_stream, base_handle) =
+///             circuit.add_input_zset::<Position>();
+///         let (movement_stream, movement_handle) =
+///             circuit.add_input_zset::<MovementDecision>();
+///         let output =
+///             apply_movement(&base_stream, &movement_stream).output();
+///         Ok((base_handle, movement_handle, output))
+///     })?;
+///
+/// base_in.push(
+///     Position {
+///         entity: 1,
+///         x: 0.0.into(),
+///         y: 0.0.into(),
+///         z: 0.0.into(),
+///     },
+///     1,
+/// );
+/// movement_in.push(
+///     MovementDecision {
+///         entity: 1,
+///         dx: OrderedFloat(1.0),
+///         dy: OrderedFloat(0.0),
+///     },
+///     1,
+/// );
+/// circuit.step()?;
+///
+/// let moved: Vec<Position> = moved_out
+///     .consolidate()
+///     .iter()
+///     .map(|(position, (), _)| position.clone())
+///     .collect();
+/// assert_eq!(moved.len(), 1);
+/// assert_eq!(moved[0].entity, 1);
+/// assert_eq!(moved[0].x, OrderedFloat(1.0));
+/// assert_eq!(moved[0].y, OrderedFloat(0.0));
+/// # Ok(())
+/// # }
 /// ```
 #[must_use]
 pub fn apply_movement(
