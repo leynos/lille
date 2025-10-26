@@ -19,6 +19,8 @@ pub struct TestWorld {
     pub entity: Option<Entity>,
     expected_damage: Arc<Mutex<Option<u16>>>,
     initial_health: Arc<Mutex<Option<u16>>>,
+    /// Monotonic generator for unique DDlog identifiers used in tests.
+    next_ddlog_id: Arc<Mutex<i64>>,
 }
 
 impl fmt::Debug for TestWorld {
@@ -38,6 +40,7 @@ impl Default for TestWorld {
             entity: None,
             expected_damage: Arc::new(Mutex::new(None)),
             initial_health: Arc::new(Mutex::new(None)),
+            next_ddlog_id: Arc::new(Mutex::new(1)),
         }
     }
 }
@@ -91,7 +94,13 @@ impl TestWorld {
     ) {
         let entity_id = {
             let mut app = self.app_guard();
-            let mut entity = app.world.spawn((DdlogId(1), transform, vel));
+            let mut id_guard = self
+                .next_ddlog_id
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
+            let ddlog_id = *id_guard;
+            *id_guard += 1;
+            let mut entity = app.world.spawn((DdlogId(ddlog_id), transform, vel));
             if let Some(force_comp) = force {
                 entity.insert(force_comp);
             }
@@ -114,7 +123,13 @@ impl TestWorld {
     ) {
         let entity_id = {
             let mut app = self.app_guard();
-            let entity = app.world.spawn((DdlogId(1), transform, vel, health));
+            let mut id_guard = self
+                .next_ddlog_id
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
+            let ddlog_id = *id_guard;
+            *id_guard += 1;
+            let entity = app.world.spawn((DdlogId(ddlog_id), transform, vel, health));
             entity.id()
         };
         self.entity = Some(entity_id);
