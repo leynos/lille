@@ -8,6 +8,11 @@ use lille::{
 };
 use rstest::rstest;
 
+/// Additional margin over the safe landing speed used to model a fast fall.
+const EXTRA_FALL_SPEED: f32 = 4.0;
+/// Baseline health for entities in the fall-damage scenario.
+const INITIAL_HEALTH: u16 = 100;
+
 #[rstest]
 fn falling_inflicts_health_damage(world: TestWorld) {
     rspec::run(&rspec::given(
@@ -25,14 +30,15 @@ fn falling_inflicts_health_damage(world: TestWorld) {
                     Transform::from_xyz(0.0, 0.0, 10.0),
                     VelocityComp::default(),
                     Health {
-                        current: 100,
-                        max: 100,
+                        current: INITIAL_HEALTH,
+                        max: INITIAL_HEALTH,
                     },
                 );
+                state.set_initial_health(INITIAL_HEALTH);
             });
             scenario.when("the simulation runs until the entity lands", |phase| {
                 phase.before_each(|state| {
-                    let fall_speed = -(expect_f32(SAFE_LANDING_SPEED) + 4.0);
+                    let fall_speed = -(expect_f32(SAFE_LANDING_SPEED) + EXTRA_FALL_SPEED);
                     state.set_velocity_z(fall_speed);
                     state.tick();
 
@@ -56,9 +62,10 @@ fn falling_inflicts_health_damage(world: TestWorld) {
                     state.set_expected_damage(expected_damage);
                 });
                 phase.then("the expected fall damage is applied", |state| {
+                    let initial_health = state.take_initial_health();
                     let expected = state.take_expected_damage();
                     let health = state.health();
-                    let lost = 100u16.saturating_sub(health.current);
+                    let lost = initial_health.saturating_sub(health.current);
                     assert_eq!(lost, expected);
                 });
             });
