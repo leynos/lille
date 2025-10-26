@@ -149,6 +149,9 @@ struct HealthDeltaExpectation {
     seq: Option<u32>,
 }
 
+/// Runs the health delta circuit for a test case and asserts the single emitted
+/// [`HealthDelta`] matches the expected delta, death flag, and optional
+/// sequence id, panicking if the circuit produces anything other than one result.
 fn assert_health_delta(case: &HealthDeltaTestCase, expected: HealthDeltaExpectation) {
     let events = case.event_records();
     let deltas = run_health_delta(case.state, &events);
