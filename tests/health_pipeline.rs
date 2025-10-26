@@ -60,7 +60,7 @@ impl HealthEnv {
         Ok(())
     }
 
-    fn current_health(&mut self) -> Result<u16> {
+    fn current_health(&self) -> Result<u16> {
         let health = self
             .app
             .world
@@ -69,7 +69,7 @@ impl HealthEnv {
         Ok(health.current)
     }
 
-    fn duplicate_count(&mut self) -> Result<u64> {
+    fn duplicate_count(&self) -> Result<u64> {
         let state = self
             .app
             .world
