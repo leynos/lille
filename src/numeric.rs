@@ -70,6 +70,14 @@ pub fn expect_u16(value: f64) -> u16 {
 }
 
 /// Floor the value and convert to `u16`, returning `None` when out of range.
+///
+/// # Examples
+/// ```rust
+/// use lille::numeric::floor_to_u16;
+/// assert_eq!(floor_to_u16(123.9_f64), Some(123));
+/// assert_eq!(floor_to_u16(70000.0_f64), None);
+/// assert_eq!(floor_to_u16(f64::NAN), None);
+/// ```
 #[expect(
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss,
@@ -91,6 +99,20 @@ pub fn floor_to_u16(value: f64) -> Option<u16> {
 ///
 /// Non-finite values (NaN or ±∞) yield `0`. Finite inputs are floored and then
 /// clamped to `i32::MIN..=i32::MAX` before casting.
+///
+/// # Examples
+/// ```rust
+/// use ordered_float::OrderedFloat;
+/// use lille::numeric::floor_to_i32;
+///
+/// assert_eq!(floor_to_i32(OrderedFloat(1.9_f64)), 1);
+/// assert_eq!(floor_to_i32(OrderedFloat(-1.1_f64)), -2);
+/// assert_eq!(floor_to_i32(OrderedFloat(f64::from(i32::MAX) + 10.0)), i32::MAX);
+/// assert_eq!(floor_to_i32(OrderedFloat(f64::from(i32::MIN) - 10.0)), i32::MIN);
+/// assert_eq!(floor_to_i32(OrderedFloat(f64::NAN)), 0);
+/// assert_eq!(floor_to_i32(OrderedFloat(f64::INFINITY)), 0);
+/// assert_eq!(floor_to_i32(OrderedFloat(f64::NEG_INFINITY)), 0);
+/// ```
 #[expect(
     clippy::cast_possible_truncation,
     reason = "The value is clamped to the i32 bounds before casting."
