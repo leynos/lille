@@ -305,6 +305,9 @@ fn health_delta_scenarios(
     assert_health_delta(&case, expected);
 }
 
+/// Parameters describing a lethal damage scenario, capturing entity id,
+/// current/maximum health, damage amount, expected delta, and optional
+/// sequence id used to assert death flag behaviour.
 #[derive(Clone, Copy)]
 struct LethalCase {
     entity: u64,
