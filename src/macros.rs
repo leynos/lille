@@ -32,6 +32,19 @@
 //! }
 //! ```
 //!
+//! // Generic with a where bound
+//! ```rust,ignore
+//! use lille::dbsp_record;
+//! dbsp_record! {
+//!     /// Generic position record
+//!     pub struct Position<T> where T: Copy + Default, {
+//!         pub marker: T,
+//!         pub x: i32,
+//!         pub y: i32,
+//!     }
+//! }
+//! ```
+//!
 //! The macro expands to a struct deriving serialisation, ordering, and size
 //! accounting traits required by the circuit. Optional traits can be
 //! appended after the struct definition as derive paths (e.g.,
@@ -67,13 +80,22 @@
 /// paths can be passed after the struct definition.
 ///
 /// # Examples
-/// ```
+/// ```rust,ignore
 /// use lille::dbsp_record;
 /// dbsp_record! {
 ///     /// Record describing a position update.
 ///     pub struct Position {
 ///         pub x: i32,
 ///         pub y: i32,
+///     }
+/// }
+///
+/// dbsp_record! {
+///     pub struct Position3D<T> where T: Copy + Default, {
+///         pub marker: T,
+///         pub x: i32,
+///         pub y: i32,
+///         pub z: i32,
 ///     }
 /// }
 /// ```
