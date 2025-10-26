@@ -39,6 +39,17 @@ pub fn expect_f32(value: f64) -> f32 {
 }
 
 /// Convert a finite `f64` into `u16`, asserting that it resides within bounds.
+///
+/// # Examples
+/// ```rust
+/// use lille::numeric::expect_u16;
+/// assert_eq!(expect_u16(42.0_f64), 42);
+/// assert_eq!(expect_u16(f64::from(u16::MIN)), 0);
+/// assert_eq!(expect_u16(f64::from(u16::MAX)), u16::MAX);
+/// ```
+///
+/// Debug assertions trigger in debug builds if the value is non-finite or
+/// outside the `u16` range; callers should clamp inputs before release builds.
 #[expect(
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss,
