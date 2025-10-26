@@ -279,23 +279,17 @@ fn healing_when_already_at_max_health_does_not_overflow(mut health_env: HealthEn
     let initial_heal = healing_event();
     health_env.push_damage(initial_heal)?;
     health_env.update()?;
-    ensure!(
-        health_env.current_health()? == 100,
-        "initial healing should cap at maximum health"
-    );
 
     let extra_heal = healing_at_max_event();
     health_env.push_damage(extra_heal)?;
     health_env.update()?;
-    ensure!(
-        health_env.current_health()? == 100,
-        "additional healing should not overflow maximum health"
-    );
-    ensure!(
-        health_env.duplicate_count()? == 0,
-        "duplicate counter should remain zero without replayed events"
-    );
-    Ok(())
+    assert_health_state(
+        &mut health_env,
+        100,
+        "additional healing should not overflow maximum health",
+        0,
+        "duplicate counter should remain zero without replayed events",
+    )
 }
 
 #[rstest]
