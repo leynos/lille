@@ -11,6 +11,7 @@ use rstest::fixture;
 use std::fmt;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
+/// Test harness wrapping a Bevy app configured for DBSP scenarios.
 #[derive(Clone)]
 pub struct TestWorld {
     /// Shared Bevy app; `rspec` fixtures must implement `Clone + Send + Sync`.
@@ -40,16 +41,19 @@ impl Default for TestWorld {
 }
 
 impl TestWorld {
+    /// Acquire the underlying Bevy `App` with panic-on-poison semantics.
     pub fn app_guard(&self) -> MutexGuard<'_, App> {
         self.app.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
+    /// Access the expected-damage slot, panicking if the mutex is poisoned.
     pub fn expected_damage_guard(&self) -> MutexGuard<'_, Option<u16>> {
         self.expected_damage
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
     }
 
+    /// Return the spawned entity or panic if not initialised.
     pub fn entity_or_panic(&self) -> Entity {
         self.entity.unwrap_or_else(|| panic!("entity not spawned"))
     }
@@ -102,6 +106,7 @@ impl TestWorld {
         self.entity = Some(entity_id);
     }
 
+    /// Fetch the entity's `Health` component, panicking if it is missing.
     pub fn health(&self) -> Health {
         let app = self.app_guard();
         let entity = self.entity_or_panic();
@@ -111,6 +116,7 @@ impl TestWorld {
             .unwrap_or_else(|| panic!("missing Health component"))
     }
 
+    /// Mutate the entity's `Transform` Z translation.
     pub fn set_position_z(&self, z: f32) {
         let mut app = self.app_guard();
         let entity = self.entity_or_panic();
@@ -120,6 +126,7 @@ impl TestWorld {
         transform.translation.z = z;
     }
 
+    /// Mutate the entity's `VelocityComp` vertical component.
     pub fn set_velocity_z(&self, vz: f32) {
         let mut app = self.app_guard();
         let entity = self.entity_or_panic();
@@ -129,10 +136,12 @@ impl TestWorld {
         velocity.vz = vz;
     }
 
+    /// Record an expected damage value for subsequent assertions.
     pub fn set_expected_damage(&self, damage: u16) {
         *self.expected_damage_guard() = Some(damage);
     }
 
+    /// Retrieve and clear the expected damage value, panicking if unset.
     pub fn take_expected_damage(&self) -> u16 {
         let mut expected = self.expected_damage_guard();
         expected
@@ -193,13 +202,16 @@ impl TestWorld {
 }
 
 /// Provides a fresh Bevy world for each scenario.
+/// Provide a fresh `TestWorld` for rstest fixtures.
 #[fixture]
 pub fn world() -> TestWorld {
     TestWorld::default()
 }
 
+/// Shortcut type for setup functions used by scenarios.
 pub type SetupFn = fn(&mut TestWorld);
 
+/// Describes a physics scenario with expected position/velocity.
 #[derive(Clone, Copy)]
 pub struct PhysicsScenario {
     pub setup: SetupFn,
@@ -207,6 +219,7 @@ pub struct PhysicsScenario {
     pub expected_velocity: (f32, f32, f32),
 }
 
+/// Build a `PhysicsScenario` from double-precision expectations.
 pub fn physics_scenario(
     setup: SetupFn,
     expected_position: (f64, f64, f64),
@@ -227,6 +240,7 @@ pub fn physics_scenario(
     }
 }
 
+/// Execute the scenario against a `TestWorld` and assert outputs.
 pub fn run_physics_scenario(mut world: TestWorld, scenario: PhysicsScenario) {
     (scenario.setup)(&mut world);
     world.tick();
@@ -236,6 +250,7 @@ pub fn run_physics_scenario(mut world: TestWorld, scenario: PhysicsScenario) {
     world.assert_velocity(vx, vy, vz);
 }
 
+/// Assert the recorded expected damage matches `expected`.
 pub fn assert_expected_damage(world: &TestWorld, expected: u16) {
     assert_eq!(world.take_expected_damage(), expected);
 }
