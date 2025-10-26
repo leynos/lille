@@ -99,12 +99,16 @@ impl DamageEventSpec {
     }
 }
 
+/// Bundles an initial health state with a sequence of damage events to
+/// validate the resulting health delta outputs produced by the circuit.
 struct HealthDeltaTestCase {
     state: HealthState,
     events: Vec<DamageEventSpec>,
 }
 
 impl HealthDeltaTestCase {
+    /// Create a new health delta test case for `entity` with the provided
+    /// current/max health and damage event specifications.
     fn new(entity: u64, current: u16, max: u16, events: Vec<DamageEventSpec>) -> Self {
         Self {
             state: HealthState {
@@ -116,6 +120,7 @@ impl HealthDeltaTestCase {
         }
     }
 
+    /// Convert the damage specs into weighted `DamageEvent` records for circuit input.
     fn event_records(&self) -> Vec<(DamageEvent, i32)> {
         self.events
             .iter()
