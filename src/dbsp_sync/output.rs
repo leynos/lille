@@ -134,7 +134,14 @@ fn apply_health_deltas(
         }
         let current = i32::from(health.current);
         let max = i32::from(health.max);
-        let new_value = (current + delta.delta).clamp(0, max);
+        let raw = current + delta.delta;
+        let new_value = raw.clamp(0, max);
+        if raw != new_value {
+            debug!(
+                "health clamped for entity {}: raw {} -> {}",
+                delta.entity, raw, new_value
+            );
+        }
         let Ok(new_u16) = u16::try_from(new_value) else {
             debug_assert!(
                 false,
