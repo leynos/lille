@@ -6,6 +6,7 @@ use bevy::prelude::*;
 use lille::dbsp_circuit::{DamageEvent, DamageSource};
 use lille::dbsp_sync::DbspState;
 use lille::{DamageInbox, DbspPlugin, DdlogId, Health};
+use rstest::{fixture, rstest};
 
 /// Encapsulates a Bevy app seeded with health fixtures.
 struct HealthEnv {
@@ -83,6 +84,11 @@ impl Default for HealthEnv {
     fn default() -> Self {
         Self::new()
     }
+}
+
+#[fixture]
+fn health_env() -> HealthEnv {
+    HealthEnv::new()
 }
 
 /// Assert both health state and duplicate counter with custom messages.
@@ -188,41 +194,34 @@ fn apply_damage_sequence(
     Ok(())
 }
 
-#[test]
-fn duplicate_events_within_tick_apply_once() -> Result<()> {
-    let mut env = HealthEnv::new();
+#[rstest]
+fn duplicate_events_within_tick_apply_once(mut health_env: HealthEnv) -> Result<()> {
     let damage = sequenced_damage_tick_one();
-    env.push_damage_twice(damage)?;
-    env.update()?;
-    ensure!(
-        env.current_health()? == 60,
-        "health should drop to 60 after consuming duplicate damage"
-    );
-    ensure!(
-        env.duplicate_count()? == 1,
-        "duplicate counter should record a single entry"
-    );
+    health_env.push_damage_twice(damage)?;
+    health_env.update()?;
+    assert_health_state(
+        &mut health_env,
+        60,
+        "health should drop to 60 after consuming duplicate damage",
+        1,
+        "duplicate counter should record a single entry",
+    )?;
     Ok(())
 }
 
-#[test]
-fn replaying_same_tick_delta_is_ignored() -> Result<()> {
-    let mut env = HealthEnv::new();
+#[rstest]
+fn replaying_same_tick_delta_is_ignored(mut health_env: HealthEnv) -> Result<()> {
     let damage = sequenced_damage_tick_one();
     apply_damage_sequence(
-        &mut env,
+        &mut health_env,
         damage,
         DamageSequencePlan {
             replay_same_tick: true,
             ..DamageSequencePlan::default()
         },
     )?;
-    ensure!(
-        env.current_health()? == 60,
-        "health should stay at 60 when replaying the same tick"
-    );
     assert_health_state(
-        &mut env,
+        &mut health_env,
         60,
         "health should stay at 60 when replaying the same tick",
         2,
@@ -230,13 +229,12 @@ fn replaying_same_tick_delta_is_ignored() -> Result<()> {
     )
 }
 
-#[test]
-fn new_ticks_consume_damage_once() -> Result<()> {
-    let mut env = HealthEnv::new();
+#[rstest]
+fn new_ticks_consume_damage_once(mut health_env: HealthEnv) -> Result<()> {
     let damage = sequenced_damage_tick_one();
     let next_tick = sequenced_damage_tick_two();
     apply_damage_sequence(
-        &mut env,
+        &mut health_env,
         damage,
         DamageSequencePlan {
             replay_same_tick: true,
@@ -245,7 +243,7 @@ fn new_ticks_consume_damage_once() -> Result<()> {
         },
     )?;
     assert_health_state(
-        &mut env,
+        &mut health_env,
         30,
         "health should drop to 30 after consuming new tick damage once",
         2,
@@ -253,14 +251,13 @@ fn new_ticks_consume_damage_once() -> Result<()> {
     )
 }
 
-#[test]
-fn healing_saturates_at_max_health() -> Result<()> {
-    let mut env = HealthEnv::new();
+#[rstest]
+fn healing_saturates_at_max_health(mut health_env: HealthEnv) -> Result<()> {
     let damage = sequenced_damage_tick_one();
     let next_tick = sequenced_damage_tick_two();
     let heal = healing_event();
     apply_damage_sequence(
-        &mut env,
+        &mut health_env,
         damage,
         DamageSequencePlan {
             replay_same_tick: true,
@@ -269,7 +266,7 @@ fn healing_saturates_at_max_health() -> Result<()> {
         },
     )?;
     assert_health_state(
-        &mut env,
+        &mut health_env,
         100,
         "healing should saturate at maximum health",
         2,
@@ -277,39 +274,37 @@ fn healing_saturates_at_max_health() -> Result<()> {
     )
 }
 
-#[test]
-fn healing_when_already_at_max_health_does_not_overflow() -> Result<()> {
-    let mut env = HealthEnv::new();
+#[rstest]
+fn healing_when_already_at_max_health_does_not_overflow(mut health_env: HealthEnv) -> Result<()> {
     let initial_heal = healing_event();
-    env.push_damage(initial_heal)?;
-    env.update()?;
+    health_env.push_damage(initial_heal)?;
+    health_env.update()?;
     ensure!(
-        env.current_health()? == 100,
+        health_env.current_health()? == 100,
         "initial healing should cap at maximum health"
     );
 
     let extra_heal = healing_at_max_event();
-    env.push_damage(extra_heal)?;
-    env.update()?;
+    health_env.push_damage(extra_heal)?;
+    health_env.update()?;
     ensure!(
-        env.current_health()? == 100,
+        health_env.current_health()? == 100,
         "additional healing should not overflow maximum health"
     );
     ensure!(
-        env.duplicate_count()? == 0,
+        health_env.duplicate_count()? == 0,
         "duplicate counter should remain zero without replayed events"
     );
     Ok(())
 }
 
-#[test]
-fn unsequenced_duplicates_are_filtered_within_tick() -> Result<()> {
-    let mut env = HealthEnv::new();
+#[rstest]
+fn unsequenced_duplicates_are_filtered_within_tick(mut health_env: HealthEnv) -> Result<()> {
     let damage = sequenced_damage_tick_one();
     let next_tick = sequenced_damage_tick_two();
     let heal = healing_event();
     apply_damage_sequence(
-        &mut env,
+        &mut health_env,
         damage,
         DamageSequencePlan {
             replay_same_tick: true,
@@ -318,10 +313,10 @@ fn unsequenced_duplicates_are_filtered_within_tick() -> Result<()> {
         },
     )?;
     let unsequenced = unsequenced_damage();
-    env.push_damage_twice(unsequenced)?;
-    env.update()?;
+    health_env.push_damage_twice(unsequenced)?;
+    health_env.update()?;
     assert_health_state(
-        &mut env,
+        &mut health_env,
         50,
         "unsequenced duplicates within a tick should only apply once",
         3,
@@ -329,14 +324,13 @@ fn unsequenced_duplicates_are_filtered_within_tick() -> Result<()> {
     )
 }
 
-#[test]
-fn replaying_unsequenced_deltas_for_same_tick_is_ignored() -> Result<()> {
-    let mut env = HealthEnv::new();
+#[rstest]
+fn replaying_unsequenced_deltas_for_same_tick_is_ignored(mut health_env: HealthEnv) -> Result<()> {
     let damage = sequenced_damage_tick_one();
     let next_tick = sequenced_damage_tick_two();
     let heal = healing_event();
     apply_damage_sequence(
-        &mut env,
+        &mut health_env,
         damage,
         DamageSequencePlan {
             replay_same_tick: true,
@@ -345,12 +339,12 @@ fn replaying_unsequenced_deltas_for_same_tick_is_ignored() -> Result<()> {
         },
     )?;
     let unsequenced = unsequenced_damage();
-    env.push_damage_twice(unsequenced)?;
-    env.update()?;
-    env.push_damage(unsequenced)?;
-    env.update()?;
+    health_env.push_damage_twice(unsequenced)?;
+    health_env.update()?;
+    health_env.push_damage(unsequenced)?;
+    health_env.update()?;
     assert_health_state(
-        &mut env,
+        &mut health_env,
         50,
         "replayed unsequenced deltas should not further change health",
         4,
