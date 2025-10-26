@@ -7,6 +7,7 @@ use crate::dbsp_circuit::{Force, NewPosition, NewVelocity, Position, Velocity};
 use crate::{apply_ground_friction, GRAVITY_PULL, TERMINAL_VELOCITY};
 use approx::assert_relative_eq;
 use rstest::rstest;
+use test_utils::expect_single;
 
 struct MotionScenario {
     position: Position,
@@ -147,18 +148,14 @@ fn motion_cases(#[case] scenario: MotionScenario) {
         .iter()
         .map(|t| t.0)
         .collect();
-    match expected_pos {
-        Some(expected) => match pos_out.as_slice() {
-            [actual] => {
-                assert_eq!(actual.entity, expected.entity);
-                assert_relative_eq!(actual.x.into_inner(), expected.x.into_inner());
-                assert_relative_eq!(actual.y.into_inner(), expected.y.into_inner());
-                assert_relative_eq!(actual.z.into_inner(), expected.z.into_inner());
-            }
-            [] => panic!("expected a position output"),
-            many => panic!("expected one position, observed {}", many.len()),
-        },
-        None => assert!(pos_out.is_empty()),
+    if let Some(expected) = expected_pos {
+        let actual = expect_single(pos_out.as_slice(), "position output");
+        assert_eq!(actual.entity, expected.entity);
+        assert_relative_eq!(actual.x.into_inner(), expected.x.into_inner());
+        assert_relative_eq!(actual.y.into_inner(), expected.y.into_inner());
+        assert_relative_eq!(actual.z.into_inner(), expected.z.into_inner());
+    } else {
+        assert!(pos_out.is_empty());
     }
 
     let vel_out: Vec<NewVelocity> = circuit
@@ -167,18 +164,14 @@ fn motion_cases(#[case] scenario: MotionScenario) {
         .iter()
         .map(|t| t.0)
         .collect();
-    match expected_vel {
-        Some(expected) => match vel_out.as_slice() {
-            [actual] => {
-                assert_eq!(actual.entity, expected.entity);
-                assert_relative_eq!(actual.vx.into_inner(), expected.vx.into_inner());
-                assert_relative_eq!(actual.vy.into_inner(), expected.vy.into_inner());
-                assert_relative_eq!(actual.vz.into_inner(), expected.vz.into_inner());
-            }
-            [] => panic!("expected a velocity output"),
-            many => panic!("expected one velocity, observed {}", many.len()),
-        },
-        None => assert!(vel_out.is_empty()),
+    if let Some(expected) = expected_vel {
+        let actual = expect_single(vel_out.as_slice(), "velocity output");
+        assert_eq!(actual.entity, expected.entity);
+        assert_relative_eq!(actual.vx.into_inner(), expected.vx.into_inner());
+        assert_relative_eq!(actual.vy.into_inner(), expected.vy.into_inner());
+        assert_relative_eq!(actual.vz.into_inner(), expected.vz.into_inner());
+    } else {
+        assert!(vel_out.is_empty());
     }
 }
 
@@ -226,16 +219,8 @@ fn non_finite_horizontal_velocity_propagates(
         .map(|record| record.0)
         .collect();
 
-    let position = match positions.as_slice() {
-        [p] => p,
-        [] => panic!("expected one position output"),
-        many => panic!("expected one position, observed {}", many.len()),
-    };
-    let velocity = match velocities.as_slice() {
-        [v] => v,
-        [] => panic!("expected one velocity output"),
-        many => panic!("expected one velocity, observed {}", many.len()),
-    };
+    let position = expect_single(positions.as_slice(), "position output");
+    let velocity = expect_single(velocities.as_slice(), "velocity output");
 
     let pos_x = position.x.into_inner();
     let vel_x = velocity.vx.into_inner();
@@ -284,11 +269,7 @@ fn standing_friction(#[case] vx: f64) {
         .iter()
         .map(|t| t.0)
         .collect();
-    let position = match pos_out.as_slice() {
-        [position] => position,
-        [] => panic!("expected one position output"),
-        many => panic!("expected one position, observed {}", many.len()),
-    };
+    let position = expect_single(pos_out.as_slice(), "position output");
     assert_relative_eq!(position.x.into_inner(), apply_ground_friction(vx));
     assert_relative_eq!(position.y.into_inner(), 0.0);
     assert_relative_eq!(position.z.into_inner(), 1.0);
@@ -299,11 +280,7 @@ fn standing_friction(#[case] vx: f64) {
         .iter()
         .map(|t| t.0)
         .collect();
-    let velocity = match vel_out.as_slice() {
-        [velocity] => velocity,
-        [] => panic!("expected one velocity output"),
-        many => panic!("expected one velocity, observed {}", many.len()),
-    };
+    let velocity = expect_single(vel_out.as_slice(), "velocity output");
     assert_relative_eq!(velocity.vx.into_inner(), apply_ground_friction(vx));
     assert_relative_eq!(velocity.vy.into_inner(), 0.0);
     assert_relative_eq!(velocity.vz.into_inner(), 0.0);
@@ -333,11 +310,7 @@ fn airborne_preserves_velocity() {
         .iter()
         .map(|t| t.0)
         .collect();
-    let velocity = match vel_out.as_slice() {
-        [v] => v,
-        [] => panic!("expected one velocity output"),
-        many => panic!("expected one velocity, observed {}", many.len()),
-    };
+    let velocity = expect_single(vel_out.as_slice(), "velocity output");
     assert_relative_eq!(velocity.vx.into_inner(), 1.0);
     assert_relative_eq!(velocity.vy.into_inner(), 0.0);
     assert_relative_eq!(velocity.vz.into_inner(), GRAVITY_PULL);
@@ -373,11 +346,7 @@ fn terminal_velocity_clamping(#[case] start_vz: f64, #[case] expected_vz: f64) {
         .iter()
         .map(|t| t.0)
         .collect();
-    let position = match pos_out.as_slice() {
-        [p] => p,
-        [] => panic!("expected one position output"),
-        many => panic!("expected one position, observed {}", many.len()),
-    };
+    let position = expect_single(pos_out.as_slice(), "position output");
     assert_relative_eq!(position.z.into_inner(), 5.0 + expected_vz);
 
     let vel_out: Vec<NewVelocity> = circuit
@@ -386,11 +355,7 @@ fn terminal_velocity_clamping(#[case] start_vz: f64, #[case] expected_vz: f64) {
         .iter()
         .map(|t| t.0)
         .collect();
-    let velocity = match vel_out.as_slice() {
-        [v] => v,
-        [] => panic!("expected one velocity output"),
-        many => panic!("expected one velocity, observed {}", many.len()),
-    };
+    let velocity = expect_single(vel_out.as_slice(), "velocity output");
     assert_relative_eq!(velocity.vz.into_inner(), expected_vz);
 }
 
