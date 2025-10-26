@@ -30,7 +30,10 @@ check-fmt:
 build-support-run:
 	./scripts/build_support_runner.sh
 
+RUSTDOC_FLAGS ?= --cfg docsrs -D warnings
+
 lint:
+	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" cargo doc --workspace --no-deps
 	cargo clippy --all-targets --all-features -- $(RUST_FLAGS)
 
 markdownlint:

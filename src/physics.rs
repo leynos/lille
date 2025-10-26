@@ -13,7 +13,7 @@ const MIN_MASS: f64 = 1e-12;
 /// Computes acceleration from a force vector and optional mass.
 ///
 /// Returns `None` if `mass` is non-positive or effectively zero (see
-/// [`MIN_MASS`]). When `mass` is `None` the [`DEFAULT_MASS`] constant is
+/// `MIN_MASS`). When `mass` is `None` the [`DEFAULT_MASS`] constant is
 /// used. The calculation applies `F=ma` for each component independently.
 ///
 /// # Examples

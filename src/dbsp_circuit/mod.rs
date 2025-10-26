@@ -2,7 +2,7 @@
 //!
 //! This module defines [`DbspCircuit`], the authoritative dataflow program for
 //! Lille's game world. Callers feed [`Position`], [`Velocity`], [`Force`],
-//! [`Target`], [`FearLevel`], and [`Block`] records into the circuit. Each tick
+//! [`Target`], [`FearLevel`], and [`Block`](crate::components::Block) records into the circuit. Each tick
 //! [`DbspCircuit::step`] derives movement decisions that yield updated
 //! [`NewPosition`] and [`NewVelocity`] outputs alongside terrain queries like
 //! [`HighestBlockAt`]. Input collections persist across steps—invoke
