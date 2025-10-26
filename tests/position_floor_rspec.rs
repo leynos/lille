@@ -9,7 +9,7 @@ use lille::{
     dbsp_circuit::{Position, PositionFloor},
     DbspCircuit,
 };
-use test_utils::{pos, step};
+use test_utils::{block, pos, step};
 
 struct Env {
     circuit: DbspCircuit,
@@ -53,15 +53,7 @@ impl Env {
 #[test]
 fn join_position_with_floor() -> Result<()> {
     let mut env = Env::new()?;
-    env.push_block(
-        Block {
-            id: 1,
-            x: 0,
-            y: 0,
-            z: 0,
-        },
-        None,
-    );
+    env.push_block(block(1, (0, 0, 0)), None);
     env.push_position(pos(1, (0.2, 0.2, 2.0)));
     env.step();
     let out = env.output();
