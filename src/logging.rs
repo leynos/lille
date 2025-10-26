@@ -22,7 +22,7 @@ where
         install(level)
             .map_err(anyhow::Error::new)
             .with_context(|| "initialising env_logger")?;
-        Ok::<(), anyhow::Error>(())
+        Ok(())
     })?;
     Ok(())
 }
