@@ -88,6 +88,8 @@ fn should_flee(level: OrderedFloat<f64>) -> bool {
     level.into_inner() > FEAR_THRESHOLD
 }
 
+const MIN_DIRECTION_MAGNITUDE: f64 = 1e-12;
+
 fn decide_movement(level: OrderedFloat<f64>, pt: &PositionTarget) -> MovementDecision {
     let displacement = DVec2::new(
         pt.tx.into_inner() - pt.px.into_inner(),
@@ -95,8 +97,7 @@ fn decide_movement(level: OrderedFloat<f64>, pt: &PositionTarget) -> MovementDec
     );
     let scaled = displacement * if should_flee(level) { -1.0 } else { 1.0 };
     let magnitude = scaled.length();
-    let eps = f64::EPSILON;
-    let direction = if magnitude > eps {
+    let direction = if magnitude > MIN_DIRECTION_MAGNITUDE {
         scaled / magnitude
     } else {
         DVec2::ZERO
