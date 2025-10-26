@@ -90,3 +90,4 @@ fn setup_invalid_mass(world: &mut TestWorld) {
 fn force_scenarios(world: TestWorld, #[case] scenario: PhysicsScenario) {
     run_physics_scenario(world, scenario);
 }
+//! Tests for acceleration, Z-axis force application with mass, and invalid-mass handling.
