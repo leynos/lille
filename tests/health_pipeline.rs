@@ -87,6 +87,26 @@ impl Default for HealthEnv {
     }
 }
 
+/// Assert both health state and duplicate counter with custom messages.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Test helper intentionally packages health and duplicate assertions."
+)]
+fn assert_health_state(
+    env: &mut HealthEnv,
+    expected_health: u16,
+    health_message: &str,
+    expected_duplicates: u64,
+    duplicates_message: &str,
+) -> Result<()> {
+    ensure!(env.current_health()? == expected_health, "{health_message}");
+    ensure!(
+        env.duplicate_count()? == expected_duplicates,
+        "{duplicates_message}"
+    );
+    Ok(())
+}
+
 const fn sequenced_damage_tick_one() -> DamageEvent {
     DamageEvent {
         entity: 1,
@@ -203,11 +223,13 @@ fn replaying_same_tick_delta_is_ignored() -> Result<()> {
         env.current_health()? == 60,
         "health should stay at 60 when replaying the same tick"
     );
-    ensure!(
-        env.duplicate_count()? == 2,
-        "duplicate counter should record both replays"
-    );
-    Ok(())
+    assert_health_state(
+        &mut env,
+        60,
+        "health should stay at 60 when replaying the same tick",
+        2,
+        "duplicate counter should record both replays",
+    )
 }
 
 #[test]
@@ -224,15 +246,13 @@ fn new_ticks_consume_damage_once() -> Result<()> {
             ..DamageSequencePlan::default()
         },
     )?;
-    ensure!(
-        env.current_health()? == 30,
-        "health should drop to 30 after consuming new tick damage once"
-    );
-    ensure!(
-        env.duplicate_count()? == 2,
-        "duplicate counter should ignore unique tick"
-    );
-    Ok(())
+    assert_health_state(
+        &mut env,
+        30,
+        "health should drop to 30 after consuming new tick damage once",
+        2,
+        "duplicate counter should ignore unique tick",
+    )
 }
 
 #[test]
@@ -250,15 +270,13 @@ fn healing_saturates_at_max_health() -> Result<()> {
             heal: Some(heal),
         },
     )?;
-    ensure!(
-        env.current_health()? == 100,
-        "healing should saturate at maximum health"
-    );
-    ensure!(
-        env.duplicate_count()? == 2,
-        "duplicate counter should remain unchanged after healing"
-    );
-    Ok(())
+    assert_health_state(
+        &mut env,
+        100,
+        "healing should saturate at maximum health",
+        2,
+        "duplicate counter should remain unchanged after healing",
+    )
 }
 
 #[test]
@@ -304,15 +322,13 @@ fn unsequenced_duplicates_are_filtered_within_tick() -> Result<()> {
     let unsequenced = unsequenced_damage();
     env.push_damage_twice(unsequenced)?;
     env.update()?;
-    ensure!(
-        env.current_health()? == 50,
-        "unsequenced duplicates within a tick should only apply once"
-    );
-    ensure!(
-        env.duplicate_count()? == 3,
-        "duplicate counter should include unsequenced duplicates"
-    );
-    Ok(())
+    assert_health_state(
+        &mut env,
+        50,
+        "unsequenced duplicates within a tick should only apply once",
+        3,
+        "duplicate counter should include unsequenced duplicates",
+    )
 }
 
 #[test]
@@ -335,13 +351,11 @@ fn replaying_unsequenced_deltas_for_same_tick_is_ignored() -> Result<()> {
     env.update()?;
     env.push_damage(unsequenced)?;
     env.update()?;
-    ensure!(
-        env.current_health()? == 50,
-        "replayed unsequenced deltas should not further change health"
-    );
-    ensure!(
-        env.duplicate_count()? == 4,
-        "duplicate counter should reflect the additional replayed delta"
-    );
-    Ok(())
+    assert_health_state(
+        &mut env,
+        50,
+        "replayed unsequenced deltas should not further change health",
+        4,
+        "duplicate counter should reflect the additional replayed delta",
+    )
 }
