@@ -71,7 +71,11 @@
 /// ```
 #[macro_export]
 macro_rules! dbsp_record {
-    ($(#[$meta:meta])* $vis:vis struct $name:ident { $($fields:tt)* } $(, $extra:tt)* $(,)? ) => {
+    ($(#[$meta:meta])* $vis:vis struct $name:ident
+        $(< $($gen:tt)* >)?
+        $(where $($where:tt)* )?
+        { $($fields:tt)* }
+        $(, $extra:path)* $(,)? ) => {
         $(#[$meta])*
         #[derive(
             ::rkyv::Archive,
@@ -89,7 +93,10 @@ macro_rules! dbsp_record {
             $(, $extra)*
         )]
         #[archive_attr(derive(Ord, PartialOrd, Eq, PartialEq, Hash))]
-        $vis struct $name { $($fields)* }
+        $vis struct $name
+            $(< $($gen)* >)?
+            $(where $($where)* )?
+        { $($fields)* }
     };
 }
 
@@ -100,9 +107,16 @@ macro_rules! dbsp_record {
 /// cloning at call sites. Do not include `Copy` in the extra derive list.
 #[macro_export]
 macro_rules! dbsp_copy_record {
-    ($(#[$meta:meta])* $vis:vis struct $name:ident { $($fields:tt)* } $(, $extra:tt)* $(,)? ) => {
+    ($(#[$meta:meta])* $vis:vis struct $name:ident
+        $(< $($gen:tt)* >)?
+        $(where $($where:tt)* )?
+        { $($fields:tt)* }
+        $(, $extra:path)* $(,)? ) => {
         $crate::dbsp_record! {
-            $(#[$meta])* $vis struct $name { $($fields)* }, Copy, $(, $extra)*
+            $(#[$meta])* $vis struct $name
+                $(< $($gen)* >)?
+                $(where $($where)* )?
+            { $($fields)* }, Copy $(, $extra)*
         }
     };
 }
