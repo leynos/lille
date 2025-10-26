@@ -12,9 +12,9 @@ pub use physics::{
 pub mod prelude {
     //! Re-export commonly used test helpers.
     pub use super::{
-        assert_all_absent, assert_all_present, assert_valid_rust_syntax, block, fear, force,
-        force_with_mass, new_circuit, pos, slope, target, vel, BlockCoords, BlockId, Coords2D,
-        Coords3D, EntityId, FearValue, ForceVector, Gradient, Mass,
+        assert_all_absent, assert_all_present, assert_valid_rust_syntax, block, expect_single,
+        fear, force, force_with_mass, new_circuit, pos, slope, target, vel, BlockCoords, BlockId,
+        Coords2D, Coords3D, EntityId, FearValue, ForceVector, Gradient, Mass,
     };
 }
 
