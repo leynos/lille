@@ -20,6 +20,24 @@ pub mod prelude {
 
 /// Extract a single item from a slice, panicking with a contextual message when
 /// the slice is empty or contains multiple entries.
+///
+/// # Examples
+/// ```rust
+/// use test_utils::expect_single;
+/// let values = [42];
+/// let item = expect_single(&values, "single value");
+/// assert_eq!(*item, 42);
+/// ```
+///
+/// ```rust,should_panic
+/// use test_utils::expect_single;
+/// expect_single::<i32>(&[], "empty slice");
+/// ```
+///
+/// ```rust,should_panic
+/// use test_utils::expect_single;
+/// expect_single(&[1, 2], "multiple items");
+/// ```
 pub fn expect_single<'a, T>(items: &'a [T], context: &str) -> &'a T {
     match items {
         [item] => item,
