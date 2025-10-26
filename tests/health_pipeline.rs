@@ -40,7 +40,7 @@ impl HealthEnv {
             .world
             .get_resource_mut::<DamageInbox>()
             .context("DamageInbox resource missing")?;
-        inbox.extend(std::iter::repeat(event).take(repeat));
+        inbox.extend(std::iter::repeat_n(event, repeat));
         Ok(())
     }
 
