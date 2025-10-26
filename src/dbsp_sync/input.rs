@@ -260,6 +260,10 @@ mod sync {
             let Some(health) = health_opt.as_deref_mut() else {
                 continue;
             };
+            let Ok(entity_id) = u64::try_from(id.0) else {
+                warn!("health component for negative id {} skipped", id.0);
+                continue;
+            };
             let original_current = health.current;
             let (clamped_current, max_value, was_clamped) = clamp_health_values(health);
             if was_clamped {
@@ -269,20 +273,13 @@ mod sync {
                 );
             }
             health.current = clamped_current;
-            match u64::try_from(id.0) {
-                Ok(entity_id) => {
-                    let snapshot = HealthState {
-                        entity: entity_id,
-                        current: clamped_current,
-                        max: max_value,
-                    };
-                    circuit.health_state_in().push(snapshot, 1);
-                    state.health_snapshot.insert(entity_id, snapshot);
-                }
-                Err(_) => {
-                    warn!("health component for negative id {} skipped", id.0);
-                }
-            }
+            let snapshot = HealthState {
+                entity: entity_id,
+                current: clamped_current,
+                max: max_value,
+            };
+            circuit.health_state_in().push(snapshot, 1);
+            state.health_snapshot.insert(entity_id, snapshot);
         }
     }
 
