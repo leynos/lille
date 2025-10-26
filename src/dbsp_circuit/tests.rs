@@ -77,6 +77,9 @@ fn run_health_delta(health: HealthState, events: &[(DamageEvent, i32)]) -> Vec<H
         .collect()
 }
 
+/// Specifies a damage event used by health delta tests, capturing the amount,
+/// source, tick, and optional sequence identifier so `DamageEvent` records can
+/// be constructed consistently in scenarios.
 #[derive(Clone, Copy)]
 struct DamageEventSpec {
     amount: u16,
