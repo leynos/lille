@@ -7,6 +7,19 @@
 use ordered_float::OrderedFloat;
 
 /// Convert a finite `f64` into `f32`, asserting that it fits the target type.
+///
+/// # Examples
+/// ```rust
+/// use lille::numeric::expect_f32;
+/// let value = expect_f32(123.5_f64);
+/// assert_eq!(value, 123.5_f32);
+/// ```
+///
+/// ```rust
+/// use lille::numeric::expect_f32;
+/// // Debug builds panic because the value exceeds f32::MAX.
+/// // expect_f32(f64::from(f32::MAX) + 1.0);
+/// ```
 #[expect(
     clippy::cast_possible_truncation,
     reason = "Callers assert that the value fits within f32 bounds."
