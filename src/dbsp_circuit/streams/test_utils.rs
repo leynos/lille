@@ -29,6 +29,18 @@ macro_rules! impl_test_helper {
 
 /// Builds a new [`DbspCircuit`] for tests.
 ///
+/// # Examples
+/// ```rust,no_run
+/// use lille::dbsp_circuit::streams::test_utils::new_circuit;
+///
+/// # fn demo() -> Result<(), dbsp::Error> {
+/// let mut circuit = new_circuit();
+/// // push inputs here, e.g. circuit.position_in().push(position, 1);
+/// circuit.step()?; // propagate evaluation errors with `?`
+/// # Ok(())
+/// # }
+/// ```
+///
 /// # Panics
 /// Panics if the underlying [`DbspCircuit::new`] call fails to construct the circuit.
 #[must_use]
