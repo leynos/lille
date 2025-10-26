@@ -240,3 +240,14 @@ pub fn assert_expected_damage(world: &TestWorld, expected: u16) {
     assert_eq!(world.take_expected_damage(), expected);
 }
 
+/// Spawn multiple blocks specified as `(x, y, z)` triples.
+pub fn spawn_blocks(world: &mut TestWorld, blocks: &[(i32, i32, i32)]) {
+    for (idx, &(x, y, z)) in blocks.iter().enumerate() {
+        world.spawn_block(Block {
+            id: idx as i64,
+            x,
+            y,
+            z,
+        });
+    }
+}
