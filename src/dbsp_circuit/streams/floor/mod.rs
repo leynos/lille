@@ -19,16 +19,17 @@ use crate::dbsp_circuit::{FloorHeightAt, HighestBlockAt};
 ///
 /// # Examples
 /// ```rust,no_run
+/// # use anyhow::Result;
+/// # fn demo() -> Result<()> {
 /// use dbsp::RootCircuit;
 /// use lille::components::Block;
-/// use lille::dbsp_circuit::streams::floor::highest_block_pair;
+/// use lille::dbsp_circuit::highest_block_pair;
 ///
-/// let (mut circuit, blocks_in, mut highest_out) = RootCircuit::build(|circuit| {
+/// let (mut circuit, (blocks_in, mut highest_out)) = RootCircuit::build(|circuit| {
 ///     let (blocks_stream, blocks_input) = circuit.add_input_zset::<Block>();
 ///     let highest = highest_block_pair(&blocks_stream).output();
 ///     Ok((blocks_input, highest))
-/// })
-/// .expect("failed to build circuit");
+/// })?;
 ///
 /// blocks_in.push(Block { id: 1, x: 0, y: 0, z: 3 }, 1);
 /// blocks_in.push(Block { id: 2, x: 0, y: 0, z: 5 }, 1);
@@ -39,10 +40,12 @@ use crate::dbsp_circuit::{FloorHeightAt, HighestBlockAt};
 /// let maxima: Vec<_> = highest_out
 ///     .consolidate()
 ///     .iter()
-///     .map(|(highest, (), _)| highest.clone())
+///     .map(|(pair, (), _)| pair.0.clone())
 ///     .collect();
 /// assert_eq!(maxima.len(), 2);
-/// assert!(maxima.iter().any(|h| h.x == 0 && h.y == 0 && h.z.into_inner() == 5));
+/// assert!(maxima.iter().any(|h| h.x == 0 && h.y == 0 && h.z == 5));
+/// # Ok(())
+/// # }
 /// ```
 #[must_use]
 pub fn highest_block_pair(
@@ -72,19 +75,20 @@ pub fn highest_block_pair(
 ///
 /// # Examples
 /// ```rust,no_run
+/// # use anyhow::Result;
+/// # fn demo() -> Result<()> {
 /// use dbsp::RootCircuit;
 /// use lille::components::{Block, BlockSlope};
-/// use lille::dbsp_circuit::streams::floor::{floor_height_stream, highest_block_pair};
+/// use lille::dbsp_circuit::{floor_height_stream, highest_block_pair};
 /// use ordered_float::OrderedFloat;
 ///
-/// let (mut circuit, block_in, slope_in, mut floor_out) = RootCircuit::build(|circuit| {
+/// let (mut circuit, (block_in, slope_in, mut floor_out)) = RootCircuit::build(|circuit| {
 ///     let (blocks_stream, blocks_input) = circuit.add_input_zset::<Block>();
 ///     let (slopes_stream, slopes_input) = circuit.add_input_zset::<BlockSlope>();
 ///     let highest = highest_block_pair(&blocks_stream);
 ///     let floor = floor_height_stream(&highest, &slopes_stream).output();
 ///     Ok((blocks_input, slopes_input, floor))
-/// })
-/// .expect("failed to build circuit");
+/// })?;
 ///
 /// block_in.push(Block { id: 10, x: 0, y: 0, z: 4 }, 1);
 /// block_in.push(Block { id: 11, x: 0, y: 0, z: 5 }, 1);
@@ -112,6 +116,8 @@ pub fn highest_block_pair(
 ///     .find(|h| h.x == 0 && h.y == 0)
 ///     .expect("origin cell");
 /// assert!(origin_height.z.into_inner() > 5.0, "slope raises the floor height");
+/// # Ok(())
+/// # }
 /// ```
 #[must_use]
 pub fn floor_height_stream(

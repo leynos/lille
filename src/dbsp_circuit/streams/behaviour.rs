@@ -310,6 +310,10 @@ mod tests {
 
         circuit.step().expect("dbsp step");
 
+        #[expect(
+            clippy::clone_on_copy,
+            reason = "MovementDecision copying is intentional for test simplicity"
+        )]
         let decisions: Vec<MovementDecision> = decisions_handle
             .consolidate()
             .iter()
@@ -351,6 +355,10 @@ mod tests {
 
         circuit.step().expect("dbsp step");
 
+        #[expect(
+            clippy::clone_on_copy,
+            reason = "MovementDecision copying is intentional for test simplicity"
+        )]
         let decisions: Vec<MovementDecision> = decisions_handle
             .consolidate()
             .iter()

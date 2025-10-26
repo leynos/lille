@@ -7,16 +7,6 @@ use once_cell::sync::OnceCell;
 
 static LOGGER_INITIALISED: OnceCell<()> = OnceCell::new();
 
-/// Initialises the global logger once for the entire process.
-///
-/// When `verbose` is `true`, all debug messages are printed. Otherwise only
-/// info level and above are shown.
-///
-/// # Examples
-/// ```
-/// # use anyhow::Result;
-/// # fn main() -> Result<()> {
-/// lille::init(true)?;
 fn init_with_cell<F, E>(cell: &OnceCell<()>, verbose: bool, install: F) -> Result<()>
 where
     F: FnOnce(LevelFilter) -> std::result::Result<(), E>,
@@ -29,10 +19,12 @@ where
             LevelFilter::Info
         };
 
-        install(level).with_context(|| "initialising env_logger")?;
-        Ok(())
-    })
-    .map(|_| ())
+        install(level)
+            .map_err(anyhow::Error::new)
+            .with_context(|| "initialising env_logger")?;
+        Ok::<(), anyhow::Error>(())
+    })?;
+    Ok(())
 }
 
 /// Initialises the global logger once for the entire process.
@@ -44,7 +36,7 @@ where
 /// ```
 /// # use anyhow::Result;
 /// # fn main() -> Result<()> {
-/// lille::init(true)?;
+/// lille::logging::init(true)?;
 /// # Ok(())
 /// # }
 /// ```

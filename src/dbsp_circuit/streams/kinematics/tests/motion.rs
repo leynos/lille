@@ -189,12 +189,6 @@ enum NonFiniteVelocity {
     NegInf,
 }
 
-impl NonFiniteVelocity {
-    const fn expects_output(self) -> bool {
-        matches!(self, Self::Nan)
-    }
-}
-
 #[rstest]
 #[case::nan(f64::NAN, NonFiniteVelocity::Nan)]
 #[case::pos_infinite(f64::INFINITY, NonFiniteVelocity::PosInf)]
@@ -231,18 +225,6 @@ fn non_finite_horizontal_velocity_propagates(
         .iter()
         .map(|record| record.0)
         .collect();
-
-    if !expectation.expects_output() {
-        assert!(
-            positions.is_empty(),
-            "expected no positions for {expectation:?} input"
-        );
-        assert!(
-            velocities.is_empty(),
-            "expected no velocities for {expectation:?} input"
-        );
-        return;
-    }
 
     let position = match positions.as_slice() {
         [p] => p,

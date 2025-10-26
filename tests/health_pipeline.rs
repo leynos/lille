@@ -137,6 +137,39 @@ const fn unsequenced_damage() -> DamageEvent {
     }
 }
 
+#[derive(Default, Clone, Copy)]
+struct DamageSequencePlan {
+    replay_same_tick: bool,
+    next_tick: Option<DamageEvent>,
+    heal: Option<DamageEvent>,
+}
+
+fn apply_damage_sequence(
+    env: &mut HealthEnv,
+    base: DamageEvent,
+    plan: DamageSequencePlan,
+) -> Result<()> {
+    env.push_damage_twice(base)?;
+    env.update()?;
+
+    if plan.replay_same_tick {
+        env.push_damage(base)?;
+        env.update()?;
+    }
+
+    if let Some(next) = plan.next_tick {
+        env.push_damage(next)?;
+        env.update()?;
+    }
+
+    if let Some(heal_event) = plan.heal {
+        env.push_damage(heal_event)?;
+        env.update()?;
+    }
+
+    Ok(())
+}
+
 #[test]
 fn duplicate_events_within_tick_apply_once() -> Result<()> {
     let mut env = HealthEnv::new();
@@ -158,10 +191,14 @@ fn duplicate_events_within_tick_apply_once() -> Result<()> {
 fn replaying_same_tick_delta_is_ignored() -> Result<()> {
     let mut env = HealthEnv::new();
     let damage = sequenced_damage_tick_one();
-    env.push_damage_twice(damage)?;
-    env.update()?;
-    env.push_damage(damage)?;
-    env.update()?;
+    apply_damage_sequence(
+        &mut env,
+        damage,
+        DamageSequencePlan {
+            replay_same_tick: true,
+            ..DamageSequencePlan::default()
+        },
+    )?;
     ensure!(
         env.current_health()? == 60,
         "health should stay at 60 when replaying the same tick"
@@ -177,13 +214,16 @@ fn replaying_same_tick_delta_is_ignored() -> Result<()> {
 fn new_ticks_consume_damage_once() -> Result<()> {
     let mut env = HealthEnv::new();
     let damage = sequenced_damage_tick_one();
-    env.push_damage_twice(damage)?;
-    env.update()?;
-    env.push_damage(damage)?;
-    env.update()?;
     let next_tick = sequenced_damage_tick_two();
-    env.push_damage(next_tick)?;
-    env.update()?;
+    apply_damage_sequence(
+        &mut env,
+        damage,
+        DamageSequencePlan {
+            replay_same_tick: true,
+            next_tick: Some(next_tick),
+            ..DamageSequencePlan::default()
+        },
+    )?;
     ensure!(
         env.current_health()? == 30,
         "health should drop to 30 after consuming new tick damage once"
@@ -199,16 +239,17 @@ fn new_ticks_consume_damage_once() -> Result<()> {
 fn healing_saturates_at_max_health() -> Result<()> {
     let mut env = HealthEnv::new();
     let damage = sequenced_damage_tick_one();
-    env.push_damage_twice(damage)?;
-    env.update()?;
-    env.push_damage(damage)?;
-    env.update()?;
     let next_tick = sequenced_damage_tick_two();
-    env.push_damage(next_tick)?;
-    env.update()?;
     let heal = healing_event();
-    env.push_damage(heal)?;
-    env.update()?;
+    apply_damage_sequence(
+        &mut env,
+        damage,
+        DamageSequencePlan {
+            replay_same_tick: true,
+            next_tick: Some(next_tick),
+            heal: Some(heal),
+        },
+    )?;
     ensure!(
         env.current_health()? == 100,
         "healing should saturate at maximum health"
@@ -249,16 +290,17 @@ fn healing_when_already_at_max_health_does_not_overflow() -> Result<()> {
 fn unsequenced_duplicates_are_filtered_within_tick() -> Result<()> {
     let mut env = HealthEnv::new();
     let damage = sequenced_damage_tick_one();
-    env.push_damage_twice(damage)?;
-    env.update()?;
-    env.push_damage(damage)?;
-    env.update()?;
     let next_tick = sequenced_damage_tick_two();
-    env.push_damage(next_tick)?;
-    env.update()?;
     let heal = healing_event();
-    env.push_damage(heal)?;
-    env.update()?;
+    apply_damage_sequence(
+        &mut env,
+        damage,
+        DamageSequencePlan {
+            replay_same_tick: true,
+            next_tick: Some(next_tick),
+            heal: Some(heal),
+        },
+    )?;
     let unsequenced = unsequenced_damage();
     env.push_damage_twice(unsequenced)?;
     env.update()?;
@@ -277,16 +319,17 @@ fn unsequenced_duplicates_are_filtered_within_tick() -> Result<()> {
 fn replaying_unsequenced_deltas_for_same_tick_is_ignored() -> Result<()> {
     let mut env = HealthEnv::new();
     let damage = sequenced_damage_tick_one();
-    env.push_damage_twice(damage)?;
-    env.update()?;
-    env.push_damage(damage)?;
-    env.update()?;
     let next_tick = sequenced_damage_tick_two();
-    env.push_damage(next_tick)?;
-    env.update()?;
     let heal = healing_event();
-    env.push_damage(heal)?;
-    env.update()?;
+    apply_damage_sequence(
+        &mut env,
+        damage,
+        DamageSequencePlan {
+            replay_same_tick: true,
+            next_tick: Some(next_tick),
+            heal: Some(heal),
+        },
+    )?;
     let unsequenced = unsequenced_damage();
     env.push_damage_twice(unsequenced)?;
     env.update()?;
