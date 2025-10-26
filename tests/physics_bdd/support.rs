@@ -18,6 +18,7 @@ pub struct TestWorld {
     app: Arc<Mutex<App>>,
     pub entity: Option<Entity>,
     expected_damage: Arc<Mutex<Option<u16>>>,
+    initial_health: Arc<Mutex<Option<u16>>>,
 }
 
 impl fmt::Debug for TestWorld {
@@ -36,6 +37,7 @@ impl Default for TestWorld {
             app: Arc::new(Mutex::new(app)),
             entity: None,
             expected_damage: Arc::new(Mutex::new(None)),
+            initial_health: Arc::new(Mutex::new(None)),
         }
     }
 }
@@ -51,6 +53,18 @@ impl TestWorld {
         self.expected_damage
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// Access the stored initial health, panicking if the mutex is poisoned.
+    pub fn initial_health_guard(&self) -> MutexGuard<'_, Option<u16>> {
+        self.initial_health
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// Record the entity's initial health for later assertions.
+    pub fn set_initial_health(&self, health: u16) {
+        *self.initial_health_guard() = Some(health);
     }
 
     /// Return the spawned entity or panic if not initialised.
@@ -104,6 +118,7 @@ impl TestWorld {
             entity.id()
         };
         self.entity = Some(entity_id);
+        self.set_initial_health(health.current);
     }
 
     /// Fetch the entity's `Health` component, panicking if it is missing.
@@ -147,6 +162,14 @@ impl TestWorld {
         expected
             .take()
             .unwrap_or_else(|| panic!("expected damage should be recorded"))
+    }
+
+    /// Retrieve and clear the initial health, panicking if unset.
+    pub fn take_initial_health(&self) -> u16 {
+        let mut initial = self.initial_health_guard();
+        initial
+            .take()
+            .unwrap_or_else(|| panic!("initial health should be recorded"))
     }
 
     /// Advances the simulation by one tick.
