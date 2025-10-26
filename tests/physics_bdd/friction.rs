@@ -1,3 +1,4 @@
+//! Tests covering standing and diagonal friction, force clamping, and unsupported velocity caps.
 use bevy::prelude::*;
 use crate::support::{spawn_blocks, world, TestWorld};
 use lille::components::ForceComp;
