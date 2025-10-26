@@ -18,6 +18,12 @@ pub mod vector_math;
 pub mod world_handle;
 pub use constants::*;
 
+#[doc(hidden)]
+pub mod __macro_deps {
+    pub use rkyv;
+    pub use size_of;
+}
+
 // Re-export commonly used items
 pub use actor::Actor;
 pub use components::{DdlogId, ForceComp, Health, Target, UnitType, VelocityComp};

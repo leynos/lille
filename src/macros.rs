@@ -86,9 +86,9 @@ macro_rules! dbsp_record {
         $(, $extra:path)* $(,)? ) => {
         $(#[$meta])*
         #[derive(
-            ::rkyv::Archive,
-            ::rkyv::Serialize,
-            ::rkyv::Deserialize,
+            $crate::__macro_deps::rkyv::Archive,
+            $crate::__macro_deps::rkyv::Serialize,
+            $crate::__macro_deps::rkyv::Deserialize,
             Clone,
             Debug,
             PartialEq,
@@ -97,7 +97,7 @@ macro_rules! dbsp_record {
             Ord,
             Hash,
             Default,
-            ::size_of::SizeOf
+            $crate::__macro_deps::size_of::SizeOf
             $(, $extra)*
         )]
         #[archive_attr(derive(Ord, PartialOrd, Eq, PartialEq, Hash))]
