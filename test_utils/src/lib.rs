@@ -38,6 +38,7 @@ pub mod prelude {
 /// use test_utils::expect_single;
 /// expect_single(&[1, 2], "multiple items");
 /// ```
+#[must_use]
 pub fn expect_single<'a, T>(items: &'a [T], context: &str) -> &'a T {
     match items {
         [item] => item,
