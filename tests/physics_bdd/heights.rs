@@ -1,3 +1,4 @@
+//! Falling landings, standing on flat terrain, standing on slopes, and height propagation consistency.
 use bevy::prelude::*;
 use crate::support::{physics_scenario, run_physics_scenario, world, PhysicsScenario, TestWorld};
 use lille::components::{Block, BlockSlope};
