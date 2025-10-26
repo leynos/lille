@@ -35,8 +35,8 @@ pub struct DbspState {
     pub(crate) health_duplicate_count: u64,
 }
 
-#[derive(SystemParam)]
 /// Convenience wrapper exposing queries required to track `DdlogId` changes.
+#[derive(SystemParam)]
 pub struct IdQueries<'w, 's> {
     /// Entities that gained a `DdlogId` this frame.
     pub added: Query<'w, 's, (Entity, &'static DdlogId), Added<DdlogId>>,
