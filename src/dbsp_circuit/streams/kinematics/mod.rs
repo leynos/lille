@@ -91,6 +91,12 @@ pub fn new_position_stream(
     )
 }
 
+/// Pairs an entity's position with the floor height at its grid location.
+///
+/// This struct is the result of joining the continuous [`Position`] stream with
+/// the discrete [`FloorHeightAt`] grid. It is primarily consumed by
+/// higher-level physics logic for tasks such as collision detection or standing
+/// checks.
 #[derive(
     Archive,
     RkyvSerialize,
@@ -106,12 +112,6 @@ pub fn new_position_stream(
     SizeOf,
 )]
 #[archive_attr(derive(Ord, PartialOrd, Eq, PartialEq, Hash))]
-/// Pairs an entity's position with the floor height at its grid location.
-///
-/// This struct is the result of joining the continuous [`Position`] stream with
-/// the discrete [`FloorHeightAt`] grid. It is primarily consumed by
-/// higher-level physics logic for tasks such as collision detection or standing
-/// checks.
 pub struct PositionFloor {
     /// Continuous position of the entity.
     pub position: Position,
