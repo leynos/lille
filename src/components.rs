@@ -73,7 +73,8 @@ pub enum UnitType {
 /// use bevy::math::Vec2;
 /// use lille::components::Target;
 /// let target = Target(Vec2::new(4.0, -2.0));
-/// assert_eq!(target.x, 4.0);
+/// assert_eq!(target.0.x, 4.0);
+/// assert_eq!(target.0.y, -2.0);
 /// ```
 #[derive(Component, Debug, Deref, DerefMut, Serialize)]
 pub struct Target(pub Vec2);
