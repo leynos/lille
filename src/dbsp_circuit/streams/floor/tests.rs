@@ -31,9 +31,9 @@ fn test_highest_block_aggregation() {
     let output = circuit.highest_block_out().consolidate();
     let mut vals: Vec<HighestBlockAt> = output.iter().map(|(hb, (), _timestamp)| hb).collect();
     vals.sort_by_key(|h| (h.x, h.y));
-    let mut deduped = vals.clone();
-    deduped.dedup_by(|a, b| a.x == b.x && a.y == b.y);
-    assert_eq!(deduped.len(), vals.len(), "duplicate (x, y) pairs detected");
+    let mut uniq = vals.clone();
+    uniq.dedup_by_key(|h| (h.x, h.y));
+    assert_eq!(uniq.len(), vals.len(), "duplicate (x, y) pairs detected");
     assert_eq!(vals.len(), 2);
     assert!(vals.contains(&HighestBlockAt { x: 10, y: 20, z: 8 }));
     assert!(vals.contains(&HighestBlockAt { x: 15, y: 25, z: 3 }));
