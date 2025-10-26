@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use crate::support::{world, TestWorld};
 use lille::components::Block;
-use lille::numeric::{expect_f32, expect_u16};
+use lille::numeric::{expect_f32, floor_to_u16};
 use lille::{
     Health, VelocityComp, FALL_DAMAGE_SCALE, GRAVITY_PULL, SAFE_LANDING_SPEED, TERMINAL_VELOCITY,
 };
@@ -46,11 +46,11 @@ fn falling_inflicts_health_damage(world: TestWorld) {
                     let expected_damage = if excess <= 0.0 {
                         0
                     } else {
-                        expect_u16(
+                        floor_to_u16(
                             (excess * FALL_DAMAGE_SCALE)
-                                .min(f64::from(u16::MAX))
-                                .floor(),
+                                .min(f64::from(u16::MAX)),
                         )
+                        .expect("fall damage should fit in u16")
                     };
                     state.set_expected_damage(expected_damage);
                 });
