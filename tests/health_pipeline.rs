@@ -97,7 +97,7 @@ fn health_env() -> HealthEnv {
     reason = "Test helper intentionally packages health and duplicate assertions."
 )]
 fn assert_health_state(
-    env: &mut HealthEnv,
+    env: &HealthEnv,
     expected_health: u16,
     health_message: &str,
     expected_duplicates: u64,
@@ -200,7 +200,7 @@ fn duplicate_events_within_tick_apply_once(mut health_env: HealthEnv) -> Result<
     health_env.push_damage_twice(damage)?;
     health_env.update()?;
     assert_health_state(
-        &mut health_env,
+        &health_env,
         60,
         "health should drop to 60 after consuming duplicate damage",
         1,
@@ -221,7 +221,7 @@ fn replaying_same_tick_delta_is_ignored(mut health_env: HealthEnv) -> Result<()>
         },
     )?;
     assert_health_state(
-        &mut health_env,
+        &health_env,
         60,
         "health should stay at 60 when replaying the same tick",
         2,
@@ -243,7 +243,7 @@ fn new_ticks_consume_damage_once(mut health_env: HealthEnv) -> Result<()> {
         },
     )?;
     assert_health_state(
-        &mut health_env,
+        &health_env,
         30,
         "health should drop to 30 after consuming new tick damage once",
         2,
@@ -266,7 +266,7 @@ fn healing_saturates_at_max_health(mut health_env: HealthEnv) -> Result<()> {
         },
     )?;
     assert_health_state(
-        &mut health_env,
+        &health_env,
         100,
         "healing should saturate at maximum health",
         2,
@@ -284,7 +284,7 @@ fn healing_when_already_at_max_health_does_not_overflow(mut health_env: HealthEn
     health_env.push_damage(extra_heal)?;
     health_env.update()?;
     assert_health_state(
-        &mut health_env,
+        &health_env,
         100,
         "additional healing should not overflow maximum health",
         0,
@@ -310,7 +310,7 @@ fn unsequenced_duplicates_are_filtered_within_tick(mut health_env: HealthEnv) ->
     health_env.push_damage_twice(unsequenced)?;
     health_env.update()?;
     assert_health_state(
-        &mut health_env,
+        &health_env,
         50,
         "unsequenced duplicates within a tick should only apply once",
         3,
@@ -338,7 +338,7 @@ fn replaying_unsequenced_deltas_for_same_tick_is_ignored(mut health_env: HealthE
     health_env.push_damage(unsequenced)?;
     health_env.update()?;
     assert_health_state(
-        &mut health_env,
+        &health_env,
         50,
         "replayed unsequenced deltas should not further change health",
         4,
