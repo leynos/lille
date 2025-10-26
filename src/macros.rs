@@ -6,7 +6,7 @@
 //! # Examples
 //!
 //! ```rust
-//! use lille::dbsp_record;
+//! use lille::{dbsp_copy_record, dbsp_record};
 //!
 //! dbsp_record! {
 //!     /// Example record
@@ -21,6 +21,14 @@
 //!     pub struct ExampleCopy {
 //!         pub value: i32,
 //!     }, Copy,
+//! }
+//!
+//! // Prefer dbsp_copy_record! for copyable data:
+//! dbsp_copy_record! {
+//!     /// Example using the Copy wrapper
+//!     pub struct ExampleWithCopy {
+//!         pub value: i32,
+//!     }
 //! }
 //! ```
 //!
