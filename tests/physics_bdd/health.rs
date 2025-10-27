@@ -2,16 +2,20 @@
 use bevy::prelude::*;
 use crate::support::{world, TestWorld};
 use lille::components::Block;
-use lille::numeric::{expect_f32, floor_to_u16};
-use lille::{
-    Health, VelocityComp, FALL_DAMAGE_SCALE, GRAVITY_PULL, SAFE_LANDING_SPEED, TERMINAL_VELOCITY,
-};
+use lille::numeric::expect_f32;
+use lille::{Health, VelocityComp, GRAVITY_PULL, SAFE_LANDING_SPEED};
 use rstest::rstest;
 
 /// Additional margin over the safe landing speed used to model a fast fall.
 const EXTRA_FALL_SPEED: f32 = 4.0;
 /// Baseline health for entities in the fall-damage scenario.
 const INITIAL_HEALTH: u16 = 100;
+// These precomputed values mirror the default physics configuration:
+// `SAFE_LANDING_SPEED = 6.0`, `GRAVITY_PULL = -1.0`, `TERMINAL_VELOCITY = 12.0`,
+// and `FALL_DAMAGE_SCALE = 4.0`. They yield an impact speed of 11.0 blocks/tick
+// and an expected damage of 20 hit points for the configured fall scenario.
+const EXPECTED_IMPACT_SPEED: f64 = 11.0;
+const EXPECTED_DAMAGE: u16 = 20;
 
 #[rstest]
 fn falling_inflicts_health_damage(world: TestWorld) {
@@ -47,19 +51,8 @@ fn falling_inflicts_health_damage(world: TestWorld) {
                     state.tick();
 
                     let fall_speed_f64 = f64::from(fall_speed);
-                    let impact_speed =
-                        (-(fall_speed_f64 + GRAVITY_PULL)).clamp(0.0, TERMINAL_VELOCITY);
-                    let excess = impact_speed - SAFE_LANDING_SPEED;
-                    let expected_damage = if excess <= 0.0 {
-                        0
-                    } else {
-                        floor_to_u16(
-                            (excess * FALL_DAMAGE_SCALE)
-                                .min(f64::from(u16::MAX)),
-                        )
-                        .expect("fall damage should fit in u16")
-                    };
-                    state.set_expected_damage(expected_damage);
+                    debug_assert!((EXPECTED_IMPACT_SPEED - (-(fall_speed_f64 + GRAVITY_PULL))).abs() < f64::EPSILON);
+                    state.set_expected_damage(EXPECTED_DAMAGE);
                 });
                 phase.then("the expected fall damage is applied", |state| {
                     let initial_health = state.take_initial_health();
