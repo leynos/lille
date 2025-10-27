@@ -71,26 +71,22 @@ fn assert_positions_match_tuples(
         actual.len()
     );
     for (position, (entity, x, y, z)) in actual.iter().zip(expected.iter().copied()) {
+        let found = position.entity;
         ensure!(
-            position.entity == entity,
-            "entity mismatch: expected {}, found {}",
-            entity,
-            position.entity
+            found == entity,
+            "entity mismatch: expected {entity}, found {found}"
         );
         ensure!(
             relative_eq!(position.x.into_inner(), x),
-            "x mismatch for entity {}",
-            entity
+            "x mismatch for entity {entity}"
         );
         ensure!(
             relative_eq!(position.y.into_inner(), y),
-            "y mismatch for entity {}",
-            entity
+            "y mismatch for entity {entity}"
         );
         ensure!(
             relative_eq!(position.z.into_inner(), z),
-            "z mismatch for entity {}",
-            entity
+            "z mismatch for entity {entity}"
         );
     }
     Ok(())
@@ -165,33 +161,31 @@ fn reactive_movement_behaviour(#[case] scenario: ReactiveScenario) -> Result<()>
     }
     env.step();
     let out = env.drain_output();
+    let expected_len = expected_output.len();
+    let actual_len = out.len();
     ensure!(
-        out.len() == expected_output.len(),
-        "expected {} positions, observed {}",
-        expected_output.len(),
-        out.len()
+        actual_len == expected_len,
+        "expected {expected_len} positions, observed {actual_len}"
     );
     for (actual, expected) in out.iter().zip(expected_output.iter()) {
+        let expected_entity = expected.entity;
+        let found = actual.entity;
         ensure!(
-            actual.entity == expected.entity,
-            "entity mismatch: expected {}, found {}",
-            expected.entity,
-            actual.entity
+            found == expected_entity,
+            "entity mismatch: expected {expected_entity}, found {found}"
         );
+        let entity = found;
         ensure!(
             relative_eq!(actual.x.into_inner(), expected.x.into_inner()),
-            "x mismatch for entity {}",
-            actual.entity
+            "x mismatch for entity {entity}"
         );
         ensure!(
             relative_eq!(actual.y.into_inner(), expected.y.into_inner()),
-            "y mismatch for entity {}",
-            actual.entity
+            "y mismatch for entity {entity}"
         );
         ensure!(
             relative_eq!(actual.z.into_inner(), expected.z.into_inner()),
-            "z mismatch for entity {}",
-            actual.entity
+            "z mismatch for entity {entity}"
         );
     }
     Ok(())
