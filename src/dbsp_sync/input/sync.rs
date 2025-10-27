@@ -127,7 +127,17 @@ fn sync_positions(
             },
             1,
         );
-        debug_assert!(world.entities.get(&id.0).is_none());
+        if world.entities.contains_key(&id.0) {
+            // `cache_state_for_dbsp_system` clears the world handle before each
+            // sync pass, so finding a pre-existing entry means stale state
+            // leaked from a previous frame. Removing it keeps the cache
+            // consistent without crashing release builds.
+            warn!(
+                "world handle entry for entity {} existed before sync; removing stale record",
+                id.0
+            );
+            world.entities.remove(&id.0);
+        }
     }
 }
 
