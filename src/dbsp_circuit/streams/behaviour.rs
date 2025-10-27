@@ -441,14 +441,10 @@ mod tests {
 
         circuit.step().expect("dbsp step");
 
-        #[expect(
-            clippy::clone_on_copy,
-            reason = "MovementDecision copying is intentional for test simplicity"
-        )]
         let decisions: Vec<MovementDecision> = decisions_handle
             .consolidate()
             .iter()
-            .map(|(decision, (), _timestamp)| decision.clone())
+            .map(|(decision, (), _timestamp)| decision)
             .collect();
         let decision = test_utils::expect_single(&decisions, "movement decision result");
         assert_relative_eq!(decision.dx.into_inner(), expected_dx);
@@ -486,14 +482,10 @@ mod tests {
 
         circuit.step().expect("dbsp step");
 
-        #[expect(
-            clippy::clone_on_copy,
-            reason = "MovementDecision copying is intentional for test simplicity"
-        )]
         let decisions: Vec<MovementDecision> = decisions_handle
             .consolidate()
             .iter()
-            .map(|(decision, (), _timestamp)| decision.clone())
+            .map(|(decision, (), _timestamp)| decision)
             .collect();
         assert!(decisions.is_empty());
     }
