@@ -20,6 +20,8 @@ pub use constants::*;
 
 #[doc(hidden)]
 pub mod __macro_deps {
+    // Public solely for cross-crate macro hygiene; do not depend on it directly.
+    // This module sits outside the semver-stable public API surface.
     pub use rkyv;
     pub use size_of;
 }
