@@ -1,9 +1,8 @@
+//! Exercises the ECS ↔ DBSP loop to ensure gravity persists through a full tick.
+
 use approx::assert_relative_eq;
 use bevy::prelude::*;
 use lille::{components::Block, DbspPlugin, DdlogId, VelocityComp, GRAVITY_PULL};
-
-/// Verifies that the ECS-DBSP round trip applies gravity to entity position and
-/// velocity.
 
 #[test]
 fn ecs_dbsp_round_trip_applies_gravity() {
@@ -28,9 +27,15 @@ fn ecs_dbsp_round_trip_applies_gravity() {
 
     app.update();
 
-    let transform = app.world.get::<Transform>(entity).unwrap();
-    assert_relative_eq!(transform.translation.z, 2.0 + GRAVITY_PULL as f32);
+    let transform = app
+        .world
+        .get::<Transform>(entity)
+        .expect("Transform component should persist after DBSP round trip");
+    assert_relative_eq!(f64::from(transform.translation.z), 2.0 + GRAVITY_PULL);
 
-    let vel = app.world.get::<VelocityComp>(entity).unwrap();
-    assert_relative_eq!(vel.vz, GRAVITY_PULL as f32);
+    let vel = app
+        .world
+        .get::<VelocityComp>(entity)
+        .expect("Velocity component should persist after DBSP round trip");
+    assert_relative_eq!(f64::from(vel.vz), GRAVITY_PULL);
 }

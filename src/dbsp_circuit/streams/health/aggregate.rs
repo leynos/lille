@@ -43,12 +43,9 @@ impl HealthAccumulator {
                 Entry::Occupied(existing) => {
                     let existing_signed = *existing.get();
                     debug_assert_eq!(
-                        existing_signed,
-                        signed,
-                        "sequenced damage event mismatch for seq {seq}: existing {existing_signed}, incoming {signed}",
-                        seq = seq,
-                        existing_signed = existing_signed,
-                        signed = signed,
+                        existing_signed, signed,
+                        "sequenced damage event mismatch for seq {seq}: \
+                         existing {existing_signed}, incoming {signed}"
                     );
                 }
             }
@@ -83,12 +80,9 @@ impl HealthAccumulator {
                 Entry::Occupied(existing) => {
                     let existing_signed = *existing.get();
                     debug_assert_eq!(
-                        existing_signed,
-                        incoming_signed,
-                        "sequenced damage event mismatch for seq {seq}: existing {existing_signed}, incoming {incoming_signed}",
-                        seq = seq_value,
-                        existing_signed = existing_signed,
-                        incoming_signed = incoming_signed,
+                        existing_signed, incoming_signed,
+                        "sequenced damage event mismatch for seq {seq_value}: \
+                         existing {existing_signed}, incoming {incoming_signed}"
                     );
                 }
             }
@@ -135,7 +129,7 @@ struct HealthAggregate {
 fn signed_amount(event: &DamageEvent) -> i32 {
     match event.source {
         DamageSource::Script => i32::from(event.amount),
-        DamageSource::External | DamageSource::Fall | DamageSource::Other(_) => {
+        DamageSource::External | DamageSource::Fall | DamageSource::Other { .. } => {
             -i32::from(event.amount)
         }
     }
@@ -143,6 +137,20 @@ fn signed_amount(event: &DamageEvent) -> i32 {
 
 /// Aggregates health state and damage inputs into canonical [`HealthDelta`]
 /// records.
+///
+/// # Examples
+/// ```rust,ignore
+/// # use anyhow::Error;
+/// # use dbsp::RootCircuit;
+/// # use lille::dbsp_circuit::{DamageEvent, HealthState};
+/// # let _ = RootCircuit::build(|circuit| -> Result<(), Error> {
+/// #     let (states, _) = circuit.add_input_zset::<HealthState>();
+/// #     let (events, _) = circuit.add_input_zset::<DamageEvent>();
+/// #     // Combine the streams with `health_delta_stream(&states, &events)`.
+/// #     Ok(())
+/// # });
+/// ```
+#[must_use]
 pub fn health_delta_stream(
     health_states: &Stream<RootCircuit, OrdZSet<HealthState>>,
     damage_events: &Stream<RootCircuit, OrdZSet<DamageEvent>>,

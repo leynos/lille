@@ -9,6 +9,7 @@ use ordered_float::OrderedFloat;
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 use size_of::SizeOf;
 
+use crate::numeric::floor_to_i32;
 use crate::{applied_acceleration, apply_ground_friction, GRAVITY_PULL, TERMINAL_VELOCITY};
 
 use crate::dbsp_circuit::{FloorHeightAt, Force, Position, Velocity};
@@ -23,6 +24,7 @@ fn clamp_terminal_velocity(vz: f64) -> OrderedFloat<f64> {
 ///
 /// Each entity may supply at most one [`Force`] record per tick. Forces with
 /// invalid masses are ignored with a log warning.
+#[must_use]
 pub fn new_velocity_stream(
     velocities: &Stream<RootCircuit, OrdZSet<Velocity>>,
     forces: &Stream<RootCircuit, OrdZSet<Force>>,
@@ -38,7 +40,7 @@ pub fn new_velocity_stream(
                         force.fy.into_inner(),
                         force.fz.into_inner(),
                     ),
-                    force.mass.map(|m| m.into_inner()),
+                    force.mass.map(OrderedFloat::into_inner),
                 );
                 if accel.is_none() {
                     warn!(
@@ -73,6 +75,7 @@ pub fn new_velocity_stream(
 /// translated by the entity's velocity components. The function performs a
 /// simple Euler integration suitable for the small time step used in the game
 /// loop.
+#[must_use]
 pub fn new_position_stream(
     positions: &Stream<RootCircuit, OrdZSet<Position>>,
     new_vel: &Stream<RootCircuit, OrdZSet<Velocity>>,
@@ -88,6 +91,12 @@ pub fn new_position_stream(
     )
 }
 
+/// Pairs an entity's position with the floor height at its grid location.
+///
+/// This struct is the result of joining the continuous [`Position`] stream with
+/// the discrete [`FloorHeightAt`] grid. It is primarily consumed by
+/// higher-level physics logic for tasks such as collision detection or standing
+/// checks.
 #[derive(
     Archive,
     RkyvSerialize,
@@ -103,14 +112,10 @@ pub fn new_position_stream(
     SizeOf,
 )]
 #[archive_attr(derive(Ord, PartialOrd, Eq, PartialEq, Hash))]
-/// Pairs an entity's position with the floor height at its grid location.
-///
-/// This struct is the result of joining the continuous [`Position`] stream with
-/// the discrete [`FloorHeightAt`] grid. It is primarily consumed by
-/// higher-level physics logic for tasks such as collision detection or standing
-/// checks.
 pub struct PositionFloor {
+    /// Continuous position of the entity.
     pub position: Position,
+    /// Floor height beneath the entity at the sampled grid cell.
     pub z_floor: OrderedFloat<f64>,
 }
 
@@ -119,20 +124,13 @@ pub struct PositionFloor {
 /// Positions are discretised to grid coordinates by flooring their `x` and `y`
 /// values. Those indices look up a [`FloorHeightAt`] record to produce a
 /// [`PositionFloor`] stream suitable for higher-level physics logic.
+#[must_use]
 pub fn position_floor_stream(
     positions: &Stream<RootCircuit, OrdZSet<Position>>,
     floor_height: &Stream<RootCircuit, OrdZSet<FloorHeightAt>>,
 ) -> Stream<RootCircuit, OrdZSet<PositionFloor>> {
     positions
-        .map_index(|p| {
-            (
-                (
-                    p.x.into_inner().floor() as i32,
-                    p.y.into_inner().floor() as i32,
-                ),
-                *p,
-            )
-        })
+        .map_index(|p| ((floor_to_i32(p.x), floor_to_i32(p.y)), *p))
         .join(
             &floor_height.map_index(|fh| ((fh.x, fh.y), fh.z)),
             |_idx, pos, &z_floor| PositionFloor {
@@ -152,6 +150,7 @@ pub fn position_floor_stream(
 ///
 /// A tuple containing the updated position and velocity streams for all
 /// standing entities.
+#[must_use]
 pub fn standing_motion_stream(
     standing: &Stream<RootCircuit, OrdZSet<PositionFloor>>,
     floor_height: &Stream<RootCircuit, OrdZSet<FloorHeightAt>>,
@@ -174,7 +173,7 @@ pub fn standing_motion_stream(
 
     let indexed = moved.map_index(|(x, y, entity, vx, vy)| {
         (
-            (x.into_inner().floor() as i32, y.into_inner().floor() as i32),
+            (floor_to_i32(*x), floor_to_i32(*y)),
             (*entity, *x, *y, *vx, *vy),
         )
     });

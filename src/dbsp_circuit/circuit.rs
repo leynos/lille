@@ -1,22 +1,19 @@
-//! DBSP-based world inference engine.
+//! Core DBSP circuit construction and handle accessors.
 //!
-//! This module defines [`DbspCircuit`], the authoritative dataflow program for
-//! Lille's game world. Callers feed [`Position`], [`Velocity`], [`Force`],
-//! [`Target`], [`FearLevel`], and [`Block`] records into the circuit. Each tick
-//! [`DbspCircuit::step`] derives movement decisions that yield updated
-//! [`NewPosition`] and [`NewVelocity`] outputs alongside terrain queries like
-//! [`HighestBlockAt`]. Input collections persist across steps—invoke
-//! [`DbspCircuit::clear_inputs`] after each frame to prevent stale data from
-//! affecting subsequent computations.
+//! This module owns the primary [`DbspCircuit`] type responsible for building
+//! Lille's DBSP dataflow, exposing typed input/output handles (e.g.,
+//! [`DbspCircuit::position_in`], [`DbspCircuit::new_velocity_out`]) and the
+//! step helpers [`step`], [`step_named`], and [`try_step`]. It is the nexus
+//! between the higher-level stream modules (`streams::*`) and consumers such as
+//! Bevy synchronisation systems interacting via the public handles.
 //!
-//! # Doctest prelude
-//!
-//! Examples in this module use the following imports:
-//!
-//! ```rust,no_run
-//! # use lille::prelude::*;
-//! # use lille::dbsp_circuit::step as _;
-//! ```
+//! The circuit is constructed through the private builder in this module,
+//! wiring terrain, physics, and health pipelines together. Other modules feed
+//! entity state into the circuit using the provided handle accessors, then
+//! advance the simulation by calling [`DbspCircuit::step`] (or the step helpers
+//! re-exported in [`crate::dbsp_circuit`]). Refer to `streams::*` for the stream
+//! composition details and to `dbsp_sync::input` / `dbsp_sync::output` for
+//! end-to-end usage examples.
 
 use anyhow::Error as AnyError;
 use dbsp::circuit::Circuit;
@@ -25,19 +22,16 @@ use dbsp::{
 };
 
 use crate::components::{Block, BlockSlope};
-use crate::GRACE_DISTANCE;
 
-mod streams;
-mod types;
-pub use streams::{
+use super::helpers::{advance_tick, within_grace};
+use super::streams::{
     apply_movement, fall_damage_stream, fear_level_stream, floor_height_stream,
     health_delta_stream, highest_block_pair, movement_decision_stream, new_position_stream,
     new_velocity_stream, position_floor_stream, standing_motion_stream, PositionFloor,
 };
-
-pub use types::{
-    DamageEvent, DamageSource, EntityId, FearLevel, FloorHeightAt, Force, HealthDelta, HealthState,
-    HighestBlockAt, MovementDecision, NewPosition, NewVelocity, Position, Target, Tick, Velocity,
+use super::types::{
+    DamageEvent, FearLevel, FloorHeightAt, Force, HealthDelta, HealthState, HighestBlockAt,
+    NewPosition, NewVelocity, Position, Target, Tick, Velocity,
 };
 
 /// Authoritative DBSP dataflow for Lille's world simulation.
@@ -74,7 +68,7 @@ pub use types::{
 /// circuit.clear_inputs();
 /// ```
 pub struct DbspCircuit {
-    circuit: CircuitHandle,
+    pub(crate) circuit: CircuitHandle,
     position_in: ZSetHandle<Position>,
     velocity_in: ZSetHandle<Velocity>,
     force_in: ZSetHandle<Force>,
@@ -122,6 +116,9 @@ impl DbspCircuit {
     ///
     /// A new `DbspCircuit` instance on success, or a DBSP error if circuit construction fails.
     ///
+    /// # Errors
+    /// Returns a DBSP error if the underlying circuit fails to build.
+    ///
     /// # Examples
     ///
     /// ```rust,no_run
@@ -130,7 +127,8 @@ impl DbspCircuit {
     /// let circuit = DbspCircuit::new().expect("circuit construction failed");
     /// ```
     pub fn new() -> Result<Self, dbsp::Error> {
-        let (circuit, handles) = RootCircuit::build(Self::build_streams)?;
+        let (circuit, handles) =
+            RootCircuit::build(|circuit| Self::build_streams(circuit).map_err(AnyError::from))?;
 
         Ok(Self {
             circuit,
@@ -176,7 +174,11 @@ impl DbspCircuit {
         self.circuit.step()
     }
 
-    fn build_streams(circuit: &mut RootCircuit) -> Result<BuildHandles, AnyError> {
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "RootCircuit::build expects constructors that return Result."
+    )]
+    fn build_streams(circuit: &mut RootCircuit) -> Result<BuildHandles, dbsp::Error> {
         let (positions, position_in) = circuit.add_input_zset::<Position>();
         let (velocities, velocity_in) = circuit.add_input_zset::<Velocity>();
         let (forces, force_in) = circuit.add_input_zset::<Force>();
@@ -189,11 +191,7 @@ impl DbspCircuit {
 
         let tick_source = circuit.add_source(Generator::new({
             let mut tick: Tick = 0;
-            move || {
-                let current = tick;
-                tick = tick.checked_add(1).expect("tick counter overflowed u64");
-                current
-            }
+            move || advance_tick(&mut tick)
         }));
         let current_tick = tick_source;
 
@@ -203,9 +201,6 @@ impl DbspCircuit {
 
         let pos_floor = position_floor_stream(&positions, &floor_height);
 
-        fn within_grace(pf: &PositionFloor) -> bool {
-            pf.position.z.into_inner() <= pf.z_floor.into_inner() + GRACE_DISTANCE
-        }
         let unsupported = pos_floor.filter(|pf| !within_grace(pf));
         let standing = pos_floor.filter(within_grace);
 
@@ -213,7 +208,7 @@ impl DbspCircuit {
         let all_new_vel = new_velocity_stream(&velocities, &forces);
         let unsupported_velocities = all_new_vel.map_index(|v| (v.entity, *v)).join(
             &unsupported.map_index(|pf| (pf.position.entity, ())),
-            |_, vel, _| *vel,
+            |_, vel, ()| *vel,
         );
         let new_pos_unsupported =
             new_position_stream(&unsupported_positions, &unsupported_velocities);
@@ -221,7 +216,7 @@ impl DbspCircuit {
         let (new_pos_standing, new_vel_standing) =
             standing_motion_stream(&standing, &floor_height, &all_new_vel);
 
-        let fall_damage = streams::fall_damage_stream(
+        let fall_damage = fall_damage_stream(
             &standing,
             &unsupported,
             &unsupported_velocities,
@@ -259,266 +254,81 @@ impl DbspCircuit {
     }
 
     /// Returns a reference to the input handle for feeding position records into the circuit.
-    ///
-    /// Use this handle to provide entity position data for processing by the dataflow circuit.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// # use lille::prelude::*;
-    /// # use lille::dbsp_circuit::step as _;
-    /// let circuit = DbspCircuit::new().expect("circuit construction failed");
-    /// let position_handle = circuit.position_in();
-    /// // Feed positions into the circuit using `position_handle`
-    /// ```
-    pub fn position_in(&self) -> &ZSetHandle<Position> {
+    pub const fn position_in(&self) -> &ZSetHandle<Position> {
         &self.position_in
     }
 
     /// Returns a reference to the input handle for feeding velocity records into the circuit.
-    ///
-    /// Use this handle to provide entity velocity data for each simulation step.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// # use lille::prelude::*;
-    /// # use lille::dbsp_circuit::step as _;
-    /// let circuit = DbspCircuit::new().expect("circuit construction failed");
-    /// let velocity_in = circuit.velocity_in();
-    /// velocity_in.push(
-    ///     Velocity {
-    ///         entity: 1,
-    ///         vx: OrderedFloat(0.0),
-    ///         vy: OrderedFloat(0.0),
-    ///         vz: OrderedFloat(0.0),
-    ///     },
-    ///     1,
-    /// );
-    /// ```
-    pub fn velocity_in(&self) -> &ZSetHandle<Velocity> {
+    pub const fn velocity_in(&self) -> &ZSetHandle<Velocity> {
         &self.velocity_in
     }
 
     /// Returns a reference to the input handle for feeding force records into the circuit.
-    ///
-    /// Use this handle to supply external forces acting on entities. If a
-    /// force is omitted for an entity, only gravity is applied.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// # use lille::prelude::*;
-    /// # use lille::dbsp_circuit::step as _;
-    /// # use ordered_float::OrderedFloat;
-    /// let circuit = DbspCircuit::new().expect("circuit construction failed");
-    /// let force_in = circuit.force_in();
-    /// force_in.push(
-    ///     Force {
-    ///         entity: 1,
-    ///         fx: OrderedFloat(5.0),
-    ///         fy: OrderedFloat(0.0),
-    ///         fz: OrderedFloat(0.0),
-    ///         mass: Some(OrderedFloat(5.0)),
-    ///     },
-    ///     1,
-    /// );
-    /// ```
-    pub fn force_in(&self) -> &ZSetHandle<Force> {
+    pub const fn force_in(&self) -> &ZSetHandle<Force> {
         &self.force_in
     }
 
     /// Returns a reference to the input handle for entity fear levels.
-    ///
-    /// Supply `FearLevel` records to influence movement decisions. Omitted
-    /// entities default to a fear level of `0.0`.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// # use ordered_float::OrderedFloat;
-    /// # use lille::dbsp_circuit::{DbspCircuit, FearLevel};
-    /// let circuit = DbspCircuit::new().expect("circuit construction failed");
-    /// let handle = circuit.fear_in();
-    /// handle.push(FearLevel { entity: 1, level: OrderedFloat(0.5) }, 1);
-    /// ```
-    pub fn fear_in(&self) -> &ZSetHandle<FearLevel> {
+    pub const fn fear_in(&self) -> &ZSetHandle<FearLevel> {
         &self.fear_in
     }
 
     /// Returns a reference to the input handle for entity targets.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// # use ordered_float::OrderedFloat;
-    /// # use lille::dbsp_circuit::{DbspCircuit, Target as DbspTarget};
-    /// let circuit = DbspCircuit::new().expect("circuit construction failed");
-    /// let handle = circuit.target_in();
-    /// handle.push(
-    ///     DbspTarget { entity: 1, x: OrderedFloat(10.0), y: OrderedFloat(5.0) },
-    ///     1,
-    /// );
-    /// ```
-    pub fn target_in(&self) -> &ZSetHandle<Target> {
+    pub const fn target_in(&self) -> &ZSetHandle<Target> {
         &self.target_in
     }
 
     /// Returns a reference to the input handle for entity health snapshots.
-    pub fn health_state_in(&self) -> &ZSetHandle<HealthState> {
+    pub const fn health_state_in(&self) -> &ZSetHandle<HealthState> {
         &self.health_state_in
     }
 
     /// Returns a reference to the damage/healing input stream.
-    pub fn damage_in(&self) -> &ZSetHandle<DamageEvent> {
+    pub const fn damage_in(&self) -> &ZSetHandle<DamageEvent> {
         &self.damage_in
     }
 
     /// Returns a reference to the input handle for feeding block records into the circuit.
-    ///
-    /// Use this handle to provide block data as input for each computation step.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// # use lille::prelude::*;
-    /// # use lille::dbsp_circuit::step as _;
-    /// let circuit = DbspCircuit::new().expect("circuit construction failed");
-    /// let block_handle = circuit.block_in();
-    /// // Feed block data into the circuit using `block_handle`
-    /// ```
-    pub fn block_in(&self) -> &ZSetHandle<Block> {
+    pub const fn block_in(&self) -> &ZSetHandle<Block> {
         &self.block_in
     }
 
     /// Returns a reference to the input handle for feeding block slope records into the circuit.
-    ///
-    /// Use this handle to supply slope gradient data for blocks, enabling
-    /// slope-aware floor height calculations.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// # use lille::prelude::*;
-    /// # use lille::dbsp_circuit::step as _;
-    /// let circuit = DbspCircuit::new().expect("circuit construction failed");
-    /// let slope_handle = circuit.block_slope_in();
-    /// // Feed block slope data into the circuit using `slope_handle`
-    /// ```
-    pub fn block_slope_in(&self) -> &ZSetHandle<BlockSlope> {
+    pub const fn block_slope_in(&self) -> &ZSetHandle<BlockSlope> {
         &self.block_slope_in
     }
 
     /// Returns a reference to the output handle for newly computed entity positions.
-    ///
-    /// The output handle provides access to the set of updated positions after each circuit step.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// # use lille::prelude::*;
-    /// # use lille::dbsp_circuit::step as _;
-    /// let circuit = DbspCircuit::new().expect("circuit construction failed");
-    /// let new_positions = circuit.new_position_out();
-    /// // Read new positions from the output handle
-    /// ```
-    pub fn new_position_out(&self) -> &OutputHandle<OrdZSet<NewPosition>> {
+    pub const fn new_position_out(&self) -> &OutputHandle<OrdZSet<NewPosition>> {
         &self.new_position_out
     }
 
     /// Returns a reference to the output handle for newly computed velocities.
-    ///
-    /// The output contains updated velocity records for all entities after applying
-    /// the circuit's physics computations, such as gravity.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// # use lille::prelude::*;
-    /// # use lille::dbsp_circuit::step as _;
-    /// let circuit = DbspCircuit::new().expect("circuit construction failed");
-    /// let velocities = circuit.new_velocity_out();
-    /// // Use `velocities` to read updated velocity data.
-    /// ```
-    pub fn new_velocity_out(&self) -> &OutputHandle<OrdZSet<NewVelocity>> {
+    pub const fn new_velocity_out(&self) -> &OutputHandle<OrdZSet<NewVelocity>> {
         &self.new_velocity_out
     }
 
     /// Returns a reference to the output handle for the highest block at each (x, y) coordinate.
-    ///
-    /// The output contains `HighestBlockAt` records representing the maximum `z` value for each `(x, y)`
-    /// position in the input block data.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// # use lille::prelude::*;
-    /// # use lille::dbsp_circuit::step as _;
-    /// let circuit = DbspCircuit::new().expect("circuit construction failed");
-    /// let highest_block_handle = circuit.highest_block_out();
-    /// // Use `highest_block_handle` to read aggregated highest block data.
-    /// ```
-    pub fn highest_block_out(&self) -> &OutputHandle<OrdZSet<HighestBlockAt>> {
+    pub const fn highest_block_out(&self) -> &OutputHandle<OrdZSet<HighestBlockAt>> {
         &self.highest_block_out
     }
 
     /// Returns a reference to the output handle for calculated floor heights.
-    ///
-    /// The output contains `FloorHeightAt` records representing the computed
-    /// floor height at each `(x, y)` position, incorporating block heights and
-    /// optional slope gradients.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// # use lille::prelude::*;
-    /// # use lille::dbsp_circuit::step as _;
-    /// let circuit = DbspCircuit::new().expect("circuit construction failed");
-    /// let floor_heights = circuit.floor_height_out();
-    /// // Read computed floor heights from the output handle
-    /// ```
-    pub fn floor_height_out(&self) -> &OutputHandle<OrdZSet<FloorHeightAt>> {
+    pub const fn floor_height_out(&self) -> &OutputHandle<OrdZSet<FloorHeightAt>> {
         &self.floor_height_out
     }
 
-    /// Returns a reference to the output handle for entity positions joined with
-    /// floor height.
-    ///
-    /// The output contains [`PositionFloor`] records that pair each entity's
-    /// [`Position`] with the discrete [`FloorHeightAt`] value at its grid cell.
-    /// Use this handle to read the results of the position-to-floor join after
-    /// each call to [`DbspCircuit::step`].
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// # use lille::prelude::*;
-    /// let mut circuit = DbspCircuit::new().expect("circuit construction failed");
-    /// let joined = circuit.position_floor_out();
-    /// // Read joined records from `joined`
-    /// ```
-    pub fn position_floor_out(&self) -> &OutputHandle<OrdZSet<PositionFloor>> {
+    /// Returns a reference to the output handle pairing positions with floor heights.
+    pub const fn position_floor_out(&self) -> &OutputHandle<OrdZSet<PositionFloor>> {
         &self.position_floor_out
     }
 
     /// Returns a reference to the health delta output handle.
-    pub fn health_delta_out(&self) -> &OutputHandle<OrdZSet<HealthDelta>> {
+    pub const fn health_delta_out(&self) -> &OutputHandle<OrdZSet<HealthDelta>> {
         &self.health_delta_out
     }
 
     /// Clears all input collections to remove accumulated records.
-    ///
-    /// Input ZSets retain data across [`DbspCircuit::step`] calls. Invoke this method after
-    /// processing outputs each frame to ensure that stale input data does not affect future
-    /// computations.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// # use lille::prelude::*;
-    /// let mut circuit = DbspCircuit::new().expect("circuit construction failed");
-    /// circuit.clear_inputs();
-    /// ```
     pub fn clear_inputs(&mut self) {
         self.position_in.clear_input();
         self.velocity_in.clear_input();
@@ -531,51 +341,3 @@ impl DbspCircuit {
         self.block_slope_in.clear_input();
     }
 }
-
-/// Advances the circuit by one tick.
-///
-/// # Panics
-/// Panics if evaluation fails.
-///
-/// # Examples
-/// ```rust
-/// use lille::dbsp_circuit::{DbspCircuit, step};
-/// let mut circuit = DbspCircuit::new().expect("circuit construction failed");
-/// step(&mut circuit);
-/// ```
-#[track_caller]
-pub fn step(circuit: &mut DbspCircuit) {
-    circuit.step().expect("DbspCircuit::step failed");
-}
-
-/// Advances the circuit and includes context in panic messages.
-///
-/// # Examples
-/// ```rust
-/// use lille::dbsp_circuit::{DbspCircuit, step_named};
-/// let mut circuit = DbspCircuit::new().expect("circuit construction failed");
-/// step_named(&mut circuit, "context");
-/// ```
-#[track_caller]
-pub fn step_named(circuit: &mut DbspCircuit, ctx: &str) {
-    circuit
-        .step()
-        .unwrap_or_else(|e| panic!("DbspCircuit::step failed: {ctx}: {e}"));
-}
-
-/// Attempts to advance the circuit by one tick.
-///
-/// Returns an error if evaluation fails.
-///
-/// # Examples
-/// ```rust
-/// use lille::dbsp_circuit::{DbspCircuit, try_step};
-/// let mut circuit = DbspCircuit::new().expect("circuit construction failed");
-/// try_step(&mut circuit).expect("circuit evaluation failed");
-/// ```
-pub fn try_step(circuit: &mut DbspCircuit) -> Result<(), dbsp::Error> {
-    circuit.step()
-}
-
-#[cfg(test)]
-mod tests;

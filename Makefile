@@ -3,8 +3,11 @@
 .ONESHELL:
 SHELL := bash
 
-RUSTFLAGS_STRICT := RUSTFLAGS="-D warnings"
+RUSTFLAGS_STRICT := -D warnings
+RUST_FLAGS ?= $(RUSTFLAGS_STRICT)
+RUST_FLAGS_ENV := RUSTFLAGS="$(RUST_FLAGS)"
 WORKSPACE_PACKAGES := --package lille --package build_support --package test_utils
+MARKDOWNLINT := $(shell which markdownlint-cli2)
 
 all: lint test build
 
@@ -12,10 +15,10 @@ clean:
 	cargo clean
 
 build:
-	$(RUSTFLAGS_STRICT) cargo build
+	$(RUST_FLAGS_ENV) cargo build
 
 test:
-	$(RUSTFLAGS_STRICT) cargo test
+	$(RUST_FLAGS_ENV) cargo test
 
 fmt:
 	cargo fmt $(WORKSPACE_PACKAGES)
@@ -27,11 +30,14 @@ check-fmt:
 build-support-run:
 	./scripts/build_support_runner.sh
 
+RUSTDOC_FLAGS ?= --cfg docsrs -D warnings
+
 lint:
-	cargo clippy --all-targets --all-features -- -D warnings
+	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" cargo doc --workspace --no-deps
+	cargo clippy --all-targets --all-features -- $(RUST_FLAGS)
 
 markdownlint:
-	find . -name '*.md' -print0 | xargs -0 markdownlint
+	$(MARKDOWNLINT) "**/*.md"
 
 nixie:
-	find . -name '*.md' -print0 | xargs -0 nixie
+	nixie --no-sandbox

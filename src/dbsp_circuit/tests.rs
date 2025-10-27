@@ -3,6 +3,7 @@ use super::*;
 use crate::dbsp_circuit::streams::health_delta_stream;
 use crate::dbsp_circuit::{DamageEvent, DamageSource, HealthDelta, HealthState};
 use crate::GRACE_DISTANCE;
+use approx::abs_diff_eq;
 use dbsp::RootCircuit;
 use rstest::rstest;
 
@@ -44,10 +45,13 @@ fn within_grace(#[case] z: f64, #[case] z_floor: f64) {
 #[case(10.0 + GRACE_DISTANCE, 10.0)]
 fn beyond_grace_or_at_boundary(#[case] z: f64, #[case] z_floor: f64) {
     let pf = make_pf(z, z_floor);
-    if pf.position.z.into_inner() == pf.z_floor.into_inner() + GRACE_DISTANCE {
-        assert!(pf.position.z.into_inner() <= pf.z_floor.into_inner() + GRACE_DISTANCE);
+    let position_z = pf.position.z.into_inner();
+    let boundary = pf.z_floor.into_inner() + GRACE_DISTANCE;
+    let tol = 1e-12;
+    if abs_diff_eq!(position_z, boundary, epsilon = tol) {
+        assert!(position_z <= boundary + tol);
     } else {
-        assert!(pf.position.z.into_inner() > pf.z_floor.into_inner() + GRACE_DISTANCE);
+        assert!(position_z > boundary + tol);
     }
 }
 
@@ -69,62 +73,96 @@ fn run_health_delta(health: HealthState, events: &[(DamageEvent, i32)]) -> Vec<H
     output
         .consolidate()
         .iter()
-        .map(|(delta, _, _)| delta)
+        .map(|(delta, (), _)| delta)
         .collect()
 }
 
-fn assert_health_delta_test(
-    health_state: HealthState,
-    events: &[(DamageEvent, i32)],
-    expected_delta: i32,
-    expected_death: bool,
-    expected_seq: Option<u32>,
-) {
-    let deltas = run_health_delta(health_state, events);
-    assert_eq!(deltas.len(), 1);
-    let delta = deltas[0];
-    assert_eq!(delta.delta, expected_delta);
-    assert_eq!(delta.death, expected_death);
-    assert_eq!(delta.seq, expected_seq);
+/// Specifies a damage event used by health delta tests, capturing the amount,
+/// source, tick, and optional sequence identifier so `DamageEvent` records can
+/// be constructed consistently in scenarios.
+#[derive(Clone, Copy)]
+struct DamageEventSpec {
+    amount: u16,
+    source: DamageSource,
+    at_tick: u64,
+    seq: Option<u32>,
 }
 
-fn run_health_delta_test(
-    entity: u64,
-    current: u16,
-    max: u16,
-    events: Vec<(u16, DamageSource, u64, Option<u32>)>,
-    expected_delta: i32,
-    expected_death: bool,
-    expected_seq: Option<u32>,
-) {
-    let health = HealthState {
-        entity,
-        current,
-        max,
-    };
-    let damage_events: Vec<(DamageEvent, i32)> = events
-        .into_iter()
-        .map(|(amount, source, at_tick, seq)| {
-            (
-                DamageEvent {
-                    entity,
-                    amount,
-                    source,
-                    at_tick,
-                    seq,
-                },
-                1,
-            )
-        })
-        .collect();
+impl DamageEventSpec {
+    const fn new(amount: u16, source: DamageSource, at_tick: u64, seq: Option<u32>) -> Self {
+        Self {
+            amount,
+            source,
+            at_tick,
+            seq,
+        }
+    }
+}
 
-    assert_health_delta_test(
-        health,
-        &damage_events,
-        expected_delta,
-        expected_death,
-        expected_seq,
-    );
+/// Bundles an initial health state with a sequence of damage events to
+/// validate the resulting health delta outputs produced by the circuit.
+struct HealthDeltaTestCase {
+    state: HealthState,
+    events: Vec<DamageEventSpec>,
+}
+
+impl HealthDeltaTestCase {
+    /// Create a new health delta test case for `entity` with the provided
+    /// current/max health and damage event specifications.
+    fn new(entity: u64, current: u16, max: u16, events: Vec<DamageEventSpec>) -> Self {
+        Self {
+            state: HealthState {
+                entity,
+                current,
+                max,
+            },
+            events,
+        }
+    }
+
+    /// Convert the damage specs into weighted `DamageEvent` records for circuit input.
+    fn event_records(&self) -> Vec<(DamageEvent, i32)> {
+        self.events
+            .iter()
+            .map(|spec| {
+                (
+                    DamageEvent {
+                        entity: self.state.entity,
+                        amount: spec.amount,
+                        source: spec.source,
+                        at_tick: spec.at_tick,
+                        seq: spec.seq,
+                    },
+                    1,
+                )
+            })
+            .collect()
+    }
+}
+
+/// Expected outcome for a health delta scenario, including the delta amount,
+/// whether the entity should be dead afterwards, and an optional sequence id to match against.
+#[derive(Clone, Copy)]
+struct HealthDeltaExpectation {
+    delta: i32,
+    death: bool,
+    seq: Option<u32>,
+}
+
+/// Runs the health delta circuit for a test case and asserts the single emitted
+/// [`HealthDelta`] matches the expected delta, death flag, and optional
+/// sequence id, panicking if the circuit produces anything other than one result.
+fn assert_health_delta(case: &HealthDeltaTestCase, expected: HealthDeltaExpectation) {
+    let events = case.event_records();
+    let deltas = run_health_delta(case.state, &events);
+    match deltas.as_slice() {
+        [delta] => {
+            assert_eq!(delta.delta, expected.delta);
+            assert_eq!(delta.death, expected.death);
+            assert_eq!(delta.seq, expected.seq);
+        }
+        _ => panic!("expected exactly one health delta, found {}", deltas.len()),
+    }
 }
 
 #[rstest]
@@ -136,110 +174,194 @@ fn healing_clamped_to_max(
     #[case] heal: u16,
     #[case] expected_delta: i32,
 ) {
-    let health = HealthState {
-        entity: 1,
+    let case = HealthDeltaTestCase::new(
+        1,
         current,
         max,
-    };
-    let event = DamageEvent {
-        entity: 1,
-        amount: heal,
-        source: DamageSource::Script,
-        at_tick: 5,
-        seq: Some(1),
-    };
-
-    let deltas = run_health_delta(health, &[(event, 1)]);
-    assert_eq!(deltas.len(), 1);
-    let delta = deltas[0];
-    assert_eq!(delta.delta, expected_delta);
-    assert!(!delta.death);
-    assert_eq!(delta.seq, Some(1));
+        vec![DamageEventSpec::new(heal, DamageSource::Script, 5, Some(1))],
+    );
+    assert_health_delta(
+        &case,
+        HealthDeltaExpectation {
+            delta: expected_delta,
+            death: false,
+            seq: Some(1),
+        },
+    );
 }
 
 #[rstest]
 #[case(Some(3))]
 #[case(None)]
 fn duplicate_damage_events_idempotent(#[case] seq: Option<u32>) {
-    let health = HealthState {
-        entity: 2,
-        current: 90,
-        max: 100,
-    };
-    let event = DamageEvent {
-        entity: 2,
-        amount: 30,
-        source: DamageSource::External,
-        at_tick: 9,
-        seq,
-    };
-
-    assert_health_delta_test(health, &[(event, 1), (event, 1)], -30, false, seq);
-}
-
-#[rstest]
-fn sequenced_events_with_same_seq_in_same_tick_are_deduplicated() {
-    let health = HealthState {
-        entity: 7,
-        current: 70,
-        max: 100,
-    };
-    let first = DamageEvent {
-        entity: 7,
-        amount: 20,
-        source: DamageSource::External,
-        at_tick: 8,
-        seq: Some(11),
-    };
-    // Provide the duplicate event with an identical payload to mirror the ingress
-    // first-write-wins policy: later `(entity, tick, seq)` writes are ignored, and
-    // the matching payload ensures the circuit's debug assertions are satisfied.
-    let second = DamageEvent {
-        entity: 7,
-        amount: 20,
-        source: DamageSource::External,
-        at_tick: 8,
-        seq: Some(11),
-    };
-
-    assert_health_delta_test(health, &[(first, 1), (second, 1)], -20, false, Some(11));
-}
-
-#[rstest]
-#[case::unsequenced_distinct_sources(6, 40, 100, vec![(15, DamageSource::External, 4, None), (25, DamageSource::Script, 4, None)], 10, false, None)]
-#[case::unsequenced_duplicate_payloads_filtered(6, 40, 100, vec![(15, DamageSource::External, 4, None), (15, DamageSource::External, 4, None)], -15, false, None)]
-#[case::multiple_events_max_seq(5, 100, 120, vec![(60, DamageSource::External, 10, Some(1)), (20, DamageSource::Script, 10, Some(4))], -40, false, Some(4))]
-#[case::healing_from_zero(4, 0, 80, vec![(30, DamageSource::Script, 3, None)], 30, false, None)]
-#[case::over_healing_clamped(5, 0, 80, vec![(150, DamageSource::Script, 4, None)], 80, false, None)]
-fn health_delta_scenarios(
-    #[case] entity: u64,
-    #[case] current: u16,
-    #[case] max: u16,
-    #[case] events: Vec<(u16, DamageSource, u64, Option<u32>)>,
-    #[case] expected_delta: i32,
-    #[case] expected_death: bool,
-    #[case] expected_seq: Option<u32>,
-) {
-    run_health_delta_test(
-        entity,
-        current,
-        max,
-        events,
-        expected_delta,
-        expected_death,
-        expected_seq,
+    let event = DamageEventSpec::new(30, DamageSource::External, 9, seq);
+    let case = HealthDeltaTestCase::new(2, 90, 100, vec![event, event]);
+    assert_health_delta(
+        &case,
+        HealthDeltaExpectation {
+            delta: -30,
+            death: false,
+            seq,
+        },
     );
 }
 
 #[rstest]
-fn lethal_damage_sets_death_flag() {
-    run_health_delta_test(
-        3,
-        20,
-        50,
-        vec![(40, DamageSource::External, 2, Some(7))],
-        -20,
-        true,
-        Some(7),
+fn sequenced_events_with_same_seq_in_same_tick_are_deduplicated() {
+    let event = DamageEventSpec::new(20, DamageSource::External, 8, Some(11));
+    // Provide the duplicate event with an identical payload to mirror the ingress
+    // first-write-wins policy: later `(entity, tick, seq)` writes are ignored, and
+    // the matching payload ensures the circuit's debug assertions are satisfied.
+    let case = HealthDeltaTestCase::new(7, 70, 100, vec![event, event]);
+    assert_health_delta(
+        &case,
+        HealthDeltaExpectation {
+            delta: -20,
+            death: false,
+            seq: Some(11),
+        },
+    );
+}
+
+#[rstest]
+#[case::unsequenced_distinct_sources(
+    HealthDeltaTestCase::new(
+        6,
+        40,
+        100,
+        vec![
+            DamageEventSpec::new(15, DamageSource::External, 4, None),
+            DamageEventSpec::new(25, DamageSource::Script, 4, None),
+        ],
+    ),
+    HealthDeltaExpectation {
+        delta: 10,
+        death: false,
+        seq: None,
+    }
+)]
+#[case::unsequenced_duplicate_payloads_filtered(
+    HealthDeltaTestCase::new(
+        6,
+        40,
+        100,
+        vec![
+            DamageEventSpec::new(15, DamageSource::External, 4, None),
+            DamageEventSpec::new(15, DamageSource::External, 4, None),
+        ],
+    ),
+    HealthDeltaExpectation {
+        delta: -15,
+        death: false,
+        seq: None,
+    }
+)]
+#[case::multiple_events_max_seq(
+    HealthDeltaTestCase::new(
+        5,
+        100,
+        120,
+        vec![
+            DamageEventSpec::new(60, DamageSource::External, 10, Some(1)),
+            DamageEventSpec::new(20, DamageSource::Script, 10, Some(4)),
+        ],
+    ),
+    HealthDeltaExpectation {
+        delta: -40,
+        death: false,
+        seq: Some(4),
+    }
+)]
+#[case::healing_from_zero(
+    HealthDeltaTestCase::new(
+        4,
+        0,
+        80,
+        vec![DamageEventSpec::new(30, DamageSource::Script, 3, None)],
+    ),
+    HealthDeltaExpectation {
+        delta: 30,
+        death: false,
+        seq: None,
+    }
+)]
+#[case::over_healing_clamped(
+    HealthDeltaTestCase::new(
+        5,
+        0,
+        80,
+        vec![DamageEventSpec::new(150, DamageSource::Script, 4, None)],
+    ),
+    HealthDeltaExpectation {
+        delta: 80,
+        death: false,
+        seq: None,
+    }
+)]
+fn health_delta_scenarios(
+    #[case] case: HealthDeltaTestCase,
+    #[case] expected: HealthDeltaExpectation,
+) {
+    assert_health_delta(&case, expected);
+}
+
+/// Parameters describing a lethal damage scenario, capturing entity id,
+/// current/maximum health, damage amount, expected delta, and optional
+/// sequence id used to assert death flag behaviour.
+#[derive(Clone, Copy)]
+struct LethalCase {
+    entity: u64,
+    current: u16,
+    max: u16,
+    damage_amount: u16,
+    expected_delta: i32,
+    seq: Option<u32>,
+}
+
+#[rstest]
+#[case::moderate_damage(LethalCase {
+    entity: 3,
+    current: 10,
+    max: 100,
+    damage_amount: 15,
+    expected_delta: -10,
+    seq: Some(2),
+})]
+#[case::high_damage(LethalCase {
+    entity: 3,
+    current: 20,
+    max: 50,
+    damage_amount: 40,
+    expected_delta: -20,
+    seq: Some(7),
+})]
+fn lethal_damage_sets_death_flag(#[case] params: LethalCase) {
+    const TICK: u64 = 2;
+    let LethalCase {
+        entity,
+        current,
+        max,
+        damage_amount,
+        expected_delta,
+        seq,
+    } = params;
+    let case = HealthDeltaTestCase::new(
+        entity,
+        current,
+        max,
+        vec![DamageEventSpec::new(
+            damage_amount,
+            DamageSource::External,
+            TICK,
+            seq,
+        )],
+    );
+    assert_health_delta(
+        &case,
+        HealthDeltaExpectation {
+            delta: expected_delta,
+            death: true,
+            seq,
+        },
     );
 }

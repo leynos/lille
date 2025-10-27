@@ -1,8 +1,103 @@
+#![cfg_attr(
+    feature = "render",
+    doc = "Integration tests covering the world-spawning Bevy system."
+)]
+#![cfg_attr(
+    not(feature = "render"),
+    doc = "Integration tests require the `render` feature."
+)]
 #![cfg(feature = "render")]
 //! Unit tests for the world-spawning system.
 //! Verifies entity counts and component assignments after system execution.
 use bevy::prelude::*;
-use lille::{spawn_world_system, DdlogId, Health, Target, UnitType};
+use lille::spawn_world_system;
+use lille::{DdlogId, Health, Target, UnitType};
+
+/// Tracks entity categories observed during `spawn_world_system` execution.
+#[derive(Default)]
+struct SpawnCounters {
+    civvy: usize,
+    baddie: usize,
+    static_units: usize,
+    cameras: usize,
+}
+
+impl SpawnCounters {
+    fn record(&mut self, inputs: SpawnInputs<'_>, transform: &Transform) {
+        match inputs.unit {
+            Some(UnitType::Civvy { fraidiness }) => {
+                self.civvy += 1;
+                assert!(
+                    (fraidiness - 1.0).abs() < f32::EPSILON,
+                    "Unexpected Civvy fraidiness: {fraidiness}"
+                );
+                assert!(inputs.target.is_some(), "Civvy missing target");
+                assert!(
+                    transform
+                        .translation
+                        .abs_diff_eq(Vec3::new(125.0, 125.0, 0.0), f32::EPSILON),
+                    "Unexpected Civvy position: {:?}",
+                    transform.translation
+                );
+            }
+            Some(UnitType::Baddie { meanness }) => {
+                self.baddie += 1;
+                assert!(
+                    (meanness - 10.0).abs() < f32::EPSILON,
+                    "Unexpected Baddie meanness: {meanness}"
+                );
+                assert!(inputs.target.is_none(), "Baddie should not have a target");
+                assert!(
+                    transform
+                        .translation
+                        .abs_diff_eq(Vec3::new(150.0, 150.5, 0.0), f32::EPSILON),
+                    "Unexpected Baddie position: {:?}",
+                    transform.translation
+                );
+            }
+            None => self.record_without_unit(inputs.dd_id, transform),
+        }
+    }
+
+    fn record_without_unit(&mut self, dd_id: Option<&DdlogId>, transform: &Transform) {
+        if dd_id.is_none() {
+            self.cameras += 1;
+            return;
+        }
+
+        self.static_units += 1;
+        assert!(
+            transform
+                .translation
+                .abs_diff_eq(Vec3::new(50.0, 50.0, 0.0), f32::EPSILON),
+            "Unexpected static position: {:?}",
+            transform.translation
+        );
+    }
+
+    fn assert_expected_totals(&self) {
+        assert_eq!(self.civvy, 1);
+        assert_eq!(self.baddie, 1);
+        assert_eq!(self.static_units, 1);
+        assert_eq!(self.cameras, 1, "Expected exactly one camera entity");
+    }
+}
+
+fn assert_positive_health(entity: Entity, health: Option<&Health>) {
+    if let Some(details) = health {
+        assert!(
+            details.current > 0,
+            "Entity {entity:?} should have positive health"
+        );
+    }
+}
+
+#[derive(Copy, Clone)]
+struct SpawnInputs<'a> {
+    dd_id: Option<&'a DdlogId>,
+    unit: Option<&'a UnitType>,
+    target: Option<&'a Target>,
+}
 
 /// Tests that the `spawn_world_system` correctly spawns Civvy, Baddie, static, and camera entities with expected properties.
 ///
@@ -24,10 +119,7 @@ fn spawns_world_entities() {
 
     let world = &mut app.world;
 
-    let mut civvy = 0;
-    let mut baddie = 0;
-    let mut static_count = 0;
-    let mut cameras = 0;
+    let mut counters = SpawnCounters::default();
 
     let mut query = world.query::<(
         Entity,
@@ -39,55 +131,16 @@ fn spawns_world_entities() {
     )>();
 
     for (entity, dd_id, unit, transform, health, target) in query.iter(world) {
-        if let Some(h) = health {
-            assert!(h.current > 0, "Entity {entity:?} missing health");
-        }
-
-        match unit {
-            Some(UnitType::Civvy { fraidiness }) => {
-                civvy += 1;
-                assert!((fraidiness - 1.0).abs() < f32::EPSILON);
-                assert!(target.is_some(), "Civvy missing target");
-                assert!(
-                    transform
-                        .translation
-                        .abs_diff_eq(Vec3::new(125.0, 125.0, 0.0), f32::EPSILON),
-                    "Unexpected Civvy position: {:?}",
-                    transform.translation
-                );
-            }
-            Some(UnitType::Baddie { meanness }) => {
-                baddie += 1;
-                assert!((meanness - 10.0).abs() < f32::EPSILON);
-                assert!(target.is_none());
-                assert!(
-                    transform
-                        .translation
-                        .abs_diff_eq(Vec3::new(150.0, 150.5, 0.0), f32::EPSILON),
-                    "Unexpected Baddie position: {:?}",
-                    transform.translation
-                );
-            }
-            None => {
-                if dd_id.is_none() {
-                    cameras += 1;
-                    assert!(unit.is_none());
-                    continue;
-                }
-                static_count += 1;
-                assert!(
-                    transform
-                        .translation
-                        .abs_diff_eq(Vec3::new(50.0, 50.0, 0.0), f32::EPSILON),
-                    "Unexpected static position: {:?}",
-                    transform.translation
-                );
-            }
-        }
+        assert_positive_health(entity, health);
+        counters.record(
+            SpawnInputs {
+                dd_id,
+                unit,
+                target,
+            },
+            transform,
+        );
     }
 
-    assert_eq!(civvy, 1);
-    assert_eq!(baddie, 1);
-    assert_eq!(static_count, 1);
-    assert_eq!(cameras, 1, "Expected exactly one camera entity");
+    counters.assert_expected_totals();
 }

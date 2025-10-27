@@ -4,6 +4,7 @@
 //! fall damage entirely within the DBSP circuit.
 
 use crate::dbsp_circuit::{DamageEvent, DamageSource, PositionFloor, Tick, Velocity};
+use crate::numeric::floor_to_u16;
 use crate::{FALL_DAMAGE_SCALE, LANDING_COOLDOWN_TICKS, SAFE_LANDING_SPEED, TERMINAL_VELOCITY};
 use dbsp::utils::Tup2;
 use dbsp::{typed_batch::OrdZSet, RootCircuit, Stream};
@@ -18,7 +19,7 @@ fn detect_landings(
 
     prev_unsupported.map_index(|entity| (*entity, ())).join(
         &standing_entities.map_index(|entity| (*entity, ())),
-        |entity, _, _| *entity,
+        |entity, (), ()| *entity,
     )
 }
 
@@ -37,7 +38,7 @@ fn apply_landing_cooldown(
     landings
         .map_index(|entity| (*entity, ()))
         .antijoin(&cooling_entities)
-        .map(|(entity, _)| *entity)
+        .map(|(entity, ())| *entity)
 }
 
 fn calculate_fall_damage(
@@ -66,12 +67,9 @@ fn calculate_fall_damage(
             if weight == 0 {
                 continue;
             }
-            let entity_id = match u64::try_from(entity) {
-                Ok(id) => id,
-                Err(_) => {
-                    debug_assert!(false, "negative entity id {entity}");
-                    continue;
-                }
+            debug_assert!(entity >= 0, "negative entity id {entity}");
+            let Ok(entity_id) = u64::try_from(entity) else {
+                continue;
             };
             let clamped_speed = speed.into_inner().min(TERMINAL_VELOCITY);
             let excess = clamped_speed - SAFE_LANDING_SPEED;
@@ -79,13 +77,14 @@ fn calculate_fall_damage(
                 continue;
             }
             let scaled = excess * FALL_DAMAGE_SCALE;
-            if scaled <= 0.0 {
+            let floored = scaled.min(f64::from(u16::MAX)).floor();
+            let Some(damage) = floor_to_u16(floored) else {
+                // When the scaled damage escapes the `u16` range we treat the
+                // landing as invalid and drop the event. This mirrors the
+                // accumulator logic, which only processes bounded health
+                // deltas, so the None here intentionally skips emission.
                 continue;
-            }
-            let damage = scaled.min(f64::from(u16::MAX)).floor() as u16;
-            if damage == 0 {
-                continue;
-            }
+            };
             let event = DamageEvent {
                 entity: entity_id,
                 amount: damage,
@@ -184,6 +183,7 @@ fn calculate_fall_damage(
 ///     .floor() as u16;
 /// assert_eq!(event.amount, expected_damage);
 /// assert_eq!(event.at_tick, 1);
+#[must_use]
 pub fn fall_damage_stream(
     standing: &Stream<RootCircuit, OrdZSet<PositionFloor>>,
     unsupported: &Stream<RootCircuit, OrdZSet<PositionFloor>>,

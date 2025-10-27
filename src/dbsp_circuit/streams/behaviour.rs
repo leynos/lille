@@ -4,6 +4,7 @@
 //! movement decisions and apply those decisions to base positions.
 
 use dbsp::{typed_batch::OrdZSet, RootCircuit, Stream};
+use glam::DVec2;
 use log::warn;
 use ordered_float::OrderedFloat;
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
@@ -28,6 +29,53 @@ impl StreamConcat for Stream<RootCircuit, OrdZSet<FearLevel>> {
 /// Each position yields a [`FearLevel`] record. Explicit fear levels flow
 /// through unchanged, while an antijoin identifies missing entities and assigns
 /// them a `0.0` level before the results are unioned back together.
+///
+/// # Examples
+/// ```rust,no_run
+/// # use anyhow::Result;
+/// # use dbsp::RootCircuit;
+/// # use ordered_float::OrderedFloat;
+/// # use lille::dbsp_circuit::{FearLevel, Position};
+/// # use lille::dbsp_circuit::fear_level_stream;
+/// # fn main() -> Result<()> {
+/// let (mut circuit, (positions_in, fears_in, mut level_out)) =
+///     RootCircuit::build(|circuit| {
+///         let (positions_stream, positions_handle) =
+///             circuit.add_input_zset::<Position>();
+///         let (fears_stream, fears_handle) =
+///             circuit.add_input_zset::<FearLevel>();
+///         let handle =
+///             fear_level_stream(&positions_stream, &fears_stream).output();
+///         Ok((positions_handle, fears_handle, handle))
+///     })?;
+///
+/// positions_in.push(
+///     Position {
+///         entity: 7,
+///         x: 0.0.into(),
+///         y: 0.0.into(),
+///         z: 0.0.into(),
+///     },
+///     1,
+/// );
+/// circuit.step()?;
+///
+/// let levels: Vec<FearLevel> = level_out
+///     .consolidate()
+///     .iter()
+///     .map(|(level, (), _)| level.clone())
+///     .collect();
+/// assert_eq!(
+///     levels,
+///     vec![FearLevel {
+///         entity: 7,
+///         level: OrderedFloat(0.0),
+///     }]
+/// );
+/// # Ok(())
+/// # }
+/// ```
+#[must_use]
 pub fn fear_level_stream(
     positions: &Stream<RootCircuit, OrdZSet<Position>>,
     fears: &Stream<RootCircuit, OrdZSet<FearLevel>>,
@@ -37,7 +85,7 @@ pub fn fear_level_stream(
     let missing = positions
         .map_index(|p| (p.entity, ()))
         .antijoin(&explicit.map_index(|f| (f.entity, ())))
-        .map(|(entity, _)| FearLevel {
+        .map(|(entity, ())| FearLevel {
             entity: *entity,
             level: OrderedFloat(0.0),
         });
@@ -73,25 +121,30 @@ fn should_flee(level: OrderedFloat<f64>) -> bool {
     level.into_inner() > FEAR_THRESHOLD
 }
 
-fn decide_movement(level: OrderedFloat<f64>, pt: &PositionTarget) -> MovementDecision {
-    let dx_t = pt.tx.into_inner() - pt.px.into_inner();
-    let dy_t = pt.ty.into_inner() - pt.py.into_inner();
-    let factor = if should_flee(level) { -1.0 } else { 1.0 };
-    let raw_dx = dx_t * factor;
-    let raw_dy = dy_t * factor;
+/// Threshold below which displacement is treated as zero when normalising.
+///
+/// The value `1e-12` avoids division by near-zero magnitudes. It suppresses
+/// floating-point noise while remaining negligible for typical movement
+/// distances.
+const MIN_DIRECTION_MAGNITUDE: f64 = 1e-12;
 
-    let magnitude = raw_dx.hypot(raw_dy);
-    // Normalise to prevent diagonal movement being faster than axis-aligned movement.
-    let (dx, dy) = if magnitude > 0.0 {
-        (raw_dx / magnitude, raw_dy / magnitude)
+fn decide_movement(level: OrderedFloat<f64>, pt: &PositionTarget) -> MovementDecision {
+    let displacement = DVec2::new(
+        pt.tx.into_inner() - pt.px.into_inner(),
+        pt.ty.into_inner() - pt.py.into_inner(),
+    );
+    let scaled = displacement * if should_flee(level) { -1.0 } else { 1.0 };
+    let magnitude = scaled.length();
+    let direction = if magnitude > MIN_DIRECTION_MAGNITUDE {
+        scaled / magnitude
     } else {
-        (0.0, 0.0)
+        DVec2::ZERO
     };
 
     MovementDecision {
         entity: pt.entity,
-        dx: OrderedFloat(dx),
-        dy: OrderedFloat(dy),
+        dx: OrderedFloat(direction.x),
+        dy: OrderedFloat(direction.y),
     }
 }
 
@@ -100,6 +153,75 @@ fn decide_movement(level: OrderedFloat<f64>, pt: &PositionTarget) -> MovementDec
 /// Entities with a target move one unit towards it when their fear is below
 /// [`FEAR_THRESHOLD`]; otherwise, they flee one unit away. Vectors are
 /// normalised to ensure consistent speed in all directions.
+///
+/// # Examples
+/// ```rust,no_run
+/// # use anyhow::Result;
+/// # use dbsp::RootCircuit;
+/// # use ordered_float::OrderedFloat;
+/// # use lille::dbsp_circuit::{FearLevel, MovementDecision, Position, Target};
+/// # use lille::dbsp_circuit::{fear_level_stream, movement_decision_stream};
+/// # use std::f64::consts::FRAC_1_SQRT_2;
+/// # fn main() -> Result<()> {
+/// let (mut circuit, (fear_in, target_in, pos_in, mut decisions_out)) =
+///     RootCircuit::build(|circuit| {
+///         let (fear_stream, fear_handle) =
+///             circuit.add_input_zset::<FearLevel>();
+///         let (target_stream, target_handle) =
+///             circuit.add_input_zset::<Target>();
+///         let (position_stream, position_handle) =
+///             circuit.add_input_zset::<Position>();
+///
+///         let fear = fear_level_stream(&position_stream, &fear_stream);
+///         let output = movement_decision_stream(
+///             &fear,
+///             &target_stream,
+///             &position_stream,
+///         )
+///         .output();
+///         Ok((fear_handle, target_handle, position_handle, output))
+///     })?;
+///
+/// fear_in.push(
+///     FearLevel {
+///         entity: 1,
+///         level: OrderedFloat(0.1),
+///     },
+///     1,
+/// );
+/// target_in.push(
+///     Target {
+///         entity: 1,
+///         x: 1.0.into(),
+///         y: 1.0.into(),
+///     },
+///     1,
+/// );
+/// pos_in.push(
+///     Position {
+///         entity: 1,
+///         x: 0.0.into(),
+///         y: 0.0.into(),
+///         z: 0.0.into(),
+///     },
+///     1,
+/// );
+/// circuit.step()?;
+///
+/// let decisions: Vec<MovementDecision> = decisions_out
+///     .consolidate()
+///     .iter()
+///     .map(|(decision, (), _)| decision.clone())
+///     .collect();
+/// assert_eq!(decisions.len(), 1);
+/// let decision = &decisions[0];
+/// assert_eq!(decision.entity, 1);
+/// assert_eq!(decision.dx, OrderedFloat(FRAC_1_SQRT_2));
+/// assert_eq!(decision.dy, OrderedFloat(FRAC_1_SQRT_2));
+/// # Ok(())
+/// # }
+/// ```
+#[must_use]
 pub fn movement_decision_stream(
     fear: &Stream<RootCircuit, OrdZSet<FearLevel>>,
     targets: &Stream<RootCircuit, OrdZSet<Target>>,
@@ -128,6 +250,58 @@ pub fn movement_decision_stream(
 ///
 /// Panics in debug builds if more than one movement record exists for the same
 /// entity in a single tick.
+///
+/// # Examples
+/// ```rust,no_run
+/// # use anyhow::Result;
+/// # use dbsp::RootCircuit;
+/// # use ordered_float::OrderedFloat;
+/// # use lille::dbsp_circuit::{MovementDecision, Position};
+/// # use lille::dbsp_circuit::apply_movement;
+/// # fn main() -> Result<()> {
+/// let (mut circuit, (base_in, movement_in, mut moved_out)) =
+///     RootCircuit::build(|circuit| {
+///         let (base_stream, base_handle) =
+///             circuit.add_input_zset::<Position>();
+///         let (movement_stream, movement_handle) =
+///             circuit.add_input_zset::<MovementDecision>();
+///         let output =
+///             apply_movement(&base_stream, &movement_stream).output();
+///         Ok((base_handle, movement_handle, output))
+///     })?;
+///
+/// base_in.push(
+///     Position {
+///         entity: 1,
+///         x: 0.0.into(),
+///         y: 0.0.into(),
+///         z: 0.0.into(),
+///     },
+///     1,
+/// );
+/// movement_in.push(
+///     MovementDecision {
+///         entity: 1,
+///         dx: OrderedFloat(1.0),
+///         dy: OrderedFloat(0.0),
+///     },
+///     1,
+/// );
+/// circuit.step()?;
+///
+/// let moved: Vec<Position> = moved_out
+///     .consolidate()
+///     .iter()
+///     .map(|(position, (), _)| position.clone())
+///     .collect();
+/// assert_eq!(moved.len(), 1);
+/// assert_eq!(moved[0].entity, 1);
+/// assert_eq!(moved[0].x, OrderedFloat(1.0));
+/// assert_eq!(moved[0].y, OrderedFloat(0.0));
+/// # Ok(())
+/// # }
+/// ```
+#[must_use]
 pub fn apply_movement(
     base: &Stream<RootCircuit, OrdZSet<Position>>,
     movement: &Stream<RootCircuit, OrdZSet<MovementDecision>>,
@@ -228,13 +402,13 @@ mod tests {
         #[case] expected_dx: f64,
         #[case] expected_dy: f64,
     ) {
-        let (circuit, (fear_in, target_in, pos_in, out)) = RootCircuit::build(|c| {
+        let (circuit, (fear_in, target_in, pos_in, decisions_handle)) = RootCircuit::build(|c| {
             let (fear_input, fi) = c.add_input_zset::<FearLevel>();
             let (targets, ti) = c.add_input_zset::<Target>();
             let (pos_s, pi) = c.add_input_zset::<Position>();
-            let fear = fear_level_stream(&pos_s, &fear_input);
-            let out = movement_decision_stream(&fear, &targets, &pos_s).output();
-            Ok((fi, ti, pi, out))
+            let fear_stream = fear_level_stream(&pos_s, &fear_input);
+            let output_handle = movement_decision_stream(&fear_stream, &targets, &pos_s).output();
+            Ok((fi, ti, pi, output_handle))
         })
         .expect("failed to build circuit for movement_decision_join");
 
@@ -267,21 +441,32 @@ mod tests {
 
         circuit.step().expect("dbsp step");
 
-        let out: Vec<MovementDecision> = out.consolidate().iter().map(|(m, _, _)| m).collect();
-        assert_eq!(out.len(), 1);
-        assert_relative_eq!(out[0].dx.into_inner(), expected_dx);
-        assert_relative_eq!(out[0].dy.into_inner(), expected_dy);
+        let decisions: Vec<MovementDecision> = decisions_handle
+            .consolidate()
+            .iter()
+            .map(|(decision, (), _timestamp)| {
+                let decision_ref: &MovementDecision = &decision;
+                *decision_ref
+            })
+            .collect();
+        let decision = test_utils::expect_single(&decisions, "movement decision result");
+        assert_relative_eq!(decision.dx.into_inner(), expected_dx);
+        assert_relative_eq!(decision.dy.into_inner(), expected_dy);
     }
 
     #[test]
     fn no_decision_without_target() {
-        let (circuit, (fear_in, pos_in, out)) = RootCircuit::build(|c| {
+        #[expect(
+            unused_mut,
+            reason = "Mutable binding retained for compatibility with API expectations"
+        )]
+        let (mut circuit, (fear_in, pos_in, decisions_handle)) = RootCircuit::build(|c| {
             let (fear_input, fi) = c.add_input_zset::<FearLevel>();
             let (pos_s, pi) = c.add_input_zset::<Position>();
             let targets = c.add_input_zset::<Target>().0;
-            let fear = fear_level_stream(&pos_s, &fear_input);
-            let out = movement_decision_stream(&fear, &targets, &pos_s).output();
-            Ok((fi, pi, out))
+            let fear_stream = fear_level_stream(&pos_s, &fear_input);
+            let output_handle = movement_decision_stream(&fear_stream, &targets, &pos_s).output();
+            Ok((fi, pi, output_handle))
         })
         .expect("failed to build circuit for no_decision_without_target");
 
@@ -304,7 +489,14 @@ mod tests {
 
         circuit.step().expect("dbsp step");
 
-        let out: Vec<MovementDecision> = out.consolidate().iter().map(|(m, _, _)| m).collect();
-        assert!(out.is_empty());
+        let decisions: Vec<MovementDecision> = decisions_handle
+            .consolidate()
+            .iter()
+            .map(|(decision, (), _timestamp)| {
+                let decision_ref: &MovementDecision = &decision;
+                *decision_ref
+            })
+            .collect();
+        assert!(decisions.is_empty());
     }
 }

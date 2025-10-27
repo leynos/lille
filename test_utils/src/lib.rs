@@ -12,10 +12,39 @@ pub use physics::{
 pub mod prelude {
     //! Re-export commonly used test helpers.
     pub use super::{
-        assert_all_absent, assert_all_present, assert_valid_rust_syntax, block, fear, force,
-        force_with_mass, new_circuit, pos, slope, target, vel, BlockCoords, BlockId, Coords2D,
-        Coords3D, EntityId, FearValue, ForceVector, Gradient, Mass,
+        assert_all_absent, assert_all_present, assert_valid_rust_syntax, block, expect_single,
+        fear, force, force_with_mass, new_circuit, pos, slope, target, vel, BlockCoords, BlockId,
+        Coords2D, Coords3D, EntityId, FearValue, ForceVector, Gradient, Mass,
     };
+}
+
+/// Extract a single item from a slice, panicking with a contextual message when
+/// the slice is empty or contains multiple entries.
+///
+/// # Examples
+/// ```rust
+/// use test_utils::expect_single;
+/// let values = [42];
+/// let item = expect_single(&values, "single value");
+/// assert_eq!(*item, 42);
+/// ```
+///
+/// ```rust,should_panic
+/// use test_utils::expect_single;
+/// expect_single::<i32>(&[], "empty slice");
+/// ```
+///
+/// ```rust,should_panic
+/// use test_utils::expect_single;
+/// expect_single(&[1, 2], "multiple items");
+/// ```
+#[must_use]
+pub fn expect_single<'a, T>(items: &'a [T], context: &str) -> &'a T {
+    match items {
+        [item] => item,
+        [] => panic!("{context}: expected one item, found none"),
+        many => panic!("{context}: expected one item, found {}", many.len()),
+    }
 }
 
 /// Assert that all strings in `keys` are present in `code`.

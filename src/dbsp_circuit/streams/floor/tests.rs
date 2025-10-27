@@ -29,11 +29,11 @@ fn test_highest_block_aggregation() {
     step_named(&mut circuit, "test_highest_block_aggregation");
 
     let output = circuit.highest_block_out().consolidate();
-    let mut vals: Vec<HighestBlockAt> = output.iter().map(|(hb, _, _)| hb).collect();
+    let mut vals: Vec<HighestBlockAt> = output.iter().map(|(hb, (), _timestamp)| hb).collect();
     vals.sort_by_key(|h| (h.x, h.y));
-    assert!(vals
-        .windows(2)
-        .all(|w| w[0].x != w[1].x || w[0].y != w[1].y));
+    let mut uniq = vals.clone();
+    uniq.dedup_by_key(|h| (h.x, h.y));
+    assert_eq!(uniq.len(), vals.len(), "duplicate (x, y) pairs detected");
     assert_eq!(vals.len(), 2);
     assert!(vals.contains(&HighestBlockAt { x: 10, y: 20, z: 8 }));
     assert!(vals.contains(&HighestBlockAt { x: 15, y: 25, z: 3 }));
@@ -55,7 +55,7 @@ fn highest_block_cases(#[case] blocks: Vec<Block>, #[case] expected: Vec<Highest
         .highest_block_out()
         .consolidate()
         .iter()
-        .map(|(hb, _, _)| hb)
+        .map(|(hb, (), _timestamp)| hb)
         .collect();
     vals.sort_by_key(|h| (h.x, h.y));
 
@@ -90,7 +90,7 @@ fn floor_height_cases(
         .floor_height_out()
         .consolidate()
         .iter()
-        .map(|(fh, _, _)| fh)
+        .map(|(fh, (), _timestamp)| fh)
         .collect();
     vals.sort_by_key(|h| (h.x, h.y));
     let mut exp = expected;
@@ -110,7 +110,7 @@ fn unmatched_slope_is_ignored() {
         .floor_height_out()
         .consolidate()
         .iter()
-        .map(|(fh, _, _)| fh)
+        .map(|(fh, (), _timestamp)| fh)
         .collect();
 
     assert_eq!(vals, vec![fh(0, 0, 1.0)]);
@@ -127,7 +127,7 @@ fn slope_without_block_yields_no_height() {
         .floor_height_out()
         .consolidate()
         .iter()
-        .map(|(fh, _, _)| fh)
+        .map(|(fh, (), _timestamp)| fh)
         .collect();
 
     assert!(vals.is_empty());

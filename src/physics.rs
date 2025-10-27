@@ -13,7 +13,7 @@ const MIN_MASS: f64 = 1e-12;
 /// Computes acceleration from a force vector and optional mass.
 ///
 /// Returns `None` if `mass` is non-positive or effectively zero (see
-/// [`MIN_MASS`]). When `mass` is `None` the [`DEFAULT_MASS`] constant is
+/// `MIN_MASS`). When `mass` is `None` the [`DEFAULT_MASS`] constant is
 /// used. The calculation applies `F=ma` for each component independently.
 ///
 /// # Examples
@@ -30,6 +30,7 @@ const MIN_MASS: f64 = 1e-12;
     clippy::assertions_on_constants,
     reason = "debug-time validation of default mass"
 )]
+#[must_use]
 pub fn applied_acceleration(force: (f64, f64, f64), mass: Option<f64>) -> Option<(f64, f64, f64)> {
     debug_assert!(
         DEFAULT_MASS > MIN_MASS,
@@ -67,6 +68,7 @@ pub fn applied_acceleration(force: (f64, f64, f64), mass: Option<f64>) -> Option
     clippy::assertions_on_constants,
     reason = "debug-time validation of ground friction"
 )]
+#[must_use]
 pub fn apply_ground_friction(v: f64) -> f64 {
     use crate::GROUND_FRICTION;
 

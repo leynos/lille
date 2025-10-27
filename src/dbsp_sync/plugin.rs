@@ -9,6 +9,7 @@ use super::{
     apply_dbsp_outputs_system, cache_state_for_dbsp_system, init_dbsp_system, DamageInbox,
 };
 
+/// Bevy plugin installing systems that synchronise DBSP with the ECS world.
 #[derive(Default)]
 pub struct DbspPlugin;
 

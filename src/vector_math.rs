@@ -2,14 +2,24 @@
 //! Small helpers for calculating magnitudes and normalised vectors.
 use glam::Vec3;
 
-/// Returns the magnitude of the vector `(x, y, z)`.
-pub fn vec_mag(x: f32, y: f32, z: f32) -> f32 {
-    Vec3::new(x, y, z).length()
+/// Returns the magnitude of a vector expressed by its components.
+///
+/// # Examples
+/// ```
+/// use lille::vector_math::vec_mag;
+/// let magnitude = vec_mag(3.0, 4.0, 12.0);
+/// assert!((magnitude - 13.0).abs() < f32::EPSILON);
+/// ```
+#[must_use]
+pub fn vec_mag(component_x: f32, component_y: f32, component_z: f32) -> f32 {
+    Vec3::new(component_x, component_y, component_z).length()
 }
 
-/// Returns the unit vector in the direction of `(x, y, z)`, or `(0.0, 0.0, 0.0)` if the input is not a valid non-zero vector.
+/// Returns the unit vector in the direction of the supplied components.
 ///
-/// The function checks that all components are finite and the vector is non-zero before normalising. If the input is invalid or the zero vector, it returns the zero vector.
+/// The function checks that all components are finite and the vector is
+/// non-zero before normalising. If the input is invalid or the zero vector,
+/// it returns `(0.0, 0.0, 0.0)`.
 ///
 /// # Examples
 ///
@@ -23,12 +33,13 @@ pub fn vec_mag(x: f32, y: f32, z: f32) -> f32 {
 /// let zero = vec_normalize(0.0, 0.0, 0.0);
 /// assert_eq!(zero, (0.0, 0.0, 0.0));
 /// ```
-pub fn vec_normalize(x: f32, y: f32, z: f32) -> (f32, f32, f32) {
-    let v = Vec3::new(x, y, z);
-    if !v.is_finite() {
+#[must_use]
+pub fn vec_normalize(component_x: f32, component_y: f32, component_z: f32) -> (f32, f32, f32) {
+    let vector = Vec3::new(component_x, component_y, component_z);
+    if !vector.is_finite() {
         return (0.0, 0.0, 0.0);
     }
 
-    let n = v.try_normalize().unwrap_or(Vec3::ZERO);
-    (n.x, n.y, n.z)
+    let normalised = vector.try_normalize().unwrap_or(Vec3::ZERO);
+    (normalised.x, normalised.y, normalised.z)
 }

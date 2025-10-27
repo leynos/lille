@@ -6,7 +6,7 @@
 //! # Examples
 //!
 //! ```rust
-//! use lille::dbsp_record;
+//! use lille::{dbsp_copy_record, dbsp_record};
 //!
 //! dbsp_record! {
 //!     /// Example record
@@ -21,6 +21,27 @@
 //!     pub struct ExampleCopy {
 //!         pub value: i32,
 //!     }, Copy,
+//! }
+//!
+//! // Prefer dbsp_copy_record! for copyable data:
+//! dbsp_copy_record! {
+//!     /// Example using the Copy wrapper
+//!     pub struct ExampleWithCopy {
+//!         pub value: i32,
+//!     }
+//! }
+//! ```
+//!
+//! // Generic with a where bound
+//! ```rust,ignore
+//! use lille::dbsp_record;
+//! dbsp_record! {
+//!     /// Generic position record
+//!     pub struct Position<T> where T: Copy + Default, {
+//!         pub marker: T,
+//!         pub x: i32,
+//!         pub y: i32,
+//!     }
 //! }
 //! ```
 //!
@@ -45,20 +66,51 @@
 //! use lille::dbsp_record;
 //!
 //! dbsp_record! {
-//!     pub struct G<T> { pub t: T }, Copy,,
+//!     pub struct G<T> { pub t: T }, Copy,
 //! }
 //! // error: `T` does not implement `Copy`
 //! ```
 //!
-//! A `Copy` bound on the generic parameter is required: `dbsp_record! { pub struct G<T: Copy> { pub t: T }, Copy,, }`
+//! A `Copy` bound on the generic parameter is required: `dbsp_record! { pub struct G<T: Copy> { pub t: T }, Copy, }`
+/// Define a DBSP record struct with consistent derives for archiving and
+/// ordering.
+///
+/// Prefer this macro when declaring types that flow through DBSP streams so
+/// they automatically derive the traits expected by the circuit. Extra derive
+/// paths can be passed after the struct definition.
+///
+/// # Examples
+/// ```rust,ignore
+/// use lille::dbsp_record;
+/// dbsp_record! {
+///     /// Record describing a position update.
+///     pub struct Position {
+///         pub x: i32,
+///         pub y: i32,
+///     }
+/// }
+///
+/// dbsp_record! {
+///     pub struct Position3D<T> where T: Copy + Default, {
+///         pub marker: T,
+///         pub x: i32,
+///         pub y: i32,
+///         pub z: i32,
+///     }
+/// }
+/// ```
 #[macro_export]
 macro_rules! dbsp_record {
-    ($(#[$meta:meta])* $vis:vis struct $name:ident { $($fields:tt)* } $(, $extra:tt)* $(,)? ) => {
+    ($(#[$meta:meta])* $vis:vis struct $name:ident
+        $(< $($gen:tt)* >)?
+        $(where $($where:tt)* )?
+        { $($fields:tt)* }
+        $(, $extra:path)* $(,)? ) => {
         $(#[$meta])*
         #[derive(
-            ::rkyv::Archive,
-            ::rkyv::Serialize,
-            ::rkyv::Deserialize,
+            $crate::__macro_deps::rkyv::Archive,
+            $crate::__macro_deps::rkyv::Serialize,
+            $crate::__macro_deps::rkyv::Deserialize,
             Clone,
             Debug,
             PartialEq,
@@ -67,21 +119,34 @@ macro_rules! dbsp_record {
             Ord,
             Hash,
             Default,
-            ::size_of::SizeOf
+            $crate::__macro_deps::size_of::SizeOf
             $(, $extra)*
         )]
         #[archive_attr(derive(Ord, PartialOrd, Eq, PartialEq, Hash))]
-        $vis struct $name { $($fields)* }
+        $vis struct $name
+            $(< $($gen)* >)?
+            $(where $($where)* )?
+        { $($fields)* }
     };
 }
 
-/// Convenience wrapper around `dbsp_record!` that also derives `Copy`.
-/// Do not include `Copy` in extras to avoid duplicate derives.
+/// Convenience wrapper around [`dbsp_record!`] that additionally derives
+/// [`Copy`].
+///
+/// Use this macro when all fields are trivially copyable and you want to avoid
+/// cloning at call sites. Do not include `Copy` in the extra derive list.
 #[macro_export]
 macro_rules! dbsp_copy_record {
-    ($(#[$meta:meta])* $vis:vis struct $name:ident { $($fields:tt)* } $(, $extra:tt)* $(,)? ) => {
+    ($(#[$meta:meta])* $vis:vis struct $name:ident
+        $(< $($gen:tt)* >)?
+        $(where $($where:tt)* )?
+        { $($fields:tt)* }
+        $(, $extra:path)* $(,)? ) => {
         $crate::dbsp_record! {
-            $(#[$meta])* $vis struct $name { $($fields)* }, Copy, $(, $extra)*
+            $(#[$meta])* $vis struct $name
+                $(< $($gen)* >)?
+                $(where $($where)* )?
+            { $($fields)* }, Copy $(, $extra)*
         }
     };
 }

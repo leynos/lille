@@ -35,15 +35,23 @@ pub struct DbspState {
     pub(crate) health_duplicate_count: u64,
 }
 
+/// Convenience wrapper exposing queries required to track `DdlogId` changes.
 #[derive(SystemParam)]
 pub struct IdQueries<'w, 's> {
+    /// Entities that gained a `DdlogId` this frame.
     pub added: Query<'w, 's, (Entity, &'static DdlogId), Added<DdlogId>>,
+    /// Entities whose `DdlogId` component changed.
     pub changed: Query<'w, 's, (Entity, &'static DdlogId), Changed<DdlogId>>,
+    /// Entities that lost their `DdlogId` component.
     pub removed: RemovedComponents<'w, 's, DdlogId>,
 }
 
 impl DbspState {
     /// Creates a new [`DbspState`] with an initialised circuit.
+    ///
+    /// # Errors
+    /// Returns a DBSP error if the underlying circuit fails to construct.
+    #[must_use = "DbspState initialisation may fail; handle the Result"]
     pub fn new() -> Result<Self, dbsp::Error> {
         Ok(Self {
             circuit: DbspCircuit::new()?,
@@ -67,6 +75,7 @@ impl DbspState {
     /// let state = DbspState::new().expect("failed to initialise DbspState");
     /// assert!(state.entity_for_id(42).is_none());
     /// ```
+    #[must_use]
     pub fn entity_for_id(&self, id: i64) -> Option<Entity> {
         self.id_map.get(&id).copied()
     }
@@ -80,7 +89,8 @@ impl DbspState {
     /// let state = DbspState::new().expect("failed to initialise DbspState");
     /// assert_eq!(state.applied_health_duplicates(), 0);
     /// ```
-    pub fn applied_health_duplicates(&self) -> u64 {
+    #[must_use]
+    pub const fn applied_health_duplicates(&self) -> u64 {
         self.health_duplicate_count
     }
 }

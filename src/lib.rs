@@ -9,6 +9,7 @@ pub mod dbsp_sync;
 pub mod entity;
 pub mod logging;
 mod macros;
+pub mod numeric;
 pub mod physics;
 #[cfg(feature = "render")]
 #[cfg_attr(docsrs, doc(cfg(feature = "render")))]
@@ -16,6 +17,14 @@ pub mod spawn_world;
 pub mod vector_math;
 pub mod world_handle;
 pub use constants::*;
+
+#[doc(hidden)]
+pub mod __macro_deps {
+    // Public solely for cross-crate macro hygiene; do not depend on it directly.
+    // This module sits outside the semver-stable public API surface.
+    pub use rkyv;
+    pub use size_of;
+}
 
 // Re-export commonly used items
 pub use actor::Actor;
@@ -29,7 +38,13 @@ pub use dbsp_sync::{
     apply_dbsp_outputs_system, cache_state_for_dbsp_system, init_dbsp_system, DamageInbox,
     DbspPlugin,
 };
-pub use entity::{BadGuy, Entity};
+pub use entity::{BadGuy, WorldEntity};
+/// Legacy alias for [`WorldEntity`]; prefer the new name.
+#[deprecated(
+    since = "0.1.0",
+    note = "Type renamed to `WorldEntity`. This alias will be removed in the next release."
+)]
+pub type Entity = WorldEntity;
 pub use logging::init as init_logging;
 pub use physics::{applied_acceleration, apply_ground_friction};
 #[cfg(feature = "render")]

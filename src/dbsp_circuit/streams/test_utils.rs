@@ -1,5 +1,10 @@
 //! Shared constructors for physics records and a helper to initialise a
 //! `DbspCircuit` for tests and examples.
+#![warn(clippy::expect_used)]
+#![allow(
+    unfulfilled_lint_expectations,
+    reason = "allow-expect-in-tests suppresses clippy::expect_used, so we document the intentional expect"
+)]
 
 use crate::components::{Block, BlockSlope};
 use crate::dbsp_circuit::{DbspCircuit, Force, Position, Velocity};
@@ -28,6 +33,29 @@ macro_rules! impl_test_helper {
 }
 
 /// Builds a new [`DbspCircuit`] for tests.
+///
+/// # Examples
+/// ```rust,no_run
+/// use lille::dbsp_circuit::streams::test_utils::new_circuit;
+///
+/// # fn demo() -> Result<(), dbsp::Error> {
+/// let mut circuit = new_circuit();
+/// // push inputs here, e.g. circuit.position_in().push(position, 1);
+/// circuit.step()?; // propagate evaluation errors with `?`
+/// # Ok(())
+/// # }
+/// ```
+///
+/// Builds a new [`DbspCircuit`] configured for stream tests.
+///
+/// # Panics
+/// Panics if the underlying [`DbspCircuit::new`] call fails to construct the circuit.
+#[cfg_attr(test, deny(clippy::expect_used))]
+#[expect(
+    clippy::expect_used,
+    reason = "Test helper must panic loudly on circuit construction failure"
+)]
+#[must_use]
 pub fn new_circuit() -> DbspCircuit {
     DbspCircuit::new().expect("failed to build DBSP circuit")
 }
@@ -38,13 +66,13 @@ where
     I: Into<BlockId>,
     C: Into<BlockCoords>,
 {
-    let id: BlockId = id.into();
-    let coords: BlockCoords = coords.into();
+    let block_id: BlockId = id.into();
+    let block_coords: BlockCoords = coords.into();
     Block {
-        id: id.0,
-        x: coords.x,
-        y: coords.y,
-        z: coords.z,
+        id: block_id.0,
+        x: block_coords.x,
+        y: block_coords.y,
+        z: block_coords.z,
     }
 }
 
@@ -54,12 +82,12 @@ where
     I: Into<BlockId>,
     G: Into<Gradient>,
 {
-    let block_id: BlockId = block_id.into();
-    let gradient: Gradient = gradient.into();
+    let slope_block_id: BlockId = block_id.into();
+    let slope_gradient: Gradient = gradient.into();
     BlockSlope {
-        block_id: block_id.0,
-        grad_x: gradient.x.into(),
-        grad_y: gradient.y.into(),
+        block_id: slope_block_id.0,
+        grad_x: slope_gradient.x.into(),
+        grad_y: slope_gradient.y.into(),
     }
 }
 

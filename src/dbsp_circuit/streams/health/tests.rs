@@ -3,6 +3,7 @@
 use super::fall_damage_stream;
 use crate::dbsp_circuit::Position;
 use crate::dbsp_circuit::{DamageEvent, DamageSource, PositionFloor, Tick, Velocity};
+use crate::numeric::expect_u16;
 use crate::{FALL_DAMAGE_SCALE, LANDING_COOLDOWN_TICKS, SAFE_LANDING_SPEED, TERMINAL_VELOCITY};
 use dbsp::{operator::Generator, typed_batch::OrdZSet, Circuit, RootCircuit};
 use ordered_float::OrderedFloat;
@@ -75,7 +76,7 @@ fn read_events(output: &dbsp::OutputHandle<OrdZSet<DamageEvent>>) -> Vec<DamageE
     output
         .consolidate()
         .iter()
-        .map(|(event, _, weight)| {
+        .map(|(event, (), weight)| {
             assert_eq!(weight, 1, "expected single-weight damage events");
             event
         })
@@ -88,7 +89,7 @@ fn delta_events(
 ) -> Vec<(DamageEvent, i64)> {
     let mut deltas = Vec::new();
 
-    for (event, _, weight) in output.consolidate().iter() {
+    for (event, (), weight) in output.consolidate().iter() {
         if weight <= 0 {
             continue;
         }
@@ -121,14 +122,14 @@ fn fall_damage_emits_event() {
     circuit.step().expect("step landing phase");
 
     let events = read_events(&output);
-    assert_eq!(events.len(), 1);
-    let event = events[0];
+    let event = test_utils::expect_single(&events, "single fall damage event");
     assert_eq!(event.entity, 1);
     assert_eq!(event.source, DamageSource::Fall);
-    let expected_amount = ((8.0_f64.min(TERMINAL_VELOCITY) - SAFE_LANDING_SPEED)
+    let expected_amount_raw = ((8.0_f64.min(TERMINAL_VELOCITY) - SAFE_LANDING_SPEED)
         * FALL_DAMAGE_SCALE)
         .min(f64::from(u16::MAX))
-        .floor() as u16;
+        .floor();
+    let expected_amount = expect_u16(expected_amount_raw);
     assert_eq!(event.amount, expected_amount);
     assert_eq!(event.at_tick, 1);
 }
@@ -163,20 +164,23 @@ fn multiple_entities_land_without_interference() {
 
     let expected_a = ((8.0_f64.min(TERMINAL_VELOCITY) - SAFE_LANDING_SPEED) * FALL_DAMAGE_SCALE)
         .min(f64::from(u16::MAX))
-        .floor() as u16;
+        .floor();
     let expected_b = ((12.0_f64.min(TERMINAL_VELOCITY) - SAFE_LANDING_SPEED) * FALL_DAMAGE_SCALE)
         .min(f64::from(u16::MAX))
-        .floor() as u16;
+        .floor();
 
-    assert_eq!(events[0].entity, 1);
-    assert_eq!(events[0].source, DamageSource::Fall);
-    assert_eq!(events[0].amount, expected_a);
-    assert_eq!(events[0].at_tick, 1);
+    let (first_slice, rest) = events.split_at(1);
+    let first = test_utils::expect_single(first_slice, "first fall damage event");
+    assert_eq!(first.entity, 1);
+    assert_eq!(first.source, DamageSource::Fall);
+    assert_eq!(first.amount, expect_u16(expected_a));
+    assert_eq!(first.at_tick, 1);
 
-    assert_eq!(events[1].entity, 2);
-    assert_eq!(events[1].source, DamageSource::Fall);
-    assert_eq!(events[1].amount, expected_b);
-    assert_eq!(events[1].at_tick, 1);
+    let second = test_utils::expect_single(rest, "second fall damage event");
+    assert_eq!(second.entity, 2);
+    assert_eq!(second.source, DamageSource::Fall);
+    assert_eq!(second.amount, expect_u16(expected_b));
+    assert_eq!(second.at_tick, 1);
 }
 
 #[rstest]
@@ -214,8 +218,10 @@ fn cooldown_prevents_rapid_retrigger() {
     circuit.step().expect("initial landing");
     let initial_events = delta_events(&output, &mut cumulative);
     assert_eq!(initial_events.len(), 1);
-    assert_eq!(initial_events[0].1, 1);
-    let first_event = initial_events[0].0;
+    let (first_event_record, first_count_ref) =
+        test_utils::expect_single(&initial_events, "initial landing event");
+    let first_count = *first_count_ref;
+    assert_eq!(first_count, 1);
 
     standing_in.push(standing_pf.clone(), -1);
     unsupported_in.push(unsupported_pf.clone(), 1);
@@ -241,10 +247,11 @@ fn cooldown_prevents_rapid_retrigger() {
     standing_in.push(standing_pf.clone(), 1);
     circuit.step().expect("post-cooldown landing");
     let final_events = delta_events(&output, &mut cumulative);
-    assert_eq!(final_events.len(), 1);
-    assert_eq!(final_events[0].1, 1);
-    let final_event = final_events[0].0;
+    let (final_event_record, final_count_ref) =
+        test_utils::expect_single(&final_events, "final landing event");
+    let final_count = *final_count_ref;
+    assert_eq!(final_count, 1);
 
-    assert!(final_event.at_tick > first_event.at_tick);
+    assert!(final_event_record.at_tick > first_event_record.at_tick);
     assert_eq!(cumulative.len(), 2);
 }

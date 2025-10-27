@@ -15,9 +15,11 @@ pub const TERMINAL_VELOCITY: f64 = 12.0;
 pub const GRAVITY_PULL: f64 = -1.0;
 /// Safe landing speed in block units per tick.
 pub const SAFE_LANDING_SPEED: f64 = 6.0;
-/// Damage scaling applied to speed beyond the safe landing threshold, in health points per block per tick.
+/// Damage scaling applied to speed beyond the safe landing threshold, in
+/// health points per block per tick.
 pub const FALL_DAMAGE_SCALE: f64 = 4.0;
-/// Minimum interval between fall damage applications, in ticks. One tick equals DELTA_TIME seconds.
+/// Minimum interval between fall damage applications, in ticks. One tick equals
+/// `DELTA_TIME` seconds.
 pub const LANDING_COOLDOWN_TICKS: u32 = 6;
 /// Simulation time step in seconds.
 pub const DELTA_TIME: f64 = 1.0;
@@ -30,7 +32,7 @@ pub const FEAR_THRESHOLD: f64 = 0.2;
 /// Minimum squared distance added to fear calculations to avoid division by
 /// zero when threats coincide with the actor, in block units.
 pub const FEAR_DISTANCE_EPSILON: f64 = 0.001;
-/// Normalized offset used to sample slopes within a block, unitless.
+/// Normalised offset used to sample slopes within a block, unitless.
 ///
 /// The `FloorHeightAt` calculation currently evaluates the slope at the
 /// centre of each block because entity-specific offsets are not yet
