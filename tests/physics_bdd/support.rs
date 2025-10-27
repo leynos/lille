@@ -2,7 +2,7 @@
 
 use approx::assert_relative_eq;
 use bevy::prelude::*;
-use lille::numeric::{expect_f32, expect_u16};
+use lille::numeric::expect_f32;
 use lille::{
     components::{Block, BlockSlope, ForceComp},
     DbspPlugin, DdlogId, Health, VelocityComp,
