@@ -41,11 +41,16 @@ macro_rules! impl_test_helper {
 /// # }
 /// ```
 ///
+/// Builds a new [`DbspCircuit`] configured for stream tests.
+///
 /// # Panics
 /// Panics if the underlying [`DbspCircuit::new`] call fails to construct the circuit.
 #[must_use]
 pub fn new_circuit() -> DbspCircuit {
-    DbspCircuit::new().unwrap_or_else(|error| panic!("failed to build DBSP circuit: {error}"))
+    match DbspCircuit::new() {
+        Ok(circuit) => circuit,
+        Err(error) => panic!("failed to build DBSP circuit: {error}"),
+    }
 }
 
 /// Constructs a [`Block`] with the given identifier and coordinates.
