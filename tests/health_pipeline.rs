@@ -197,6 +197,20 @@ fn apply_damage_sequence(
     Ok(())
 }
 
+/// Push unsequenced damage twice within the same tick and update.
+fn apply_unsequenced_damage_within_tick(env: &mut HealthEnv, event: DamageEvent) -> Result<()> {
+    env.push_damage_twice(event)?;
+    env.update()
+}
+
+/// Push unsequenced damage twice, update, then replay it once more.
+fn apply_and_replay_unsequenced_damage(env: &mut HealthEnv, event: DamageEvent) -> Result<()> {
+    env.push_damage_twice(event)?;
+    env.update()?;
+    env.push_damage(event)?;
+    env.update()
+}
+
 type PostPlanFn = fn(&mut HealthEnv) -> Result<()>;
 
 #[expect(
@@ -213,17 +227,12 @@ fn no_follow_up(_: &mut HealthEnv) -> Result<()> {
 
 fn apply_unsequenced_duplicates(env: &mut HealthEnv) -> Result<()> {
     let unsequenced = unsequenced_damage();
-    env.push_damage_twice(unsequenced)?;
-    env.update()?;
-    Ok(())
+    apply_unsequenced_damage_within_tick(env, unsequenced)
 }
 
 fn apply_unsequenced_duplicates_with_replay(env: &mut HealthEnv) -> Result<()> {
-    apply_unsequenced_duplicates(env)?;
     let unsequenced = unsequenced_damage();
-    env.push_damage(unsequenced)?;
-    env.update()?;
-    Ok(())
+    apply_and_replay_unsequenced_damage(env, unsequenced)
 }
 
 #[rstest]
