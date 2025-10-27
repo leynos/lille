@@ -1,5 +1,10 @@
 //! Shared constructors for physics records and a helper to initialise a
 //! `DbspCircuit` for tests and examples.
+#![warn(clippy::expect_used)]
+#![allow(
+    unfulfilled_lint_expectations,
+    reason = "allow-expect-in-tests suppresses clippy::expect_used, so we document the intentional expect"
+)]
 
 use crate::components::{Block, BlockSlope};
 use crate::dbsp_circuit::{DbspCircuit, Force, Position, Velocity};
@@ -45,12 +50,14 @@ macro_rules! impl_test_helper {
 ///
 /// # Panics
 /// Panics if the underlying [`DbspCircuit::new`] call fails to construct the circuit.
+#[cfg_attr(test, deny(clippy::expect_used))]
+#[expect(
+    clippy::expect_used,
+    reason = "Test helper must panic loudly on circuit construction failure"
+)]
 #[must_use]
 pub fn new_circuit() -> DbspCircuit {
-    match DbspCircuit::new() {
-        Ok(circuit) => circuit,
-        Err(error) => panic!("failed to build DBSP circuit: {error}"),
-    }
+    DbspCircuit::new().expect("failed to build DBSP circuit")
 }
 
 /// Constructs a [`Block`] with the given identifier and coordinates.
