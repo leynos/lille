@@ -59,6 +59,43 @@ impl Env {
     }
 }
 
+/// Assert actual positions match expected tuple values (entity, x, y, z).
+fn assert_positions_match_tuples(
+    actual: &[NewPosition],
+    expected: &[(i64, f64, f64, f64)],
+) -> Result<()> {
+    ensure!(
+        actual.len() == expected.len(),
+        "expected {} entities, observed {}",
+        expected.len(),
+        actual.len()
+    );
+    for (position, (entity, x, y, z)) in actual.iter().zip(expected.iter().copied()) {
+        ensure!(
+            position.entity == entity,
+            "entity mismatch: expected {}, found {}",
+            entity,
+            position.entity
+        );
+        ensure!(
+            relative_eq!(position.x.into_inner(), x),
+            "x mismatch for entity {}",
+            entity
+        );
+        ensure!(
+            relative_eq!(position.y.into_inner(), y),
+            "y mismatch for entity {}",
+            entity
+        );
+        ensure!(
+            relative_eq!(position.z.into_inner(), z),
+            "z mismatch for entity {}",
+            entity
+        );
+    }
+    Ok(())
+}
+
 #[derive(Clone)]
 struct ReactiveScenario {
     description: &'static str,
@@ -205,31 +242,5 @@ fn handles_multiple_entities_with_mixed_states() -> Result<()> {
         ),
         (3, 0.0, 0.0, 1.0),
     ];
-    ensure!(
-        out.len() == expected.len(),
-        "expected {} entities, observed {}",
-        expected.len(),
-        out.len()
-    );
-    for (position, (entity, x, y, z)) in out.iter().zip(expected) {
-        ensure!(
-            position.entity == entity,
-            "entity mismatch: expected {}, found {}",
-            entity,
-            position.entity
-        );
-        ensure!(
-            relative_eq!(position.x.into_inner(), x),
-            "x mismatch for entity {entity}"
-        );
-        ensure!(
-            relative_eq!(position.y.into_inner(), y),
-            "y mismatch for entity {entity}"
-        );
-        ensure!(
-            relative_eq!(position.z.into_inner(), z),
-            "z mismatch for entity {entity}"
-        );
-    }
-    Ok(())
+    assert_positions_match_tuples(&out, &expected)
 }
