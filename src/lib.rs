@@ -39,11 +39,11 @@ pub use dbsp_sync::{
     DbspPlugin,
 };
 pub use entity::{BadGuy, WorldEntity};
+/// Legacy alias for [`WorldEntity`]; prefer the new name.
 #[deprecated(
-    since = "0.2.0",
+    since = "0.1.0",
     note = "Type renamed to `WorldEntity`. This alias will be removed in the next release."
 )]
-/// Legacy alias for [`WorldEntity`]; prefer the new name.
 pub type Entity = WorldEntity;
 pub use logging::init as init_logging;
 pub use physics::{applied_acceleration, apply_ground_friction};
