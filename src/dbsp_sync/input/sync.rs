@@ -6,11 +6,37 @@ use bevy::prelude::{Entity, Query};
 use dbsp::operator::input::ZSetHandle;
 use log::{debug, warn};
 
-use crate::components::{Block, BlockSlope, DdlogId, ForceComp, Health};
+use crate::components::{
+    Block, BlockSlope, DdlogId, ForceComp, Health, Target as TargetComp, VelocityComp,
+};
 use crate::dbsp_circuit::{DbspCircuit, Force, HealthState, Position, Target, Velocity};
 use crate::world_handle::{DdlogEntity, WorldHandle};
 
 use super::{DbspState, EntityRow, IdQueries};
+
+/// Macro to generate component synchronisation wrapper functions.
+macro_rules! sync_component_wrapper {
+    (
+        $(#[$meta:meta])* $fn_name:ident, $row_field:tt, $component_type:ty,
+        $struct_name:ident { $($field:ident),+ }, $input_handle:ident
+    ) => {
+        $(#[$meta])*
+        fn $fn_name(state: &mut DbspState, query: &mut Query<EntityRow<'_>>) {
+            sync_component(
+                state,
+                query,
+                |row| row.$row_field.map(|component: &$component_type| {
+                    ( $(component.$field),+ )
+                }),
+                |entity, ( $( $field ),+ )| $struct_name {
+                    entity,
+                    $( $field: f64::from($field).into() ),+
+                },
+                |circuit: &DbspCircuit| circuit.$input_handle(),
+            );
+        }
+    };
+}
 
 pub(super) fn blocks(
     circuit: &mut DbspCircuit,
@@ -105,36 +131,23 @@ fn sync_positions(
     }
 }
 
-/// Synchronises entity velocities with the DBSP circuit.
-fn sync_velocities(state: &mut DbspState, query: &mut Query<EntityRow<'_>>) {
-    sync_component(
-        state,
-        query,
-        |row| row.3.map(|v| (v.vx, v.vy, v.vz)),
-        |entity, (vx, vy, vz)| Velocity {
-            entity,
-            vx: f64::from(vx).into(),
-            vy: f64::from(vy).into(),
-            vz: f64::from(vz).into(),
-        },
-        |circuit: &DbspCircuit| circuit.velocity_in(),
-    );
-}
+sync_component_wrapper!(
+    /// Synchronises entity velocities with the DBSP circuit.
+    sync_velocities,
+    3,
+    VelocityComp,
+    Velocity { vx, vy, vz },
+    velocity_in
+);
 
-/// Synchronises entity targets with the DBSP circuit.
-fn sync_targets(state: &mut DbspState, query: &mut Query<EntityRow<'_>>) {
-    sync_component(
-        state,
-        query,
-        |row| row.4.map(|t| (t.x, t.y)),
-        |entity, (x, y)| Target {
-            entity,
-            x: f64::from(x).into(),
-            y: f64::from(y).into(),
-        },
-        |circuit: &DbspCircuit| circuit.target_in(),
-    );
-}
+sync_component_wrapper!(
+    /// Synchronises entity targets with the DBSP circuit.
+    sync_targets,
+    4,
+    TargetComp,
+    Target { x, y },
+    target_in
+);
 
 /// Mirrors entity health into the circuit, enforcing clamps and logging once.
 fn sync_health(state: &mut DbspState, query: &mut Query<EntityRow<'_>>) {
