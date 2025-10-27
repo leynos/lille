@@ -43,13 +43,9 @@ macro_rules! impl_test_helper {
 ///
 /// # Panics
 /// Panics if the underlying [`DbspCircuit::new`] call fails to construct the circuit.
-#[expect(
-    clippy::expect_used,
-    reason = "Test helper must panic loudly on circuit construction failure"
-)]
 #[must_use]
 pub fn new_circuit() -> DbspCircuit {
-    DbspCircuit::new().expect("failed to build DBSP circuit")
+    DbspCircuit::new().unwrap_or_else(|error| panic!("failed to build DBSP circuit: {error}"))
 }
 
 /// Constructs a [`Block`] with the given identifier and coordinates.
