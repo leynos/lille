@@ -46,12 +46,12 @@ impl Default for TestWorld {
 }
 
 impl TestWorld {
-    /// Acquire the underlying Bevy `App` with panic-on-poison semantics.
+    /// Acquire the underlying Bevy `App`, recovering the guard if the mutex is poisoned.
     pub fn app_guard(&self) -> MutexGuard<'_, App> {
         self.app.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    /// Access the expected-damage slot, panicking if the mutex is poisoned.
+    /// Access the expected-damage slot, recovering the guard if the mutex is poisoned.
     pub fn expected_damage_guard(&self) -> MutexGuard<'_, Option<u16>> {
         self.expected_damage
             .lock()
