@@ -1,6 +1,6 @@
 //! Tests covering standing and diagonal friction, force clamping, and unsupported velocity caps.
-use bevy::prelude::*;
 use crate::support::{spawn_blocks, world, TestWorld};
+use bevy::prelude::*;
 use lille::components::ForceComp;
 use lille::numeric::expect_f32;
 use lille::{
@@ -8,6 +8,7 @@ use lille::{
 };
 use rstest::rstest;
 
+/// Bundles the block layout, initial state, applied force, and expected outcomes for a friction BDD case.
 struct FrictionConfig {
     blocks: &'static [(i32, i32, i32)],
     transform_z: f32,
@@ -17,6 +18,7 @@ struct FrictionConfig {
     expected_velocity: (f64, f64, f64),
 }
 
+/// Applies a friction configuration by spawning blocks, creating the entity fixtures, and advancing the world one tick.
 fn apply_config(world: &mut TestWorld, config: &FrictionConfig) {
     spawn_blocks(world, config.blocks);
     let transform = Transform::from_xyz(0.0, 0.0, config.transform_z);

@@ -1,11 +1,6 @@
 //! Shared constructors for physics records and a helper to initialise a
 //! `DbspCircuit` for tests and examples.
 
-#![allow(
-    clippy::expect_used,
-    reason = "Test helpers panic explicitly on construction failures"
-)]
-
 use crate::components::{Block, BlockSlope};
 use crate::dbsp_circuit::{DbspCircuit, Force, Position, Velocity};
 pub use test_utils::physics::{
@@ -48,6 +43,10 @@ macro_rules! impl_test_helper {
 ///
 /// # Panics
 /// Panics if the underlying [`DbspCircuit::new`] call fails to construct the circuit.
+#[expect(
+    clippy::expect_used,
+    reason = "Test helper must panic loudly on circuit construction failure"
+)]
 #[must_use]
 pub fn new_circuit() -> DbspCircuit {
     DbspCircuit::new().expect("failed to build DBSP circuit")
