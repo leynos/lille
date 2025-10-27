@@ -453,7 +453,11 @@ mod tests {
 
     #[test]
     fn no_decision_without_target() {
-        let (circuit, (fear_in, pos_in, decisions_handle)) = RootCircuit::build(|c| {
+        #[expect(
+            unused_mut,
+            reason = "Mutable binding retained for compatibility with API expectations"
+        )]
+        let (mut circuit, (fear_in, pos_in, decisions_handle)) = RootCircuit::build(|c| {
             let (fear_input, fi) = c.add_input_zset::<FearLevel>();
             let (pos_s, pi) = c.add_input_zset::<Position>();
             let targets = c.add_input_zset::<Target>().0;
