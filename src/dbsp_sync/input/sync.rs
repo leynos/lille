@@ -159,9 +159,19 @@ sync_component_wrapper!(
     target_in
 );
 
+fn create_and_store_health_snapshot(state: &mut DbspState, entity: u64, current: u16, max: u16) {
+    let circuit = &state.circuit;
+    let snapshot = HealthState {
+        entity,
+        current,
+        max,
+    };
+    circuit.health_state_in().push(snapshot, 1);
+    state.health_snapshot.insert(entity, snapshot);
+}
+
 /// Mirrors entity health into the circuit, enforcing clamps and logging once.
 fn sync_health(state: &mut DbspState, query: &mut Query<EntityRow<'_>>) {
-    let circuit = &state.circuit;
     for (_, id, _, _, _, mut health_opt) in query.iter_mut() {
         let Some(health) = health_opt.as_deref_mut() else {
             continue;
@@ -179,13 +189,7 @@ fn sync_health(state: &mut DbspState, query: &mut Query<EntityRow<'_>>) {
             );
         }
         health.current = clamped_current;
-        let snapshot = HealthState {
-            entity: entity_id,
-            current: clamped_current,
-            max: max_value,
-        };
-        circuit.health_state_in().push(snapshot, 1);
-        state.health_snapshot.insert(entity_id, snapshot);
+        create_and_store_health_snapshot(state, entity_id, clamped_current, max_value);
     }
 }
 
