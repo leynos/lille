@@ -220,18 +220,15 @@ fn handles_multiple_entities_with_mixed_states() -> Result<()> {
         );
         ensure!(
             relative_eq!(position.x.into_inner(), x),
-            "x mismatch for entity {}",
-            entity
+            "x mismatch for entity {entity}"
         );
         ensure!(
             relative_eq!(position.y.into_inner(), y),
-            "y mismatch for entity {}",
-            entity
+            "y mismatch for entity {entity}"
         );
         ensure!(
             relative_eq!(position.z.into_inner(), z),
-            "z mismatch for entity {}",
-            entity
+            "z mismatch for entity {entity}"
         );
     }
     Ok(())
