@@ -78,6 +78,19 @@ By fulfilling these responsibilities, the `LilleMapPlugin` will provide an
 *implementation blueprint* that Lille developers can follow to integrate Tiled
 maps into the engine, aligning with Lille’s declarative, data-driven design.
 
+### 2.1 Current implementation snapshot
+
+- `src/map.rs` now exposes `LilleMapPlugin`, a thin Bevy plugin that registers
+  `bevy_ecs_tiled::TiledPlugin` once and otherwise defers to DBSP for
+  authoritative interpretation of any derived behaviour.
+- The historical `spawn_world_system` entry point has been removed so the map
+  plugin is the sole surface for bringing authored environments into the engine.
+- `tests/map_plugin.rs` covers the happy path (plugin registers the Tiled
+  pipeline) with `rstest` and a behavioural scenario using `rust-rspec` to
+  prove that user-supplied Tiled configuration is preserved even when
+  `LilleMapPlugin` is re-added. This safeguards the DBSP circuit’s status as
+  the source of truth for inferred world state.
+
 ## 3. Map Loading Lifecycle (From Asset to Entities)
 
 Understanding the lifecycle of loading a Tiled map is key to designing our
@@ -368,7 +381,7 @@ general entity hierarchy and relevant components:
   terrain for physics. This is a Lille ECS component defined as
   `Block { id: i64, x: i32, y: i32, z: i32 }`
   ([7](https://github.com/leynos/lille/blob/8af31fc80ee2784e8ac40d96e49e33cb4b77e9f0/src/components.rs#L44-L52)).
-  It identifies a cell of solid ground or obstacle in the world. We will
+   It identifies a cell of solid ground or obstacle in the world. We will
   compute and assign these values based on the map:
 
 - `x, y, z`: the grid coordinates of the block. For a 2D map, `x` and `y`
@@ -396,7 +409,7 @@ general entity hierarchy and relevant components:
   sloped surface. `BlockSlope` is defined as
   `BlockSlope { block_id: i64, grad_x: f64, grad_y: f64 }`
   ([7](https://github.com/leynos/lille/blob/8af31fc80ee2784e8ac40d96e49e33cb4b77e9f0/src/components.rs#L68-L73)).
-  It represents the slope (gradient) of a block, for sloped terrain. The
+   It represents the slope (gradient) of a block, for sloped terrain. The
   `block_id` links to the `Block.id` so the physics circuit can join them (the
   slope modifies the block’s floor
   height)([3](https://github.com/leynos/lille/blob/8af31fc80ee2784e8ac40d96e49e33cb4b77e9f0/docs/lille-physics-engine-design.md#L79-L83)).
@@ -434,14 +447,14 @@ classDiagram
         - GlobalTransform : (world coords)
         - Collidable : true  <<custom property tag>>
         - SlopeProp : grad_x=0.5, grad_y=0.0  <<if slope>>
-        + Block : {id, x=10, y=5, z=0}
-        + BlockSlope : {block_id=id, grad_x=0.5, grad_y=0.0} <<if slope>>
+        + attach_block(id,x,y,z)
+        + attach_block_slope(block_id,grad_x,grad_y) <<if slope>>
     }
     class ObjectEntity {
         - Name : "PlayerSpawn"
         - Transform : (world coords)
-        - SpawnPoint : {enemy_type:0, respawn:false} <<custom component>>
-        + (spawns Player on load)
+        - SpawnPoint : enemy_type=0, respawn=false <<custom component>>
+        + spawn_player_on_load()
     }
     MapEntity *-- LayerEntity : "child"
     LayerEntity *-- TileEntity : "child tile"
@@ -1202,7 +1215,7 @@ update the corresponding `Block` in ECS and thus push a retraction (`-1`) to
 the DBSP input. The DBSP API allows removals by pushing a record with weight
 `-1`
 ([4](https://github.com/leynos/lille/blob/53d933fd0e70e88701245432682616258493b3b1/src/dbsp_sync/input.rs#L82-L90)).
-Currently, the engine’s input sync tracks removals of entities via `removed`
+ Currently, the engine’s input sync tracks removals of entities via `removed`
 queries for `DdlogId`, etc., but for Blocks we don’t assign `DdlogId`
 typically. We could manage a similar mechanism or simply treat map
 modifications as events that rebuild that part of the circuit. For now, static
