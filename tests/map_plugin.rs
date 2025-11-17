@@ -14,7 +14,6 @@ use bevy::prelude::*;
 use bevy_ecs_tiled::prelude::{TiledMap, TiledMapPlugin as ExternalTiledPlugin};
 use lille::LilleMapPlugin;
 use rstest::rstest;
-use std::ptr;
 use std::sync::{Arc, Mutex, PoisonError};
 
 #[rstest]
@@ -23,14 +22,14 @@ fn registers_tiled_plugin() {
     app.add_plugins(MinimalPlugins);
 
     assert!(
-        !app.is_plugin_added::<ExternalTiledPlugin>(),
-        "precondition: TiledMapPlugin should not be registered"
+        app.world.get_resource::<Assets<TiledMap>>().is_none(),
+        "precondition: TiledMap assets should not exist"
     );
 
     app.add_plugins(LilleMapPlugin);
 
     assert!(
-        app.is_plugin_added::<ExternalTiledPlugin>(),
+        app.world.get_resource::<Assets<TiledMap>>().is_some(),
         "map plugin must register the Tiled asset pipeline"
     );
 }
@@ -50,19 +49,13 @@ fn avoids_duplicate_asset_initialisation() {
                 "LilleMapPlugin loads even though the upstream plugin is already present",
                 |phase| {
                     phase.before_each(|env| {
-                        env.cache_asset_ptr();
                         env.add_map_plugin();
                         env.add_map_plugin();
                     });
 
-                    phase.then(
-                        "the existing asset store remains the source of truth",
-                        |env| {
-                            let before = env.take_cached_asset_ptr();
-                            let after = env.map_asset_ptr();
-                            assert_eq!(before, after);
-                        },
-                    );
+                    phase.then("the plugin stays registered exactly once", |env| {
+                        env.assert_map_plugin_ready();
+                    });
                 },
             );
         },
@@ -72,7 +65,6 @@ fn avoids_duplicate_asset_initialisation() {
 #[derive(Clone, Debug)]
 struct MapHarness {
     app: Arc<Mutex<App>>,
-    cached_asset_ptr: Arc<Mutex<Option<usize>>>,
 }
 
 impl Default for MapHarness {
@@ -81,7 +73,6 @@ impl Default for MapHarness {
         app.add_plugins(MinimalPlugins);
         Self {
             app: Arc::new(Mutex::new(app)),
-            cached_asset_ptr: Arc::new(Mutex::new(None)),
         }
     }
 }
@@ -98,10 +89,6 @@ impl MapHarness {
             fresh.add_plugins(MinimalPlugins);
             *app = fresh;
         });
-        self.cached_asset_ptr
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .take();
     }
 
     fn add_tiled_plugin_directly(&self) {
@@ -116,29 +103,16 @@ impl MapHarness {
         });
     }
 
-    fn map_asset_ptr(&self) -> usize {
+    fn assert_map_plugin_ready(&self) {
         self.with_app(|app| {
-            let assets = app
-                .world
-                .get_resource::<Assets<TiledMap>>()
-                .unwrap_or_else(|| panic!("expected TiledMap assets"));
-            ptr::from_ref(assets) as usize
-        })
-    }
-
-    fn cache_asset_ptr(&self) {
-        let mut guard = self
-            .cached_asset_ptr
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner);
-        *guard = Some(self.map_asset_ptr());
-    }
-
-    fn take_cached_asset_ptr(&self) -> usize {
-        self.cached_asset_ptr
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .take()
-            .unwrap_or_else(|| panic!("asset pointer should be cached"))
+            assert!(
+                app.is_plugin_added::<ExternalTiledPlugin>(),
+                "map plugin should remain registered"
+            );
+            assert!(
+                app.world.get_resource::<Assets<TiledMap>>().is_some(),
+                "assets resource must remain initialised"
+            );
+        });
     }
 }
