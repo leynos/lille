@@ -57,6 +57,9 @@ anyhow = { workspace = true }
 [workspace]
 members = ["build_support", "test_utils"]
 
+[patch.crates-io]
+bevy_ecs_tiled = { path = "third_party/bevy_ecs_tiled" }
+
 [workspace.dependencies]
 anyhow = "1"
 glam = "0.30"
