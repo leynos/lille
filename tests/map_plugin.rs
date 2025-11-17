@@ -88,10 +88,7 @@ impl Default for MapHarness {
 
 impl MapHarness {
     fn with_app<R>(&self, f: impl FnOnce(&mut App) -> R) -> R {
-        let mut guard = self
-            .app
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner);
+        let mut guard = self.app.lock().unwrap_or_else(PoisonError::into_inner);
         f(&mut guard)
     }
 
