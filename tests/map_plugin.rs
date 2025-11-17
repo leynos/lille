@@ -10,7 +10,7 @@
 //! Verifies that `LilleMapPlugin` wires the Tiled asset pipeline without
 //! overriding player-authored behaviours already expressed through DBSP.
 
-use bevy::prelude::*;
+use bevy::{asset::AssetPlugin, prelude::*};
 use bevy_ecs_tiled::prelude::{TiledMap, TiledMapPlugin as ExternalTiledPlugin};
 use lille::LilleMapPlugin;
 use rstest::rstest;
@@ -70,7 +70,7 @@ struct MapHarness {
 impl Default for MapHarness {
     fn default() -> Self {
         let mut app = App::new();
-        app.add_plugins(MinimalPlugins);
+        Self::install_baseline_plugins(&mut app);
         Self {
             app: Arc::new(Mutex::new(app)),
         }
@@ -78,6 +78,16 @@ impl Default for MapHarness {
 }
 
 impl MapHarness {
+    // `MinimalPlugins` keeps the scheduler lightweight, but it also omits
+    // `AssetPlugin`. The Tiled asset loader depends on `AssetServer`, so the
+    // harness adds the asset plugin explicitly to mimic real game startup.
+    fn install_baseline_plugins(app: &mut App) {
+        app.add_plugins(MinimalPlugins);
+        if !app.is_plugin_added::<AssetPlugin>() {
+            app.add_plugins(AssetPlugin::default());
+        }
+    }
+
     fn with_app<R>(&self, f: impl FnOnce(&mut App) -> R) -> R {
         let mut guard = self.app.lock().unwrap_or_else(PoisonError::into_inner);
         f(&mut guard)
@@ -86,7 +96,7 @@ impl MapHarness {
     fn reset(&self) {
         self.with_app(|app| {
             let mut fresh = App::new();
-            fresh.add_plugins(MinimalPlugins);
+            Self::install_baseline_plugins(&mut fresh);
             *app = fresh;
         });
     }

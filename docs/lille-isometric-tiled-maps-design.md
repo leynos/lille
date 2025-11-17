@@ -81,8 +81,10 @@ maps into the engine, aligning with Lille’s declarative, data-driven design.
 ### 2.1 Current implementation snapshot
 
 - `src/map.rs` now exposes `LilleMapPlugin`, a thin Bevy plugin that registers
-  `bevy_ecs_tiled::TiledPlugin` once and otherwise defers to DBSP for
-  authoritative interpretation of any derived behaviour.
+  `bevy_ecs_tiled::TiledPlugin` once, backfills `AssetPlugin` when Lille runs
+  on `MinimalPlugins`, opts out of Bevy's uniqueness guard so repeated
+  `add_plugins(LilleMapPlugin)` calls remain legal, and otherwise defers to
+  DBSP for authoritative interpretation of any derived behaviour.
 - The historical `spawn_world_system` entry point has been removed so the map
   plugin is the sole surface for bringing authored environments into the engine.
 - `tests/map_plugin.rs` covers the happy path (plugin registers the Tiled

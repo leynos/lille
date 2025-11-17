@@ -4,7 +4,7 @@
 //! remains the single authority for inferred world behaviour. The plugin only
 //! exposes the data pipeline, allowing DBSP-driven systems to interpret the
 //! loaded entities.
-use bevy::prelude::*;
+use bevy::{asset::AssetPlugin, prelude::*};
 use bevy_ecs_tiled::prelude::TiledMapPlugin as TiledPlugin;
 
 /// Registers the `bevy_ecs_tiled` plugin exactly once.
@@ -25,10 +25,29 @@ pub struct LilleMapPlugin;
 
 impl Plugin for LilleMapPlugin {
     fn build(&self, app: &mut App) {
+        ensure_asset_pipeline(app);
+
         if app.is_plugin_added::<TiledPlugin>() {
             return;
         }
 
         app.add_plugins(TiledPlugin);
     }
+
+    // Multiple subsystems may call `add_plugins(LilleMapPlugin)`; reporting the
+    // plugin as non-unique allows Bevy to accept repeated registrations while
+    // the guard above keeps the actual wiring idempotent.
+    fn is_unique(&self) -> bool {
+        false
+    }
+}
+
+// Minimal Bevy setups omit `AssetServer`, so eagerly install the asset plugin
+// to prevent downstream loaders (such as `TiledPlugin`) from panicking.
+fn ensure_asset_pipeline(app: &mut App) {
+    if app.is_plugin_added::<AssetPlugin>() {
+        return;
+    }
+
+    app.add_plugins(AssetPlugin::default());
 }
