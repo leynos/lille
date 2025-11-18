@@ -1170,8 +1170,8 @@ and Parameterization** <!-- markdownlint-disable MD013 -->
 | Feature                                  | Standard #[test] Approach                                     | rstest Approach                                                                  |
 | ---------------------------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | Fixture Injection                        | Manual calls to setup functions within each test.             | Fixture name as argument in #[rstest] function; fixture defined with #[fixture]. |
-| Parameterized Tests (Specific Cases)     | Loop inside one test, or multiple distinct #[test] functions. | #[case(…)] attributes on #[rstest] function.                                   |
-| Parameterized Tests (Value Combinations) | Nested loops inside one test, or complex manual generation.   | #[values(…)] attributes on arguments of #[rstest] function.                    |
+| Parameterized Tests (Specific Cases)     | Loop inside one test, or multiple distinct #[test] functions. | #[case(…)] attributes on #[rstest] function.                                     |
+| Parameterized Tests (Value Combinations) | Nested loops inside one test, or complex manual generation.   | #[values(…)] attributes on arguments of #[rstest] function.                      |
 | Async Fixture Setup                      | Manual async block and .await calls inside test.              | async fn fixtures, with #[future] and #[awt] for ergonomic .awaiting.            |
 | Reusing Parameter Sets                   | Manual duplication of cases or custom helper macros.          | rstest_reuse crate with #[template] and #[apply] attributes.                     |
 <!-- markdownlint-enable MD013 -->
@@ -1313,20 +1313,20 @@ provided by `rstest`:
 **Table 2: Key** `rstest` **Attributes Quick Reference** <!--
 markdownlint-disable MD013 -->
 
-| Attribute | Purpose |
-| --------- | ------- |
-| `#[rstest]` | Marks a function as an rstest test; enables fixture injection and parameterization. |
-| `#[fixture]` | Defines a fixture provider function. |
-| `#[case(…)]` | Defines a single parameterised test case. |
-| `#[values(…)]` | Specifies a set of values for parameterisation. |
-| `#[once]` | Initialises a fixture only once. |
-| `#[future]` | Simplifies async argument types by removing `impl Future`. |
-| `#[awt]` | Automatically awaits future arguments in async tests. |
-| `#[from(original_name)]` | Renames an injected fixture argument. |
-| `#[with(…)]` | Overrides default fixture arguments. |
-| `#[default(…)]` | Provides default values inside a fixture. |
-| `#[timeout(…)]` | Sets a timeout for an asynchronous test. |
-| `#[files("glob_pattern",…)]` | Injects file paths matching a glob pattern as test arguments. |
+| Attribute                      | Purpose                                                                             |
+| ------------------------------ | ----------------------------------------------------------------------------------- |
+| `#[rstest]`                    | Marks a function as an rstest test; enables fixture injection and parameterization. |
+| `#[fixture]`                   | Defines a fixture provider function.                                                |
+| `#[case(…)]`                   | Defines a single parameterised test case.                                           |
+| `#[values(…)]`                 | Specifies a set of values for parameterisation.                                     |
+| `#[once]`                      | Initialises a fixture only once.                                                    |
+| `#[future]`                    | Simplifies async argument types by removing `impl Future`.                          |
+| `#[awt]`                       | Automatically awaits future arguments in async tests.                               |
+| `#[from(original_name)]`       | Renames an injected fixture argument.                                               |
+| `#[with(…)]`                   | Overrides default fixture arguments.                                                |
+| `#[default(…)]`                | Provides default values inside a fixture.                                           |
+| `#[timeout(…)]`                | Sets a timeout for an asynchronous test.                                            |
+| `#[files("glob_pattern",…)]`   | Injects file paths matching a glob pattern as test arguments.                       |
 <!-- markdownlint-enable MD013 -->
 
 By mastering `rstest`, Rust developers can significantly elevate the quality
