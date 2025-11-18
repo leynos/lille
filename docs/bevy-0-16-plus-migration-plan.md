@@ -62,6 +62,19 @@ stable and headless builds reproducible.
 - CI scripts call `make fmt|lint|test`; no Bevy-specific runners exist yet, so
   new checks (wasm, feature combos) must be added explicitly.
 
+## Subsystem ownership
+
+| Subsystem                | Owner(s)                 |
+| ------------------------ | ------------------------ |
+| Render                   | Leynos / Payton McIntosh |
+| Testing and CI           | Leynos / Payton McIntosh |
+| DBSP circuit integration | Leynos / Payton McIntosh |
+
+Lille currently has a single maintainer, so the same person covers both owner
+and reviewer duties. Whenever a change is high risk (render regressions, DBSP
+semantics, CI infra), queue an ad-hoc reviewer from the wider contributors list
+before merging to keep the “two sets of eyes” policy meaningful.
+
 ## Execution Phases
 
 ### Phase 0 – Pre-flight
@@ -70,6 +83,17 @@ stable and headless builds reproducible.
 - Capture baseline artefacts: `cargo check --all-features`, `cargo test`, and a
   short render smoke test to compare behaviour later.
 - Document owners for each subsystem (render/test/DBSP) and line up reviewers.
+
+#### Phase 0 baseline (18 November 2025)
+
+- Logs for the required commands live under
+  `artifacts/bevy-0-17-upgrade/phase-0/`. The workflow and observations are
+  documented in `docs/migrations/bevy-0-17-phase-0.md` so future phases can
+  reuse the same scripts and diff the results.
+- Render smoke testing uses
+  `RUST_LOG=info timeout 5s cargo run -p lille --features render -- --verbose`
+  to avoid hanging CI while still exercising window creation and DBSP
+  synchronisation. The timeout-induced exit status is expected.
 
 ### Phase 1 – 0.12 → 0.13
 
