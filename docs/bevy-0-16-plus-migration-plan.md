@@ -93,7 +93,7 @@ before merging to keep the “two sets of eyes” policy meaningful.
 - Render smoke testing uses
   `RUST_LOG=info timeout 5s cargo run -p lille --features render -- --verbose`
   to avoid hanging CI while still exercising window creation and DBSP
-  synchronisation. The timeout-induced exit status is expected.
+  synchronization. The timeout-induced exit status is expected.
 
 ### Phase 1 – 0.12 → 0.13
 

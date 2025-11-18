@@ -14,7 +14,7 @@ later phases.
   `bevy_math`, `bevy_reflect`, `bevy_transform`, and the optional `bevy_log`
   crate to `0.13`. The linux-only dependency mirrors the same version bump.
 - Added a `TestWorld::spawn_orphan_entity` helper plus a tracked-entity
-  despawner so behavioural tests can exercise both sides of the synchronisation
+  despawner, so behavioural tests can exercise both sides of the synchronization
   contract.
 - Introduced `tests/physics_bdd/dbsp_authority.rs`, an `rstest` + `rust-rspec`
   scenario that asserts only entities carrying `DdlogId` receive DBSP-driven
@@ -39,11 +39,11 @@ Raw logs live under `artifacts/bevy-0-17-upgrade/phase-1/`:
 - `render-smoke.log` –
   `RUST_LOG=info timeout 5s cargo run -p lille --features render -- --verbose`
   execution. The timeout's `SIGTERM` exit is expected; it records plugin
-  registration and window initialisation on Bevy 0.13.
+  registration and window initialization on Bevy 0.13.
 
 ## Follow-ups
 
 - Proceed to Phase 2 (0.13 → 0.14) by repeating the dependency bump and rerun
   the artefact suite plus the MinimalPlugins BDD scenarios.
-- Expand CI to upload the artefact bundles so reviewers can diff phase outputs
+- Expand CI to upload the artefact bundles, so reviewers can diff phase outputs
   without rerunning locally.
