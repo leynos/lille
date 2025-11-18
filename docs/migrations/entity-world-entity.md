@@ -4,7 +4,7 @@ Status: active
 
 Lille `0.1.0` renamed the `lille::Entity` data type to `lille::WorldEntity` to
 avoid clashes with Bevy’s `Entity`. A deprecated type alias is provided for the
-`0.1.x` series so existing code continues to compile with warnings.
+`0.1.x` series, so existing code continues to compile with warnings.
 
 ## Migration Guidance
 
