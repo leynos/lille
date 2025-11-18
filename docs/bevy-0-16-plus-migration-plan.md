@@ -104,6 +104,16 @@ before merging to keep the “two sets of eyes” policy meaningful.
   automatically.[^6]
 - Smoke-test MinimalPlugins scenarios (unit tests and `DbspPlugin` tests).
 
+#### Phase 1 status (18 November 2025)
+
+- Dependency graph now targets Bevy 0.13.2; see
+  `docs/migrations/bevy-0-17-phase-1.md` plus the recorded outputs in
+  `artifacts/bevy-0-17-upgrade/phase-1/`.
+- Added `tests/physics_bdd/dbsp_authority.rs`, a combined `rstest` and
+  `rust-rspec` scenario that exercises the MinimalPlugins + `DbspPlugin` path
+  for both happy and unhappy cases, proving the DBSP circuit remains the
+  authority after the scheduler changes in 0.13.
+
 ### Phase 2 – 0.13 → 0.14
 
 - Update dependencies to 0.14.*.

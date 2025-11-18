@@ -1,0 +1,5 @@
+bevy v0.13.2
+└── lille v0.1.0 (/mnt/home/leynos/Projects/lille)
+    └── test_utils v0.1.0 (/mnt/home/leynos/Projects/lille/test_utils)
+        [dev-dependencies]
+        └── lille v0.1.0 (/mnt/home/leynos/Projects/lille) (*)

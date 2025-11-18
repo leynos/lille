@@ -3,7 +3,7 @@
 //! These helpers merge fear levels with positions, transform targets into
 //! movement decisions and apply those decisions to base positions.
 
-use dbsp::{typed_batch::OrdZSet, RootCircuit, Stream};
+use dbsp::{algebra::Semigroup, operator::Fold, typed_batch::OrdZSet, RootCircuit, Stream};
 use glam::DVec2;
 use log::warn;
 use ordered_float::OrderedFloat;
@@ -240,10 +240,124 @@ pub fn movement_decision_stream(
         })
         .map_index(|pt| (pt.entity, pt.clone()));
 
-    fear.map_index(|f| (f.entity, f.level))
+    let raw = fear
+        .map_index(|f| (f.entity, f.level))
         .join(&pos_target, |_entity, &level, pt| {
             decide_movement(level, pt)
+        });
+    dedupe_movement_decisions(&raw)
+}
+
+fn dedupe_movement_decisions(
+    movement: &Stream<RootCircuit, OrdZSet<MovementDecision>>,
+) -> Stream<RootCircuit, OrdZSet<MovementDecision>> {
+    movement
+        .map_index(|decision| (decision.entity, *decision))
+        .aggregate(Fold::<
+            MovementDecision,
+            MovementAccumulator,
+            MovementAccumulatorSemigroup,
+            _,
+            _,
+        >::with_output(
+            MovementAccumulator::default(),
+            |acc: &mut MovementAccumulator, decision: &MovementDecision, weight: i64| {
+                acc.apply(decision, weight);
+            },
+            |acc: MovementAccumulator| acc,
+        ))
+        .flat_map(|(entity, accumulator)| accumulator.clone().into_decision(*entity).into_iter())
+}
+
+#[derive(
+    Archive,
+    RkyvSerialize,
+    RkyvDeserialize,
+    Clone,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    SizeOf,
+)]
+#[archive_attr(derive(Eq, PartialEq, Ord, PartialOrd, Hash))]
+struct MovementAccumulator {
+    sum_dx: OrderedFloat<f64>,
+    sum_dy: OrderedFloat<f64>,
+    total_weight: i64,
+}
+
+impl MovementAccumulator {
+    fn apply(&mut self, movement: &MovementDecision, weight: i64) {
+        let dx = movement.dx.into_inner();
+        let dy = movement.dy.into_inner();
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "Movement counts remain tiny so converting to f64 is exact"
+        )]
+        let scaled = weight as f64;
+        self.sum_dx = OrderedFloat(self.sum_dx.into_inner() + dx * scaled);
+        self.sum_dy = OrderedFloat(self.sum_dy.into_inner() + dy * scaled);
+        self.total_weight += weight;
+        if self.total_weight == 0 {
+            self.sum_dx = OrderedFloat(0.0);
+            self.sum_dy = OrderedFloat(0.0);
+        }
+    }
+
+    fn merge(&mut self, other: &Self) {
+        self.sum_dx = OrderedFloat(self.sum_dx.into_inner() + other.sum_dx.into_inner());
+        self.sum_dy = OrderedFloat(self.sum_dy.into_inner() + other.sum_dy.into_inner());
+        self.total_weight += other.total_weight;
+        if self.total_weight == 0 {
+            self.sum_dx = OrderedFloat(0.0);
+            self.sum_dy = OrderedFloat(0.0);
+        }
+    }
+
+    fn into_decision(self, entity: i64) -> Option<MovementDecision> {
+        if self.total_weight == 0 {
+            return None;
+        }
+        if self.total_weight.abs() > 1 {
+            warn!(
+                "aggregated {} movement decisions for entity {entity}, normalising to one vector",
+                self.total_weight
+            );
+        }
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "Movement counts remain tiny so converting to f64 is exact"
+        )]
+        let weight = self.total_weight as f64;
+        let avg_x = self.sum_dx.into_inner() / weight;
+        let avg_y = self.sum_dy.into_inner() / weight;
+        let magnitude = (avg_x * avg_x + avg_y * avg_y).sqrt();
+        let (dx, dy) = if magnitude > MIN_DIRECTION_MAGNITUDE {
+            (avg_x / magnitude, avg_y / magnitude)
+        } else {
+            (0.0, 0.0)
+        };
+        Some(MovementDecision {
+            entity,
+            dx: OrderedFloat(dx),
+            dy: OrderedFloat(dy),
         })
+    }
+}
+
+#[derive(Clone)]
+struct MovementAccumulatorSemigroup;
+
+impl Semigroup<MovementAccumulator> for MovementAccumulatorSemigroup {
+    fn combine(left: &MovementAccumulator, right: &MovementAccumulator) -> MovementAccumulator {
+        let mut combined = left.clone();
+        combined.merge(right);
+        combined
+    }
 }
 
 /// Applies movement decisions to base positions.
@@ -498,5 +612,62 @@ mod tests {
             })
             .collect();
         assert!(decisions.is_empty());
+    }
+
+    #[test]
+    fn duplicate_targets_produce_single_decision() {
+        let (circuit, (fear_in, target_in, pos_in, decisions_handle)) =
+            RootCircuit::build(|circuit| {
+                let (fear_input, fear_handle) = circuit.add_input_zset::<FearLevel>();
+                let (target_stream, target_handle) = circuit.add_input_zset::<Target>();
+                let (position_stream, position_handle) = circuit.add_input_zset::<Position>();
+                let fear_stream = fear_level_stream(&position_stream, &fear_input);
+                let output_handle =
+                    movement_decision_stream(&fear_stream, &target_stream, &position_stream)
+                        .output();
+                Ok((fear_handle, target_handle, position_handle, output_handle))
+            })
+            .expect("failed to build circuit for duplicate target test");
+
+        fear_in.push(
+            FearLevel {
+                entity: 1,
+                level: 0.0.into(),
+            },
+            1,
+        );
+
+        let target = Target {
+            entity: 1,
+            x: 5.0.into(),
+            y: (-3.0).into(),
+        };
+        target_in.push(target, 1);
+        target_in.push(target, 1);
+
+        pos_in.push(
+            Position {
+                entity: 1,
+                x: 0.0.into(),
+                y: 0.0.into(),
+                z: 0.0.into(),
+            },
+            1,
+        );
+
+        circuit.step().expect("dbsp step");
+
+        let decisions: Vec<MovementDecision> = decisions_handle
+            .consolidate()
+            .iter()
+            .map(|(decision, (), _timestamp)| {
+                let decision_ref: &MovementDecision = &decision;
+                *decision_ref
+            })
+            .collect();
+        let decision = test_utils::expect_single(&decisions, "movement decision result");
+        let magnitude = (5_f64.powi(2) + (-3_f64).powi(2)).sqrt();
+        assert_relative_eq!(decision.dx.into_inner(), 5.0 / magnitude);
+        assert_relative_eq!(decision.dy.into_inner(), -3.0 / magnitude);
     }
 }
