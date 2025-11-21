@@ -25,10 +25,10 @@ using the workspace’s pinned nightly toolchain.
   hunting.
 - Render smoke test → `render-smoke.log`. Executed via
   `RUST_LOG=info timeout 5s cargo run -p lille --features render -- --verbose`.
-  The five-second timeout cleanly terminates the Bevy loop after confirming
-  that window creation, plugin wiring, and DBSP synchronisation still
-  initialise correctly. A non-zero exit status is expected because `timeout`
-  sends SIGTERM.
+  Note: the baseline hit a `duplicate movement decisions for entity 2` panic at
+  `src/dbsp_circuit/streams/behaviour.rs:326`, ending the run via panic rather
+  than the timeout. Phase 1 resolves this via `dedupe_movement_decisions()`,
+  leaving the log here as the pre-fix comparison point.
 
 ## Observations
 

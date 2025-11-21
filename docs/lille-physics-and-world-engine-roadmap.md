@@ -28,7 +28,8 @@ behaviours.
 
 ## Bevy Upgrade Checklist
 
-- [x] Phase 0 — Capture the 0.12 baseline (`docs/migrations/bevy-0-17-phase-0.md`
+- [x] Phase 0 — Capture the 0.12 baseline
+      (`docs/migrations/bevy-0-17-phase-0.md`
   and `artifacts/bevy-0-17-upgrade/phase-0/`).
 - [x] Phase 1 — Upgrade Bevy crates from 0.12 to 0.13 (completed 18 November
   2025 with artefacts stored under `artifacts/bevy-0-17-upgrade/phase-1/` and

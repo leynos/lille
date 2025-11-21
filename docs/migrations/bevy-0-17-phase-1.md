@@ -14,8 +14,8 @@ later phases.
   `bevy_math`, `bevy_reflect`, `bevy_transform`, and the optional `bevy_log`
   crate to `0.13`. The linux-only dependency mirrors the same version bump.
 - Added a `TestWorld::spawn_orphan_entity` helper plus a tracked-entity
-  despawner, so behavioural tests can exercise both sides of the synchronization
-  contract.
+  despawner, so behavioural tests can exercise both sides of the
+  synchronization.
 - Introduced `tests/physics_bdd/dbsp_authority.rs`, an `rstest` + `rust-rspec`
   scenario that asserts only entities carrying `DdlogId` receive DBSP-driven
   gravity updates. This captures the happy (registered) and unhappy (orphan)
