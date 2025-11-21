@@ -136,6 +136,25 @@ impl TestWorld {
         self.set_initial_health(health.current);
     }
 
+    /// Spawns an entity without registering it with the DBSP circuit.
+    pub fn spawn_orphan_entity(&mut self, transform: Transform, vel: VelocityComp) {
+        let entity_id = {
+            let mut app = self.app_guard();
+            app.world.spawn((transform, vel)).id()
+        };
+        self.entity = Some(entity_id);
+    }
+
+    /// Despawns the currently tracked entity if it exists.
+    pub fn despawn_tracked_entity(&mut self) {
+        if let Some(entity) = self.entity.take() {
+            let mut app = self.app_guard();
+            if app.world.get_entity(entity).is_some() {
+                app.world.entity_mut(entity).despawn_recursive();
+            }
+        }
+    }
+
     /// Fetch the entity's `Health` component, panicking if it is missing.
     pub fn health(&self) -> Health {
         let app = self.app_guard();

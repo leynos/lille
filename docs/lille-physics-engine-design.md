@@ -299,6 +299,13 @@ pushed `DamageEvent`s, draining both collections with negative weights at the
 start of the next tick. This keeps the circuit's view of the world aligned with
 the ECS source of truth and ensures replay detection remains deterministic.
 
+The Bevy 0.13 migration reaffirmed this ownership boundary: only entities that
+carry a `DdlogId` participate in the synchronization loop. The new
+behaviour-driven regression (`tests/physics_bdd/dbsp_authority.rs`) explicitly
+covers the happy path (registered entities receiving gravity updates) and the
+unhappy path (orphan entities remaining untouched), so future upgrades cannot
+accidentally let ECS-only state leak back into the simulation.
+
 The ingress, circuit aggregation, and egress responsibilities interact as shown
 below.
 

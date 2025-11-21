@@ -26,6 +26,19 @@ behaviours.
 
 - **Testing:** `docs/testing-declarative-game-logic-in-dbsp.md`
 
+## Bevy Upgrade Checklist
+
+- [x] Phase 0 — Capture the 0.12 baseline
+      (`docs/migrations/bevy-0-17-phase-0.md`
+  and `artifacts/bevy-0-17-upgrade/phase-0/`).
+- [x] Phase 1 — Upgrade Bevy crates from 0.12 to 0.13 (completed 18 November
+  2025 with artefacts stored under `artifacts/bevy-0-17-upgrade/phase-1/` and
+  regression coverage in `tests/physics_bdd/dbsp_authority.rs`).
+- [ ] Phase 2 — Upgrade Bevy crates from 0.13 to 0.14.
+- [ ] Phase 3 — Upgrade Bevy crates from 0.14 to 0.15.
+- [ ] Phase 4 — Upgrade Bevy crates from 0.15 to 0.16.
+- [ ] Phase 5 — Upgrade Bevy crates from 0.16 to 0.17.3.
+
 ## Phase 1: Foundational Migration to DBSP
 
 **Goal**: To completely remove the DDlog dependency and establish a working,

@@ -62,6 +62,19 @@ stable and headless builds reproducible.
 - CI scripts call `make fmt|lint|test`; no Bevy-specific runners exist yet, so
   new checks (wasm, feature combos) must be added explicitly.
 
+## Subsystem ownership
+
+| Subsystem                | Owner(s)                 |
+| ------------------------ | ------------------------ |
+| Render                   | Leynos / Payton McIntosh |
+| Testing and CI           | Leynos / Payton McIntosh |
+| DBSP circuit integration | Leynos / Payton McIntosh |
+
+Lille currently has a single maintainer, so the same person covers both owner
+and reviewer duties. Whenever a change is high risk (render regressions, DBSP
+semantics, CI infra), queue an ad-hoc reviewer from the wider contributors list
+before merging to keep the “two sets of eyes” policy meaningful.
+
 ## Execution Phases
 
 ### Phase 0 – Pre-flight
@@ -71,6 +84,17 @@ stable and headless builds reproducible.
   short render smoke test to compare behaviour later.
 - Document owners for each subsystem (render/test/DBSP) and line up reviewers.
 
+#### Phase 0 baseline (18 November 2025)
+
+- Logs for the required commands live under
+  `artifacts/bevy-0-17-upgrade/phase-0/`. The workflow and observations are
+  documented in `docs/migrations/bevy-0-17-phase-0.md` so future phases can
+  reuse the same scripts and diff the results.
+- Render smoke testing uses
+  `RUST_LOG=info timeout 5s cargo run -p lille --features render -- --verbose`
+  to avoid hanging CI while still exercising window creation and DBSP
+  synchronization. The timeout-induced exit status is expected.
+
 ### Phase 1 – 0.12 → 0.13
 
 - Bump `bevy*` crates to 0.13.*, keeping feature flags unchanged.
@@ -79,6 +103,16 @@ stable and headless builds reproducible.
   especially around `Query` lifetimes because `apply_deferred` is now handled
   automatically.[^6]
 - Smoke-test MinimalPlugins scenarios (unit tests and `DbspPlugin` tests).
+
+#### Phase 1 status (18 November 2025)
+
+- Dependency graph now targets Bevy 0.13.2; see
+  `docs/migrations/bevy-0-17-phase-1.md` plus the recorded outputs in
+  `artifacts/bevy-0-17-upgrade/phase-1/`.
+- Added `tests/physics_bdd/dbsp_authority.rs`, a combined `rstest` and
+  `rust-rspec` scenario that exercises the MinimalPlugins + `DbspPlugin` path
+  for both happy and unhappy cases, proving the DBSP circuit remains the
+  authority after the scheduler changes in 0.13.
 
 ### Phase 2 – 0.13 → 0.14
 
