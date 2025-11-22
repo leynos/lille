@@ -233,14 +233,14 @@ mod tests {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins);
         app.insert_resource(WorldHandle::default());
-        app.world.insert_non_send_resource(
+        app.world_mut().insert_non_send_resource(
             DbspState::new().expect("failed to init DbspState for tests"),
         );
         app
     }
 
     fn spawn_entity(app: &mut App) -> Entity {
-        app.world
+        app.world_mut()
             .spawn((
                 DdlogId(1),
                 Transform::default(),
@@ -255,7 +255,7 @@ mod tests {
 
     fn prime_state(app: &mut App, entity: Entity) {
         {
-            let mut world_handle = app.world.resource_mut::<WorldHandle>();
+            let mut world_handle = app.world_mut().resource_mut::<WorldHandle>();
             world_handle.entities.insert(
                 1,
                 DdlogEntity {
@@ -268,7 +268,7 @@ mod tests {
             );
         }
 
-        let mut state = app.world.non_send_resource_mut::<DbspState>();
+        let mut state = app.world_mut().non_send_resource_mut::<DbspState>();
         state.id_map.insert(1, entity);
         state.rev_map.insert(entity, 1);
         state.circuit.block_in().push(
@@ -301,7 +301,7 @@ mod tests {
     }
 
     fn push_health_inputs(app: &mut App, current: u16, amount: u16) {
-        let state = app.world.non_send_resource_mut::<DbspState>();
+        let state = app.world_mut().non_send_resource_mut::<DbspState>();
         state.circuit.health_state_in().push(
             HealthState {
                 entity: 1,
@@ -329,27 +329,27 @@ mod tests {
         prime_state(&mut app, entity);
         push_health_inputs(&mut app, 90, 50);
 
-        app.world.run_system_once(apply_dbsp_outputs_system);
+        app.world_mut().run_system_once(apply_dbsp_outputs_system);
 
         let health = app
-            .world
+            .world()
             .entity(entity)
             .get::<Health>()
             .expect("Health component should remain after applying DBSP outputs");
         assert_eq!(health.current, 40);
         let velocity = app
-            .world
+            .world()
             .entity(entity)
             .get::<VelocityComp>()
             .expect("Velocity component should remain after applying DBSP outputs");
         assert!(velocity.vx < 1.0);
         let transform = app
-            .world
+            .world()
             .entity(entity)
             .get::<Transform>()
             .expect("Transform component should remain after applying DBSP outputs");
         assert!(transform.translation.x.abs() > f32::EPSILON);
-        let world_handle = app.world.resource::<WorldHandle>();
+        let world_handle = app.world().resource::<WorldHandle>();
         let entry = world_handle
             .entities
             .get(&1)
@@ -364,9 +364,9 @@ mod tests {
         prime_state(&mut app, entity);
         push_health_inputs(&mut app, 90, 50);
 
-        app.world.run_system_once(apply_dbsp_outputs_system);
+        app.world_mut().run_system_once(apply_dbsp_outputs_system);
         assert_eq!(
-            app.world
+            app.world()
                 .entity(entity)
                 .get::<Health>()
                 .expect("Health component should remain after initial DBSP output")
@@ -375,12 +375,12 @@ mod tests {
         );
 
         push_health_inputs(&mut app, 90, 50);
-        app.world.run_system_once(apply_dbsp_outputs_system);
+        app.world_mut().run_system_once(apply_dbsp_outputs_system);
 
-        let state = app.world.non_send_resource::<DbspState>();
+        let state = app.world().non_send_resource::<DbspState>();
         assert_eq!(state.applied_health_duplicates(), 1);
         assert_eq!(
-            app.world
+            app.world()
                 .entity(entity)
                 .get::<Health>()
                 .expect("Health component should remain after duplicate DBSP output")

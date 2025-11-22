@@ -20,8 +20,8 @@ use crate::components::{DdlogId, Health, Target, UnitType, VelocityComp};
 /// ```ignore
 /// use bevy::prelude::*;
 /// use lille::spawn_world::basic_sprite;
-/// let sprite = basic_sprite(Color::RED, Vec3::new(10.0, 20.0, 0.0));
-/// assert_eq!(sprite.sprite.color, Color::RED);
+/// let sprite = basic_sprite(Color::srgb(1.0, 0.0, 0.0), Vec3::new(10.0, 20.0, 0.0));
+/// assert_eq!(sprite.sprite.color, Color::srgb(1.0, 0.0, 0.0));
 /// assert_eq!(sprite.transform.translation, Vec3::new(10.0, 20.0, 0.0));
 /// ```
 fn basic_sprite(color: Color, translation: Vec3) -> SpriteBundle {
@@ -50,13 +50,19 @@ pub fn spawn_world_system(mut commands: Commands) {
 
     // Static landmark entity
     commands
-        .spawn(basic_sprite(Color::GRAY, Vec3::new(50.0, 50.0, 0.0)))
+        .spawn(basic_sprite(
+            Color::srgb(0.5, 0.5, 0.5),
+            Vec3::new(50.0, 50.0, 0.0),
+        ))
         .insert(DdlogId(next_id));
     next_id += 1;
 
     // Civilian unit with a movement target
     commands
-        .spawn(basic_sprite(Color::WHITE, Vec3::new(125.0, 125.0, 0.0)))
+        .spawn(basic_sprite(
+            Color::srgb(1.0, 1.0, 1.0),
+            Vec3::new(125.0, 125.0, 0.0),
+        ))
         .insert((
             DdlogId(next_id),
             Health {
@@ -71,7 +77,10 @@ pub fn spawn_world_system(mut commands: Commands) {
 
     // Threatening baddie
     commands
-        .spawn(basic_sprite(Color::RED, Vec3::new(150.0, 150.5, 0.0)))
+        .spawn(basic_sprite(
+            Color::srgb(1.0, 0.0, 0.0),
+            Vec3::new(150.0, 150.5, 0.0),
+        ))
         .insert((
             DdlogId(next_id),
             Health {

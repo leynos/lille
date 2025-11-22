@@ -15,7 +15,7 @@ pub struct DbspPlugin;
 
 impl Plugin for DbspPlugin {
     fn build(&self, app: &mut App) {
-        if let Err(e) = init_dbsp_system(&mut app.world) {
+        if let Err(e) = init_dbsp_system(app.world_mut()) {
             error!("failed to init DBSP: {e}");
             return;
         }
@@ -41,9 +41,9 @@ mod tests {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins);
         app.add_plugins(DbspPlugin);
-        assert!(app.world.contains_resource::<DamageInbox>());
-        assert!(app.world.get_non_send_resource::<DbspState>().is_some());
+        assert!(app.world().contains_resource::<DamageInbox>());
+        assert!(app.world().get_non_send_resource::<DbspState>().is_some());
         app.update();
-        assert!(app.world.contains_resource::<WorldHandle>());
+        assert!(app.world().contains_resource::<WorldHandle>());
     }
 }

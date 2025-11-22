@@ -496,6 +496,14 @@ over testing across an FFI boundary.
    set up a scenario (`Given`), run the simulation for a tick (`When`), and
    assert that the final state of the ECS matches the expected outcome (`Then`).
 
+Recent Bevy 0.14 scheduling changes are guarded by regression tests that keep
+DBSP as the authority for inferred state. An `rstest` suite asserts that the
+non-send `DbspState` resource remains stable across updates and that damage
+ingestion completes within a single `Update` tick. A complementary `rust-rspec`
+scenario verifies that the `WorldHandle` mirror is rebuilt from DBSP outputs
+each frame even if tampered with, ensuring diagnostics cannot drift away from
+the circuit's view of the world.
+
 > For a complete overview of the testing methodology, including code examples
 > and best practices, see:
 >

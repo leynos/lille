@@ -117,7 +117,7 @@ fn spawns_world_entities() {
     app.add_systems(Startup, spawn_world_system);
     app.update();
 
-    let world = &mut app.world;
+    let world = app.world_mut();
 
     let mut counters = SpawnCounters::default();
 

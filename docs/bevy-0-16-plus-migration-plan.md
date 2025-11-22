@@ -125,6 +125,18 @@ before merging to keep the “two sets of eyes” policy meaningful.
 - Rebuild docs to verify that rustdoc output still compiles with new lint
   defaults.
 
+#### Phase 2 status (21 November 2025)
+
+- Bevy crates now target 0.14.2 (Linux `x11` variant included); see
+  `docs/migrations/bevy-0-17-phase-2.md` plus logs under
+  `artifacts/bevy-0-17-upgrade/phase-2/`.
+- Added `tests/dbsp_schedule_regression.rs` (`rstest`) and an expanded
+  `tests/physics_bdd/dbsp_authority.rs` scenario to assert chained DBSP systems
+  still run within a single `Update` tick and that the `WorldHandle` mirror is
+  refreshed from DBSP outputs when tampered with.
+- Rustdoc builds succeed on Bevy 0.14 with the stricter lint set; MinimalPlugins
+  regression tests cover `get_non_send_resource` stability.
+
 ### Phase 3 – 0.14 → 0.15
 
 - Upgrade to 0.15.* and switch from deprecated bundles to Required Components
