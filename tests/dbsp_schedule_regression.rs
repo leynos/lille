@@ -19,13 +19,15 @@ fn non_send_state_survives_updates() {
         std::ptr::from_ref(state)
     };
 
-    app.update();
+    for _ in 0..5 {
+        app.update();
+    }
 
     let after_ptr = {
         let world = app.world();
         let state = world
             .get_non_send_resource::<DbspState>()
-            .expect("DbspState should remain after running the Update schedule");
+            .expect("DbspState should remain after running multiple Update ticks");
         std::ptr::from_ref(state)
     };
 
