@@ -1,11 +1,13 @@
 //! Behavioural tests for DBSP health integration.
 
-use anyhow::{ensure, Context, Result};
+use anyhow::{Context, Result};
+
+mod common;
 
 use bevy::prelude::*;
+use common::{DbspAssertions, DbspTestAppBuilder};
 use lille::dbsp_circuit::{DamageEvent, DamageSource};
-use lille::dbsp_sync::DbspState;
-use lille::{DamageInbox, DbspPlugin, DdlogId, Health};
+use lille::DamageInbox;
 use rstest::{fixture, rstest};
 
 /// Encapsulates a Bevy app seeded with health fixtures.
@@ -16,25 +18,19 @@ struct HealthEnv {
 
 impl HealthEnv {
     fn new() -> Self {
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins).add_plugins(DbspPlugin);
-        let entity = app
-            .world_mut()
-            .spawn((
-                DdlogId(1),
-                Transform::default(),
-                Health {
-                    current: 90,
-                    max: 100,
-                },
-            ))
-            .id();
-        // Prime the circuit so the initial health snapshot is registered.
-        app.update();
-        Self { app, entity }
+        let (builder, entity_id) = DbspTestAppBuilder::new().spawn_entity_with_health(1, 90, 100);
+        let (app, tracked_entity) = builder.prime().build_with_entity(entity_id);
+        if let Err(err) = DbspAssertions::assert_inbox_empty(&app) {
+            panic!("DamageInbox should start empty after priming the circuit: {err}");
+        }
+        Self {
+            app,
+            entity: tracked_entity,
+        }
     }
 
     fn push_damage_repeated(&mut self, event: DamageEvent, repeat: usize) -> Result<()> {
+        DbspAssertions::get_damage_inbox(&self.app)?;
         let mut inbox = self
             .app
             .world_mut()
@@ -60,24 +56,6 @@ impl HealthEnv {
         self.app.update();
         Ok(())
     }
-
-    fn current_health(&self) -> Result<u16> {
-        let health = self
-            .app
-            .world()
-            .get::<Health>(self.entity)
-            .context("entity missing Health component")?;
-        Ok(health.current)
-    }
-
-    fn duplicate_count(&self) -> Result<u64> {
-        let state = self
-            .app
-            .world()
-            .get_non_send_resource::<DbspState>()
-            .context("DbspState non-send resource missing")?;
-        Ok(state.applied_health_duplicates())
-    }
 }
 
 impl Default for HealthEnv {
@@ -101,16 +79,10 @@ struct ExpectedHealthState {
 
 /// Assert both health state and duplicate counter with custom messages.
 fn assert_health_state(env: &HealthEnv, expected: ExpectedHealthState) -> Result<()> {
-    ensure!(
-        env.current_health()? == expected.health,
-        "{}",
-        expected.health_message
-    );
-    ensure!(
-        env.duplicate_count()? == expected.duplicates,
-        "{}",
-        expected.duplicates_message
-    );
+    DbspAssertions::assert_health_current(&env.app, env.entity, expected.health)
+        .context(expected.health_message)?;
+    DbspAssertions::assert_duplicate_count(&env.app, expected.duplicates)
+        .context(expected.duplicates_message)?;
     Ok(())
 }
 

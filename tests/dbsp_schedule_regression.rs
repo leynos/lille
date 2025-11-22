@@ -1,15 +1,16 @@
 //! Regressions guarding Bevy 0.14 scheduling changes.
 
-use bevy::prelude::*;
+mod common;
+
+use common::{DbspAssertions, DbspTestAppBuilder};
 use lille::dbsp_circuit::{DamageEvent, DamageSource};
 use lille::dbsp_sync::DbspState;
-use lille::{DamageInbox, DbspPlugin, DdlogId, Health};
+use lille::DamageInbox;
 use rstest::rstest;
 
 #[rstest]
 fn non_send_state_survives_updates() {
-    let mut app = App::new();
-    app.add_plugins(MinimalPlugins).add_plugins(DbspPlugin);
+    let mut app = DbspTestAppBuilder::new().prime().build();
 
     let initial_ptr = {
         let world = app.world();
@@ -39,20 +40,8 @@ fn non_send_state_survives_updates() {
 
 #[rstest]
 fn damage_events_apply_in_a_single_frame() {
-    let mut app = App::new();
-    app.add_plugins(MinimalPlugins).add_plugins(DbspPlugin);
-
-    let entity = app
-        .world_mut()
-        .spawn((
-            DdlogId(1),
-            Transform::default(),
-            Health {
-                current: 100,
-                max: 100,
-            },
-        ))
-        .id();
+    let (builder, entity) = DbspTestAppBuilder::new().spawn_entity_with_health(1, 100, 100);
+    let (mut app, tracked_entity) = builder.build_with_entity(entity);
 
     {
         let mut inbox = app.world_mut().resource_mut::<DamageInbox>();
@@ -67,21 +56,8 @@ fn damage_events_apply_in_a_single_frame() {
 
     app.update();
 
-    let health = app
-        .world()
-        .get::<Health>(entity)
-        .expect("Health should remain attached after DBSP step");
-    assert_eq!(health.current, 75);
-
-    let state = app
-        .world()
-        .get_non_send_resource::<DbspState>()
-        .expect("DbspState should be available via get_non_send_resource");
-    assert_eq!(state.applied_health_duplicates(), 0);
-
-    let inbox = app.world().resource::<DamageInbox>();
-    assert!(
-        inbox.is_empty(),
-        "DamageInbox should be drained in the same frame"
-    );
+    DbspAssertions::assert_health_current(&app, tracked_entity, 75)
+        .expect("Health should be 75 after damage");
+    DbspAssertions::assert_duplicate_count(&app, 0).expect("No duplicates should be recorded");
+    DbspAssertions::assert_inbox_empty(&app).expect("DamageInbox should be drained");
 }

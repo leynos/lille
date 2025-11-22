@@ -4,9 +4,9 @@
 
 Phase 2 bumps every Bevy crate to the 0.14 line and validates that the
 Differential Dataflow Stream Processing (DBSP) sync layer still runs inside a
-single `Update` tick after the schedule timing
-changes introduced in 0.14. The MinimalPlugins path remains the reference
-environment for CI and local testing; render work is deferred to Phase 3.
+single `Update` tick after the schedule timing changes introduced in 0.14. The
+MinimalPlugins path remains the reference environment for CI and local testing;
+render work is deferred to Phase 3.
 
 ## Key changes
 
@@ -22,9 +22,9 @@ environment for CI and local testing; render work is deferred to Phase 3.
   refreshes the mirror immediately, keeping the circuit authoritative for
   inferred state.
 - Documented the scheduling invariants in
-  `docs/bevy-0-16-plus-migration-plan.md`
-  and `docs/lille-physics-engine-design.md` so contributors understand why the
-  new regressions exist.
+  `docs/bevy-0-16-plus-migration-plan.md` and
+  `docs/lille-physics-engine-design.md` so contributors understand why the new
+  regressions exist.
 
 ## Test evidence
 
