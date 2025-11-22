@@ -19,7 +19,7 @@ impl HealthEnv {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins).add_plugins(DbspPlugin);
         let entity = app
-            .world
+            .world_mut()
             .spawn((
                 DdlogId(1),
                 Transform::default(),
@@ -37,7 +37,7 @@ impl HealthEnv {
     fn push_damage_repeated(&mut self, event: DamageEvent, repeat: usize) -> Result<()> {
         let mut inbox = self
             .app
-            .world
+            .world_mut()
             .get_resource_mut::<DamageInbox>()
             .context("DamageInbox resource missing")?;
         inbox.extend(std::iter::repeat_n(event, repeat));
@@ -64,7 +64,7 @@ impl HealthEnv {
     fn current_health(&self) -> Result<u16> {
         let health = self
             .app
-            .world
+            .world()
             .get::<Health>(self.entity)
             .context("entity missing Health component")?;
         Ok(health.current)
@@ -73,7 +73,7 @@ impl HealthEnv {
     fn duplicate_count(&self) -> Result<u64> {
         let state = self
             .app
-            .world
+            .world()
             .get_non_send_resource::<DbspState>()
             .context("DbspState non-send resource missing")?;
         Ok(state.applied_health_duplicates())

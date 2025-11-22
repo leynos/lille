@@ -77,12 +77,12 @@ impl TestWorld {
 
     /// Spawns a block into the world.
     pub fn spawn_block(&mut self, block: Block) {
-        self.app_guard().world.spawn(block);
+        self.app_guard().world_mut().spawn(block);
     }
 
     /// Spawns a block together with its slope on the same entity.
     pub fn spawn_sloped_block(&mut self, block: Block, slope: BlockSlope) {
-        self.app_guard().world.spawn((block, slope));
+        self.app_guard().world_mut().spawn((block, slope));
     }
 
     /// Spawns an entity at `transform` with the supplied velocity.
@@ -100,7 +100,7 @@ impl TestWorld {
                 .unwrap_or_else(PoisonError::into_inner);
             let ddlog_id = *id_guard;
             *id_guard += 1;
-            let mut entity = app.world.spawn((DdlogId(ddlog_id), transform, vel));
+            let mut entity = app.world_mut().spawn((DdlogId(ddlog_id), transform, vel));
             if let Some(force_comp) = force {
                 entity.insert(force_comp);
             }
@@ -129,7 +129,9 @@ impl TestWorld {
                 .unwrap_or_else(PoisonError::into_inner);
             let ddlog_id = *id_guard;
             *id_guard += 1;
-            let entity = app.world.spawn((DdlogId(ddlog_id), transform, vel, health));
+            let entity = app
+                .world_mut()
+                .spawn((DdlogId(ddlog_id), transform, vel, health));
             entity.id()
         };
         self.entity = Some(entity_id);
@@ -140,7 +142,7 @@ impl TestWorld {
     pub fn spawn_orphan_entity(&mut self, transform: Transform, vel: VelocityComp) {
         let entity_id = {
             let mut app = self.app_guard();
-            app.world.spawn((transform, vel)).id()
+            app.world_mut().spawn((transform, vel)).id()
         };
         self.entity = Some(entity_id);
     }
@@ -149,8 +151,8 @@ impl TestWorld {
     pub fn despawn_tracked_entity(&mut self) {
         if let Some(entity) = self.entity.take() {
             let mut app = self.app_guard();
-            if app.world.get_entity(entity).is_some() {
-                app.world.entity_mut(entity).despawn_recursive();
+            if app.world().get_entity(entity).is_some() {
+                app.world_mut().entity_mut(entity).despawn_recursive();
             }
         }
     }
@@ -159,7 +161,7 @@ impl TestWorld {
     pub fn health(&self) -> Health {
         let app = self.app_guard();
         let entity = self.entity_or_panic();
-        app.world
+        app.world()
             .get::<Health>(entity)
             .cloned()
             .unwrap_or_else(|| panic!("missing Health component"))
@@ -169,7 +171,7 @@ impl TestWorld {
     pub fn set_position_z(&self, z: f32) {
         let mut app = self.app_guard();
         let entity = self.entity_or_panic();
-        let Some(mut transform) = app.world.get_mut::<Transform>(entity) else {
+        let Some(mut transform) = app.world_mut().get_mut::<Transform>(entity) else {
             panic!("missing Transform component");
         };
         transform.translation.z = z;
@@ -179,7 +181,7 @@ impl TestWorld {
     pub fn set_velocity_z(&self, vz: f32) {
         let mut app = self.app_guard();
         let entity = self.entity_or_panic();
-        let Some(mut velocity) = app.world.get_mut::<VelocityComp>(entity) else {
+        let Some(mut velocity) = app.world_mut().get_mut::<VelocityComp>(entity) else {
             panic!("missing VelocityComp component");
         };
         velocity.vz = vz;
@@ -219,7 +221,7 @@ impl TestWorld {
     {
         let app = self.app_guard();
         let entity = self.entity_or_panic();
-        let Some(component) = app.world.get::<T>(entity) else {
+        let Some(component) = app.world().get::<T>(entity) else {
             panic!("missing {name}");
         };
 
