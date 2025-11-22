@@ -11,7 +11,7 @@ environment for CI and local testing; render work is deferred to Phase 3.
 
 - `bevy`, `bevy_app`, `bevy_ecs`, `bevy_hierarchy`, `bevy_math`,
   `bevy_reflect`, `bevy_transform`, and optional `bevy_log` now target 0.14.2,
-  including the linux `x11` variant. `App::world` field access was rewritten to
+  including the Linux `x11` variant. `App::world` field access was rewritten to
   the 0.14 `world()` / `world_mut()` API across tests and DBSP helpers.
 - Added `tests/dbsp_schedule_regression.rs` (`rstest`) to prove `DbspState`
   stays available via `World::get_non_send_resource` across frames and that
