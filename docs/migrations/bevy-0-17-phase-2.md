@@ -2,8 +2,9 @@
 
 ## Summary
 
-Phase 2 bumps every Bevy crate to the 0.14 line and validates that the DBSP
-sync layer still runs inside a single `Update` tick after the schedule timing
+Phase 2 bumps every Bevy crate to the 0.14 line and validates that the
+Differential Dataflow Stream Processing (DBSP) sync layer still runs inside a
+single `Update` tick after the schedule timing
 changes introduced in 0.14. The MinimalPlugins path remains the reference
 environment for CI and local testing; render work is deferred to Phase 3.
 
