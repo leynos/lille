@@ -127,7 +127,7 @@ before merging to keep the “two sets of eyes” policy meaningful.
 
 #### Phase 2 status (21 November 2025)
 
-- Bevy crates now target 0.14.2 (linux `x11` variant included); see
+- Bevy crates now target 0.14.2 (Linux `x11` variant included); see
   `docs/migrations/bevy-0-17-phase-2.md` plus logs under
   `artifacts/bevy-0-17-upgrade/phase-2/`.
 - Added `tests/dbsp_schedule_regression.rs` (`rstest`) and an expanded
