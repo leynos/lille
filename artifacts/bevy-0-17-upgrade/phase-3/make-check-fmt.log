@@ -1,0 +1,1 @@
+cargo fmt --package lille --package build_support --package test_utils -- --check

@@ -5,7 +5,7 @@ use lille::components::Block;
 use lille::numeric::expect_f32;
 use lille::{VelocityComp, GRAVITY_PULL};
 use rstest::rstest;
-use rspec::Scenario;
+use rspec::block::Context as Scenario;
 
 use crate::support::{world, TestWorld};
 
