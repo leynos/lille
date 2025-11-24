@@ -11,45 +11,25 @@
 //! through the DBSP cache, keeping the circuit authoritative for inferred
 //! behaviour even when component data goes missing.
 
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+#[path = "support/thread_safe_app.rs"]
+mod thread_safe_app;
+
+#[path = "support/rspec_runner.rs"]
+mod rspec_runner;
+
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use bevy::prelude::*;
 use lille::{DbspPlugin, DdlogId, WorldHandle};
 use rspec::block::Context as Scenario;
-use std::ops::{Deref, DerefMut};
+use rspec_runner::run_serial;
+use thread_safe_app::{lock_app, SharedApp, ThreadSafeApp};
 
 use lille::spawn_world_system;
 
-#[derive(Debug)]
-struct ThreadSafeApp(App);
-
-impl Deref for ThreadSafeApp {
-    type Target = App;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for ThreadSafeApp {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-// SAFETY: Access to the wrapped `App` is serialised through the mutex in tests.
-unsafe impl Send for ThreadSafeApp {}
-unsafe impl Sync for ThreadSafeApp {}
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct SpawnDbspFixture {
-    app: Arc<Mutex<ThreadSafeApp>>,
-}
-
-impl Clone for SpawnDbspFixture {
-    fn clone(&self) -> Self {
-        Self::bootstrap()
-    }
+    app: SharedApp,
 }
 
 impl SpawnDbspFixture {
@@ -64,11 +44,24 @@ impl SpawnDbspFixture {
     }
 
     fn app_guard(&self) -> MutexGuard<'_, ThreadSafeApp> {
-        self.app.lock().unwrap_or_else(PoisonError::into_inner)
+        lock_app(&self.app)
     }
 
     fn tick(&self) {
-        self.app_guard().update();
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            self.app_guard().update();
+        }));
+        if let Err(payload) = result {
+            bevy::log::error!(
+                "tick panicked: {}",
+                payload
+                    .downcast_ref::<&str>()
+                    .copied()
+                    .or_else(|| payload.downcast_ref::<String>().map(String::as_str))
+                    .unwrap_or("non-string panic payload")
+            );
+            std::panic::resume_unwind(payload);
+        }
     }
 
     fn cached_ids(&self) -> Vec<i64> {
@@ -96,7 +89,7 @@ impl SpawnDbspFixture {
 #[test]
 fn dbsp_caches_spawned_entities() {
     let fixture = SpawnDbspFixture::bootstrap();
-    rspec::run(&rspec::given(
+    run_serial(&rspec::given(
         "spawn_world_system seeds demo entities",
         fixture,
         |scenario: &mut Scenario<SpawnDbspFixture>| {

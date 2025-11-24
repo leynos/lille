@@ -1,0 +1,27 @@
+   Compiling lille v0.1.0 (/mnt/home/leynos/Projects/lille)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.36s
+     Running tests/spawn.rs (target/debug/deps/spawn-6e3f5db729992e67)
+
+running 1 test
+test spawns_world_entities ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/spawn_dbsp_rspec.rs (target/debug/deps/spawn_dbsp_rspec-64950c21925d6771)
+
+running 2 tests
+
+tests:
+
+Given "spawn_world_system seeds demo entities"
+  Then "DBSP caches all spawned DdlogIds from the ECS world" ... ok
+  Then "DBSP drops entities without transforms on subsequent ticks" ... test cached_ids_drop_when_transform_missing ... ok
+ok
+
+duration: 0.035s.
+
+test result: ok. 2 passed; 0 failed; 0 ignored
+test dbsp_caches_spawned_entities ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+

@@ -26,7 +26,7 @@ controls (scrolling, zooming) for the isometric view.
 ## 2. Core Technologies & Bevy Concepts
 
 - `Sprite`, `Transform`, and `Visibility`: The Required Components trio for 2D
-  sprites in Bevy 0.15. We will attach these to every renderable entity.
+  sprites in Bevy 0.15. These components attach to every renderable entity.
 - `TextureAtlas`: To improve rendering performance and manage sprite animations
   in the future, entities will use sprites from a texture atlas.
 - `OrthographicProjection`: A component on the camera that controls the visible
@@ -116,13 +116,13 @@ This keeps the concerns cleanly separated: the `map` module knows _what_ to
 spawn (a player, an enemy), and the `presentation` module provides the systems
 to make it visible and interactable from a viewport perspective.
 
-#### `camera_setup`,**(Startup System)**
+#### `camera_setup` (Startup System)
 
 1. Spawns a `Camera2d` plus a 2D `Projection`, letting Bevy's Required
    Components fill in the remaining camera components.
 2. Inserts our `CameraController` marker component onto the camera entity.
 
-#### `camera_controls`,**(Update System)**
+#### `camera_controls` (Update System)
 
 1. Queries for the single camera entity with
    `Query<(&mut Transform, &mut OrthographicProjection), With<CameraController>>`.
@@ -136,7 +136,7 @@ to make it visible and interactable from a viewport perspective.
    and increasing it zooms out. The scale will be clamped to a reasonable
    min/max range.
 
-#### `update_sprite_z_for_sorting`,**(Update System)**
+#### `update_sprite_z_for_sorting` (Update System)
 
 1. Performs a `Query<&mut Transform, With<YSorted>>`.
 2. For each entity, it calculates a Z-value based on its Y-coordinate. A common

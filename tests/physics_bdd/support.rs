@@ -1,5 +1,8 @@
 //! Shared helpers for physics BDD tests.
 
+#[path = "../support/thread_safe_app.rs"]
+mod thread_safe_app;
+
 use approx::assert_relative_eq;
 use bevy::prelude::*;
 use lille::numeric::expect_f32;
@@ -9,38 +12,14 @@ use lille::{
 };
 use rstest::fixture;
 use std::fmt;
-use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
-
-/// Wraps Bevy's `App` to provide explicit `Send` and `Sync` guarantees for
-/// tests that serialise access through a mutex.
-#[derive(Debug)]
-struct ThreadSafeApp(App);
-
-impl Deref for ThreadSafeApp {
-    type Target = App;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for ThreadSafeApp {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-// SAFETY: Tests execute on a single thread via rspec and all access is guarded
-// by the mutex, so forwarding `Send`/`Sync` to the wrapper is sound here.
-unsafe impl Send for ThreadSafeApp {}
-unsafe impl Sync for ThreadSafeApp {}
+use thread_safe_app::{lock_app, SharedApp, ThreadSafeApp};
 
 /// Test harness wrapping a Bevy app configured for DBSP scenarios.
 #[derive(Clone)]
 pub struct TestWorld {
     /// Shared Bevy app; `rspec` fixtures must implement `Clone + Send + Sync`.
-    app: Arc<Mutex<ThreadSafeApp>>,
+    app: SharedApp,
     pub entity: Option<Entity>,
     expected_damage: Arc<Mutex<Option<u16>>>,
     initial_health: Arc<Mutex<Option<u16>>>,
@@ -73,7 +52,7 @@ impl Default for TestWorld {
 impl TestWorld {
     /// Acquire the underlying Bevy `App`, recovering the guard if the mutex is poisoned.
     pub fn app_guard(&self) -> MutexGuard<'_, ThreadSafeApp> {
-        self.app.lock().unwrap_or_else(PoisonError::into_inner)
+        lock_app(&self.app)
     }
 
     /// Access the expected-damage slot, recovering the guard if the mutex is poisoned.

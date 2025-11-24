@@ -4,10 +4,11 @@
 
 Phase 3 upgrades the workspace to Bevy 0.15.1 and replaces deprecated bundles
 in `spawn_world_system` with the Required Components model introduced in 0.15.
-Sprites now spawn via `Sprite` + `Transform` + `Visibility`, and the camera uses
-`Camera2d` with an orthographic `Projection` positioned above the world to keep
-render parity with the old bundle defaults. A `rust-rspec` scenario ensures the
-DBSP circuit stays authoritative when components go missing between ticks.
+Sprites now spawn via `Sprite` + `Transform` + `Visibility`, and the camera
+uses `Camera2d` with an orthographic `Projection` positioned above the world to
+keep render parity with the old bundle defaults. A `rust-rspec` scenario
+ensures the Differential Dataflow Stream Processing (DBSP) circuit stays
+authoritative when components go missing between ticks.
 
 ## Key changes
 

@@ -39,6 +39,7 @@ struct ObservedEntity {
     translation: Vec3,
     has_target: bool,
     has_health: bool,
+    health: Option<Health>,
     visibility: Option<Visibility>,
     camera: CameraInfo,
 }
@@ -81,6 +82,7 @@ fn collect_observations(app: &mut App) -> Vec<ObservedEntity> {
                     translation: transform.translation,
                     has_target: target.is_some(),
                     has_health: health.is_some(),
+                    health: health.cloned(),
                     visibility: visibility.copied(),
                     camera,
                 }
@@ -179,6 +181,7 @@ fn assert_components(observed: &ObservedEntity, expected: &SpawnExpectation) {
             expected.label
         );
     }
+    assert_positive_health_if_expected(observed, expected);
 }
 
 fn assert_visibility(observed: &ObservedEntity, expected: &SpawnExpectation) {
@@ -222,6 +225,22 @@ fn assert_matches(observed: &ObservedEntity, expected: &SpawnExpectation) {
     assert_components(observed, expected);
     assert_visibility(observed, expected);
     assert_camera(observed, expected);
+}
+
+fn assert_positive_health_if_expected(observed: &ObservedEntity, expected: &SpawnExpectation) {
+    if !expected.has_health {
+        return;
+    }
+    let health = observed
+        .health
+        .as_ref()
+        .unwrap_or_else(|| panic!("{} should include a Health component", expected.label));
+    assert!(
+        health.current > 0,
+        "{} should spawn with positive health but had {}",
+        expected.label,
+        health.current
+    );
 }
 
 /// Tests that the `spawn_world_system` correctly spawns Civvy, Baddie, static,
@@ -268,7 +287,7 @@ fn spawns_world_entities(mut app: App) {
             has_target: false,
             has_health: false,
             expects_camera: true,
-            expected_visibility: None,
+            expected_visibility: Some(Visibility::Visible),
         },
     ];
 
