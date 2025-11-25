@@ -54,6 +54,12 @@ The data flows in a continuous loop each simulation tick:
 In this model, the Bevy systems act as thin, stateless data marshals. All
 substantive logic resides within the DBSP circuit.
 
+Rendering scaffolding follows Bevy 0.15's Required Components model: sprites
+attach `Sprite`, `Transform`, and `Visibility` while the camera uses
+`Camera2d` plus a 2D `Projection`. These components only seed initial state;
+all inferred behaviour (movement, health, authority over mirrors) continues to
+flow exclusively through the DBSP circuit.
+
 > For a detailed breakdown of the circuit's construction, I/O streams, and the
 > mechanics of its integration with Bevy, see:
 >

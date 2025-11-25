@@ -329,7 +329,9 @@ mod tests {
         prime_state(&mut app, entity);
         push_health_inputs(&mut app, 90, 50);
 
-        app.world_mut().run_system_once(apply_dbsp_outputs_system);
+        app.world_mut()
+            .run_system_once(apply_dbsp_outputs_system)
+            .expect("applying DBSP outputs should succeed");
 
         let health = app
             .world()
@@ -364,7 +366,9 @@ mod tests {
         prime_state(&mut app, entity);
         push_health_inputs(&mut app, 90, 50);
 
-        app.world_mut().run_system_once(apply_dbsp_outputs_system);
+        app.world_mut()
+            .run_system_once(apply_dbsp_outputs_system)
+            .expect("applying DBSP outputs should succeed");
         assert_eq!(
             app.world()
                 .entity(entity)
@@ -375,7 +379,9 @@ mod tests {
         );
 
         push_health_inputs(&mut app, 90, 50);
-        app.world_mut().run_system_once(apply_dbsp_outputs_system);
+        app.world_mut()
+            .run_system_once(apply_dbsp_outputs_system)
+            .expect("applying DBSP outputs should succeed");
 
         let state = app.world().non_send_resource::<DbspState>();
         assert_eq!(state.applied_health_duplicates(), 1);

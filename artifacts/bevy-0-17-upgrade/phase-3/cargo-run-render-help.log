@@ -1,0 +1,55 @@
+   Compiling bytemuck v1.21.0
+   Compiling tinyvec v1.10.0
+   Compiling approx v0.5.1
+   Compiling crossbeam-deque v0.8.6
+   Compiling lille v0.1.0 (/mnt/home/leynos/Projects/lille)
+   Compiling crossbeam v0.8.4
+   Compiling glam v0.29.3
+   Compiling wgpu-hal v23.0.1
+   Compiling image v0.25.9
+   Compiling winit v0.30.12
+   Compiling safe_arch v0.7.4
+   Compiling binrw v0.13.3
+   Compiling wide v0.7.33
+   Compiling fastbloom v0.8.0
+   Compiling dbsp v0.98.0
+   Compiling accesskit_winit v0.23.1
+   Compiling wgpu-core v23.0.1
+   Compiling bevy_reflect v0.15.1
+   Compiling encase v0.10.0
+   Compiling hexasphere v15.1.0
+   Compiling bevy_mikktspace v0.15.3
+   Compiling wgpu v23.0.1
+   Compiling bevy_ecs v0.15.1
+   Compiling bevy_math v0.15.1
+   Compiling bevy_color v0.15.2
+   Compiling bevy_app v0.15.1
+   Compiling bevy_core v0.15.1
+   Compiling bevy_asset v0.15.1
+   Compiling bevy_a11y v0.15.1
+   Compiling bevy_time v0.15.1
+   Compiling bevy_log v0.15.1
+   Compiling bevy_hierarchy v0.15.1
+   Compiling bevy_input v0.15.1
+   Compiling bevy_diagnostic v0.15.1
+   Compiling bevy_transform v0.15.1
+   Compiling bevy_window v0.15.1
+   Compiling bevy_image v0.15.1
+   Compiling bevy_mesh v0.15.1
+   Compiling bevy_winit v0.15.1
+   Compiling bevy_render v0.15.1
+   Compiling bevy_picking v0.15.1
+   Compiling bevy_core_pipeline v0.15.1
+   Compiling bevy_sprite v0.15.1
+   Compiling bevy_internal v0.15.1
+   Compiling bevy v0.15.1
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 43.45s
+     Running `target/debug/lille --help`
+A realtime strategy game
+
+Usage: lille [OPTIONS]
+
+Options:
+  -v, --verbose  Enable verbose logging
+  -h, --help     Print help
+  -V, --version  Print version

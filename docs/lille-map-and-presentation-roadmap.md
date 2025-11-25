@@ -108,7 +108,8 @@ input handling while remaining a passive observer of simulation state.
 
 - [ ] Task 2.1.1 — Create PresentationPlugin and camera marker
   - Outcome: `src/presentation.rs` defines `PresentationPlugin`, spawns a
-    `Camera2dBundle`, and tags it with a `CameraController` component.
+    `Camera2d` with a 2D `Projection`, and tags it with a `CameraController`
+    component.
   - Completion criteria: The application renders through the presentation
     camera and legacy camera setup code is removed from map systems.
   - Dependencies: Task 1.1.1.

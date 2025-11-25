@@ -1,10 +1,11 @@
 //! Systems for spawning entities into the Bevy world.
 //! Provides helper functions to create sprites and initialise game objects.
 use bevy::prelude::*;
+use bevy::render::camera::OrthographicProjection;
 
 use crate::components::{DdlogId, Health, Target, UnitType, VelocityComp};
 
-/// Creates a `SpriteBundle` with the specified colour and position.
+/// Creates the components for a coloured sprite at the given position.
 ///
 /// # Parameters
 ///
@@ -13,23 +14,26 @@ use crate::components::{DdlogId, Health, Target, UnitType, VelocityComp};
 ///
 /// # Returns
 ///
-/// A `SpriteBundle` with the given colour and translation, using default values for other fields.
+/// A tuple of [`Sprite`], [`Transform`], and [`Visibility`] components with the
+/// specified colour and translation.
 ///
 /// # Examples
 ///
 /// ```ignore
 /// use bevy::prelude::*;
 /// use lille::spawn_world::basic_sprite;
-/// let sprite = basic_sprite(Color::srgb(1.0, 0.0, 0.0), Vec3::new(10.0, 20.0, 0.0));
-/// assert_eq!(sprite.sprite.color, Color::srgb(1.0, 0.0, 0.0));
-/// assert_eq!(sprite.transform.translation, Vec3::new(10.0, 20.0, 0.0));
+/// let (sprite, transform, visibility) =
+///     basic_sprite(Color::srgb(1.0, 0.0, 0.0), Vec3::new(10.0, 20.0, 0.0));
+/// assert_eq!(sprite.color, Color::srgb(1.0, 0.0, 0.0));
+/// assert_eq!(transform.translation, Vec3::new(10.0, 20.0, 0.0));
+/// assert_eq!(visibility, Visibility::Visible);
 /// ```
-fn basic_sprite(color: Color, translation: Vec3) -> SpriteBundle {
-    SpriteBundle {
-        sprite: Sprite { color, ..default() },
-        transform: Transform::from_translation(translation),
-        ..default()
-    }
+fn basic_sprite(color: Color, translation: Vec3) -> (Sprite, Transform, Visibility) {
+    (
+        Sprite { color, ..default() },
+        Transform::from_translation(translation),
+        Visibility::Visible,
+    )
 }
 
 /// Spawns a fixed set of demo entities and a camera into the Bevy ECS world.
@@ -94,5 +98,11 @@ pub fn spawn_world_system(mut commands: Commands) {
     let _ = next_id;
 
     // Camera
-    commands.spawn(Camera2dBundle::default());
+    // Keep the camera above sprite Z so rendering matches pre-0.15 bundle defaults.
+    commands.spawn((
+        Camera2d,
+        Projection::from(OrthographicProjection::default_2d()),
+        Transform::from_xyz(0.0, 0.0, 999.9),
+        Visibility::Visible,
+    ));
 }

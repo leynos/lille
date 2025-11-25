@@ -1,17 +1,21 @@
 //! Ensures DBSP remains the source of truth for entity state updates.
+#[path = "../support/rspec_runner.rs"]
+mod rspec_runner;
+
 use approx::assert_relative_eq;
 use bevy::prelude::*;
 use lille::components::Block;
 use lille::numeric::expect_f32;
 use lille::{VelocityComp, GRAVITY_PULL};
 use rstest::rstest;
-use rspec::Scenario;
+use rspec::block::Context as Scenario;
 
 use crate::support::{world, TestWorld};
+use rspec_runner::run_serial;
 
 #[rstest]
 fn dbsp_controls_entity_state(world: TestWorld) {
-    rspec::run(&rspec::given(
+    run_serial(&rspec::given(
         "a gravity-aware DBSP circuit",
         world,
         |scenario| {

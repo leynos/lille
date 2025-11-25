@@ -47,9 +47,10 @@ stable and headless builds reproducible.
 
 ### Rendering and Assets (`src/spawn_world.rs`)
 
-- Uses `SpriteBundle` and `Camera2dBundle`. Bevy 0.15 deprecated most bundles
-  in favour of Required Components so we must migrate to spawning the
-  components directly and rely on the new default requirements.[^4]
+- Uses `Sprite`, `Transform`, and `Visibility` for sprites plus `Camera2d` and
+  `Projection` for the camera. Bevy 0.15 deprecated most bundles in favour of
+  Required Components so the spawn logic now relies on the new default
+  requirements.[^4]
 - We only use solid-colour sprites and have no textures or meshes, so the new
   asset usage flags introduced in 0.13 do not block the upgrade. Keep an eye on
   `RenderAssetUsages` once textured sprites arrive.
@@ -146,6 +147,20 @@ before merging to keep the “two sets of eyes” policy meaningful.
   `Msaa::Sample4` if needed to retain anti-aliasing.
 - Run the render feature locally to catch any material or visibility
   regressions introduced by the new bundle model.[^4]
+
+#### Phase 3 status (23 November 2025)
+
+- Bevy crates bumped to 0.15.1 (newer 0.15.x pins `uuid` =1.12, which conflicts
+  with DBSP’s `uuid` ^1.17 requirement). The render feature still uses the
+  minimal Bevy feature set with `x11` on Linux.
+- `spawn_world_system` now spawns sprites with `Sprite` + `Transform` +
+  `Visibility` and a camera with `Camera2d` + `Projection`, aligning with the
+  Required Components model.
+- Added `rstest` coverage for spawn expectations and a `rust-rspec` scenario to
+  prove DBSP remains authoritative over cached entity state when components go
+  missing.
+- Phase logs live under `artifacts/bevy-0-17-upgrade/phase-3/` and accompany
+  `docs/migrations/bevy-0-17-phase-3.md`.
 
 ### Phase 4 – 0.15 → 0.16
 

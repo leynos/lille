@@ -49,6 +49,19 @@ pub struct WorldHandle {
     pub(crate) entities: HashMap<i64, DdlogEntity>,
 }
 
+impl WorldHandle {
+    /// Returns an iterator over tracked entity identifiers.
+    pub fn entity_ids(&self) -> impl Iterator<Item = i64> + '_ {
+        self.entities.keys().copied()
+    }
+
+    /// Returns the number of tracked entities.
+    #[must_use]
+    pub fn entity_count(&self) -> usize {
+        self.entities.len()
+    }
+}
+
 /// Inserts an empty [`WorldHandle`] resource.
 pub fn init_world_handle_system(mut commands: Commands) {
     commands.insert_resource(WorldHandle::default());
