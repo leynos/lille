@@ -226,7 +226,7 @@ mod tests {
     use crate::components::{Block, DdlogId, Health, UnitType};
     use crate::dbsp_circuit::{DamageEvent, DamageSource, HealthState, Position, Velocity};
     use crate::world_handle::DdlogEntity;
-    use bevy_ecs::system::RunSystemOnce;
+    use bevy::ecs::system::RunSystemOnce;
     use rstest::rstest;
 
     fn setup_app() -> App {

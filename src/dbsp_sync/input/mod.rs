@@ -46,10 +46,6 @@ pub fn init_dbsp_system(world: &mut World) -> Result<(), dbsp::Error> {
 /// also refreshes the [`WorldHandle`] resource with the same cached data for
 /// tests and diagnostics.
 #[expect(
-    clippy::needless_pass_by_value,
-    reason = "Bevy systems receive queries by value."
-)]
-#[expect(
     clippy::too_many_arguments,
     reason = "System boundary requires multiple Bevy resources."
 )]

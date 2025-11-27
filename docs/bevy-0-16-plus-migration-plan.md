@@ -172,6 +172,23 @@ before merging to keep the “two sets of eyes” policy meaningful.
   of mixing refactors into the bump.
 - Validate linux-only dependencies (`x11`) against the new Bevy window stack.
 
+#### Phase 4 status (25 November 2025)
+
+- Bevy crates upgraded to 0.16.1 with the Linux `x11` feature retained to
+  validate
+  the refreshed window stack; no extra render features leaked into the minimal
+  build.
+- `spawn_world_system` now parents demo entities beneath a `WorldRoot` entity
+  using the new `ChildOf` relationship, so hierarchy lookups use the 0.16
+  fast-path while keeping DBSP as the source of truth for inferred behaviour.
+- Added `rstest` coverage for the parent-child wiring and a `rust-rspec`
+  scenario proving DBSP caches stay intact when `ChildOf` is removed, alongside
+  the existing unhappy-path transform removal case.
+- Observers V1 were reviewed but deferred; a follow-up ticket is required once
+  the DBSP event push/pull flow is ready for refactor.
+- Logs for this phase live in `artifacts/bevy-0-17-upgrade/phase-4/` and mirror
+  the Phase 3 command set.
+
 ### Phase 5 – 0.16 → 0.17.3
 
 - Final bump to 0.17.3. Update `bevy_log` usages to the renamed Observer +
