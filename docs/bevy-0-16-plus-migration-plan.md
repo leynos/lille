@@ -174,11 +174,12 @@ before merging to keep the “two sets of eyes” policy meaningful.
 
 #### Phase 4 status (25 November 2025)
 
-- Bevy crates upgraded to 0.16.1 with the Linux `x11` feature kept to validate
+- Bevy crates upgraded to 0.16.1 with the Linux `x11` feature retained to
+  validate
   the refreshed window stack; no extra render features leaked into the minimal
   build.
 - `spawn_world_system` now parents demo entities beneath a `WorldRoot` entity
-  using the new `ChildOf` relationship so hierarchy lookups use the 0.16
+  using the new `ChildOf` relationship, so hierarchy lookups use the 0.16
   fast-path while keeping DBSP as the source of truth for inferred behaviour.
 - Added `rstest` coverage for the parent-child wiring and a `rust-rspec`
   scenario proving DBSP caches stay intact when `ChildOf` is removed, alongside
