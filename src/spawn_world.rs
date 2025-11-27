@@ -51,7 +51,7 @@ fn basic_sprite(color: Color, translation: Vec3) -> (Sprite, Transform, Visibili
 /// use bevy::prelude::*;
 /// use lille::spawn_world::spawn_world_system;
 /// App::new()
-///     .add_startup_system(spawn_world_system)
+///     .add_systems(Startup, spawn_world_system)
 ///     .run();
 /// ```
 pub fn spawn_world_system(mut commands: Commands, existing_roots: Query<Entity, With<WorldRoot>>) {
