@@ -7,6 +7,7 @@
 
 use bevy::prelude::*;
 use hashbrown::HashMap;
+use log::info;
 use serde::Serialize;
 
 use crate::components::{Block, BlockSlope, UnitType};

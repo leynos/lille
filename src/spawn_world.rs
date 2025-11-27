@@ -1,9 +1,14 @@
 //! Systems for spawning entities into the Bevy world.
 //! Provides helper functions to create sprites and initialise game objects.
+use bevy::log::warn;
 use bevy::prelude::*;
 use bevy::render::camera::OrthographicProjection;
 
 use crate::components::{DdlogId, Health, Target, UnitType, VelocityComp};
+
+/// Marker for the root entity that owns all demo world children.
+#[derive(Component, Debug)]
+pub struct WorldRoot;
 
 /// Creates the components for a coloured sprite at the given position.
 ///
@@ -49,53 +54,62 @@ fn basic_sprite(color: Color, translation: Vec3) -> (Sprite, Transform, Visibili
 ///     .add_startup_system(spawn_world_system)
 ///     .run();
 /// ```
-pub fn spawn_world_system(mut commands: Commands) {
+pub fn spawn_world_system(mut commands: Commands, existing_roots: Query<Entity, With<WorldRoot>>) {
     let mut next_id: i64 = 1;
 
-    // Static landmark entity
-    commands
-        .spawn(basic_sprite(
-            Color::srgb(0.5, 0.5, 0.5),
-            Vec3::new(50.0, 50.0, 0.0),
+    if !existing_roots.is_empty() {
+        warn!("WorldRoot already present; skipping duplicate spawn_world_system");
+        return;
+    }
+
+    let world_root = commands
+        .spawn((
+            WorldRoot,
+            Name::new("demo-world-root"),
+            Transform::default(),
+            GlobalTransform::default(),
+            Visibility::Visible,
+            InheritedVisibility::VISIBLE,
         ))
-        .insert(DdlogId(next_id));
+        .id();
+    // Parent all demo entities under a single root to exercise Bevy 0.16's
+    // relationship lookups and keep hierarchy queries cache-friendly.
+
+    // Static landmark entity
+    commands.spawn((
+        basic_sprite(Color::srgb(0.5, 0.5, 0.5), Vec3::new(50.0, 50.0, 0.0)),
+        DdlogId(next_id),
+        ChildOf(world_root),
+    ));
     next_id += 1;
 
     // Civilian unit with a movement target
-    commands
-        .spawn(basic_sprite(
-            Color::srgb(1.0, 1.0, 1.0),
-            Vec3::new(125.0, 125.0, 0.0),
-        ))
-        .insert((
-            DdlogId(next_id),
-            Health {
-                current: 100,
-                max: 100,
-            },
-            UnitType::Civvy { fraidiness: 1.0 },
-            Target(Vec2::new(202.0, 200.0)),
-            VelocityComp::default(),
-        ));
+    commands.spawn((
+        basic_sprite(Color::srgb(1.0, 1.0, 1.0), Vec3::new(125.0, 125.0, 0.0)),
+        DdlogId(next_id),
+        Health {
+            current: 100,
+            max: 100,
+        },
+        UnitType::Civvy { fraidiness: 1.0 },
+        Target(Vec2::new(202.0, 200.0)),
+        VelocityComp::default(),
+        ChildOf(world_root),
+    ));
     next_id += 1;
 
     // Threatening baddie
-    commands
-        .spawn(basic_sprite(
-            Color::srgb(1.0, 0.0, 0.0),
-            Vec3::new(150.0, 150.5, 0.0),
-        ))
-        .insert((
-            DdlogId(next_id),
-            Health {
-                current: 100,
-                max: 100,
-            },
-            UnitType::Baddie { meanness: 10.0 },
-            VelocityComp::default(),
-        ));
-    next_id += 1;
-    let _ = next_id;
+    commands.spawn((
+        basic_sprite(Color::srgb(1.0, 0.0, 0.0), Vec3::new(150.0, 150.5, 0.0)),
+        DdlogId(next_id),
+        Health {
+            current: 100,
+            max: 100,
+        },
+        UnitType::Baddie { meanness: 10.0 },
+        VelocityComp::default(),
+        ChildOf(world_root),
+    ));
 
     // Camera
     // Keep the camera above sprite Z so rendering matches pre-0.15 bundle defaults.
@@ -104,5 +118,6 @@ pub fn spawn_world_system(mut commands: Commands) {
         Projection::from(OrthographicProjection::default_2d()),
         Transform::from_xyz(0.0, 0.0, 999.9),
         Visibility::Visible,
+        ChildOf(world_root),
     ));
 }

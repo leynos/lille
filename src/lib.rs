@@ -49,7 +49,7 @@ pub use logging::init as init_logging;
 pub use physics::{applied_acceleration, apply_ground_friction};
 #[cfg(feature = "render")]
 #[cfg_attr(docsrs, doc(cfg(feature = "render")))]
-pub use spawn_world::spawn_world_system;
+pub use spawn_world::{spawn_world_system, WorldRoot};
 pub use vector_math::{vec_mag, vec_normalize};
 pub use world_handle::{init_world_handle_system, WorldHandle};
 

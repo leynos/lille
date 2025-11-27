@@ -11,7 +11,7 @@
 //! Verifies entity counts and component assignments after system execution.
 use bevy::prelude::*;
 use lille::spawn_world_system;
-use lille::{DdlogId, Health, Target, UnitType};
+use lille::{DdlogId, Health, Target, UnitType, WorldRoot};
 use rstest::{fixture, rstest};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -44,6 +44,13 @@ struct ObservedEntity {
     camera: CameraInfo,
 }
 
+fn root_entity(app: &mut App) -> Entity {
+    let mut query = app.world_mut().query_filtered::<Entity, With<WorldRoot>>();
+    query
+        .single(app.world())
+        .unwrap_or_else(|_| panic!("WorldRoot should exist exactly once"))
+}
+
 #[fixture]
 fn app() -> App {
     let mut app = App::new();
@@ -54,7 +61,7 @@ fn app() -> App {
 }
 
 fn collect_observations(app: &mut App) -> Vec<ObservedEntity> {
-    let mut query = app.world_mut().query::<(
+    let mut query = app.world_mut().query_filtered::<(
         Option<&DdlogId>,
         Option<&UnitType>,
         &Transform,
@@ -63,7 +70,7 @@ fn collect_observations(app: &mut App) -> Vec<ObservedEntity> {
         Option<&Visibility>,
         Option<&Camera2d>,
         Option<&Projection>,
-    )>();
+    ), Or<(With<DdlogId>, With<Camera2d>)>>();
 
     query
         .iter(app.world())
@@ -243,9 +250,38 @@ fn assert_positive_health_if_expected(observed: &ObservedEntity, expected: &Spaw
     );
 }
 
+#[rstest]
+fn children_attach_to_root(mut app: App) {
+    let root = root_entity(&mut app);
+    let mut query = app.world_mut().query::<(
+        Entity,
+        Option<&DdlogId>,
+        Option<&Camera2d>,
+        Option<&ChildOf>,
+    )>();
+
+    let mut missing: Vec<Entity> = Vec::new();
+
+    for (entity, ddlog_id, camera, child_of) in query.iter(app.world()) {
+        if ddlog_id.is_none() && camera.is_none() {
+            continue;
+        }
+        let Some(child_of_rel) = child_of else {
+            missing.push(entity);
+            continue;
+        };
+        assert_eq!(
+            child_of_rel.0, root,
+            "entity {entity:?} should be parented to the WorldRoot"
+        );
+    }
+
+    assert!(missing.is_empty(), "entities missing ChildOf: {missing:?}");
+}
+
 /// Tests that the `spawn_world_system` correctly spawns Civvy, Baddie, static,
-/// and camera entities with expected properties using Bevy 0.15 required
-/// components.
+/// and camera entities with expected properties using the Bevy 0.16 child
+/// relationship API.
 #[rstest]
 fn spawns_world_entities(mut app: App) {
     let expectations = vec![

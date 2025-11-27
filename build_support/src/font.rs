@@ -98,6 +98,7 @@ pub fn download_font(manifest_dir: impl AsRef<Path>) -> Result<PathBuf> {
 ///
 /// # Examples
 /// ```rust,no_run
+/// # use anyhow::Result;
 /// # use build_support::font::{download_font_with, FontFetcher};
 /// # struct Dummy;
 /// # impl FontFetcher for Dummy {

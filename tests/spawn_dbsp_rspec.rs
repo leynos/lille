@@ -84,6 +84,16 @@ impl SpawnDbspFixture {
         app.world_mut().entity_mut(entity).remove::<Transform>();
         true
     }
+
+    fn remove_child_of(&self, ddlog_id: i64) -> bool {
+        let mut app = self.app_guard();
+        let mut query = app.world_mut().query::<(Entity, &DdlogId)>();
+        let Some((entity, _)) = query.iter(app.world()).find(|(_, id)| id.0 == ddlog_id) else {
+            return false;
+        };
+        app.world_mut().entity_mut(entity).remove::<ChildOf>();
+        true
+    }
 }
 
 #[test]
@@ -100,6 +110,23 @@ fn dbsp_caches_spawned_entities() {
                 |state| {
                     let ids = state.cached_ids();
                     assert_eq!(ids, vec![1, 2, 3], "cached ids after spawn: {ids:?}");
+                },
+            );
+
+            scenario.then(
+                "ChildOf removal does not evict entities from the DBSP cache",
+                |state| {
+                    assert!(
+                        state.remove_child_of(3),
+                        "Baddie entity with DdlogId 3 should exist"
+                    );
+                    state.tick();
+                    let ids = state.cached_ids();
+                    assert_eq!(
+                        ids,
+                        vec![1, 2, 3],
+                        "cached ids after ChildOf removal: {ids:?}"
+                    );
                 },
             );
 
