@@ -2,10 +2,10 @@
 
 ## Summary
 
-Phase 4 upgrades the workspace to Bevy 0.16.1 and adopts the new hierarchy
+Phase 4 upgrades the workspace to Bevy 0.16.1, and adopts the new hierarchy
 spawn API so demo entities share a single `WorldRoot` parent via `ChildOf`. The
 change keeps the Differential Dataflow Stream Processing (DBSP) circuit as the
-authority for inferred behaviour while letting Bevy use faster relationship
+authority for inferred behaviour, while letting Bevy use faster relationship
 lookups introduced in 0.16.
 
 ## Key changes
