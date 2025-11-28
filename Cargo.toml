@@ -18,7 +18,7 @@ bevy = { workspace = true, default-features = false }
 bevy_app = "0.17.3"
 bevy_ecs = "0.17.3"
 bevy_math = "0.17.3"
-bevy_reflect = { version = "0.17.3", features = ["auto_register"] }
+bevy_reflect = { version = "0.17.3", features = ["auto_register_inventory"] }
 bevy_transform = "0.17.3"
 bevy_log = { version = "0.17.3", optional = true }
 log = "0.4"  # Structured logging facade
