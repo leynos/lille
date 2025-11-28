@@ -1,0 +1,22 @@
+cargo fmt --package lille --package build_support --package test_utils
+mdformat-all
++ with_all_md mdtablefix --wrap --renumber --breaks --ellipsis --fences --headings --in-place
++ [[ 8 -eq 0 ]]
++ find . '(' -name .venv -o -name node_modules ')' -prune -false -o -type f -name '*.md' -print0
++ xargs -0 mdtablefix --wrap --renumber --breaks --ellipsis --fences --headings --in-place
++ with_all_md markdownlint --fix
++ [[ 2 -eq 0 ]]
++ find . '(' -name .venv -o -name node_modules ')' -prune -false -o -type f -name '*.md' -print0
++ xargs -0 markdownlint --fix
++ MDLINT_BIN=/home/leynos/.bun/bin/markdownlint-cli2
+++ mktemp -d
++ MDLINT_CONFIG_DIR=/tmp/tmp.plvqwpTINM
++ MDLINT_CONFIG=/tmp/tmp.plvqwpTINM/.markdownlint-cli2.jsonc
++ cat
++ [[ -f .markdownlint-cli2.jsonc ]]
++ /home/leynos/.bun/bin/markdownlint-cli2 --fix ./README.md ./docs/declarative-world-inference-with-dbsp-and-rust.md ./docs/map-data-format.md ./docs/README.md ./docs/behavioural-testing-in-rust-with-rspec.md ./docs/test_utils.md ./docs/documentation-style-guide.md ./docs/architecture.md ./docs/bevy-headless-testing.md ./docs/complexity-antipatterns-and-refactoring-strategies.md ./docs/testing-declarative-game-logic-in-dbsp.md ./docs/migrations/bevy-0-17-phase-0.md ./docs/migrations/bevy-0-17-phase-1.md ./docs/migrations/entity-world-entity.md ./docs/migrations/bevy-0-17-phase-2.md ./docs/migrations/bevy-0-17-phase-3.md ./docs/migrations/bevy-0-17-phase-4.md ./docs/lille-physics-engine-design.md ./docs/lille-isometric-tiled-maps-design.md ./docs/lille-physics-and-world-engine-roadmap.md ./docs/rust-testing-with-rstest-fixtures.md ./docs/lille-map-and-presentation-roadmap.md ./docs/lille-presentational-layer.md ./docs/bevy-0-16-plus-migration-plan.md ./target/doc/static.files/SourceSerif4-LICENSE-a2cfd9d5.md ./AGENTS.md
+markdownlint-cli2 v0.18.1 (markdownlint v0.38.0)
+Finding: ./README.md ./docs/declarative-world-inference-with-dbsp-and-rust.md ./docs/map-data-format.md ./docs/README.md ./docs/behavioural-testing-in-rust-with-rspec.md ./docs/test_utils.md ./docs/documentation-style-guide.md ./docs/architecture.md ./docs/bevy-headless-testing.md ./docs/complexity-antipatterns-and-refactoring-strategies.md ./docs/testing-declarative-game-logic-in-dbsp.md ./docs/migrations/bevy-0-17-phase-0.md ./docs/migrations/bevy-0-17-phase-1.md ./docs/migrations/entity-world-entity.md ./docs/migrations/bevy-0-17-phase-2.md ./docs/migrations/bevy-0-17-phase-3.md ./docs/migrations/bevy-0-17-phase-4.md ./docs/lille-physics-engine-design.md ./docs/lille-isometric-tiled-maps-design.md ./docs/lille-physics-and-world-engine-roadmap.md ./docs/rust-testing-with-rstest-fixtures.md ./docs/lille-map-and-presentation-roadmap.md ./docs/lille-presentational-layer.md ./docs/bevy-0-16-plus-migration-plan.md ./target/doc/static.files/SourceSerif4-LICENSE-a2cfd9d5.md ./AGENTS.md !**/.venv/** !**/node_modules/** !**/target/**
+Linting: 25 file(s)
+Summary: 0 error(s)
++ rm -rf /tmp/tmp.plvqwpTINM

@@ -3,13 +3,13 @@
 use std::convert::TryFrom;
 
 use bevy::prelude::*;
-use log::{debug, error, warn};
+use log::{debug, warn};
 
 use crate::components::{DdlogId, Health, VelocityComp};
-use crate::dbsp_circuit::{try_step, HealthDelta, Tick};
+use crate::dbsp_circuit::{HealthDelta, Tick};
 use crate::world_handle::WorldHandle;
 
-use super::DbspState;
+use super::{DbspState, DbspSyncError, DbspSyncErrorContext};
 
 type DbspWriteQuery<'w, 's> = Query<
     'w,
@@ -198,12 +198,16 @@ fn should_apply_health_delta(
 /// Outputs are drained after application to prevent reapplying stale deltas on
 /// subsequent frames.
 pub fn apply_dbsp_outputs_system(
+    mut commands: Commands,
     mut state: NonSendMut<DbspState>,
     mut write_query: DbspWriteQuery<'_, '_>,
     mut world_handle: ResMut<WorldHandle>,
 ) {
-    if let Err(e) = try_step(&mut state.circuit) {
-        error!("DbspCircuit::step failed: {e}");
+    if let Err(error) = state.step_circuit() {
+        commands.trigger(DbspSyncError::new(
+            DbspSyncErrorContext::Step,
+            error.to_string(),
+        ));
         return;
     }
 
@@ -226,8 +230,22 @@ mod tests {
     use crate::components::{Block, DdlogId, Health, UnitType};
     use crate::dbsp_circuit::{DamageEvent, DamageSource, HealthState, Position, Velocity};
     use crate::world_handle::DdlogEntity;
+    use crate::DbspCircuit;
+    use bevy::ecs::prelude::On;
     use bevy::ecs::system::RunSystemOnce;
     use rstest::rstest;
+    use std::io;
+
+    #[derive(Resource, Default)]
+    struct CapturedErrors(Vec<DbspSyncError>);
+
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "Observer systems must take On<T> by value."
+    )]
+    fn capture_error(event: On<DbspSyncError>, mut errors: ResMut<CapturedErrors>) {
+        errors.0.push(event.event().clone());
+    }
 
     fn setup_app() -> App {
         let mut app = App::new();
@@ -322,6 +340,10 @@ mod tests {
         );
     }
 
+    fn force_step_error(_: &mut DbspCircuit) -> Result<(), dbsp::Error> {
+        Err(dbsp::Error::IO(io::Error::other("forced failure")))
+    }
+
     #[rstest]
     fn applies_outputs_updates_components() {
         let mut app = setup_app();
@@ -393,5 +415,40 @@ mod tests {
                 .current,
             40
         );
+    }
+
+    #[rstest]
+    fn step_failure_triggers_error_event() {
+        let mut app = setup_app();
+        app.insert_resource(CapturedErrors::default());
+        app.add_observer(capture_error);
+        let entity = spawn_entity(&mut app);
+        prime_state(&mut app, entity);
+
+        {
+            let mut state = app.world_mut().non_send_resource_mut::<DbspState>();
+            state.set_stepper_for_testing(force_step_error);
+        }
+
+        app.world_mut()
+            .run_system_once(apply_dbsp_outputs_system)
+            .expect("DBSP step failure should be handled");
+        app.world_mut().flush();
+
+        let errors = app.world().resource::<CapturedErrors>();
+        let error = errors
+            .0
+            .first()
+            .expect("DBSP error event should be captured");
+        assert_eq!(errors.0.len(), 1);
+        assert_eq!(error.context, DbspSyncErrorContext::Step);
+        assert!(error.detail.contains("forced failure"));
+
+        let transform = app
+            .world()
+            .entity(entity)
+            .get::<Transform>()
+            .expect("Transform should remain after failed step");
+        assert_eq!(transform.translation, Vec3::ZERO);
     }
 }

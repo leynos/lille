@@ -1,0 +1,396 @@
+   Compiling lille v0.1.0 (/mnt/home/leynos/Projects/lille)
+   Compiling test_utils v0.1.0 (/mnt/home/leynos/Projects/lille/test_utils)
+   Compiling build_support v0.1.0 (/mnt/home/leynos/Projects/lille/build_support)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 04s
+     Running unittests src/lib.rs (target/debug/deps/build_support-c9449307f836f45e)
+
+running 6 tests
+test font::tests::fallback_font_path_constant ... ok
+test font::tests::fallback_on_write_error ... ok
+test font::tests::invalid_manifest_dir ... ok
+test font::tests::creates_assets_directory ... ok
+test font::tests::concurrent_calls ... ok
+test font::tests::returns_existing_font_path ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/build_support_runner.rs (target/debug/deps/build_support_runner-6eb03b7cd90a651e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/lille-0ffb6bee79686cd4)
+
+running 108 tests
+test dbsp_circuit::streams::behaviour::tests::decide_movement_direction::case_2_flee ... ok
+test dbsp_circuit::streams::behaviour::tests::decide_movement_direction::case_1_approach ... ok
+test dbsp_circuit::streams::behaviour::tests::decide_movement_direction::case_3_equals_threshold ... ok
+test dbsp_circuit::streams::behaviour::tests::no_decision_without_target ... ok
+test dbsp_circuit::streams::behaviour::tests::movement_decision_join::case_1_approach ... ok
+test dbsp_circuit::streams::behaviour::tests::movement_decision_join::case_2_flee ... ok
+test dbsp_circuit::streams::behaviour::tests::movement_decision_join::case_4_default ... ok
+test dbsp_circuit::streams::behaviour::tests::duplicate_targets_produce_single_decision ... ok
+test dbsp_circuit::streams::behaviour::tests::movement_decision_join::case_3_equals_threshold ... ok
+test dbsp_circuit::streams::floor::tests::floor_height_cases::case_1_block_only ... ok
+test dbsp_circuit::streams::floor::tests::floor_height_cases::case_5_zero_slope ... ok
+test dbsp_circuit::streams::floor::tests::highest_block_cases::case_3_duplicate_same_height ... ok
+test dbsp_circuit::streams::floor::tests::floor_height_cases::case_8_multiple_slopes ... ok
+test dbsp_circuit::streams::floor::tests::floor_height_cases::case_7_large_gradients ... ok
+test dbsp_circuit::streams::floor::tests::floor_height_cases::case_4_negative_slope ... ok
+test dbsp_circuit::streams::floor::tests::floor_height_cases::case_6_negative_coords ... ok
+test dbsp_circuit::streams::floor::tests::floor_height_cases::case_3_highest_block_wins ... ok
+test dbsp_circuit::streams::health::tests::multiple_entities_land_without_interference ... ok
+test dbsp_circuit::streams::kinematics::tests::motion::default_mass_is_positive ... ok
+test dbsp_circuit::streams::health::tests::fall_damage_emits_event ... ok
+test dbsp_circuit::streams::health::tests::safe_speed_emits_no_damage ... ok
+test dbsp_circuit::streams::floor::tests::highest_block_cases::case_2_single ... ok
+test dbsp_circuit::streams::floor::tests::highest_block_cases::case_4_mixed ... ok
+test dbsp_circuit::streams::floor::tests::floor_height_cases::case_2_block_with_slope ... ok
+test dbsp_circuit::streams::floor::tests::highest_block_cases::case_1_empty ... ok
+test dbsp_circuit::streams::floor::tests::slope_without_block_yields_no_height ... ok
+test dbsp_circuit::streams::health::tests::cooldown_prevents_rapid_retrigger ... ok
+test dbsp_circuit::streams::floor::tests::test_highest_block_aggregation ... ok
+test dbsp_circuit::streams::kinematics::tests::motion::motion_cases::case_3_boundary_snaps_to_floor ... ok
+test dbsp_circuit::streams::kinematics::tests::motion::airborne_preserves_velocity ... ok
+test dbsp_circuit::streams::kinematics::tests::motion::motion_cases::case_8_negative_horizontal_velocity ... ok
+test dbsp_circuit::streams::kinematics::tests::motion::motion_cases::case_5_invalid_mass_ignores_force ... ok
+test dbsp_circuit::streams::kinematics::tests::motion::motion_cases::case_2_unsupported_falls ... ok
+test dbsp_circuit::streams::floor::tests::unmatched_slope_is_ignored ... ok
+test dbsp_circuit::streams::kinematics::tests::motion::non_finite_horizontal_velocity_propagates::case_1_nan ... ok
+test dbsp_circuit::streams::kinematics::tests::motion::non_finite_horizontal_velocity_propagates::case_2_pos_infinite ... ok
+test dbsp_circuit::streams::kinematics::tests::motion::motion_cases::case_6_force_with_default_mass ... ok
+test dbsp_circuit::streams::kinematics::tests::motion::motion_cases::case_7_large_horizontal_velocity ... ok
+test dbsp_circuit::streams::kinematics::tests::motion::motion_cases::case_4_force_accelerates ... ok
+test dbsp_circuit::streams::kinematics::tests::motion::motion_cases::case_1_standing_moves ... ok
+test dbsp_circuit::streams::kinematics::tests::motion::standing_friction::case_2_negative ... ok
+test dbsp_circuit::streams::kinematics::tests::motion::terminal_velocity_clamping::case_1_at_limit ... ok
+test dbsp_circuit::streams::kinematics::tests::motion::non_finite_horizontal_velocity_propagates::case_3_neg_infinite ... ok
+test dbsp_circuit::tests::beyond_grace_or_at_boundary::case_1 ... ok
+test dbsp_circuit::streams::kinematics::tests::motion::terminal_velocity_clamping::case_3_upward_limit ... ok
+test dbsp_circuit::tests::beyond_grace_or_at_boundary::case_2 ... ok
+test dbsp_circuit::streams::kinematics::tests::motion::terminal_velocity_clamping::case_6_near_zero_positive ... ok
+test dbsp_circuit::tests::duplicate_damage_events_idempotent::case_1 ... ok
+test dbsp_circuit::streams::kinematics::tests::motion::standing_friction::case_1_positive ... ok
+test dbsp_circuit::tests::duplicate_damage_events_idempotent::case_2 ... ok
+test dbsp_circuit::streams::kinematics::tests::motion::terminal_velocity_clamping::case_5_near_zero_negative ... ok
+test dbsp_circuit::tests::healing_clamped_to_max::case_1 ... ok
+test dbsp_circuit::tests::health_delta_scenarios::case_1_unsequenced_distinct_sources ... ok
+test dbsp_circuit::streams::kinematics::tests::motion::terminal_velocity_clamping::case_2_beyond_limit ... ok
+test dbsp_circuit::tests::health_delta_scenarios::case_2_unsequenced_duplicate_payloads_filtered ... ok
+test dbsp_circuit::streams::kinematics::tests::motion::standing_friction::case_3_zero ... ok
+test dbsp_circuit::tests::health_delta_scenarios::case_3_multiple_events_max_seq ... ok
+test dbsp_circuit::tests::health_delta_scenarios::case_5_over_healing_clamped ... ok
+test dbsp_circuit::streams::kinematics::tests::position_floor::position_floor_cases::case_1 ... ok
+test dbsp_circuit::tests::healing_clamped_to_max::case_2 ... ok
+test dbsp_circuit::tests::lethal_damage_sets_death_flag::case_1_moderate_damage ... ok
+test dbsp_circuit::tests::health_delta_scenarios::case_4_healing_from_zero ... ok
+test dbsp_circuit::streams::kinematics::tests::position_floor::multiple_positions_same_grid_cell ... ok
+test dbsp_circuit::tests::within_grace::case_1 ... ok
+test dbsp_circuit::tests::within_grace::case_2 ... ok
+test dbsp_circuit::tests::within_grace::case_3 ... ok
+test dbsp_circuit::tests::within_grace::case_4 ... ok
+test dbsp_circuit::tests::within_grace::case_5 ... ok
+test dbsp_circuit::tests::within_grace::case_6 ... ok
+test dbsp_circuit::tests::within_grace::case_7 ... ok
+test dbsp_circuit::tests::within_grace::case_9 ... ok
+test dbsp_sync::damage_inbox::tests::extend_appends_multiple_events ... ok
+test dbsp_sync::damage_inbox::tests::push_appends_single_event ... ok
+test dbsp_circuit::tests::lethal_damage_sets_death_flag::case_2_high_damage ... ok
+test dbsp_circuit::tests::within_grace::case_8 ... ok
+test dbsp_circuit::tests::sequenced_events_with_same_seq_in_same_tick_are_deduplicated ... ok
+test dbsp_circuit::streams::kinematics::tests::motion::terminal_velocity_clamping::case_4_upward_beyond_limit ... ok
+test dbsp_circuit::streams::kinematics::tests::position_floor::position_floor_cases::case_2 ... ok
+test dbsp_sync::duplicate_filter::tests::unsequenced_duplicate_is_counted ... ok
+test dbsp_sync::duplicate_filter::tests::unsequenced_events_reset_each_tick ... ok
+test dbsp_sync::duplicate_filter::tests::sequenced_event_reapplied_in_next_frame_is_ignored ... ok
+test dbsp_sync::input::tests::unique_events_are_ingested ... ok
+test dbsp_sync::tests::damage_inbox_is_constructible ... ok
+test dbsp_circuit::streams::kinematics::tests::position_floor::position_floor_cases::case_3 ... ok
+test dbsp_sync::tests::plugin_is_default_constructible ... ok
+test dbsp_sync::input::tests::unsequenced_duplicates_are_dropped ... ok
+test logging::tests::init_resets_flag_when_installation_fails ... ok
+test logging::tests::init_with_sets_trace_logging_when_verbose ... ok
+test logging::tests::init_is_idempotent_after_success ... ok
+test numeric::tests::expect_f32_converts_in_range_values ... ok
+test numeric::tests::expect_u16_converts_in_range_values ... ok
+test numeric::tests::floor_to_u16_floors_valid_values ... ok
+test numeric::tests::floor_to_u16_returns_none_for_negative_values ... ok
+test numeric::tests::floor_to_u16_returns_none_for_non_finite_values ... ok
+test numeric::tests::floor_to_u16_returns_none_for_overflow_values ... ok
+test numeric::tests::floor_to_i32_clamps_to_bounds ... ok
+test physics::tests::friction_handles_extreme_values ... ok
+test physics::tests::friction_scales_velocity ... ok
+test dbsp_sync::input::tests::sequenced_duplicates_are_dropped ... ok
+test dbsp_sync::duplicate_filter::tests::sequenced_duplicate_is_counted ... ok
+test dbsp_sync::output::tests::step_failure_triggers_error_event ... ok
+test dbsp_sync::state::tests::entity_lookup_uses_mapping ... ok
+test dbsp_sync::state::tests::new_state_starts_empty ... ok
+test dbsp_sync::output::tests::applies_outputs_updates_components ... ok
+test dbsp_sync::tests::init_system_exposes_state ... ok
+test dbsp_sync::state::tests::duplicate_counter_reports_value ... ok
+test dbsp_sync::plugin::tests::plugin_initialises_resources ... ok
+test dbsp_sync::output::tests::duplicate_health_delta_is_ignored ... ok
+
+test result: ok. 108 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.40s
+
+     Running unittests src/main.rs (target/debug/deps/lille-f0faecd204e32e1d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/applied_acceleration.rs (target/debug/deps/applied_acceleration-d3ddd3a91bc35bd6)
+
+running 6 tests
+test acceleration_cases::case_1_explicit_mass ... ok
+test acceleration_cases::case_2_default_mass ... ok
+test acceleration_cases::case_3_invalid_mass ... ok
+test acceleration_cases::case_4_negative_mass ... ok
+test acceleration_cases::case_5_near_zero_mass ... ok
+test acceleration_cases::case_6_extremely_large_mass ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/bevy_dbsp_loop.rs (target/debug/deps/bevy_dbsp_loop-41cbcbd0dc4353c0)
+
+running 1 test
+test ecs_dbsp_round_trip_applies_gravity ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/copy_record_rspec.rs (target/debug/deps/copy_record_rspec-89c3cfd1dd1e0c39)
+
+running 6 tests
+test copy_records_are_copy::case_2_velocity ... ok
+test copy_records_are_copy::case_1_position ... ok
+test copy_records_are_copy::case_3_highest_block ... ok
+test copy_records_are_copy::case_4_floor_height ... ok
+test copy_records_are_copy::case_6_movement_decision ... ok
+test copy_records_are_copy::case_5_target ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/dbsp_error_rspec.rs (target/debug/deps/dbsp_error_rspec-f40e8b7f36350e22)
+
+running 1 test
+
+tests:
+
+Given "a DBSP step failure is triggered"
+  Then "the observer records a DbspSyncError" ... ok
+  Then "existing ECS data remains unchanged" ... ok
+
+duration: 0.002s.
+
+test result: ok. 2 passed; 0 failed; 0 ignored
+test dbsp_step_failure_is_observed_and_non_destructive ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/dbsp_schedule_regression.rs (target/debug/deps/dbsp_schedule_regression-0bbb978ce80d49f6)
+
+running 2 tests
+test damage_events_apply_in_a_single_frame ... ok
+test non_send_state_survives_updates ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+     Running tests/dbsp_sync_id_map.rs (target/debug/deps/dbsp_sync_id_map-880f052d35df7326)
+
+running 2 tests
+test updates_id_map_when_ddlog_id_changed ... ok
+test removes_entity_from_id_map_when_ddlog_id_removed ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/fear_level_not_copy_rspec.rs (target/debug/deps/fear_level_not_copy_rspec-e604f9d896c64fc4)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/geometry_rspec.rs (target/debug/deps/geometry_rspec-97fab8da7c192f3b)
+
+running 1 test
+test slope_block_outputs_height ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/health_pipeline.rs (target/debug/deps/health_pipeline-34a54d2990050212)
+
+running 7 tests
+test duplicate_events_within_tick_apply_once ... ok
+test healing_when_already_at_max_health_does_not_overflow ... ok
+test replaying_same_tick_delta_is_ignored ... ok
+test damage_sequence_behaviour::case_1_new_ticks_consume_damage_once ... ok
+test damage_sequence_behaviour::case_3_unsequenced_duplicates_filtered ... ok
+test damage_sequence_behaviour::case_2_healing_saturates_at_max ... ok
+test damage_sequence_behaviour::case_4_unsequenced_replays_ignored ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+
+     Running tests/position_floor_rspec.rs (target/debug/deps/position_floor_rspec-7969de3842b1af00)
+
+running 1 test
+test join_position_with_floor ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/reactive_behaviour_rspec.rs (target/debug/deps/reactive_behaviour_rspec-477c249e6acf17f0)
+
+running 4 tests
+test reactive_movement_behaviour::case_3 ... ok
+test reactive_movement_behaviour::case_2 ... ok
+test reactive_movement_behaviour::case_1 ... ok
+test handles_multiple_entities_with_mixed_states ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/spawn.rs (target/debug/deps/spawn-1343a68357374e1b)
+
+running 2 tests
+test spawns_world_entities ... ok
+test children_attach_to_root ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/spawn_dbsp_rspec.rs (target/debug/deps/spawn_dbsp_rspec-b151c29d4b20275d)
+
+running 2 tests
+
+tests:
+
+Given "spawn_world_system seeds demo entities"
+  Then "DBSP caches all spawned DdlogIds from the ECS world" ... ok
+  Then "ChildOf removal does not evict entities from the DBSP cache" ... test cached_ids_drop_when_transform_missing ... ok
+ok
+  Then "DBSP drops entities without transforms on subsequent ticks" ... ok
+
+duration: 0.080s.
+
+test result: ok. 3 passed; 0 failed; 0 ignored
+test dbsp_caches_spawned_entities ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+
+     Running tests/vector_math.rs (target/debug/deps/vector_math-607f12382c0cf3bf)
+
+running 14 tests
+test vec_mag_matches_pythagoras ... ok
+test vec_normalize_returns_expected::case_01_nan_x ... ok
+test vec_normalize_returns_expected::case_02_pos_x_axis ... ok
+test vec_normalize_returns_expected::case_03_zero ... ok
+test vec_normalize_returns_expected::case_04_infinite_x ... ok
+test vec_normalize_returns_expected::case_05_nan_y ... ok
+test vec_normalize_returns_expected::case_06_nan_z ... ok
+test vec_normalize_returns_expected::case_07_infinite_y ... ok
+test vec_normalize_returns_expected::case_08_infinite_z ... ok
+test vec_normalize_returns_expected::case_10_neg_infinite_y ... ok
+test vec_normalize_returns_expected::case_09_neg_infinite_x ... ok
+test vec_normalize_returns_expected::case_11_neg_infinite_z ... ok
+test vec_normalize_returns_expected::case_13_diagonal ... ok
+test vec_normalize_returns_expected::case_12_neg_x_axis ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/test_utils-b642b5c4e38be4a8)
+
+running 6 tests
+test conversions::tests::block_coords_from_tuple_roundtrip ... ok
+test conversions::tests::coords2d_from_tuple_roundtrip ... ok
+test conversions::tests::coords3d_from_tuple_roundtrip ... ok
+test conversions::tests::entity_id_roundtrip ... ok
+test conversions::tests::fear_value_roundtrip ... ok
+test conversions::tests::mass_roundtrip ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests build_support
+
+running 4 tests
+test build_support/src/lib.rs - build (line 15) - compile ... ok
+test build_support/src/font.rs - font::download_font (line 77) - compile ... ok
+test build_support/src/font.rs - font::download_font_with (line 100) - compile ... ok
+test build_support/src/font.rs - font::FontFetcher (line 24) - compile ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+   Doc-tests lille
+
+running 42 tests
+test src/dbsp_circuit/circuit.rs - dbsp_circuit::circuit::DbspCircuit::new (line 124) - compile ... ok
+test src/dbsp_circuit/step.rs - dbsp_circuit::step::try_step (line 58) - compile ... ok
+test src/dbsp_circuit/step.rs - dbsp_circuit::step::step_named (line 36) - compile ... ok
+test src/dbsp_circuit/streams/behaviour.rs - dbsp_circuit::streams::behaviour::fear_level_stream (line 34) - compile ... ok
+test src/dbsp_circuit/streams/health/aggregate.rs - dbsp_circuit::streams::health::aggregate::health_delta_stream (line 142) ... ignored
+test src/dbsp_circuit/streams/behaviour.rs - dbsp_circuit::streams::behaviour::apply_movement (line 369) - compile ... ok
+test src/dbsp_circuit/step.rs - dbsp_circuit::step::step (line 11) - compile ... ok
+test src/dbsp_circuit/streams/behaviour.rs - dbsp_circuit::streams::behaviour::movement_decision_stream (line 158) - compile ... ok
+test src/dbsp_circuit/circuit.rs - dbsp_circuit::circuit::DbspCircuit (line 47) - compile ... ok
+test src/dbsp_circuit/circuit.rs - dbsp_circuit::circuit::DbspCircuit::step (line 168) - compile ... ok
+test src/dbsp_circuit/streams/floor/mod.rs - dbsp_circuit::streams::floor::floor_height_stream (line 77) - compile ... ok
+test src/dbsp_circuit/types.rs - dbsp_circuit::types::Force (line 142) - compile ... ok
+test src/dbsp_circuit/streams/floor/mod.rs - dbsp_circuit::streams::floor::highest_block_pair (line 21) - compile ... ok
+test src/dbsp_circuit/streams/health/fall.rs - dbsp_circuit::streams::health::fall::fall_damage_stream (line 104) - compile ... ok
+test src/lib.rs - prelude (line 59) - compile ... ok
+test src/components.rs - components::UnitType (line 44) ... ok
+test src/macros.rs - macros (line 36) ... ignored
+test src/components.rs - components::Target (line 72) ... ok
+test src/macros.rs - macros (line 65) - compile fail ... ok
+test src/macros.rs - macros::dbsp_record (line 83) ... ignored
+test src/components.rs - components::Health (line 25) ... ok
+test src/components.rs - components::ForceComp (line 179) ... ok
+test src/dbsp_sync/damage_inbox.rs - dbsp_sync::damage_inbox::DamageInbox::is_empty (line 86) ... ok
+test src/dbsp_sync/damage_inbox.rs - dbsp_sync::damage_inbox::DamageInbox::push (line 17) ... ok
+test src/dbsp_sync/state.rs - dbsp_sync::state::DbspState::applied_health_duplicates (line 93) ... ok
+test src/dbsp_sync/damage_inbox.rs - dbsp_sync::damage_inbox::DamageInbox::drain (line 62) ... ok
+test src/logging.rs - logging::init (line 36) ... ok
+test src/spawn_world.rs - spawn_world::basic_sprite (line 26) ... ignored
+test src/spawn_world.rs - spawn_world::spawn_world_system (line 49) ... ignored
+test src/dbsp_sync/damage_inbox.rs - dbsp_sync::damage_inbox::DamageInbox::extend (line 37) ... ok
+test src/dbsp_circuit/types.rs - dbsp_circuit::types::FearLevel (line 235) ... ok
+test src/dbsp_sync/state.rs - dbsp_sync::state::DbspState::entity_for_id (line 79) ... ok
+test src/macros.rs - macros (line 8) ... ok
+test src/numeric.rs - numeric::expect_f32 (line 12) ... ok
+test src/numeric.rs - numeric::expect_f32 (line 18) ... ok
+test src/numeric.rs - numeric::floor_to_i32 (line 104) ... ok
+test src/numeric.rs - numeric::expect_u16 (line 44) ... ok
+test src/numeric.rs - numeric::floor_to_u16 (line 75) ... ok
+test src/vector_math.rs - vector_math::vec_mag (line 8) ... ok
+test src/physics.rs - physics::apply_ground_friction (line 61) ... ok
+test src/physics.rs - physics::applied_acceleration (line 21) ... ok
+test src/vector_math.rs - vector_math::vec_normalize (line 26) ... ok
+
+test result: ok. 37 passed; 0 failed; 5 ignored; 0 measured; 0 filtered out; finished in 29.59s
+
+   Doc-tests test_utils
+
+running 24 tests
+test test_utils/src/lib.rs - expect_single (line 37) ... ok
+test test_utils/src/physics.rs - physics::BlockCoords::new (line 73) ... ok
+test test_utils/src/physics.rs - physics::Coords2D::new (line 93) ... ok
+test test_utils/src/physics.rs - physics::FearValue::new (line 175) ... ok
+test test_utils/src/physics.rs - physics::EntityId::new (line 14) ... ok
+test test_utils/src/lib.rs - expect_single (line 32) ... ok
+test test_utils/src/lib.rs - step (line 82) ... ok
+test test_utils/src/lib.rs - expect_single (line 25) ... ok
+test test_utils/src/physics.rs - physics::BlockId::new (line 31) ... ok
+test test_utils/src/lib.rs - step_named (line 92) ... ok
+test test_utils/src/conversions.rs - conversions (line 5) ... ok
+test test_utils/src/physics.rs - physics::new_circuit (line 191) - compile ... ok
+test test_utils/src/physics.rs - physics::Coords3D::new (line 52) ... ok
+test test_utils/src/physics.rs - physics::ForceVector::new (line 114) ... ok
+test test_utils/src/physics.rs - physics::block (line 398) ... ok
+test test_utils/src/physics.rs - physics::Gradient::new (line 134) ... ok
+test test_utils/src/physics.rs - physics::pos (line 255) ... ok
+test test_utils/src/physics.rs - physics::fear (line 300) ... ok
+test test_utils/src/physics.rs - physics::force_with_mass (line 353) ... ok
+test test_utils/src/physics.rs - physics::force_inner (line 323) ... ok
+test test_utils/src/physics.rs - physics::Mass::new (line 150) ... ok
+test test_utils/src/physics.rs - physics::slope (line 374) ... ok
+test test_utils/src/physics.rs - physics::vel (line 270) ... ok
+test test_utils/src/physics.rs - physics::target (line 285) ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 32.30s
+

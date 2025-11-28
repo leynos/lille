@@ -1,0 +1,72 @@
+   Compiling bytemuck v1.24.0
+   Compiling fixedbitset v0.5.7
+   Compiling nonmax v0.5.5
+   Compiling encase v0.11.2
+   Compiling half v2.7.1
+   Compiling approx v0.5.1
+   Compiling crossbeam-deque v0.8.6
+   Compiling lille v0.1.0 (/mnt/home/leynos/Projects/lille)
+   Compiling crossbeam v0.8.4
+   Compiling glam v0.30.9
+   Compiling wgpu-types v26.0.0
+   Compiling image v0.25.9
+   Compiling winit v0.30.12
+   Compiling safe_arch v0.7.4
+   Compiling binrw v0.13.3
+   Compiling wide v0.7.33
+   Compiling fastbloom v0.8.0
+   Compiling dbsp v0.98.0
+   Compiling accesskit_winit v0.29.2
+   Compiling bevy_reflect v0.17.3
+   Compiling hexasphere v16.0.0
+   Compiling bevy_ecs v0.17.3
+   Compiling bevy_math v0.17.3
+   Compiling bevy_color v0.17.3
+   Compiling bevy_app v0.17.3
+   Compiling bevy_asset v0.17.3
+   Compiling bevy_log v0.17.3
+   Compiling bevy_input v0.17.3
+   Compiling bevy_time v0.17.3
+   Compiling bevy_a11y v0.17.3
+   Compiling bevy_transform v0.17.3
+   Compiling bevy_diagnostic v0.17.3
+   Compiling bevy_window v0.17.3
+   Compiling bevy_image v0.17.3
+   Compiling bevy_mesh v0.17.3
+   Compiling bevy_camera v0.17.3
+   Compiling bevy_picking v0.17.3
+   Compiling bevy_input_focus v0.17.3
+   Compiling bevy_winit v0.17.3
+   Compiling bevy_internal v0.17.3
+   Compiling bevy v0.17.3
+   Compiling test_utils v0.1.0 (/mnt/home/leynos/Projects/lille/test_utils)
+   Compiling build_support v0.1.0 (/mnt/home/leynos/Projects/lille/build_support)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 30s
+     Running unittests src/lib.rs (target/debug/deps/build_support-d340ce4d9130fa9b)
+
+running 6 tests
+test font::tests::fallback_font_path_constant ... ok
+test font::tests::creates_assets_directory ... ok
+test font::tests::fallback_on_write_error ... ok
+test font::tests::invalid_manifest_dir ... ok
+test font::tests::returns_existing_font_path ... ok
+test font::tests::concurrent_calls ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/build_support_runner.rs (target/debug/deps/build_support_runner-10f6d890a5bd42df)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests build_support
+
+running 4 tests
+test build_support/src/font.rs - font::download_font_with (line 100) - compile ... ok
+test build_support/src/font.rs - font::FontFetcher (line 24) - compile ... ok
+test build_support/src/font.rs - font::download_font (line 77) - compile ... ok
+test build_support/src/lib.rs - build (line 15) - compile ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+

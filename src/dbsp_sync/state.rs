@@ -6,11 +6,16 @@ use bevy::ecs::system::SystemParam;
 use bevy::prelude::{Added, Changed, Entity, Query, RemovedComponents};
 
 use crate::components::DdlogId;
-use crate::dbsp_circuit::{DamageEvent, DbspCircuit, EntityId, HealthState, Tick};
+use crate::dbsp_circuit::{try_step, DamageEvent, DbspCircuit, EntityId, HealthState, Tick};
+
+type DbspStepFn = fn(&mut DbspCircuit) -> Result<(), dbsp::Error>;
 
 /// Resource storing the DBSP circuit and deduplication state.
 pub struct DbspState {
     pub(crate) circuit: DbspCircuit,
+    /// Function pointer used to advance the circuit; overridden in tests to
+    /// force error paths without mutating the real DBSP logic.
+    stepper: DbspStepFn,
     /// Cached mapping from DBSP entity IDs to Bevy `Entity` values.
     ///
     /// The map is maintained incrementally by
@@ -55,6 +60,7 @@ impl DbspState {
     pub fn new() -> Result<Self, dbsp::Error> {
         Ok(Self {
             circuit: DbspCircuit::new()?,
+            stepper: try_step,
             id_map: HashMap::new(),
             rev_map: HashMap::new(),
             applied_health: HashMap::new(),
@@ -93,6 +99,17 @@ impl DbspState {
     pub const fn applied_health_duplicates(&self) -> u64 {
         self.health_duplicate_count
     }
+
+    /// Invokes the configured circuit stepper.
+    pub(crate) fn step_circuit(&mut self) -> Result<(), dbsp::Error> {
+        (self.stepper)(&mut self.circuit)
+    }
+
+    /// Overrides the circuit stepper. Intended for tests that need to force an
+    /// error path without mutating the DBSP logic.
+    pub fn set_stepper_for_testing(&mut self, stepper: DbspStepFn) {
+        self.stepper = stepper;
+    }
 }
 
 #[cfg(test)]
@@ -117,7 +134,7 @@ mod tests {
     #[rstest]
     fn entity_lookup_uses_mapping() {
         let mut state = DbspState::new().expect("failed to initialise DbspState for tests");
-        let entity = Entity::from_raw(42);
+        let entity = Entity::from_bits(42);
         state.id_map.insert(7, entity);
         state.rev_map.insert(entity, 7);
         assert_eq!(state.entity_for_id(7), Some(entity));

@@ -63,6 +63,14 @@ health, authority over mirrors) continues to flow exclusively through the DBSP
 circuit, and tests cover both the happy path and cases where parent links go
 missing.
 
+### 2.1. Error reporting on Bevy 0.17
+
+`DbspPlugin` now surfaces failures as `DbspSyncError` events that flow through
+Bevy's Events V2 observers. Observers log the error context and message even
+when `bevy_log` is disabled, keeping diagnostics available in headless runs.
+The systems bail out before applying outputs, ensuring the DBSP circuit remains
+the sole authority when a step fails and avoiding partial writes to ECS state.
+
 > For a detailed breakdown of the circuit's construction, I/O streams, and the
 > mechanics of its integration with Bevy, see:
 >
