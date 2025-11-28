@@ -124,8 +124,8 @@ fn dbsp_step_failure_is_observed_and_non_destructive() {
                     .first()
                     .expect("error event should be recorded via observer");
                 assert_eq!(errors.len(), 1);
-                assert_eq!(error.context, DbspSyncErrorContext::Step);
-                assert!(error.detail.contains("forced failure"));
+                assert_eq!(error.0, format!("{:?}", DbspSyncErrorContext::Step));
+                assert!(error.1.contains("forced failure"));
             });
 
             scenario.then("existing ECS data remains unchanged", |state| {

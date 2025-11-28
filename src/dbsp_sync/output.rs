@@ -429,8 +429,8 @@ mod tests {
             .first()
             .expect("DBSP error event should be captured");
         assert_eq!(errors.0.len(), 1);
-        assert_eq!(error.context, DbspSyncErrorContext::Step);
-        assert!(error.detail.contains("forced failure"));
+        assert_eq!(error.0, format!("{:?}", DbspSyncErrorContext::Step));
+        assert!(error.1.contains("forced failure"));
 
         let transform = app
             .world()
