@@ -232,7 +232,6 @@ mod tests {
     use crate::dbsp_sync::test_support;
     use crate::world_handle::DdlogEntity;
     use crate::DbspCircuit;
-    use bevy::ecs::prelude::On;
     use bevy::ecs::system::RunSystemOnce;
     use rstest::rstest;
     use std::io;
