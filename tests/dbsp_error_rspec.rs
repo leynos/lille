@@ -20,17 +20,6 @@ use rspec::block::Context as Scenario;
 use rspec_runner::run_serial;
 use thread_safe_app::{lock_app, SharedApp, ThreadSafeApp};
 
-#[derive(Resource, Default)]
-struct CapturedErrors(Vec<DbspSyncError>);
-
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "Observer systems must take On<T> by value."
-)]
-fn record_error(event: On<DbspSyncError>, mut errors: ResMut<CapturedErrors>) {
-    errors.0.push(event.event().clone());
-}
-
 fn failing_step(_: &mut DbspCircuit) -> Result<(), dbsp::Error> {
     Err(dbsp::Error::IO(io::Error::other("forced failure")))
 }
@@ -45,8 +34,7 @@ impl DbspErrorFixture {
     fn bootstrap() -> Self {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins);
-        app.insert_resource(CapturedErrors::default());
-        app.add_observer(record_error);
+        lille::test_support::install_error_observer(&mut app);
         app.add_plugins(DbspPlugin);
         let entity = app
             .world_mut()
@@ -75,7 +63,10 @@ impl DbspErrorFixture {
         app.world_mut()
             .non_send_resource_mut::<DbspState>()
             .set_stepper_for_testing(failing_step);
-        app.world_mut().resource_mut::<CapturedErrors>().0.clear();
+        app.world_mut()
+            .resource_mut::<lille::test_support::CapturedErrors>()
+            .0
+            .clear();
         if let Some(mut transform) = app.world_mut().get_mut::<Transform>(self.entity) {
             transform.translation = Vec3::new(7.0, 0.0, 0.0);
         }
@@ -101,7 +92,7 @@ impl DbspErrorFixture {
     fn errors(&self) -> Vec<DbspSyncError> {
         self.app_guard()
             .world()
-            .resource::<CapturedErrors>()
+            .resource::<lille::test_support::CapturedErrors>()
             .0
             .clone()
     }

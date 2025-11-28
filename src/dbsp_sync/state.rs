@@ -8,14 +8,12 @@ use bevy::prelude::{Added, Changed, Entity, Query, RemovedComponents};
 use crate::components::DdlogId;
 use crate::dbsp_circuit::{try_step, DamageEvent, DbspCircuit, EntityId, HealthState, Tick};
 
-type DbspStepFn = fn(&mut DbspCircuit) -> Result<(), dbsp::Error>;
-
 /// Resource storing the DBSP circuit and deduplication state.
 pub struct DbspState {
     pub(crate) circuit: DbspCircuit,
     /// Function pointer used to advance the circuit; overridden in tests to
     /// force error paths without mutating the real DBSP logic.
-    stepper: DbspStepFn,
+    stepper: fn(&mut DbspCircuit) -> Result<(), dbsp::Error>,
     /// Cached mapping from DBSP entity IDs to Bevy `Entity` values.
     ///
     /// The map is maintained incrementally by
@@ -107,7 +105,11 @@ impl DbspState {
 
     /// Overrides the circuit stepper. Intended for tests that need to force an
     /// error path without mutating the DBSP logic.
-    pub fn set_stepper_for_testing(&mut self, stepper: DbspStepFn) {
+    #[cfg(test)]
+    pub fn set_stepper_for_testing(
+        &mut self,
+        stepper: fn(&mut DbspCircuit) -> Result<(), dbsp::Error>,
+    ) {
         self.stepper = stepper;
     }
 }

@@ -229,23 +229,13 @@ mod tests {
     use super::*;
     use crate::components::{Block, DdlogId, Health, UnitType};
     use crate::dbsp_circuit::{DamageEvent, DamageSource, HealthState, Position, Velocity};
+    use crate::dbsp_sync::test_support;
     use crate::world_handle::DdlogEntity;
     use crate::DbspCircuit;
     use bevy::ecs::prelude::On;
     use bevy::ecs::system::RunSystemOnce;
     use rstest::rstest;
     use std::io;
-
-    #[derive(Resource, Default)]
-    struct CapturedErrors(Vec<DbspSyncError>);
-
-    #[expect(
-        clippy::needless_pass_by_value,
-        reason = "Observer systems must take On<T> by value."
-    )]
-    fn capture_error(event: On<DbspSyncError>, mut errors: ResMut<CapturedErrors>) {
-        errors.0.push(event.event().clone());
-    }
 
     fn setup_app() -> App {
         let mut app = App::new();
@@ -420,8 +410,7 @@ mod tests {
     #[rstest]
     fn step_failure_triggers_error_event() {
         let mut app = setup_app();
-        app.insert_resource(CapturedErrors::default());
-        app.add_observer(capture_error);
+        test_support::install_error_observer(&mut app);
         let entity = spawn_entity(&mut app);
         prime_state(&mut app, entity);
 
@@ -435,7 +424,7 @@ mod tests {
             .expect("DBSP step failure should be handled");
         app.world_mut().flush();
 
-        let errors = app.world().resource::<CapturedErrors>();
+        let errors = app.world().resource::<test_support::CapturedErrors>();
         let error = errors
             .0
             .first()

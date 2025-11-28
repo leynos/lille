@@ -2,10 +2,11 @@
 
 ## Summary
 
-Phase 5 completes the upgrade to Bevy 0.17.3. We enabled Reflect
-auto-registration, adopted the Events V2 observer pipeline for DBSP error
-reporting, and validated that the DBSP circuit remains the single authority
-over inferred behaviour even when a circuit step fails.
+Phase 5 completes the upgrade to Bevy 0.17.3. Reflect auto-registration is
+enabled, the Events V2 observer pipeline is adopted for Differential
+Bidirectional Stream Processing (DBSP) error reporting, and the DBSP circuit
+is validated as the single authority over inferred behaviour even when a
+circuit step fails.
 
 ## Key changes
 
@@ -13,8 +14,9 @@ over inferred behaviour even when a circuit step fails.
   `Reflect` types register automatically without manual `App::register_type`
   calls.
 - `DbspPlugin` emits `DbspSyncError` events through Events V2 observers and
-  logs both initialisation and step failures while bailing out before any ECS
-  writes, keeping DBSP authoritative during error paths.
+  logs both initialisation and step failures while bailing out before any
+  Entity Component System (ECS) writes, keeping DBSP authoritative during
+  error paths.
 - Added `rstest` coverage for the step failure path and a `rust-rspec`
   scenario that proves observers capture the error while the world state stays
   unchanged; a test hook allows the circuit stepper to be swapped during
