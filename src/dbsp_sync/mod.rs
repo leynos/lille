@@ -17,9 +17,6 @@ pub use plugin::{DbspPlugin, DbspSyncError, DbspSyncErrorContext};
 pub use state::{DbspState, IdQueries};
 
 #[cfg(test)]
-pub mod test_support;
-
-#[cfg(test)]
 mod tests {
     use super::*;
     use bevy::prelude::World;

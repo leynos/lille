@@ -8,3 +8,4 @@ publish = false
 syn = { version = "2.0.103", features = ["full"] }
 lille = { path = ".." }
 ordered-float = { workspace = true }
+bevy = { workspace = true, default-features = false }

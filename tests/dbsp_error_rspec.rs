@@ -18,6 +18,7 @@ use lille::{
 use log::error;
 use rspec::block::Context as Scenario;
 use rspec_runner::run_serial;
+use test_utils::dbsp_sync as dbsp_test_support;
 use thread_safe_app::{lock_app, SharedApp, ThreadSafeApp};
 
 fn failing_step(_: &mut DbspCircuit) -> Result<(), dbsp::Error> {
@@ -34,7 +35,7 @@ impl DbspErrorFixture {
     fn bootstrap() -> Self {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins);
-        lille::test_support::install_error_observer(&mut app);
+        dbsp_test_support::install_error_observer(&mut app);
         app.add_plugins(DbspPlugin);
         let entity = app
             .world_mut()
@@ -64,7 +65,7 @@ impl DbspErrorFixture {
             .non_send_resource_mut::<DbspState>()
             .set_stepper_for_testing(failing_step);
         app.world_mut()
-            .resource_mut::<lille::test_support::CapturedErrors>()
+            .resource_mut::<dbsp_test_support::CapturedErrors>()
             .0
             .clear();
         if let Some(mut transform) = app.world_mut().get_mut::<Transform>(self.entity) {
@@ -92,7 +93,7 @@ impl DbspErrorFixture {
     fn errors(&self) -> Vec<DbspSyncError> {
         self.app_guard()
             .world()
-            .resource::<lille::test_support::CapturedErrors>()
+            .resource::<dbsp_test_support::CapturedErrors>()
             .0
             .clone()
     }

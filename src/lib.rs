@@ -34,8 +34,6 @@ pub use dbsp_circuit::{
     Position, PositionFloor, Target as DbspTarget,
 };
 pub use dbsp_circuit::{NewVelocity, Velocity};
-#[cfg(test)]
-pub use dbsp_sync::test_support;
 pub use dbsp_sync::{
     apply_dbsp_outputs_system, cache_state_for_dbsp_system, init_dbsp_system, DamageInbox,
     DbspPlugin, DbspSyncError, DbspSyncErrorContext,
