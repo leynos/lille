@@ -27,6 +27,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 anyhow = { workspace = true }
 ordered-float = { workspace = true }
+thiserror = "1"
 size-of = { version = "0.1", package = "feldera-size-of", features = ["ordered-float"] }
 rkyv = { version = "0.7", default-features = false, features = ["std", "size_64", "validation", "uuid"] }
 dbsp = "0.98"

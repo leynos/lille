@@ -3,6 +3,7 @@
 use bevy::ecs::prelude::On;
 use bevy::prelude::*;
 use log::error;
+use thiserror::Error;
 
 use crate::world_handle::init_world_handle_system;
 
@@ -23,7 +24,8 @@ pub enum DbspSyncErrorContext {
 ///
 /// Observers log these events using Bevy's Events V2 pipeline so diagnostics
 /// remain visible even when `bevy_log` is disabled.
-#[derive(Event, Debug, Clone)]
+#[derive(Event, Debug, Clone, Error)]
+#[error("{context:?}: {detail}")]
 pub struct DbspSyncError {
     /// Where the failure occurred.
     pub context: DbspSyncErrorContext,
