@@ -106,7 +106,7 @@ impl DbspState {
     /// Overrides the circuit stepper. Intended for tests that need to force an
     /// error path without mutating the DBSP logic.
     #[cfg(test)]
-    pub fn set_stepper_for_testing(
+    pub(crate) fn set_stepper_for_testing(
         &mut self,
         stepper: fn(&mut DbspCircuit) -> Result<(), dbsp::Error>,
     ) {
