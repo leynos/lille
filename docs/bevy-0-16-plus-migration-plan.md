@@ -204,7 +204,7 @@ before merging to keep the “two sets of eyes” policy meaningful.
 - Bevy crates upgraded to 0.17.3 with `reflect_auto_register` enabled so new
   `Reflect` types auto-register without manual `App::register_type` calls.
 - `DbspPlugin` emits `DbspSyncError` events via Events V2 observers, logging
-  initialisation and step failures while bailing out before any ECS writes so
+  initialization and step failures while bailing out before any ECS writes so
   the DBSP circuit remains authoritative.
 - Added `rstest` and `rust-rspec` coverage for the error path to prove
   diagnostics fire and ECS data stays untouched when the circuit step fails.
