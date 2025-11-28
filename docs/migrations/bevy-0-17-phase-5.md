@@ -14,7 +14,7 @@ circuit step fails.
   `Reflect` types register automatically without manual `App::register_type`
   calls.
 - `DbspPlugin` emits `DbspSyncError` events through Events V2 observers and
-  logs both initialisation and step failures while bailing out before any
+  logs both initialization and step failures while bailing out before any
   Entity Component System (ECS) writes, keeping DBSP authoritative during
   error paths.
 - Added `rstest` coverage for the step failure path and a `rust-rspec`
