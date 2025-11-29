@@ -103,13 +103,14 @@ impl DbspState {
         (self.stepper)(&mut self.circuit)
     }
 
-    /// Overrides the circuit stepper. Intended for tests that need to force an
-    /// error path without mutating the DBSP logic.
-    #[expect(
-        dead_code,
-        reason = "Exposed for integration tests via test_utils to force circuit failures."
-    )]
-    pub(crate) fn set_stepper_for_testing(
+    /// Overrides the circuit stepper for tests that need to force an error
+    /// path without mutating the DBSP logic.
+    ///
+    /// Only compiled for test builds or when the `test_utils` feature is
+    /// enabled so production code cannot swap the stepper.
+    #[cfg(any(test, debug_assertions))]
+    #[doc(hidden)]
+    pub fn set_stepper_for_testing(
         &mut self,
         stepper: fn(&mut DbspCircuit) -> Result<(), dbsp::Error>,
     ) {

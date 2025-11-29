@@ -12,14 +12,14 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use bevy::prelude::*;
 use lille::dbsp_sync::DbspState;
-use lille::{
-    DbspCircuit, DbspPlugin, DbspSyncError, DbspSyncErrorContext, DdlogId, Health, VelocityComp,
-};
+use lille::{DbspCircuit, DbspPlugin, DbspSyncErrorContext, DdlogId, Health, VelocityComp};
 use log::error;
 use rspec::block::Context as Scenario;
 use rspec_runner::run_serial;
-use test_utils::dbsp_sync as dbsp_test_support;
 use thread_safe_app::{lock_app, SharedApp, ThreadSafeApp};
+
+#[path = "support/dbsp_error_capture.rs"]
+mod dbsp_test_support;
 
 fn failing_step(_: &mut DbspCircuit) -> Result<(), dbsp::Error> {
     Err(dbsp::Error::IO(io::Error::other("forced failure")))
@@ -90,7 +90,7 @@ impl DbspErrorFixture {
         }
     }
 
-    fn errors(&self) -> Vec<DbspSyncError> {
+    fn errors(&self) -> Vec<(String, String)> {
         self.app_guard()
             .world()
             .resource::<dbsp_test_support::CapturedErrors>()

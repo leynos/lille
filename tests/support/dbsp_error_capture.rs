@@ -1,5 +1,4 @@
-//! Helpers for observing DBSP sync errors in integration tests.
-
+/// Shared helpers for observing `DbspSyncError` events in tests.
 use bevy::ecs::prelude::On;
 use bevy::prelude::*;
 use lille::dbsp_sync::DbspSyncError;
@@ -23,5 +22,5 @@ fn record_error(event: On<DbspSyncError>, mut errors: ResMut<CapturedErrors>) {
 /// Installs the error-capturing observer and resource on the provided app.
 pub fn install_error_observer(app: &mut App) {
     app.insert_resource(CapturedErrors::default());
-    app.add_observer(record_error);
+    app.world_mut().add_observer(record_error);
 }

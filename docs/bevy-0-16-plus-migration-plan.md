@@ -201,6 +201,7 @@ before merging to keep the “two sets of eyes” policy meaningful.
 
 #### Phase 5 status (27 November 2025)
 
+- Status: done.
 - Bevy crates upgraded to 0.17.3 with `reflect_auto_register` enabled, so new
   `Reflect` types auto-register without manual `App::register_type` calls.
 - `DbspPlugin` emits `DbspSyncError` events via Events V2 observers, logging

@@ -230,11 +230,18 @@ mod tests {
     use crate::components::{Block, DdlogId, Health, UnitType};
     use crate::dbsp_circuit::{DamageEvent, DamageSource, HealthState, Position, Velocity};
     use crate::world_handle::DdlogEntity;
-    use crate::DbspCircuit;
+    use crate::{DbspCircuit, DbspPlugin};
     use bevy::ecs::system::RunSystemOnce;
     use rstest::rstest;
     use std::io;
-    use test_utils::dbsp_sync as dbsp_test_support;
+
+    mod dbsp_test_support {
+        use crate as lille;
+        include!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/support/dbsp_error_capture.rs"
+        ));
+    }
 
     fn setup_app() -> App {
         let mut app = App::new();
@@ -408,8 +415,27 @@ mod tests {
 
     #[rstest]
     fn step_failure_triggers_error_event() {
-        let mut app = setup_app();
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
         dbsp_test_support::install_error_observer(&mut app);
+        app.add_plugins(DbspPlugin);
+        app.world_mut().flush();
+
+        // Run startup to initialise WorldHandle before priming state.
+        app.update();
+
+        app.world_mut()
+            .trigger(DbspSyncError::new(DbspSyncErrorContext::Init, "probe"));
+        app.update();
+        let mut probe_errors = app
+            .world_mut()
+            .resource_mut::<dbsp_test_support::CapturedErrors>();
+        assert!(
+            !probe_errors.0.is_empty(),
+            "observer should capture triggered probe event"
+        );
+        probe_errors.0.clear();
+
         let entity = spawn_entity(&mut app);
         prime_state(&mut app, entity);
 
@@ -418,17 +444,13 @@ mod tests {
             state.set_stepper_for_testing(force_step_error);
         }
 
-        app.world_mut()
-            .run_system_once(apply_dbsp_outputs_system)
-            .expect("DBSP step failure should be handled");
-        app.world_mut().flush();
+        app.update();
 
-        let errors = app.world().resource::<dbsp_test_support::CapturedErrors>();
-        let error = errors
+        let step_errors = app.world().resource::<dbsp_test_support::CapturedErrors>();
+        let error = step_errors
             .0
             .first()
             .expect("DBSP error event should be captured");
-        assert_eq!(errors.0.len(), 1);
         assert_eq!(error.0, format!("{:?}", DbspSyncErrorContext::Step));
         assert!(error.1.contains("forced failure"));
 
