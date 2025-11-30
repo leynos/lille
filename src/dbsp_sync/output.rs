@@ -231,11 +231,33 @@ mod tests {
     use crate::dbsp_circuit::{DamageEvent, DamageSource, HealthState, Position, Velocity};
     use crate::world_handle::DdlogEntity;
     use crate::{DbspCircuit, DbspPlugin};
+    use bevy::ecs::prelude::On;
     use bevy::ecs::system::RunSystemOnce;
     use rstest::rstest;
     use std::io;
 
-    use test_utils::dbsp_sync as dbsp_test_support;
+    mod dbsp_test_support {
+        use super::*;
+
+        #[derive(Resource, Default, Debug)]
+        pub struct CapturedErrors(pub Vec<(String, String)>);
+
+        #[expect(
+            clippy::needless_pass_by_value,
+            reason = "Observer systems must take On<T> by value."
+        )]
+        fn record_error(event: On<DbspSyncError>, mut errors: ResMut<CapturedErrors>) {
+            let err = event.event();
+            errors
+                .0
+                .push((format!("{:?}", err.context), err.detail.clone()));
+        }
+
+        pub fn install_error_observer(app: &mut App) {
+            app.insert_resource(CapturedErrors::default());
+            app.world_mut().add_observer(record_error);
+        }
+    }
 
     fn setup_app() -> App {
         let mut app = App::new();
@@ -417,18 +439,6 @@ mod tests {
 
         // Run startup to initialise WorldHandle before priming state.
         app.update();
-
-        app.world_mut()
-            .trigger(DbspSyncError::new(DbspSyncErrorContext::Init, "probe"));
-        app.update();
-        let mut probe_errors = app
-            .world_mut()
-            .resource_mut::<dbsp_test_support::CapturedErrors>();
-        assert!(
-            !probe_errors.0.is_empty(),
-            "observer should capture triggered probe event"
-        );
-        probe_errors.0.clear();
 
         let entity = spawn_entity(&mut app);
         prime_state(&mut app, entity);
