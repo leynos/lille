@@ -47,6 +47,7 @@ render = [
     "bevy/bevy_log",
 ]
 text = ["render", "bevy/bevy_text"]
+test-support = []
 
 [build-dependencies]
 build_support = { path = "build_support" }

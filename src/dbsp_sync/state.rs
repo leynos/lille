@@ -106,9 +106,10 @@ impl DbspState {
     /// Overrides the circuit stepper for tests that need to force an error
     /// path without mutating the DBSP logic.
     ///
-    /// Only compiled for test builds or when the `test_utils` feature is
-    /// enabled so production code cannot swap the stepper.
-    #[cfg(any(test, debug_assertions))]
+    /// Only compiled for test builds, debug builds, or when the
+    /// `test-support` feature is enabled so production code cannot swap the
+    /// stepper accidentally.
+    #[cfg(any(test, debug_assertions, feature = "test-support"))]
     #[doc(hidden)]
     pub fn set_stepper_for_testing(
         &mut self,
