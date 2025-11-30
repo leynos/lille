@@ -13,7 +13,7 @@ mod state;
 pub use damage_inbox::DamageInbox;
 pub use input::{cache_state_for_dbsp_system, init_dbsp_system};
 pub use output::apply_dbsp_outputs_system;
-pub use plugin::DbspPlugin;
+pub use plugin::{DbspPlugin, DbspSyncError, DbspSyncErrorContext};
 pub use state::{DbspState, IdQueries};
 
 #[cfg(test)]

@@ -1,0 +1,10 @@
+RUSTDOCFLAGS="--cfg docsrs -D warnings" cargo doc --workspace --no-deps
+cargo clippy --all-targets --all-features -- -D warnings
+    Checking lille v0.1.0 (/mnt/home/leynos/Projects/lille)
+ Documenting lille v0.1.0 (/mnt/home/leynos/Projects/lille)
+ Documenting test_utils v0.1.0 (/mnt/home/leynos/Projects/lille/test_utils)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 23.00s
+   Generated /mnt/home/leynos/Projects/lille/target/doc/build_support/index.html and 3 other files
+    Checking lille v0.1.0 (/mnt/home/leynos/Projects/lille)
+    Checking test_utils v0.1.0 (/mnt/home/leynos/Projects/lille/test_utils)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.52s

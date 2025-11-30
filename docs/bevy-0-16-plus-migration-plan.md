@@ -175,9 +175,8 @@ before merging to keep the “two sets of eyes” policy meaningful.
 #### Phase 4 status (25 November 2025)
 
 - Bevy crates upgraded to 0.16.1 with the Linux `x11` feature retained to
-  validate
-  the refreshed window stack; no extra render features leaked into the minimal
-  build.
+  validate the refreshed window stack; no extra render features leaked into the
+  minimal build.
 - `spawn_world_system` now parents demo entities beneath a `WorldRoot` entity
   using the new `ChildOf` relationship, so hierarchy lookups use the 0.16
   fast-path while keeping DBSP as the source of truth for inferred behaviour.
@@ -199,6 +198,17 @@ before merging to keep the “two sets of eyes” policy meaningful.
 - Re-run all feature combos (`default`, `render`, `text`) plus `cargo test
   --all-features` and `cargo test -p
   build_support` to confirm the workspace is stable on the new stack.
+
+#### Phase 5 status (27 November 2025)
+
+- Status: done.
+- Bevy crates upgraded to 0.17.3 with `reflect_auto_register` enabled, so new
+  `Reflect` types auto-register without manual `App::register_type` calls.
+- `DbspPlugin` emits `DbspSyncError` events via Events V2 observers, logging
+  initialization and step failures while bailing out before any ECS writes so
+  the DBSP circuit remains authoritative.
+- Added `rstest` and `rust-rspec` coverage for the error path to prove
+  diagnostics fire and ECS data stays untouched when the circuit step fails.
 
 ### Phase 6 – Map enablement after 0.17.3 lands
 

@@ -18,7 +18,7 @@ build:
 	$(RUST_FLAGS_ENV) cargo build
 
 test:
-	$(RUST_FLAGS_ENV) cargo test
+	$(RUST_FLAGS_ENV) cargo test --features test-support
 
 fmt:
 	cargo fmt $(WORKSPACE_PACKAGES)

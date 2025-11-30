@@ -36,7 +36,7 @@ pub use dbsp_circuit::{
 pub use dbsp_circuit::{NewVelocity, Velocity};
 pub use dbsp_sync::{
     apply_dbsp_outputs_system, cache_state_for_dbsp_system, init_dbsp_system, DamageInbox,
-    DbspPlugin,
+    DbspPlugin, DbspSyncError, DbspSyncErrorContext,
 };
 pub use entity::{BadGuy, WorldEntity};
 /// Legacy alias for [`WorldEntity`]; prefer the new name.

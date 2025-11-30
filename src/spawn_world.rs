@@ -2,7 +2,6 @@
 //! Provides helper functions to create sprites and initialise game objects.
 use bevy::log::warn;
 use bevy::prelude::*;
-use bevy::render::camera::OrthographicProjection;
 
 use crate::components::{DdlogId, Health, Target, UnitType, VelocityComp};
 
