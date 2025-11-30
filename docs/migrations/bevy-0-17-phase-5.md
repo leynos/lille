@@ -10,7 +10,7 @@ step fails.
 
 ## Key changes
 
-- All Bevy crates now target 0.17.3; `reflect_auto_register` is enabled so new
+- All Bevy crates now target 0.17.3; `reflect_auto_register` is enabled, so new
   `Reflect` types register automatically without manual `App::register_type`
   calls.
 - `DbspPlugin` emits `DbspSyncError` events through Events V2 observers and
