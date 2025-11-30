@@ -235,13 +235,7 @@ mod tests {
     use rstest::rstest;
     use std::io;
 
-    mod dbsp_test_support {
-        use crate as lille;
-        include!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/tests/support/dbsp_error_capture.rs"
-        ));
-    }
+    use test_utils::dbsp_sync as dbsp_test_support;
 
     fn setup_app() -> App {
         let mut app = App::new();
