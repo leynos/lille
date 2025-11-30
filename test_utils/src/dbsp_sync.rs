@@ -32,11 +32,12 @@ mod tests {
 
     #[test]
     fn observer_records_triggered_error() {
-        let mut world = World::new();
-        install_error_observer(&mut world.as_world_mut());
-        world.trigger(DbspSyncError::new(DbspSyncErrorContext::Step, "probe"));
+        let mut app = App::new();
+        install_error_observer(&mut app);
+        app.world_mut()
+            .trigger(DbspSyncError::new(DbspSyncErrorContext::Step, "probe"));
         assert!(
-            !world.resource::<CapturedErrors>().0.is_empty(),
+            !app.world().resource::<CapturedErrors>().0.is_empty(),
             "observer should record triggered error"
         );
     }
