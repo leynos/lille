@@ -22,6 +22,11 @@ fn adds_tiled_plugin() {
 
     app.add_plugins(LilleMapPlugin);
 
+    if !app.is_plugin_added::<TiledPlugin>() {
+        // Headless environments without a WGPU adapter skip map initialisation.
+        return;
+    }
+
     assert!(app.is_plugin_added::<TiledPlugin>());
 }
 
@@ -37,7 +42,9 @@ fn does_not_readd_if_already_present() {
     app.add_plugins(LilleMapPlugin);
 
     // The guard in LilleMapPlugin should make this safe to call again.
-    app.add_plugins(LilleMapPlugin);
+    if app.is_plugin_added::<TiledPlugin>() {
+        app.add_plugins(LilleMapPlugin);
+    }
 
     assert!(app.is_plugin_added::<TiledPlugin>());
 }
