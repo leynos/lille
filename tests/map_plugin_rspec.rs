@@ -47,6 +47,7 @@ impl MapPluginFixture {
     }
 
     fn tick(&self) {
+        // Capture panics to log clearer payloads during rspec runs, then rethrow so the harness still fails after any teardown.
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             self.app_guard().update();
         }));
