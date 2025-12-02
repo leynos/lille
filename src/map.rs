@@ -26,4 +26,8 @@ impl Plugin for LilleMapPlugin {
 
         app.add_plugins(TiledPlugin::default());
     }
+
+    fn is_unique(&self) -> bool {
+        false
+    }
 }
