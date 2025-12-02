@@ -30,8 +30,8 @@ encapsulate all map-loading functionality. It will be responsible for:
 ### Current implementation status (30 November 2025)
 
 - `LilleMapPlugin` now lives in `src/map.rs` and registers
-  `bevy_ecs_tiled::TiledPlugin` with an idempotent guard so downstream apps can
-  opt in without double-registration panics.
+  `bevy_ecs_tiled::TiledPlugin` with an idempotent guard, so downstream apps
+  can opt in without double-registration panics.
 - The legacy `spawn_world_system` demo path is removed from the runtime flow,
   keeping DBSP as the source of truth until Tiled-driven spawning arrives in
   later tasks.

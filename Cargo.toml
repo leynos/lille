@@ -23,7 +23,7 @@ bevy_transform = "0.17.3"
 bevy_log = { version = "0.17.3", optional = true }
 log = "0.4"  # Structured logging facade
 env_logger = "0.10"  # Logger implementation controlled via RUST_LOG
-bevy_ecs_tiled = { git = "https://github.com/adrien-bon/bevy_ecs_tiled.git", rev = "abeefe40ed7ac3bd9562c8dab59824acdd51d643", optional = true, default-features = false, features = ["png"] }
+bevy_ecs_tiled = { version = "0.7.1", optional = true, default-features = false, features = ["png"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 anyhow = { workspace = true }
