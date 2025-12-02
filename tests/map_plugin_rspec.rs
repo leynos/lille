@@ -76,7 +76,7 @@ impl MapPluginFixture {
         let mut app = self.app_guard();
         let world = app.world_mut();
         let mut query = world.query::<&DdlogId>();
-        query.iter(world).map(|id| id.0).collect()
+        query.iter(world).map(|&DdlogId(n)| n).collect()
     }
 }
 
