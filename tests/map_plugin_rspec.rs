@@ -111,3 +111,25 @@ fn map_plugin_leaves_dbsp_authoritative_without_maps() {
         },
     ));
 }
+
+#[test]
+fn map_plugin_can_be_added_multiple_times_and_app_updates() {
+    let fixture = MapPluginFixture::bootstrap();
+
+    run_serial(&rspec::given(
+        "LilleMapPlugin is added twice",
+        fixture,
+        |scenario: &mut Scenario<MapPluginFixture>| {
+            scenario.before_each(|state| {
+                let mut app = state.app_guard();
+                app.add_plugins(LilleMapPlugin);
+            });
+
+            scenario.then("the app can tick without panic", |state| {
+                state.tick();
+                state.tick();
+                assert_eq!(state.world_handle_entity_count(), 0);
+            });
+        },
+    ));
+}
