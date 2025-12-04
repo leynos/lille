@@ -27,6 +27,15 @@ tone and documentation style of existing Lille design docs.
 **Plugin Name:** `LilleMapPlugin` (tentative). This Bevy plugin will
 encapsulate all map-loading functionality. It will be responsible for:
 
+### Current implementation status (30 November 2025)
+
+- `LilleMapPlugin` now lives in `src/map.rs` and registers
+  `bevy_ecs_tiled::TiledPlugin` with an idempotent guard, so downstream apps
+  can opt in without double-registration panics.
+- The legacy `spawn_world_system` demo path is removed from the runtime flow,
+  keeping DBSP as the source of truth until Tiled-driven spawning arrives in
+  later tasks.
+
 - **Asset Loading:** Initializing `bevy_ecs_tiled::TiledPlugin` to register the
   Tiled map loader and asset types. This hooks into Bevy’s asset system so that
   `.tmx` files can be loaded as `TiledMapAsset` resources.

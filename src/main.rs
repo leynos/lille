@@ -5,7 +5,9 @@ use anyhow::Result;
 use bevy::log::LogPlugin;
 use bevy::prelude::*;
 use clap::Parser;
-use lille::{init_logging, spawn_world_system, DbspPlugin};
+#[cfg(feature = "map")]
+use lille::LilleMapPlugin;
+use lille::{init_logging, DbspPlugin};
 
 /// A realtime strategy game
 #[derive(Parser)]
@@ -26,11 +28,15 @@ struct Args {
 fn main() -> Result<()> {
     let args = Args::parse();
     init_logging(args.verbose)?;
+    let mut app = App::new();
+    app.add_plugins(DefaultPlugins.build().disable::<LogPlugin>());
+    app.add_plugins(DbspPlugin);
 
-    App::new()
-        .add_plugins(DefaultPlugins.build().disable::<LogPlugin>())
-        .add_plugins(DbspPlugin)
-        .add_systems(Startup, spawn_world_system)
-        .run();
+    #[cfg(feature = "map")]
+    {
+        app.add_plugins(LilleMapPlugin);
+    }
+
+    app.run();
     Ok(())
 }

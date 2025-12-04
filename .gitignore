@@ -5,3 +5,4 @@ Cargo.lock
 assets/
 .env
 .crush/
+.cargo-home/

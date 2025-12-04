@@ -17,7 +17,7 @@ physics circuit.
 What we will build: A Bevy plugin that encapsulates map asset loading and
 exposes a single entry point for spawning the active isometric map.
 
-- [ ] Task 1.1.1 — Create LilleMapPlugin skeleton
+- [x] Task 1.1.1 — Create LilleMapPlugin skeleton
   - Outcome: `src/map.rs` exposes `LilleMapPlugin` registering
     `bevy_ecs_tiled::TiledPlugin` and the module is wired into `main.rs`.
   - Completion criteria: The application compiles with the plugin enabled and
