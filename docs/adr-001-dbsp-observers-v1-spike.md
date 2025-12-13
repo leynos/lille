@@ -2,14 +2,14 @@
 
 ## Context
 
-During the Bevy 0.16 upgrade work we kept the existing DBSP event push/retract
-flow (the `DamageInbox` buffer drained during `cache_state_for_dbsp_system`)
-and deferred adopting Observers V1.
+During the Bevy 0.16 upgrade, the existing DBSP event push/retract flow (the
+`DamageInbox` buffer drained during `cache_state_for_dbsp_system`) was
+retained, and adoption of Observers V1 was deferred.
 
 Observers V1 (and the Events V2 trigger API) promise simpler event routing and
 clearer ownership semantics, potentially reducing boilerplate for DBSP-facing
 event ingress/egress (damage events, health deltas, and transform
-synchronisation).
+synchronization).
 
 This spike is tracked under issue 231.
 
@@ -116,7 +116,7 @@ Rationale:
   would require additional design work to avoid silently changing when ECS
   reads observe DBSP outputs.
 - Bevy’s event APIs are still evolving (Events V2), so keeping the spike
-  feature-gated minimises churn risk.
+  feature-gated minimizes churn risk.
 
 Concrete blockers to adopting broadly in 0.17:
 
