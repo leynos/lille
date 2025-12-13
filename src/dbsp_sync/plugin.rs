@@ -55,6 +55,16 @@ fn log_dbsp_error(event: On<DbspSyncError>) {
     error!("DBSP sync error during {context:?}: {detail}");
 }
 
+fn add_dbsp_sync_chain(app: &mut App) {
+    let chain = (cache_state_for_dbsp_system, apply_dbsp_outputs_system).chain();
+
+    #[cfg(feature = "observers-v1-spike")]
+    app.add_systems(PostUpdate, chain);
+
+    #[cfg(not(feature = "observers-v1-spike"))]
+    app.add_systems(Update, chain);
+}
+
 /// Bevy plugin installing systems that synchronise DBSP with the ECS world.
 #[derive(Default)]
 pub struct DbspPlugin;
@@ -76,18 +86,7 @@ impl Plugin for DbspPlugin {
 
         app.init_resource::<DamageInbox>();
         app.add_systems(Startup, init_world_handle_system);
-
-        #[cfg(feature = "observers-v1-spike")]
-        app.add_systems(
-            PostUpdate,
-            (cache_state_for_dbsp_system, apply_dbsp_outputs_system).chain(),
-        );
-
-        #[cfg(not(feature = "observers-v1-spike"))]
-        app.add_systems(
-            Update,
-            (cache_state_for_dbsp_system, apply_dbsp_outputs_system).chain(),
-        );
+        add_dbsp_sync_chain(app);
     }
 }
 

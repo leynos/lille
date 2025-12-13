@@ -10,7 +10,7 @@ use bevy::prelude::*;
 use lille::dbsp_circuit::{DamageEvent, DamageSource};
 use lille::dbsp_sync::DbspDamageIngress;
 use lille::{DbspPlugin, DdlogId, Health};
-use rstest::rstest;
+use rstest::{fixture, rstest};
 
 #[derive(Resource, Default)]
 struct PendingDamage {
@@ -23,7 +23,8 @@ fn trigger_pending_damage(mut commands: Commands, mut pending: ResMut<PendingDam
     }
 }
 
-fn setup_app() -> (App, Entity) {
+#[fixture]
+fn app_with_entity() -> (App, Entity) {
     let mut app = App::new();
     app.add_plugins(MinimalPlugins);
     app.add_plugins(DbspPlugin);
@@ -31,6 +32,8 @@ fn setup_app() -> (App, Entity) {
         .world_mut()
         .spawn((
             DdlogId(1),
+            // DBSP sync reads and writes `Transform`; include it so the test entity
+            // matches the production shape.
             Transform::default(),
             Health {
                 current: 90,
@@ -38,6 +41,8 @@ fn setup_app() -> (App, Entity) {
             },
         ))
         .id();
+    // Run one update cycle to finish plugin initialization and ensure all DBSP
+    // sync resources/observers are installed before triggering ingress events.
     app.update();
     (app, entity)
 }
@@ -53,28 +58,23 @@ const fn sequenced_damage_tick_one() -> DamageEvent {
 }
 
 #[rstest]
-fn observer_events_ingest_damage_within_frame() {
-    let (mut app, entity) = setup_app();
-    app.insert_resource(PendingDamage {
-        events: vec![sequenced_damage_tick_one()],
-    });
+#[case::single_event(vec![sequenced_damage_tick_one()], 60)]
+#[case::duplicate_events_deduplicated(
+    vec![sequenced_damage_tick_one(), sequenced_damage_tick_one()],
+    60,
+)]
+fn observer_damage_ingress_applies_expected_health(
+    app_with_entity: (App, Entity),
+    #[case] events: Vec<DamageEvent>,
+    #[case] expected_health: u16,
+) {
+    let (mut app, entity) = app_with_entity;
+    app.insert_resource(PendingDamage { events });
     app.add_systems(Update, trigger_pending_damage);
     app.update();
 
+    // Health starts at 90. A 30-point damage event is ingested via the observer
+    // route and applies once (deduplication), so 90 - 30 = 60.
     let health = app.world().get::<Health>(entity).expect("missing Health");
-    assert_eq!(health.current, 60);
-}
-
-#[rstest]
-fn duplicate_events_within_tick_apply_once() {
-    let (mut app, entity) = setup_app();
-    let damage = sequenced_damage_tick_one();
-    app.insert_resource(PendingDamage {
-        events: vec![damage, damage],
-    });
-    app.add_systems(Update, trigger_pending_damage);
-    app.update();
-
-    let health = app.world().get::<Health>(entity).expect("missing Health");
-    assert_eq!(health.current, 60);
+    assert_eq!(health.current, expected_health);
 }

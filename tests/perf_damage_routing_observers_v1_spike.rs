@@ -47,6 +47,10 @@ unsafe impl GlobalAlloc for CountingAlloc {
 #[global_allocator]
 static GLOBAL: CountingAlloc = CountingAlloc;
 
+// NOTE: This test installs a global allocator for the entire integration test
+// binary so allocations can be counted. The counters are reset between the
+// direct and observer paths to provide a relative comparison.
+
 fn reset_alloc_counters() {
     ALLOCATIONS.store(0, Ordering::Relaxed);
     ALLOCATED_BYTES.store(0, Ordering::Relaxed);
@@ -73,14 +77,15 @@ const fn sample_event() -> DamageEvent {
 fn routing_costs_are_reasonable() {
     const N: usize = 10_000;
 
-    drop(env_logger::builder().is_test(true).try_init());
+    // Enable log output for `-- --nocapture` runs without failing if another
+    // test already initialised logging.
+    let _logging_initialised = env_logger::builder().is_test(true).try_init().is_ok();
 
     let mut app = App::new();
     app.add_plugins(MinimalPlugins);
     app.add_plugins(DbspPlugin);
 
-    let events: Vec<_> = std::iter::repeat_n(sample_event(), N).collect();
-    assert_eq!(events.len(), N);
+    let events = vec![sample_event(); N];
 
     // Baseline: direct resource pushes.
     reset_alloc_counters();

@@ -1,4 +1,4 @@
-# DBSP Observers V1 spike (damage ingress)
+# Differential Datalog-Based Stream Processing (DBSP) Observers V1 spike (damage ingress)
 
 ## Context
 
@@ -56,8 +56,10 @@ Run the observer tests:
 
 Run the micro-benchmark with captured output:
 
-- `RUST_LOG=info cargo test --features "test-support observers-v1-spike" \
-  --test perf_damage_routing_observers_v1_spike -- --nocapture`
+```shell
+RUST_LOG=info cargo test --features "test-support observers-v1-spike" \
+  --test perf_damage_routing_observers_v1_spike -- --nocapture
+```
 
 ## Comparison
 
@@ -91,14 +93,16 @@ not introduce pathological allocation behaviour.
 
 Sample output (run on 13 December 2025, Linux, `N = 10_000`):
 
-- Direct inbox push: ~236µs, 14 allocations, ~680KiB allocated
-- Observer routing: ~848µs, 20 allocations, ~556KiB allocated
+- Direct inbox push: ~236 µs, 14 allocations, ~680 KiB allocated
+- Observer routing: ~848 µs, 20 allocations, ~556 KiB allocated
 
 These numbers are only intended for relative comparison and will vary across
 machines and Bevy versions. Reproduce by running:
 
-- `RUST_LOG=info cargo test --features "test-support observers-v1-spike" \
-  --test perf_damage_routing_observers_v1_spike -- --nocapture`
+```shell
+RUST_LOG=info cargo test --features "test-support observers-v1-spike" \
+  --test perf_damage_routing_observers_v1_spike -- --nocapture
+```
 
 ## Decision
 
@@ -113,8 +117,8 @@ Rationale:
   route compared to direct inbox mutation, even though allocation behaviour is
   broadly comparable at this scale.
 - The intended broader migration (health delta outputs and transform sync)
-  would require additional design work to avoid silently changing when ECS
-  reads observe DBSP outputs.
+  would require additional design work to avoid silently changing when the
+  Entity Component System (ECS) reads observe DBSP outputs.
 - Bevy’s event APIs are still evolving (Events V2), so keeping the spike
   feature-gated minimizes churn risk.
 
