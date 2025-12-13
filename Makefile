@@ -1,4 +1,4 @@
-.PHONY: all clean build fmt check-fmt test lint build-support-run markdownlint nixie
+.PHONY: all clean build fmt check-fmt test test-observers-v1 lint build-support-run markdownlint nixie
 
 .ONESHELL:
 SHELL := bash
@@ -8,6 +8,7 @@ RUST_FLAGS ?= $(RUSTFLAGS_STRICT)
 RUST_FLAGS_ENV := RUSTFLAGS="$(RUST_FLAGS)"
 WORKSPACE_PACKAGES := --package lille --package build_support --package test_utils
 MARKDOWNLINT := $(shell which markdownlint-cli2)
+MD_FILES := $(shell git ls-files -co --exclude-standard '*.md')
 
 all: lint test build
 
@@ -20,9 +21,13 @@ build:
 test:
 	$(RUST_FLAGS_ENV) cargo test --features test-support
 
+test-observers-v1:
+	$(RUST_FLAGS_ENV) cargo test --features "test-support observers-v1-spike"
+
 fmt:
 	cargo fmt $(WORKSPACE_PACKAGES)
-	mdformat-all
+	mdtablefix --wrap --renumber --breaks --ellipsis --fences --headings --in-place $(MD_FILES)
+	$(MARKDOWNLINT) --fix $(MD_FILES)
 
 check-fmt:
 	cargo fmt $(WORKSPACE_PACKAGES) -- --check
@@ -37,7 +42,7 @@ lint:
 	cargo clippy --all-targets --all-features -- $(RUST_FLAGS)
 
 markdownlint:
-	$(MARKDOWNLINT) "**/*.md"
+	$(MARKDOWNLINT) $(MD_FILES)
 
 nixie:
 	nixie --no-sandbox

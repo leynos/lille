@@ -11,6 +11,9 @@ use super::{
     apply_dbsp_outputs_system, cache_state_for_dbsp_system, init_dbsp_system, DamageInbox,
 };
 
+#[cfg(feature = "observers-v1-spike")]
+use super::observers_v1;
+
 /// Context carried by [`DbspSyncError`] events.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DbspSyncErrorContext {
@@ -60,6 +63,9 @@ impl Plugin for DbspPlugin {
     fn build(&self, app: &mut App) {
         app.add_observer(log_dbsp_error);
 
+        #[cfg(feature = "observers-v1-spike")]
+        app.add_observer(observers_v1::buffer_damage_ingress);
+
         if let Err(e) = init_dbsp_system(app.world_mut()) {
             app.world_mut().trigger(DbspSyncError::new(
                 DbspSyncErrorContext::Init,
@@ -70,6 +76,14 @@ impl Plugin for DbspPlugin {
 
         app.init_resource::<DamageInbox>();
         app.add_systems(Startup, init_world_handle_system);
+
+        #[cfg(feature = "observers-v1-spike")]
+        app.add_systems(
+            PostUpdate,
+            (cache_state_for_dbsp_system, apply_dbsp_outputs_system).chain(),
+        );
+
+        #[cfg(not(feature = "observers-v1-spike"))]
         app.add_systems(
             Update,
             (cache_state_for_dbsp_system, apply_dbsp_outputs_system).chain(),

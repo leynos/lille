@@ -6,12 +6,16 @@
 mod damage_inbox;
 mod duplicate_filter;
 mod input;
+#[cfg(feature = "observers-v1-spike")]
+mod observers_v1;
 mod output;
 mod plugin;
 mod state;
 
 pub use damage_inbox::DamageInbox;
 pub use input::{cache_state_for_dbsp_system, init_dbsp_system};
+#[cfg(feature = "observers-v1-spike")]
+pub use observers_v1::DbspDamageIngress;
 pub use output::apply_dbsp_outputs_system;
 pub use plugin::{DbspPlugin, DbspSyncError, DbspSyncErrorContext};
 pub use state::{DbspState, IdQueries};
