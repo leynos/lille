@@ -50,6 +50,7 @@ render = [
 map = ["render", "bevy_ecs_tiled"]
 text = ["render", "bevy/bevy_text"]
 test-support = []
+observers-v1-spike = []
 
 [build-dependencies]
 build_support = { path = "build_support" }
