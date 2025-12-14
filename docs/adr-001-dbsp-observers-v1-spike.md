@@ -48,6 +48,38 @@ Changes:
 No Bevy feature flags are required beyond the existing Bevy 0.17 configuration;
 the project already uses observer APIs for `DbspSyncError`.
 
+Sequence diagram: observer-driven damage ingress (deferred trigger flush at the
+end of `Update`, followed by DBSP ingestion in `PostUpdate` under
+`observers-v1-spike`).
+
+```mermaid
+sequenceDiagram
+    actor GameplaySystem
+    participant World
+    participant Observer_buffer_damage_ingress
+    participant DamageInbox
+    participant DbspSyncChain as DbspSyncChain_PostUpdate
+
+    rect rgb(230,230,255)
+        note over GameplaySystem,World: Update schedule
+        GameplaySystem->>World: Commands.trigger(DbspDamageIngress::new(DamageEvent))
+        World-->>GameplaySystem: enqueue trigger (deferred)
+    end
+
+    rect rgb(230,255,230)
+        note over World,Observer_buffer_damage_ingress: End of Update: deferred flush
+        World->>Observer_buffer_damage_ingress: On<DbspDamageIngress>
+        Observer_buffer_damage_ingress->>DamageInbox: push(DamageEvent)
+    end
+
+    rect rgb(255,230,230)
+        note over DbspSyncChain,DamageInbox: PostUpdate schedule under observers-v1-spike
+        DbspSyncChain->>DamageInbox: drain buffered damage
+        DbspSyncChain-->>DbspSyncChain: cache_state_for_dbsp_system
+        DbspSyncChain-->>DbspSyncChain: apply_dbsp_outputs_system
+    end
+```
+
 ## How to run
 
 Run the observer tests:
