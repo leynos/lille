@@ -23,7 +23,7 @@ exposes a single entry point for spawning the active isometric map.
   - Completion criteria: The application compiles with the plugin enabled and
     the legacy `spawn_world_system` path is removed.
   - Dependencies: None.
-- [ ] Task 1.1.2 — Load primary isometric map asset
+- [x] Task 1.1.2 — Load primary isometric map asset
   - Outcome: `LilleMapPlugin` spawns an entity with a `TiledMap` component
     pointing at the selected `.tmx` file in `assets/maps` and ensures the Bevy
     hierarchy loads.
