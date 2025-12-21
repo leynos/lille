@@ -192,7 +192,19 @@ fn spawn_primary_map_if_enabled(mut commands: Commands, mut context: PrimaryMapS
 }
 
 fn validate_asset_path(asset_path: &str) -> Result<(), LilleMapError> {
-    if asset_path.is_empty() || asset_path.starts_with('/') || asset_path.contains("..") {
+    if asset_path.is_empty() {
+        return Err(LilleMapError::InvalidPrimaryMapAssetPath {
+            path: asset_path.to_owned(),
+        });
+    }
+
+    if asset_path.starts_with('/') {
+        return Err(LilleMapError::InvalidPrimaryMapAssetPath {
+            path: asset_path.to_owned(),
+        });
+    }
+
+    if asset_path.contains("..") {
         return Err(LilleMapError::InvalidPrimaryMapAssetPath {
             path: asset_path.to_owned(),
         });
