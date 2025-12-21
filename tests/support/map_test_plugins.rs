@@ -36,7 +36,11 @@ pub fn add_map_test_plugins(app: &mut App) {
             .set(RenderPlugin {
                 synchronous_pipeline_compilation: true,
                 render_creation: bevy::render::settings::RenderCreation::Automatic(WgpuSettings {
-                    force_fallback_adapter: true,
+                    // Avoid initialising WGPU / a render device in CI.
+                    // This keeps tests runnable on hosts without a GPU (or
+                    // graphics drivers), while still registering render-typed
+                    // assets and schedules.
+                    backends: None,
                     ..default()
                 }),
                 ..default()

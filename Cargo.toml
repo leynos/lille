@@ -51,7 +51,7 @@ render = [
 ]
 map = ["bevy/bevy_asset", "bevy_ecs_tiled"]
 text = ["render", "bevy/bevy_text"]
-test-support = ["map"]
+test-support = ["map", "bevy_ecs_tiled?/atlas"]
 observers-v1-spike = []
 
 [build-dependencies]
