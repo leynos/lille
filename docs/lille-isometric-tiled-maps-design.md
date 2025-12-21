@@ -27,7 +27,7 @@ tone and documentation style of existing Lille design docs.
 **Plugin Name:** `LilleMapPlugin` (tentative). This Bevy plugin will
 encapsulate all map-loading functionality. It will be responsible for:
 
-### Current implementation status (30 November 2025)
+### Current implementation status (17 December 2025)
 
 - `LilleMapPlugin` now lives in `src/map.rs` and registers
   `bevy_ecs_tiled::TiledPlugin` with an idempotent guard, so downstream apps
@@ -35,6 +35,30 @@ encapsulate all map-loading functionality. It will be responsible for:
 - The legacy `spawn_world_system` demo path is removed from the runtime flow,
   keeping DBSP as the source of truth until Tiled-driven spawning arrives in
   later tasks.
+- `LilleMapPlugin` now spawns a `TiledMap` root entity in `Startup` pointing at
+  the primary map asset (`maps/primary-isometric.tmx` by default). This is
+  configurable via `LilleMapSettings` and can be disabled for headless or
+  DBSP-only test scenarios.
+- The baseline map asset now lives in `assets/maps/primary-isometric.tmx` with
+  a minimal tileset image in `assets/maps/tiles/iso-tile.png` so the map’s base
+  tile layer renders.
+- To make the map visible before the `PresentationPlugin` work lands, the map
+  plugin also spawns a minimal `Camera2d` only when the world has no existing
+  2D camera. This is intentionally temporary and will be superseded once Task
+  2.1.1 introduces a dedicated presentation camera.
+- Missing or invalid primary map configuration is reported as `LilleMapError`
+  events (and logged via an observer) rather than panicking, so runtime and
+  test runs fail loudly but safely.
+- The plugin keeps a `PrimaryMapAssetTracking` resource containing the
+  asset-server path and a strong `Handle<TiledMapAsset>`. This makes recursive
+  dependency load failures observable even if `bevy_ecs_tiled` despawns the map
+  entity during failure handling.
+- `bevy_ecs_tiled` is built with its `render` feature explicitly enabled (in
+  addition to `png`). Lille opts out of dependency defaults, so this opt-in is
+  required to satisfy the “renders base tile layers” completion criteria.
+- Automated tests that rely on the asset pipeline use headless `DefaultPlugins`
+  with `WinitPlugin` disabled, because the Rust test harness runs tests on
+  worker threads and `WinitPlugin` requires main-thread initialisation.
 
 - **Asset Loading:** Initializing `bevy_ecs_tiled::TiledPlugin` to register the
   Tiled map loader and asset types. This hooks into Bevy’s asset system so that

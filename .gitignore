@@ -2,7 +2,9 @@
 **/*.rs.bk
 Cargo.lock
 *.ttf
-assets/
+assets/*
+!assets/maps/
+!assets/maps/**
 .env
 .crush/
 .serena/

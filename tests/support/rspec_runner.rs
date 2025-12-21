@@ -12,7 +12,9 @@ where
     let logger = Arc::new(Logger::new(std::io::stdout()));
     let config = ConfigurationBuilder::default()
         .parallel(false)
-        .exit_on_failure(false)
+        // Ensure rspec failures fail the Rust test binary (by exiting with the
+        // standard `cargo test` failure code via rspec's runner).
+        .exit_on_failure(true)
         .build()
         .unwrap_or_else(|e| panic!("rspec configuration failed: {e}"));
     Runner::new(config, vec![logger]).run(suite);
