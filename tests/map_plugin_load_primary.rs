@@ -6,45 +6,35 @@
 #![cfg(feature = "test-support")]
 //! Loads the primary isometric map and asserts the Tiled hierarchy appears.
 //!
-//! This test ticks the Bevy app, which initialises a render device under
+//! This test ticks the Bevy app, which initializes a render device under
 //! `--all-features`. Bevy's renderer uses process-global state, so this file
 //! intentionally contains a single test.
 
 #[path = "support/map_test_plugins.rs"]
 mod map_test_plugins;
 
-use bevy::ecs::prelude::On;
 use bevy::prelude::*;
 use bevy_ecs_tiled::prelude::{TiledLayer, TiledMap};
-use lille::map::{LilleMapError, PRIMARY_ISOMETRIC_MAP_PATH};
+use lille::map::PRIMARY_ISOMETRIC_MAP_PATH;
 use lille::LilleMapPlugin;
 use rstest::rstest;
 
-#[derive(Resource, Default, Debug)]
-struct CapturedMapErrors(pub Vec<LilleMapError>);
+use map_test_plugins::map_test_app;
+use map_test_plugins::CapturedMapErrors;
 
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "Observer systems must accept On<T> by value for Events V2."
-)]
-fn record_map_error(event: On<LilleMapError>, mut captured: ResMut<CapturedMapErrors>) {
-    captured.0.push(event.event().clone());
-}
+const MAX_LOAD_TICKS: usize = 2_000;
+const TICK_SLEEP_MS: u64 = 1;
 
 #[rstest]
-fn loads_primary_map_and_spawns_layers() {
-    let mut app = App::new();
-    map_test_plugins::add_map_test_plugins(&mut app);
-    app.insert_resource(CapturedMapErrors::default());
-    app.world_mut().add_observer(record_map_error);
-    app.add_plugins(LilleMapPlugin);
-    app.finish();
-    app.cleanup();
+fn loads_primary_map_and_spawns_layers(mut map_test_app: App) {
+    map_test_app.add_plugins(LilleMapPlugin);
+    map_test_app.finish();
+    map_test_app.cleanup();
 
-    app.update();
+    map_test_app.update();
 
     {
-        let world = app.world_mut();
+        let world = map_test_app.world_mut();
         let mut query = world.query::<&TiledMap>();
         let map = query
             .iter(world)
@@ -63,22 +53,27 @@ fn loads_primary_map_and_spawns_layers() {
     }
 
     let mut layer_found = false;
-    for _ in 0..2_000 {
-        app.update();
-        std::thread::sleep(std::time::Duration::from_millis(1));
+    for _ in 0..MAX_LOAD_TICKS {
+        map_test_app.update();
+        std::thread::sleep(std::time::Duration::from_millis(TICK_SLEEP_MS));
 
-        if !app.world().resource::<CapturedMapErrors>().0.is_empty() {
+        if !map_test_app
+            .world()
+            .resource::<CapturedMapErrors>()
+            .0
+            .is_empty()
+        {
             break;
         }
 
-        let world = app.world_mut();
+        let world = map_test_app.world_mut();
         if world.query::<&TiledLayer>().iter(world).next().is_some() {
             layer_found = true;
             break;
         }
     }
 
-    let errors = app.world().resource::<CapturedMapErrors>();
+    let errors = map_test_app.world().resource::<CapturedMapErrors>();
     assert!(
         errors.0.is_empty(),
         "expected the primary map to load without emitting LilleMapError events, but observed: {:?}",

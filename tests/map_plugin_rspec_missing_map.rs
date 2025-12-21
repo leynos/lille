@@ -10,7 +10,7 @@
 //! Behavioural test: missing map assets emit a structured error.
 //!
 //! This file contains a single test because it ticks the Bevy app under
-//! `--all-features`, which initialises a render device and uses process-global
+//! `--all-features`, which initializes a render device and uses process-global
 //! renderer state.
 
 #[path = "support/map_test_plugins.rs"]
@@ -22,35 +22,27 @@ mod thread_safe_app;
 #[path = "support/rspec_runner.rs"]
 mod rspec_runner;
 
-use std::sync::{Arc, Mutex, MutexGuard};
+#[path = "support/map_fixture.rs"]
+mod map_fixture;
 
-use bevy::ecs::prelude::On;
+use std::sync::MutexGuard;
+
 use bevy::prelude::*;
 use bevy_ecs_tiled::prelude::TiledLayer;
 use lille::map::{LilleMapError, LilleMapSettings, MapAssetPath};
 use lille::{DbspPlugin, LilleMapPlugin};
 use rspec::block::Context as Scenario;
 use rspec_runner::run_serial;
-use thread_safe_app::{lock_app, SharedApp, ThreadSafeApp};
+use thread_safe_app::ThreadSafeApp;
 
-#[derive(Resource, Default, Debug)]
-struct CapturedMapErrors(pub Vec<LilleMapError>);
+use map_test_plugins::CapturedMapErrors;
 
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "Observer systems must accept On<T> by value for Events V2."
-)]
-fn record_map_error(event: On<LilleMapError>, mut captured: ResMut<CapturedMapErrors>) {
-    captured.0.push(event.event().clone());
-}
+const MAX_ERROR_WAIT_TICKS: usize = 200;
 
 #[derive(Debug, Clone)]
 struct MapPluginFixture {
-    app: SharedApp,
+    base: map_fixture::MapPluginFixtureBase,
 }
-
-#[derive(Resource, Debug, Default)]
-struct PluginsFinalised;
 
 impl MapPluginFixture {
     fn bootstrap_missing_map() -> Self {
@@ -63,28 +55,20 @@ impl MapPluginFixture {
             should_bootstrap_camera: false,
         });
 
-        app.insert_resource(CapturedMapErrors::default());
-        app.world_mut().add_observer(record_map_error);
+        map_test_plugins::install_map_error_capture(&mut app);
         app.add_plugins(LilleMapPlugin);
 
         Self {
-            app: Arc::new(Mutex::new(ThreadSafeApp(app))),
+            base: map_fixture::MapPluginFixtureBase::new(app),
         }
     }
 
     fn app_guard(&self) -> MutexGuard<'_, ThreadSafeApp> {
-        lock_app(&self.app)
+        self.base.app_guard()
     }
 
     fn tick(&self) {
-        let mut app = self.app_guard();
-        if app.world().get_resource::<PluginsFinalised>().is_none() {
-            app.finish();
-            app.cleanup();
-            app.insert_resource(PluginsFinalised);
-        }
-        app.update();
-        std::thread::sleep(std::time::Duration::from_millis(1));
+        self.base.tick();
     }
 
     fn tick_until_map_error(&self, max_ticks: usize) {
@@ -121,7 +105,7 @@ fn map_plugin_reports_missing_primary_map_and_does_not_panic() {
         fixture,
         |scenario: &mut Scenario<MapPluginFixture>| {
             scenario.then("ticking emits a map error and spawns no layers", |state| {
-                state.tick_until_map_error(200);
+                state.tick_until_map_error(MAX_ERROR_WAIT_TICKS);
                 assert_eq!(state.tiled_layer_count(), 0);
 
                 let errors = state.captured_map_errors();

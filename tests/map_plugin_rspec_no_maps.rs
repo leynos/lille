@@ -10,7 +10,7 @@
 //! Behavioural test: when map spawning is disabled, DBSP remains authoritative.
 //!
 //! This file contains a single test because it ticks the Bevy app under
-//! `--all-features`, which initialises a render device and uses process-global
+//! `--all-features`, which initializes a render device and uses process-global
 //! renderer state.
 
 #[path = "support/map_test_plugins.rs"]
@@ -22,34 +22,22 @@ mod thread_safe_app;
 #[path = "support/rspec_runner.rs"]
 mod rspec_runner;
 
-use std::sync::{Arc, Mutex, MutexGuard};
+#[path = "support/map_fixture.rs"]
+mod map_fixture;
 
-use bevy::ecs::prelude::On;
+use std::sync::MutexGuard;
+
 use bevy::prelude::*;
-use lille::map::{LilleMapError, LilleMapSettings, MapAssetPath, PRIMARY_ISOMETRIC_MAP_PATH};
+use lille::map::{LilleMapSettings, MapAssetPath, PRIMARY_ISOMETRIC_MAP_PATH};
 use lille::{DbspPlugin, DdlogId, LilleMapPlugin, WorldHandle};
 use rspec::block::Context as Scenario;
 use rspec_runner::run_serial;
-use thread_safe_app::{lock_app, SharedApp, ThreadSafeApp};
-
-#[derive(Resource, Default, Debug)]
-struct CapturedMapErrors(pub Vec<LilleMapError>);
-
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "Observer systems must accept On<T> by value for Events V2."
-)]
-fn record_map_error(event: On<LilleMapError>, mut captured: ResMut<CapturedMapErrors>) {
-    captured.0.push(event.event().clone());
-}
+use thread_safe_app::ThreadSafeApp;
 
 #[derive(Debug, Clone)]
 struct MapPluginFixture {
-    app: SharedApp,
+    base: map_fixture::MapPluginFixtureBase,
 }
-
-#[derive(Resource, Debug, Default)]
-struct PluginsFinalised;
 
 impl MapPluginFixture {
     fn bootstrap_with_settings(settings: LilleMapSettings) -> Self {
@@ -58,29 +46,22 @@ impl MapPluginFixture {
         app.add_plugins(DbspPlugin);
         app.insert_resource(settings);
 
-        app.insert_resource(CapturedMapErrors::default());
-        app.world_mut().add_observer(record_map_error);
+        map_test_plugins::install_map_error_capture(&mut app);
         app.add_plugins(LilleMapPlugin);
+        // Deliberately add twice to verify idempotence.
         app.add_plugins(LilleMapPlugin);
 
         Self {
-            app: Arc::new(Mutex::new(ThreadSafeApp(app))),
+            base: map_fixture::MapPluginFixtureBase::new(app),
         }
     }
 
     fn app_guard(&self) -> MutexGuard<'_, ThreadSafeApp> {
-        lock_app(&self.app)
+        self.base.app_guard()
     }
 
     fn tick(&self) {
-        let mut app = self.app_guard();
-        if app.world().get_resource::<PluginsFinalised>().is_none() {
-            app.finish();
-            app.cleanup();
-            app.insert_resource(PluginsFinalised);
-        }
-        app.update();
-        std::thread::sleep(std::time::Duration::from_millis(1));
+        self.base.tick();
     }
 
     fn world_handle_entity_count(&self) -> usize {

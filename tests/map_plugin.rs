@@ -15,44 +15,38 @@ use rstest::rstest;
 #[path = "support/map_test_plugins.rs"]
 mod map_test_plugins;
 
-#[rstest]
-fn adds_tiled_plugin() {
-    let mut app = App::new();
-    map_test_plugins::add_map_test_plugins(&mut app);
+use map_test_plugins::map_test_app;
 
-    app.add_plugins(LilleMapPlugin);
+#[rstest]
+fn adds_tiled_plugin(mut map_test_app: App) {
+    map_test_app.add_plugins(LilleMapPlugin);
 
     assert!(
-        app.is_plugin_added::<TiledPlugin>(),
+        map_test_app.is_plugin_added::<TiledPlugin>(),
         "LilleMapPlugin should add TiledPlugin; if this fails, map support \
-         is no longer being initialised and this is a regression."
+         is no longer being initialized and this is a regression."
     );
 }
 
 #[rstest]
-fn does_not_readd_if_already_present() {
-    let mut app = App::new();
-    map_test_plugins::add_map_test_plugins(&mut app);
-    app.add_plugins(TiledPlugin::default());
+fn does_not_readd_if_already_present(mut map_test_app: App) {
+    map_test_app.add_plugins(TiledPlugin::default());
 
-    app.add_plugins(LilleMapPlugin);
+    map_test_app.add_plugins(LilleMapPlugin);
 
     // The guard in LilleMapPlugin should make this safe to call again.
-    app.add_plugins(LilleMapPlugin);
+    map_test_app.add_plugins(LilleMapPlugin);
 
-    assert!(app.is_plugin_added::<TiledPlugin>());
+    assert!(map_test_app.is_plugin_added::<TiledPlugin>());
 }
 
 #[rstest]
-fn adding_plugin_twice_does_not_panic_and_keeps_tiled() {
-    let mut app = App::new();
-    map_test_plugins::add_map_test_plugins(&mut app);
-
-    app.add_plugins(LilleMapPlugin);
-    app.add_plugins(LilleMapPlugin);
+fn adding_plugin_twice_does_not_panic_and_keeps_tiled(mut map_test_app: App) {
+    map_test_app.add_plugins(LilleMapPlugin);
+    map_test_app.add_plugins(LilleMapPlugin);
 
     assert!(
-        app.is_plugin_added::<TiledPlugin>(),
+        map_test_app.is_plugin_added::<TiledPlugin>(),
         "Repeated additions must leave TiledPlugin registered exactly once"
     );
 }

@@ -57,6 +57,12 @@ impl MapAssetPath {
     }
 }
 
+impl AsRef<str> for MapAssetPath {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
 impl From<&str> for MapAssetPath {
     fn from(path: &str) -> Self {
         Self::new(path)
@@ -307,13 +313,12 @@ impl Plugin for LilleMapPlugin {
             app.add_plugins(TiledPlugin::default());
         }
 
-        app.add_observer(log_map_error);
-
         if app.world().contains_resource::<LilleMapPluginInstalled>() {
             return;
         }
 
         app.insert_resource(LilleMapPluginInstalled);
+        app.add_observer(log_map_error);
         app.init_resource::<LilleMapSettings>();
         app.init_resource::<PrimaryMapAssetTracking>();
         try_spawn_primary_map_on_build(app);

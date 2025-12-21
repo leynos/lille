@@ -36,7 +36,7 @@ and renders the map asset.
 ## Surprises & Discoveries
 
 - Observation: The Rust test harness runs tests on worker threads, and Bevy’s
-  `WinitPlugin` panics if its event loop is initialised off the main thread.
+  `WinitPlugin` panics if its event loop is initialized off the main thread.
   Evidence: unit tests panic with the standard “event loop must be on the main
   thread” failure if `WinitPlugin` is left enabled.
 
@@ -46,7 +46,7 @@ and renders the map asset.
   `TiledMap` entity being queryable even though a load failure occurred.
 
 - Observation: Enabling `bevy_ecs_tiled` rendering in `test-support` builds
-  makes the Bevy test harness brittle (render initialisation and platform
+  makes the Bevy test harness brittle (render initialization and platform
   threading assumptions), even when no window is created. Evidence: tests are
   substantially more reliable when `map` does not imply `render`, and when
   tests explicitly configure the `RenderPlugin` while disabling
@@ -70,7 +70,7 @@ and renders the map asset.
 
 - Decision: Enable `bevy_ecs_tiled`’s `render` feature (in addition to `png`)
   only when the `render` feature is enabled, so base tile layers render in the
-  game binary without forcing render initialisation in tests. Rationale:
+  game binary without forcing render initialization in tests. Rationale:
   `bevy_ecs_tiled`’s defaults include rendering, but Lille opts out of
   dependency defaults. To satisfy the task completion criteria (“renders base
   tile layers”), Lille must explicitly opt into rendering, but keeping that

@@ -7,7 +7,7 @@
 //! Confirms the primary map spawn can be disabled.
 //!
 //! This file contains a single test because it ticks the Bevy app (which can
-//! initialise renderer state under `--all-features`).
+//! initialize renderer state under `--all-features`).
 
 #[path = "support/map_test_plugins.rs"]
 mod map_test_plugins;
