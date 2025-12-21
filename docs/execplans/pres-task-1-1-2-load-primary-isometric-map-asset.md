@@ -55,13 +55,12 @@ and renders the map asset.
 ## Decision Log
 
 - Decision: Add a minimal camera spawn that only runs if no `Camera2d` exists,
-  and only compiles in `render` builds.
-  Rationale: Task 1.1.2 requires base tile layers to render when launching the
-  game. Lille currently spawns no camera, and the future `PresentationPlugin`
-  (Task 2.1.1) is not implemented yet. A conditional “only if missing” camera
-  keeps the map visible now while remaining safe to replace later, while the
-  `render` gate ensures headless builds stay minimal. Date/Author: 2025-12-17
-  (Codex CLI)
+  and only compiles in `render` builds. Rationale: Task 1.1.2 requires base
+  tile layers to render when launching the game. Lille currently spawns no
+  camera, and the future `PresentationPlugin` (Task 2.1.1) is not implemented
+  yet. A conditional “only if missing” camera keeps the map visible now while
+  remaining safe to replace later, while the `render` gate ensures headless
+  builds stay minimal. Date/Author: 2025-12-17 (Codex CLI)
 
 - Decision: Keep `LilleMapPlugin` idempotent and safe to add multiple times by
   installing its systems only once. Rationale: Existing tests (and the design
@@ -71,11 +70,11 @@ and renders the map asset.
 
 - Decision: Enable `bevy_ecs_tiled`’s `render` feature (in addition to `png`)
   only when the `render` feature is enabled, so base tile layers render in the
-  game binary without forcing render initialisation in tests.
-  Rationale: `bevy_ecs_tiled`’s defaults include rendering, but Lille opts out
-  of dependency defaults. To satisfy the task completion criteria (“renders
-  base tile layers”), Lille must explicitly opt into rendering, but keeping
-  that opt-in behind `render` avoids brittle headless test configurations.
+  game binary without forcing render initialisation in tests. Rationale:
+  `bevy_ecs_tiled`’s defaults include rendering, but Lille opts out of
+  dependency defaults. To satisfy the task completion criteria (“renders base
+  tile layers”), Lille must explicitly opt into rendering, but keeping that
+  opt-in behind `render` avoids brittle headless test configurations.
   Date/Author: 2025-12-17 (Codex CLI)
 
 - Decision: Use a `PrimaryMapAssetTracking` resource to hold the strong
@@ -258,5 +257,5 @@ At the end of this task, the following interfaces must exist:
 ## Revision note (required when editing an ExecPlan)
 
 2025-12-17 (Codex CLI): Marked the quality gates as complete and recorded the
-log locations. Updated decision notes to reflect the final feature split
-(`map` is independent of `render`) and the `render`-gated camera bootstrap.
+log locations. Updated decision notes to reflect the final feature split (`map`
+is independent of `render`) and the `render`-gated camera bootstrap.
