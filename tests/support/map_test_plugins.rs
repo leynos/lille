@@ -83,9 +83,8 @@ pub fn add_map_test_plugins(app: &mut App) {
             .disable::<bevy::winit::WinitPlugin>(),
     );
 
-    // `bevy_ecs_tiled` loads tile images, so ensure image asset types exist.
-    app.init_asset::<Image>();
-    app.init_asset::<TextureAtlasLayout>();
+    // `bevy_ecs_tiled` loads tile images; DefaultPlugins already registers the
+    // required render-typed assets even when we keep WGPU headless.
 }
 
 /// Creates a new `App` configured for map plugin tests.

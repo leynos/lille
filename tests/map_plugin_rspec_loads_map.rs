@@ -37,6 +37,8 @@ use thread_safe_app::ThreadSafeApp;
 
 use map_test_plugins::CapturedMapErrors;
 
+const MAX_LAYER_WAIT_TICKS: usize = 50;
+
 #[derive(Debug, Clone)]
 struct MapPluginFixture {
     base: map_fixture::MapPluginFixtureBase,
@@ -64,13 +66,15 @@ impl MapPluginFixture {
         self.base.tick();
     }
 
-    fn tick_until_layers_loaded(&self, max_ticks: usize) {
+    fn tick_until_layers_loaded(&self, max_ticks: usize) -> bool {
         for _ in 0..max_ticks {
             self.tick();
             if self.tiled_layer_count() > 0 {
-                return;
+                return true;
             }
         }
+
+        false
     }
 
     fn world_handle_entity_count(&self) -> usize {
@@ -119,7 +123,12 @@ fn map_plugin_loads_primary_map_hierarchy_without_touching_dbsp() {
         fixture,
         |scenario: &mut Scenario<MapPluginFixture>| {
             scenario.when("the app ticks until map layers appear", |ctx| {
-                ctx.before_each(|state| state.tick_until_layers_loaded(50));
+                ctx.before_each(|state| {
+                    assert!(
+                        state.tick_until_layers_loaded(MAX_LAYER_WAIT_TICKS),
+                        "expected map layers to load within {MAX_LAYER_WAIT_TICKS} ticks"
+                    );
+                });
 
                 ctx.then("a single TiledMap root entity exists", |state| {
                     assert_eq!(state.tiled_map_count(), 1);

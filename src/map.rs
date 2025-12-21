@@ -96,7 +96,7 @@ impl Default for LilleMapSettings {
     }
 }
 
-#[derive(Component, Debug)]
+#[derive(Component, Debug, Default)]
 struct PrimaryTiledMap;
 
 #[cfg(feature = "render")]
@@ -131,9 +131,18 @@ struct PrimaryTiledMapBundle {
 impl PrimaryTiledMapBundle {
     fn new(handle: Handle<TiledMapAsset>) -> Self {
         Self {
+            map: TiledMap(handle),
+            ..Self::default()
+        }
+    }
+}
+
+impl Default for PrimaryTiledMapBundle {
+    fn default() -> Self {
+        Self {
             name: Name::new("PrimaryTiledMap"),
             marker: PrimaryTiledMap,
-            map: TiledMap(handle),
+            map: TiledMap(Handle::default()),
             respawn: bevy_ecs_tiled::prelude::RespawnTiledMap,
             storage: bevy_ecs_tiled::prelude::TiledMapStorage::default(),
             layer_z_offset: bevy_ecs_tiled::prelude::TiledMapLayerZOffset::default(),
