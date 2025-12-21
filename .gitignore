@@ -6,6 +6,7 @@ assets/*
 !assets/maps/
 !assets/maps/**
 .env
+tiled_types_export.json
 .crush/
 .serena/
 .cargo-home/

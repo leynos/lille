@@ -56,6 +56,10 @@ encapsulate all map-loading functionality. It will be responsible for:
 - `bevy_ecs_tiled` is built with its `render` feature explicitly enabled (in
   addition to `png`). Lille opts out of dependency defaults, so this opt-in is
   required to satisfy the “renders base tile layers” completion criteria.
+- `LilleMapPlugin` now registers the `Collidable`, `SlopeProperties`,
+  `PlayerSpawn`, and `SpawnPoint` custom property types, with
+  `bevy_ecs_tiled`'s `user_properties` feature enabled so typed Tiled metadata
+  hydrates into ECS components without adding non-DBSP inference.
 - Automated tests that rely on the asset pipeline use headless `DefaultPlugins`
   with `WinitPlugin` disabled, because the Rust test harness runs tests on
   worker threads and `WinitPlugin` requires main-thread initialisation.
@@ -467,13 +471,13 @@ classDiagram
         - GlobalTransform : (world coords)
         - Collidable : true  <<custom property tag>>
         - SlopeProp : grad_x=0.5, grad_y=0.0  <<if slope>>
-        + Block : {id, x=10, y=5, z=0}
-        + BlockSlope : {block_id=id, grad_x=0.5, grad_y=0.0} <<if slope>>
+        + Block : id=10, x=10, y=5, z=0
+        + BlockSlope : block_id=id, grad_x=0.5, grad_y=0.0  <<if slope>>
     }
     class ObjectEntity {
         - Name : "PlayerSpawn"
         - Transform : (world coords)
-        - SpawnPoint : {enemy_type:0, respawn:false} <<custom component>>
+        - SpawnPoint : enemy_type=0, respawn=false  <<custom component>>
         + (spawns Player on load)
     }
     MapEntity *-- LayerEntity : "child"
@@ -953,6 +957,20 @@ This would export the types file to our assets folder for easy import into
 Tiled. (We’d instruct team members to import that in Tiled’s Custom Types
 Editor to get our components in the dropdown.) For brevity, the example used
 `.default()` which exports to the workspace root.
+
+### Designer workflow: exporting and importing custom types
+
+Designers need the generated `tiled_types_export.json` so Tiled knows about
+Lille’s custom property types.
+
+1. Run the game once with map and render enabled (for example,
+   `cargo run --features "map render"`). This writes `tiled_types_export.json`
+   to the repository root unless a custom path is configured. The file is
+   ignored in Git; share it via artefact storage or hand-off instead of
+   committing it.
+2. In Tiled, open **View → Custom Types Editor**, click **Import**, and select
+   the exported JSON file. The types will then appear in the property type
+   dropdowns.
 
 **6.2 Plugin Structure:**
 

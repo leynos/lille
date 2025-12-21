@@ -96,6 +96,36 @@ impl Default for LilleMapSettings {
     }
 }
 
+/// Marker set by Tiled to flag collidable tiles or objects.
+#[derive(Component, Reflect, Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[reflect(Component, Default)]
+pub struct Collidable;
+
+/// Slope metadata authored in Tiled for sloped terrain tiles.
+#[derive(Component, Reflect, Default, Debug, Clone, Copy, PartialEq)]
+#[reflect(Component, Default)]
+pub struct SlopeProperties {
+    /// Gradient of the slope along the X axis.
+    pub grad_x: f32,
+    /// Gradient of the slope along the Y axis.
+    pub grad_y: f32,
+}
+
+/// Marker describing where the player should spawn.
+#[derive(Component, Reflect, Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[reflect(Component, Default)]
+pub struct PlayerSpawn;
+
+/// Metadata for NPC spawn points authored in Tiled.
+#[derive(Component, Reflect, Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[reflect(Component, Default)]
+pub struct SpawnPoint {
+    /// Identifier or index that the spawn system can map to a unit archetype.
+    pub enemy_type: u32,
+    /// Whether the spawn point should respawn after use.
+    pub respawn: bool,
+}
+
 #[derive(Component, Debug, Default)]
 struct PrimaryTiledMap;
 
@@ -327,6 +357,10 @@ impl Plugin for LilleMapPlugin {
         }
 
         app.insert_resource(LilleMapPluginInstalled);
+        app.register_type::<Collidable>()
+            .register_type::<SlopeProperties>()
+            .register_type::<PlayerSpawn>()
+            .register_type::<SpawnPoint>();
         app.add_observer(log_map_error);
         app.init_resource::<LilleMapSettings>();
         app.init_resource::<PrimaryMapAssetTracking>();
