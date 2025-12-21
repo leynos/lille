@@ -34,14 +34,8 @@ fn registers_map_property_types() {
     let registry = app.world().resource::<AppTypeRegistry>();
     let registry_guard = registry.read();
 
-    assert_eq!(is_component_registered::<Collidable>(&registry_guard), true);
-    assert_eq!(
-        is_component_registered::<SlopeProperties>(&registry_guard),
-        true
-    );
-    assert_eq!(
-        is_component_registered::<PlayerSpawn>(&registry_guard),
-        true
-    );
-    assert_eq!(is_component_registered::<SpawnPoint>(&registry_guard), true);
+    assert!(is_component_registered::<Collidable>(&registry_guard));
+    assert!(is_component_registered::<SlopeProperties>(&registry_guard));
+    assert!(is_component_registered::<PlayerSpawn>(&registry_guard));
+    assert!(is_component_registered::<SpawnPoint>(&registry_guard));
 }
