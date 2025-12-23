@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.11.0" orientation="isometric" renderorder="right-down" width="2" height="2" tilewidth="64" tileheight="32" infinite="0" nextlayerid="3" nextobjectid="4">
+ <tileset firstgid="1" name="lille-iso-placeholder" tilewidth="64" tileheight="32" tilecount="1" columns="1">
+  <image source="tiles/iso-tile.png" width="64" height="32"/>
+  <tile id="0">
+   <properties>
+    <property name="collidable" type="class" propertytype="lille::map::Collidable"/>
+    <property name="slope" type="class" propertytype="lille::map::SlopeProperties">
+     <properties>
+      <property name="grad_x" type="float" value="0.25"/>
+      <property name="grad_y" type="float" value="0.5"/>
+     </properties>
+    </property>
+   </properties>
+  </tile>
+ </tileset>
+ <layer id="1" name="Ground" width="2" height="2">
+  <data encoding="csv">
+1,1,
+1,1
+  </data>
+ </layer>
+ <objectgroup id="2" name="Spawns">
+  <object id="1" name="PlayerStart" x="0" y="0">
+   <properties>
+    <property name="player_spawn" type="class" propertytype="lille::map::PlayerSpawn"/>
+   </properties>
+  </object>
+  <object id="2" name="EnemySpawn" x="64" y="32">
+   <properties>
+    <property name="spawn_point" type="class" propertytype="lille::map::SpawnPoint">
+     <properties>
+      <property name="enemy_type" type="int" value="7"/>
+      <property name="respawn" type="bool" value="true"/>
+     </properties>
+    </property>
+   </properties>
+  </object>
+  <object id="3" name="UnknownSpawn" x="128" y="64">
+   <properties>
+    <property name="unknown_spawn" type="class" propertytype="lille::map::UnknownSpawnPoint">
+     <properties>
+      <property name="enemy_type" type="int" value="999"/>
+      <property name="respawn" type="bool" value="false"/>
+     </properties>
+    </property>
+   </properties>
+  </object>
+ </objectgroup>
+</map>

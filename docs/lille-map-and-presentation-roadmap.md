@@ -30,7 +30,7 @@ exposes a single entry point for spawning the active isometric map.
   - Completion criteria: Launching the game loads the baseline isometric map
     without runtime errors and renders base tile layers.
   - Dependencies: Task 1.1.1.
-- [ ] Task 1.1.3 — Register custom property types for map data
+- [x] Task 1.1.3 — Register custom property types for map data
   - Outcome: `LilleMapPlugin` enables the `user_properties` feature of
     `bevy_ecs_tiled` and registers Lille components via `App::register_type`.
   - Completion criteria: Maps containing typed custom properties yield ECS
