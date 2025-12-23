@@ -203,6 +203,16 @@ fn map_plugin_attaches_blocks_to_collidable_tiles() {
                     assert_eq!(state.block_count(), state.collidable_count());
                 });
 
+                ctx.then("collidable count matches expected fixture count", |state| {
+                    assert_eq!(
+                        state.collidable_count(),
+                        EXPECTED_COLLIDABLE_COUNT,
+                        "map fixture has changed: expected {EXPECTED_COLLIDABLE_COUNT} \
+                         Collidable tiles, found {}",
+                        state.collidable_count()
+                    );
+                });
+
                 ctx.then("no blocks exist without Collidable", |state| {
                     assert_eq!(state.blocks_without_collidable_count(), 0);
                 });

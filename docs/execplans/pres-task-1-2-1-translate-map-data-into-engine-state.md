@@ -1,13 +1,14 @@
 # Translate Map Data into Engine State (Task 1.2.1)
 
-This ExecPlan is a living document. The sections `Progress`,
+This Execution Plan (ExecPlan) is a living document. The sections `Progress`,
 `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must
 be kept up to date as work proceeds.
 
 ## Purpose / Big Picture
 
-Translate Tiled collision annotations into DBSP-compatible physics components
-so that static map geometry participates in the physics simulation. When
+Translate Tiled collision annotations into Differential Dataflow-Based Stream
+Processing (DBSP)-compatible physics components so that static map geometry
+participates in the physics simulation. When
 complete, tiles marked `Collidable` in Tiled will carry `Block` components that
 DBSP consumes for floor detection and collision. This bridges authored map data
 with the declarative physics circuit, keeping DBSP as the sole source of
@@ -18,8 +19,10 @@ inferred behaviour.
 - [x] Review roadmap and design context for Task 1.2.1.
 - [x] Create `src/map/translate.rs` with block attachment system.
 - [x] Register the system in `LilleMapPlugin`.
-- [x] Add rstest unit tests for block attachment logic.
-- [x] Add rust-rspec behavioural tests for property hydration.
+- [x] Add rstest (parameterized testing crate) unit tests for block attachment
+  logic.
+- [x] Add rust-rspec (RSpec-style behaviour-driven testing) behavioural tests
+  for property hydration.
 - [x] Update roadmap to mark Task 1.2.1 complete.
 - [x] Run validation commands and capture evidence.
 
@@ -76,9 +79,9 @@ consume these blocks for floor height calculations and collision detection.
 - Task 1.2.2 ("Attach physics blocks via Tiled events") is now largely
   superseded by this implementation. Consider updating the roadmap to reflect
   that the event-based trigger (`TiledEvent<MapCreated>`) is already in place.
-- Task 1.2.3 ("Feed static geometry to DBSP") may already be satisfied since the
-  existing DBSP input system queries `Block` components each tick. Verify and
-  potentially mark complete.
+- Task 1.2.3 ("Feed static geometry to DBSP") may already be satisfied, since
+  the existing DBSP input system queries `Block` components each tick. Verify
+  and potentially mark complete.
 - Task 1.2.4 ("Support slope metadata for terrain") can follow the same pattern:
   observe `SlopeProperties` and attach `BlockSlope` linked to the corresponding
   `Block` ID.
@@ -91,7 +94,7 @@ and wiring in `bevy_ecs_tiled`. Task 1.1.3 registered `Collidable` and
 tile entities at load time.
 
 The DBSP physics circuit consumes `Block` and `BlockSlope` components via the
-input synchronisation system in `src/dbsp_sync/input/sync.rs`. This task
+input synchronization system in `src/dbsp_sync/input/sync.rs`. This task
 bridges the gap: when a tile carries `Collidable`, we attach a `Block` so the
 physics circuit can compute floor heights and collision behaviour.
 
