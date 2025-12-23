@@ -42,11 +42,11 @@ exposes a single entry point for spawning the active isometric map.
 What we will build: Systems that honour Tiled annotations by attaching Lille
 components and feeding static geometry into DBSP precisely once per map load.
 
-- [ ] Task 1.2.1 — Map collision annotations to Wall component
-  - Outcome: A `Wall` component is defined and automatically attached to tile
-    entities whose Tiled custom property marks them as collision geometry.
-  - Completion criteria: Querying loaded maps for `Wall` returns every wall
-    tile and no unrelated tiles.
+- [x] Task 1.2.1 — Map collision annotations to Block component
+  - Outcome: `Block` components are automatically attached to tile entities
+    whose Tiled custom property marks them as collision geometry.
+  - Completion criteria: Querying loaded maps for `Block` returns every
+    collidable tile and no unrelated tiles.
   - Dependencies: Task 1.1.3.
 - [ ] Task 1.2.2 — Attach physics blocks via Tiled events
   - Outcome: Systems listening to `TiledEvent<ObjectCreated>`

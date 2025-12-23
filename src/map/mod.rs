@@ -1,16 +1,21 @@
 //! Map integration plugin that wires Tiled maps into Lille.
 //!
-//! `LilleMapPlugin` owns the “load the authored map into ECS” entry point.
-//! This is deliberately limited to asset and hierarchy concerns:
+//! `LilleMapPlugin` owns the "load the authored map into ECS" entry point and
+//! the translation of authored annotations into engine components:
 //!
 //! - It registers `bevy_ecs_tiled::TiledPlugin` so `.tmx` assets can load.
 //! - It spawns a root entity with a `TiledMap` component, which triggers the
 //!   `bevy_ecs_tiled` spawn pipeline (layers, tilemaps, etc).
+//! - It attaches `Block` components to tiles marked `Collidable` so they
+//!   participate in DBSP physics.
 //!
-//! Importantly, this module must not infer gameplay or physics state. The DBSP
-//! circuit remains the sole source of truth for any inferred behaviour in the
-//! game world; map loading only exposes authored data so later tasks can
-//! translate it into typed components and feed it into DBSP.
+//! The DBSP circuit remains the sole source of truth for any inferred behaviour
+//! in the game world; this module translates authored data into typed
+//! components and feeds them into DBSP.
+
+mod translate;
+
+pub use translate::attach_collision_blocks;
 
 use bevy::asset::RecursiveDependencyLoadState;
 use bevy::prelude::*;
@@ -368,7 +373,13 @@ impl Plugin for LilleMapPlugin {
         #[cfg(feature = "render")]
         app.add_systems(Startup, bootstrap_camera_if_missing);
         app.add_systems(PostStartup, spawn_primary_map_if_enabled);
-        app.add_systems(Update, monitor_primary_map_load_state);
+        app.add_systems(
+            Update,
+            (
+                monitor_primary_map_load_state,
+                translate::attach_collision_blocks,
+            ),
+        );
     }
 
     fn is_unique(&self) -> bool {
