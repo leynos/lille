@@ -10,10 +10,11 @@ plan-of-record for the change.
 ## Purpose / Big Picture
 
 Enable Lille's Tiled integration to read typed custom properties and surface
-them as ECS components, so map-authored metadata flows into the game world
-without bespoke parsing. Success is visible when loading a map with typed
-properties produces entities with populated components, and the DBSP circuit
-remains the only source of inferred behaviour.
+them as entity component system (ECS) components, so map-authored metadata
+flows into the game world without bespoke parsing. Success is visible when
+loading a map with typed properties produces entities with populated
+components, and the Database Stream Processor (DBSP) circuit remains the only
+source of inferred behaviour.
 
 ## Progress
 
@@ -83,7 +84,7 @@ Tiled maps.
 
 The current tests for `LilleMapPlugin` live under `tests/`, with shared helpers
 in `tests/support/`. Behavioural tests use `rust-rspec` and must run in their
-own file because ticking the Bevy app initialises renderer state. The roadmap
+own file because ticking the Bevy app initializes renderer state. The roadmap
 for this work is in `docs/lille-map-and-presentation-roadmap.md`, and the
 design rationale is in `docs/lille-isometric-tiled-maps-design.md`.
 

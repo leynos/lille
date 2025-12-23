@@ -10,7 +10,7 @@
 //! Behavioural test: typed custom properties hydrate into ECS components.
 //!
 //! This file contains a single test because it ticks the Bevy app under
-//! `--all-features`, which initialises a render device and uses process-global
+//! `--all-features`, which initializes a render device and uses process-global
 //! renderer state.
 
 #[path = "support/map_test_plugins.rs"]
@@ -41,6 +41,9 @@ use thread_safe_app::ThreadSafeApp;
 
 const CUSTOM_PROPERTIES_MAP_PATH: &str = "maps/primary-isometric-custom-properties.tmx";
 const MAX_LOAD_TICKS: usize = 50;
+
+/// The fixture map uses a 2×2 tile grid; every tile carries `Collidable`.
+const EXPECTED_COLLIDABLE_COUNT: usize = 4;
 
 #[derive(Debug, Clone)]
 struct MapCustomPropertiesFixture {
@@ -162,7 +165,11 @@ fn map_plugin_hydrates_tiled_custom_properties() {
                 });
 
                 ctx.then("collidable tiles are hydrated", |state| {
-                    assert!(state.collidable_count() > 0);
+                    assert_eq!(
+                        state.collidable_count(),
+                        EXPECTED_COLLIDABLE_COUNT,
+                        "expected exactly {EXPECTED_COLLIDABLE_COUNT} collidable tiles"
+                    );
                 });
 
                 ctx.then("slope values are hydrated from Tiled data", |state| {
@@ -189,7 +196,14 @@ fn map_plugin_hydrates_tiled_custom_properties() {
                 });
 
                 ctx.then("unknown property types are ignored", |state| {
-                    assert_eq!(state.spawn_points().len(), 1);
+                    // The map defines 3 objects but only 2 have registered property types.
+                    // If unknown types were incorrectly registered, we'd see more than 2.
+                    let hydrated_spawn_count =
+                        state.player_spawn_count() + state.spawn_points().len();
+                    assert_eq!(
+                        hydrated_spawn_count, 2,
+                        "expected only 2 spawn components from 3 objects"
+                    );
                 });
 
                 ctx.then("DBSP world handle stays empty", |state| {

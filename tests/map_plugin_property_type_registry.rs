@@ -18,15 +18,23 @@ use lille::map::{Collidable, PlayerSpawn, SlopeProperties, SpawnPoint};
 use lille::LilleMapPlugin;
 use rstest::rstest;
 
-fn is_component_registered<T: Reflect>(registry: &TypeRegistry) -> bool {
+fn is_type_registered_as_component(registry: &TypeRegistry, type_id: TypeId) -> bool {
     registry
-        .get(TypeId::of::<T>())
+        .get(type_id)
         .and_then(|entry| entry.data::<ReflectComponent>())
         .is_some()
 }
 
+/// Dummy type to verify that unregistered types return false.
+#[derive(Reflect)]
+struct NotRegistered;
+
 #[rstest]
-fn registers_map_property_types() {
+#[case::collidable(TypeId::of::<Collidable>(), "Collidable")]
+#[case::slope_properties(TypeId::of::<SlopeProperties>(), "SlopeProperties")]
+#[case::player_spawn(TypeId::of::<PlayerSpawn>(), "PlayerSpawn")]
+#[case::spawn_point(TypeId::of::<SpawnPoint>(), "SpawnPoint")]
+fn registers_map_property_type(#[case] type_id: TypeId, #[case] type_name: &str) {
     let mut app = App::new();
     map_test_plugins::add_map_test_plugins(&mut app);
     app.add_plugins(LilleMapPlugin);
@@ -34,8 +42,23 @@ fn registers_map_property_types() {
     let registry = app.world().resource::<AppTypeRegistry>();
     let registry_guard = registry.read();
 
-    assert!(is_component_registered::<Collidable>(&registry_guard));
-    assert!(is_component_registered::<SlopeProperties>(&registry_guard));
-    assert!(is_component_registered::<PlayerSpawn>(&registry_guard));
-    assert!(is_component_registered::<SpawnPoint>(&registry_guard));
+    assert!(
+        is_type_registered_as_component(&registry_guard, type_id),
+        "{type_name} should be registered as a component"
+    );
+}
+
+#[rstest]
+fn unregistered_type_is_not_a_component() {
+    let mut app = App::new();
+    map_test_plugins::add_map_test_plugins(&mut app);
+    app.add_plugins(LilleMapPlugin);
+
+    let registry = app.world().resource::<AppTypeRegistry>();
+    let registry_guard = registry.read();
+
+    assert!(
+        !is_type_registered_as_component(&registry_guard, TypeId::of::<NotRegistered>()),
+        "NotRegistered should not be registered as a component"
+    );
 }
