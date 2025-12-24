@@ -66,7 +66,7 @@ components and feeding static geometry into DBSP precisely once per map load.
   - Dependencies: Task 1.2.2.
   - Note: Already satisfied by existing DBSP input system in
     `src/dbsp_sync/input/sync.rs` which queries `Block` components each tick.
-- [ ] Task 1.2.4 — Support slope metadata for terrain
+- [x] Task 1.2.4 — Support slope metadata for terrain
   - Outcome: Tiles flagged with slope information in Tiled produce
     `BlockSlope` components linked to their parent `Block` identifiers.
   - Completion criteria: Sloped tiles expose gradient data that DBSP consumes

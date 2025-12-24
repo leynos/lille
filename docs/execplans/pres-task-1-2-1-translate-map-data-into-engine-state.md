@@ -8,11 +8,11 @@ be kept up to date as work proceeds.
 
 Translate Tiled collision annotations into Differential Dataflow-Based Stream
 Processing (DBSP)-compatible physics components so that static map geometry
-participates in the physics simulation. When
-complete, tiles marked `Collidable` in Tiled will carry `Block` components that
-DBSP consumes for floor detection and collision. This bridges authored map data
-with the declarative physics circuit, keeping DBSP as the sole source of
-inferred behaviour.
+participates in the physics simulation. When complete, tiles marked
+`Collidable` in Tiled will carry `Block` components that DBSP consumes for
+floor detection and collision. This bridges authored map data with the
+declarative physics circuit, keeping DBSP as the sole source of inferred
+behaviour.
 
 ## Progress
 
