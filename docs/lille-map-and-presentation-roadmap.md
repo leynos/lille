@@ -42,26 +42,30 @@ exposes a single entry point for spawning the active isometric map.
 What we will build: Systems that honour Tiled annotations by attaching Lille
 components and feeding static geometry into DBSP precisely once per map load.
 
-- [ ] Task 1.2.1 — Map collision annotations to Wall component
-  - Outcome: A `Wall` component is defined and automatically attached to tile
-    entities whose Tiled custom property marks them as collision geometry.
-  - Completion criteria: Querying loaded maps for `Wall` returns every wall
-    tile and no unrelated tiles.
+- [x] Task 1.2.1 — Map collision annotations to Block component
+  - Outcome: `Block` components are automatically attached to tile entities
+    whose Tiled custom property marks them as collision geometry.
+  - Completion criteria: Querying loaded maps for `Block` returns every
+    collidable tile and no unrelated tiles.
   - Dependencies: Task 1.1.3.
-- [ ] Task 1.2.2 — Attach physics blocks via Tiled events
+- [x] Task 1.2.2 — Attach physics blocks via Tiled events (superseded)
   - Outcome: Systems listening to `TiledEvent<ObjectCreated>`
     or `TiledEvent<LayerCreated>` compute `Block` identifiers and insert
     `Block` components on relevant entities after spawn.
   - Completion criteria: Each wall entity gains a stable `Block` with
     coordinates and identifier derived from its tile position.
   - Dependencies: Task 1.2.1.
-- [ ] Task 1.2.3 — Feed static geometry to DBSP
+  - Note: Superseded by Task 1.2.1 which already uses `TiledEvent<MapCreated>`
+    to trigger block attachment.
+- [x] Task 1.2.3 — Feed static geometry to DBSP (already satisfied)
   - Outcome: A one-shot system reacting to `TiledEvent<MapCreated>` gathers all
     `Block` (and later `BlockSlope`) records and pushes them into the DBSP
     `block_in` and `block_slope_in` streams.
   - Completion criteria: DBSP physics receives block data matching the loaded
-    map, confirmed via logging or debug visualisation.
+    map, confirmed via logging or debug visualization.
   - Dependencies: Task 1.2.2.
+  - Note: Already satisfied by existing DBSP input system in
+    `src/dbsp_sync/input/sync.rs` which queries `Block` components each tick.
 - [ ] Task 1.2.4 — Support slope metadata for terrain
   - Outcome: Tiles flagged with slope information in Tiled produce
     `BlockSlope` components linked to their parent `Block` identifiers.
