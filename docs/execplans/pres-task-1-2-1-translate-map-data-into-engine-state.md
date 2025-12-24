@@ -191,7 +191,7 @@ pub fn attach_collision_blocks(
 )
 ```
 
-Depends on:
+This system depends on:
 
 - `bevy_ecs_tiled::prelude::TiledEvent`, `MapCreated`
 - `bevy_ecs_tilemap::tiles::TilePos`

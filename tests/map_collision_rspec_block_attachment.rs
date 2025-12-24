@@ -185,9 +185,12 @@ fn map_plugin_attaches_blocks_to_collidable_tiles() {
         |scenario: &mut Scenario<BlockAttachmentFixture>| {
             scenario.when("the app ticks until blocks are attached", |ctx| {
                 ctx.before_each(|state| {
+                    let attached = state.tick_until_blocks_attached(MAX_LOAD_TICKS);
+                    let map_errors = state.captured_map_errors();
                     assert!(
-                        state.tick_until_blocks_attached(MAX_LOAD_TICKS),
-                        "expected blocks to be attached within {MAX_LOAD_TICKS} ticks"
+                        attached,
+                        "expected blocks to be attached within {MAX_LOAD_TICKS} ticks; \
+                         map errors: {map_errors:?}"
                     );
                 });
 
