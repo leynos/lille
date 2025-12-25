@@ -83,16 +83,16 @@ pub fn attach_collision_blocks(
             z: 0,
         };
 
-        commands.entity(entity).insert(block.clone());
-
-        // Attach BlockSlope if the tile has slope metadata from Tiled.
+        // Attach BlockSlope alongside Block when slope metadata is present.
         if let Some(slope_props) = slope_properties {
             let block_slope = BlockSlope {
                 block_id: block.id,
                 grad_x: OrderedFloat(f64::from(slope_props.grad_x)),
                 grad_y: OrderedFloat(f64::from(slope_props.grad_y)),
             };
-            commands.entity(entity).insert(block_slope);
+            commands.entity(entity).insert((block, block_slope));
+        } else {
+            commands.entity(entity).insert(block);
         }
 
         *block_id_counter += 1;

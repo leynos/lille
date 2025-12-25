@@ -7,7 +7,8 @@ be kept up to date as work proceeds.
 ## Purpose / Big Picture
 
 Extend the map translation system to attach `BlockSlope` components to tiles
-that carry `SlopeProperties` metadata from Tiled. This enables the DBSP physics
+that carry `SlopeProperties` metadata from Tiled. This enables the Differential
+Dataflow-Based Stream Processing (DBSP) physics
 circuit to calculate gradient-adjusted floor heights for sloped terrain,
 providing smooth movement on inclines. When complete, sloped tiles expose
 gradient data that DBSP consumes, enabling terrain-aware physics without
@@ -90,7 +91,7 @@ Data flow after this task:
 
 ```text
 Tiled (.tmx) -> bevy_ecs_tiled hydrates SlopeProperties
-             -> our system attaches BlockSlope (and Block)
+             -> map translation system attaches BlockSlope (and Block)
              -> DBSP input system pushes to block_slope_in()
              -> floor_height_stream applies gradient adjustment
              -> physics circuit computes sloped floor heights
