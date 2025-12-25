@@ -7,11 +7,11 @@
     doc = "Behavioural tests require `test-support`."
 )]
 #![cfg(feature = "test-support")]
-//! Behavioural test: `Block` and `BlockSlope` components are attached to tiles.
+//! Behavioural tests: `Block` and `BlockSlope` components are attached to tiles.
 //!
-//! This file contains a single test because it ticks the Bevy app under
-//! `--all-features`, which initializes a render device and uses process-global
-//! renderer state.
+//! These tests tick the Bevy app under `--all-features`, which initializes a
+//! render device and uses process-global renderer state. The rspec runner
+//! serializes execution to avoid conflicts.
 
 #[path = "support/map_test_plugins.rs"]
 mod map_test_plugins;
@@ -224,10 +224,6 @@ impl BlockAttachmentFixture {
 }
 
 #[test]
-#[expect(
-    clippy::too_many_lines,
-    reason = "rspec-style tests with before_each and multiple then clauses are inherently verbose"
-)]
 fn map_plugin_attaches_blocks_to_collidable_tiles() {
     let fixture = BlockAttachmentFixture::bootstrap();
 
@@ -298,8 +294,29 @@ fn map_plugin_attaches_blocks_to_collidable_tiles() {
                 ctx.then("no map errors are emitted", |state| {
                     assert!(state.captured_map_errors().is_empty());
                 });
+            });
+        },
+    ));
+}
 
-                // --- BlockSlope assertions ---
+#[test]
+fn map_plugin_attaches_block_slopes_to_sloped_tiles() {
+    let fixture = BlockAttachmentFixture::bootstrap();
+
+    run_serial(&rspec::given(
+        "LilleMapPlugin attaches BlockSlope to sloped tiles",
+        fixture,
+        |scenario: &mut Scenario<BlockAttachmentFixture>| {
+            scenario.when("the app ticks until blocks are attached", |ctx| {
+                ctx.before_each(|state| {
+                    let attached = state.tick_until_blocks_attached(MAX_LOAD_TICKS);
+                    let map_errors = state.captured_map_errors();
+                    assert!(
+                        attached,
+                        "expected blocks to be attached within {MAX_LOAD_TICKS} ticks; \
+                         map errors: {map_errors:?}"
+                    );
+                });
 
                 ctx.then("sloped tiles receive BlockSlope components", |state| {
                     assert_eq!(
@@ -344,7 +361,7 @@ fn map_plugin_attaches_blocks_to_collidable_tiles() {
                 });
 
                 ctx.then("slope gradients match fixture values", |state| {
-                    // The fixture map has grad_x=0.25, grad_y=0.5 on all tiles.
+                    // The fixture map has `grad_x=0.25`, `grad_y=0.5` on all tiles.
                     assert!(
                         state.all_slopes_have_expected_gradients(0.25, 0.5),
                         "gradients should match fixture values (0.25, 0.5)"
