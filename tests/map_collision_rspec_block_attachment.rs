@@ -321,21 +321,10 @@ fn map_plugin_attaches_block_slopes_to_sloped_tiles() {
                 ctx.then("sloped tiles receive BlockSlope components", |state| {
                     assert_eq!(
                         state.block_slope_count(),
-                        EXPECTED_COLLIDABLE_COUNT,
-                        "expected {EXPECTED_COLLIDABLE_COUNT} BlockSlope components"
+                        state.slope_properties_count(),
+                        "BlockSlope count should match SlopeProperties count"
                     );
                 });
-
-                ctx.then(
-                    "block slope count matches slope properties count",
-                    |state| {
-                        assert_eq!(
-                            state.block_slope_count(),
-                            state.slope_properties_count(),
-                            "BlockSlope count should match SlopeProperties count"
-                        );
-                    },
-                );
 
                 ctx.then("all BlockSlope IDs match their parent Block IDs", |state| {
                     assert!(

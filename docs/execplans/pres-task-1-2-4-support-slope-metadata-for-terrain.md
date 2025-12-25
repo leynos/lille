@@ -21,7 +21,7 @@ breaking maps that contain no slopes.
 - [x] Add rstest unit tests for slope attachment logic.
 - [x] Add rust-rspec behavioural tests for slope property hydration.
 - [x] Update roadmap to mark Task 1.2.4 complete.
-- [ ] Run validation commands and capture evidence.
+- [x] Run validation commands and capture evidence.
 
 ## Surprises & Discoveries
 
@@ -64,9 +64,9 @@ these slopes for gradient-adjusted floor height calculations.
 
 - 6 new rstest unit tests covering BlockSlope attachment, gradient conversion,
   ID linkage, and parameterised gradient values.
-- 6 new rust-rspec behavioural assertions confirming slope attachment,
-  gradient values matching fixture (0.25, 0.5), and ID linkage.
-- Validation pending: `make check-fmt`, `make lint`, `make test`.
+- 5 rust-rspec behavioural assertions confirming slope attachment, gradient
+  values matching fixture (0.25, 0.5), and ID linkage (consolidated from 6).
+- Validation complete: `make check-fmt`, `make lint`, `make test` all pass.
 
 **Notes for future work:**
 

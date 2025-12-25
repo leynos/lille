@@ -61,12 +61,12 @@ pub fn attach_collision_blocks(
     mut block_id_counter: Local<i64>,
 ) {
     // Only process when a map has just finished loading.
-    if map_events.read().next().is_none() {
+    let mut events = map_events.read();
+    if events.next().is_none() {
         return;
     }
-
-    // Drain all remaining events (supports multiple maps, though unusual).
-    map_events.read().for_each(drop);
+    // Drain remaining events (supports multiple maps, though unusual).
+    events.for_each(drop);
 
     for (entity, tile_pos, slope_properties) in &collidable_tiles {
         // TilePos uses u32 for grid coordinates. For typical map sizes (well
