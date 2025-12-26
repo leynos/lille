@@ -39,6 +39,16 @@ fn spawn_non_collidable_tile(world: &mut World, x: u32, y: u32) -> Entity {
     world.spawn(TilePos { x, y }).id()
 }
 
+/// Spawns a tile entity with `SlopeProperties` and `TilePos` but no `Collidable`.
+fn spawn_sloped_non_collidable_tile(
+    world: &mut World,
+    x: u32,
+    y: u32,
+    slope: SlopeProperties,
+) -> Entity {
+    world.spawn((TilePos { x, y }, slope)).id()
+}
+
 /// Spawns a tile entity with `Collidable`, `TilePos`, and `SlopeProperties`.
 fn spawn_sloped_collidable_tile(
     world: &mut World,
@@ -83,6 +93,27 @@ fn does_not_attach_block_to_non_collidable_entity(mut test_app: App) {
     assert!(
         test_app.world().get::<Block>(entity).is_none(),
         "non-collidable entities should not receive Block"
+    );
+}
+
+#[rstest]
+fn does_not_attach_block_or_slope_to_sloped_non_collidable_entity(mut test_app: App) {
+    let slope = SlopeProperties {
+        grad_x: 0.25,
+        grad_y: 0.5,
+    };
+    let entity = spawn_sloped_non_collidable_tile(test_app.world_mut(), 3, 7, slope);
+    trigger_map_created(test_app.world_mut());
+
+    test_app.update();
+
+    assert!(
+        test_app.world().get::<Block>(entity).is_none(),
+        "tiles with SlopeProperties but without Collidable should not receive Block"
+    );
+    assert!(
+        test_app.world().get::<BlockSlope>(entity).is_none(),
+        "tiles with SlopeProperties but without Collidable should not receive BlockSlope"
     );
 }
 
