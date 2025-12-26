@@ -1,17 +1,17 @@
 #![cfg_attr(
     feature = "test-support",
-    doc = "Behavioural tests for Block attachment to Collidable tiles using rust-rspec."
+    doc = "Behavioural tests for Block and `BlockSlope` attachment using rust-rspec."
 )]
 #![cfg_attr(
     not(feature = "test-support"),
     doc = "Behavioural tests require `test-support`."
 )]
 #![cfg(feature = "test-support")]
-//! Behavioural test: `Block` components are attached to `Collidable` tiles.
+//! Behavioural tests: `Block` and `BlockSlope` components are attached to tiles.
 //!
-//! This file contains a single test because it ticks the Bevy app under
-//! `--all-features`, which initializes a render device and uses process-global
-//! renderer state.
+//! These tests tick the Bevy app under `--all-features`, which initializes a
+//! render device and uses process-global renderer state. The rspec runner
+//! serializes execution to avoid conflicts.
 
 #[path = "support/map_test_plugins.rs"]
 mod map_test_plugins;
@@ -29,8 +29,8 @@ use std::sync::MutexGuard;
 
 use bevy::prelude::*;
 use bevy_ecs_tiled::prelude::TilePos;
-use lille::components::Block;
-use lille::map::{Collidable, LilleMapError, LilleMapSettings, MapAssetPath};
+use lille::components::{Block, BlockSlope};
+use lille::map::{Collidable, LilleMapError, LilleMapSettings, MapAssetPath, SlopeProperties};
 use lille::{DbspPlugin, LilleMapPlugin};
 use map_test_plugins::CapturedMapErrors;
 use rspec::block::Context as Scenario;
@@ -41,6 +41,7 @@ const CUSTOM_PROPERTIES_MAP_PATH: &str = "maps/primary-isometric-custom-properti
 const MAX_LOAD_TICKS: usize = 100;
 
 /// The fixture map uses a 2x2 tile grid; every tile carries `Collidable`.
+/// All tiles also have `SlopeProperties` with `grad_x=0.25` and `grad_y=0.5`.
 const EXPECTED_COLLIDABLE_COUNT: usize = 4;
 
 #[derive(Debug, Clone)]
@@ -173,6 +174,53 @@ impl BlockAttachmentFixture {
             .iter()
             .all(|(tx, ty)| blocks.contains(&(*tx as i32, *ty as i32)))
     }
+
+    // --- BlockSlope query methods ---
+
+    fn block_slope_count(&self) -> usize {
+        let mut app = self.app_guard();
+        let world = app.world_mut();
+        let mut query = world.query::<&BlockSlope>();
+        query.iter(world).count()
+    }
+
+    fn blocks_with_slopes_count(&self) -> usize {
+        let mut app = self.app_guard();
+        let world = app.world_mut();
+        let mut query = world.query::<(&Block, &BlockSlope)>();
+        query.iter(world).count()
+    }
+
+    fn slopes_without_blocks_count(&self) -> usize {
+        let mut app = self.app_guard();
+        let world = app.world_mut();
+        let mut query = world.query_filtered::<&BlockSlope, Without<Block>>();
+        query.iter(world).count()
+    }
+
+    fn slope_properties_count(&self) -> usize {
+        let mut app = self.app_guard();
+        let world = app.world_mut();
+        let mut query = world.query::<&SlopeProperties>();
+        query.iter(world).count()
+    }
+
+    fn block_slope_ids_match_block_ids(&self) -> bool {
+        let mut app = self.app_guard();
+        let world = app.world_mut();
+        let mut query = world.query::<(&Block, &BlockSlope)>();
+        query.iter(world).all(|(b, s)| b.id == s.block_id)
+    }
+
+    fn all_slopes_have_expected_gradients(&self, expected_x: f64, expected_y: f64) -> bool {
+        let mut app = self.app_guard();
+        let world = app.world_mut();
+        let mut query = world.query::<&BlockSlope>();
+        query.iter(world).all(|s| {
+            (s.grad_x.into_inner() - expected_x).abs() < f64::EPSILON
+                && (s.grad_y.into_inner() - expected_y).abs() < f64::EPSILON
+        })
+    }
 }
 
 #[test]
@@ -245,6 +293,68 @@ fn map_plugin_attaches_blocks_to_collidable_tiles() {
 
                 ctx.then("no map errors are emitted", |state| {
                     assert!(state.captured_map_errors().is_empty());
+                });
+            });
+        },
+    ));
+}
+
+#[test]
+fn map_plugin_attaches_block_slopes_to_sloped_tiles() {
+    let fixture = BlockAttachmentFixture::bootstrap();
+
+    run_serial(&rspec::given(
+        "LilleMapPlugin attaches BlockSlope to sloped tiles",
+        fixture,
+        |scenario: &mut Scenario<BlockAttachmentFixture>| {
+            scenario.when("the app ticks until blocks are attached", |ctx| {
+                ctx.before_each(|state| {
+                    let attached = state.tick_until_blocks_attached(MAX_LOAD_TICKS);
+                    let map_errors = state.captured_map_errors();
+                    assert!(
+                        attached,
+                        "expected blocks to be attached within {MAX_LOAD_TICKS} ticks; \
+                         map errors: {map_errors:?}"
+                    );
+                });
+
+                ctx.then("sloped tiles receive BlockSlope components", |state| {
+                    assert_eq!(
+                        state.block_slope_count(),
+                        state.slope_properties_count(),
+                        "BlockSlope count should match SlopeProperties count"
+                    );
+                });
+
+                ctx.then("all BlockSlope IDs match their parent Block IDs", |state| {
+                    assert!(
+                        state.block_slope_ids_match_block_ids(),
+                        "all BlockSlope.block_id values should match Block.id"
+                    );
+                });
+
+                ctx.then("no BlockSlope exists without a Block", |state| {
+                    assert_eq!(
+                        state.slopes_without_blocks_count(),
+                        0,
+                        "no BlockSlope should exist without a matching Block"
+                    );
+                });
+
+                ctx.then("all slopes have blocks", |state| {
+                    assert_eq!(
+                        state.blocks_with_slopes_count(),
+                        state.block_slope_count(),
+                        "all BlockSlopes should be paired with Blocks"
+                    );
+                });
+
+                ctx.then("slope gradients match fixture values", |state| {
+                    // The fixture map has `grad_x=0.25`, `grad_y=0.5` on all tiles.
+                    assert!(
+                        state.all_slopes_have_expected_gradients(0.25, 0.5),
+                        "gradients should match fixture values (0.25, 0.5)"
+                    );
                 });
             });
         },
