@@ -64,7 +64,7 @@ these slopes for gradient-adjusted floor height calculations.
 **Evidence:**
 
 - 6 new rstest unit tests covering BlockSlope attachment, gradient conversion,
-  ID linkage, and parameterised gradient values.
+  ID linkage, and parameterized gradient values.
 - 5 rust-rspec behavioural assertions confirming slope attachment, gradient
   values matching fixture (0.25, 0.5), and ID linkage (consolidated from 6).
 - Validation complete: `make check-fmt`, `make lint`, `make test` all pass.
@@ -101,7 +101,7 @@ Key dependencies:
 
 - `SlopeProperties` component defined in `src/map/mod.rs`
 - `BlockSlope` component defined in `src/components.rs`
-- `ordered_float::OrderedFloat` for DBSP-compatible floating point
+- `ordered_float::OrderedFloat` for DBSP-compatible floating-point
 - Test map with slope data:
   `assets/maps/primary-isometric-custom-properties.tmx`
 
@@ -131,12 +131,12 @@ contains no slopes."
    - Test: `attaches_block_slope_to_sloped_entity`
    - Test: `does_not_attach_block_slope_when_no_slope_properties`
    - Test: `block_slope_id_matches_block_id`
-   - Test: `block_slope_gradients_converted_correctly` (parameterised)
+   - Test: `block_slope_gradients_converted_correctly` (parameterized)
    - Test: `multiple_sloped_tiles_have_unique_block_ids`
 
 3. Add to `tests/map_collision_rspec_block_attachment.rs`:
    - Helper methods: `block_slope_count`, `blocks_with_slopes_count`, etc.
-   - Assertions for slope attachment, ID linkage, gradient values
+   - Assertions for slope attachment, ID linkage, gradient values.
 
 4. Update `docs/lille-map-and-presentation-roadmap.md`:
    - Mark `[x] Task 1.2.4`
