@@ -31,7 +31,8 @@ use super::streams::{
 };
 use super::types::{
     DamageEvent, FearLevel, FloorHeightAt, Force, HealthDelta, HealthState, HighestBlockAt,
-    NewPosition, NewVelocity, Position, Target, Tick, Velocity,
+    NewPosition, NewVelocity, PlayerSpawnLocation, Position, SpawnPointRecord, Target, Tick,
+    Velocity,
 };
 
 /// Authoritative DBSP dataflow for Lille's world simulation.
@@ -78,6 +79,8 @@ pub struct DbspCircuit {
     damage_in: ZSetHandle<DamageEvent>,
     block_in: ZSetHandle<Block>,
     block_slope_in: ZSetHandle<BlockSlope>,
+    player_spawn_in: ZSetHandle<PlayerSpawnLocation>,
+    spawn_point_in: ZSetHandle<SpawnPointRecord>,
     new_position_out: OutputHandle<OrdZSet<NewPosition>>,
     new_velocity_out: OutputHandle<OrdZSet<NewVelocity>>,
     highest_block_out: OutputHandle<OrdZSet<HighestBlockAt>>,
@@ -96,6 +99,8 @@ struct BuildHandles {
     damage_in: ZSetHandle<DamageEvent>,
     block_in: ZSetHandle<Block>,
     block_slope_in: ZSetHandle<BlockSlope>,
+    player_spawn_in: ZSetHandle<PlayerSpawnLocation>,
+    spawn_point_in: ZSetHandle<SpawnPointRecord>,
     new_position_out: OutputHandle<OrdZSet<NewPosition>>,
     new_velocity_out: OutputHandle<OrdZSet<NewVelocity>>,
     highest_block_out: OutputHandle<OrdZSet<HighestBlockAt>>,
@@ -141,6 +146,8 @@ impl DbspCircuit {
             damage_in: handles.damage_in,
             block_in: handles.block_in,
             block_slope_in: handles.block_slope_in,
+            player_spawn_in: handles.player_spawn_in,
+            spawn_point_in: handles.spawn_point_in,
             new_position_out: handles.new_position_out,
             new_velocity_out: handles.new_velocity_out,
             highest_block_out: handles.highest_block_out,
@@ -188,6 +195,8 @@ impl DbspCircuit {
         let (damage_events, damage_in) = circuit.add_input_zset::<DamageEvent>();
         let (blocks, block_in) = circuit.add_input_zset::<Block>();
         let (slopes, block_slope_in) = circuit.add_input_zset::<BlockSlope>();
+        let (_player_spawns, player_spawn_in) = circuit.add_input_zset::<PlayerSpawnLocation>();
+        let (_spawn_points, spawn_point_in) = circuit.add_input_zset::<SpawnPointRecord>();
 
         let tick_source = circuit.add_source(Generator::new({
             let mut tick: Tick = 0;
@@ -244,6 +253,8 @@ impl DbspCircuit {
             damage_in,
             block_in,
             block_slope_in,
+            player_spawn_in,
+            spawn_point_in,
             new_position_out: moved_pos.output(),
             new_velocity_out: new_vel.output(),
             highest_block_out: highest.output(),
@@ -298,6 +309,16 @@ impl DbspCircuit {
         &self.block_slope_in
     }
 
+    /// Returns a reference to the input handle for player spawn locations.
+    pub const fn player_spawn_in(&self) -> &ZSetHandle<PlayerSpawnLocation> {
+        &self.player_spawn_in
+    }
+
+    /// Returns a reference to the input handle for NPC spawn points.
+    pub const fn spawn_point_in(&self) -> &ZSetHandle<SpawnPointRecord> {
+        &self.spawn_point_in
+    }
+
     /// Returns a reference to the output handle for newly computed entity positions.
     pub const fn new_position_out(&self) -> &OutputHandle<OrdZSet<NewPosition>> {
         &self.new_position_out
@@ -339,5 +360,7 @@ impl DbspCircuit {
         self.damage_in.clear_input();
         self.block_in.clear_input();
         self.block_slope_in.clear_input();
+        self.player_spawn_in.clear_input();
+        self.spawn_point_in.clear_input();
     }
 }

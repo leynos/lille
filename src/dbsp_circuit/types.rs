@@ -275,3 +275,76 @@ crate::dbsp_copy_record! {
         pub dy: OrderedFloat<f64>,
     }
 }
+
+crate::dbsp_copy_record! {
+    /// Player spawn location for the DBSP circuit.
+    ///
+    /// Contains world-space coordinates of the spawn point derived from the
+    /// entity's `Transform` component. The circuit can use this to query floor
+    /// heights at spawn locations or to trigger spawn logic.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use ordered_float::OrderedFloat;
+    ///
+    /// use lille::dbsp_circuit::PlayerSpawnLocation;
+    ///
+    /// let spawn = PlayerSpawnLocation {
+    ///     id: 42,
+    ///     x: OrderedFloat(10.5),
+    ///     y: OrderedFloat(20.5),
+    ///     z: OrderedFloat(0.0),
+    /// };
+    /// assert_eq!(spawn.id, 42);
+    /// ```
+    pub struct PlayerSpawnLocation {
+        /// Unique identifier derived from Bevy Entity bits.
+        pub id: i64,
+        /// World-space X coordinate.
+        pub x: OrderedFloat<f64>,
+        /// World-space Y coordinate.
+        pub y: OrderedFloat<f64>,
+        /// World-space Z coordinate.
+        pub z: OrderedFloat<f64>,
+    }
+}
+
+crate::dbsp_copy_record! {
+    /// NPC spawn point for the DBSP circuit.
+    ///
+    /// Contains world-space coordinates and spawn configuration. The circuit
+    /// uses this to query floor heights at spawn locations and to provide spawn
+    /// metadata for entity creation systems.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use ordered_float::OrderedFloat;
+    ///
+    /// use lille::dbsp_circuit::SpawnPointRecord;
+    ///
+    /// let spawn = SpawnPointRecord {
+    ///     id: 1,
+    ///     x: OrderedFloat(5.0),
+    ///     y: OrderedFloat(10.0),
+    ///     z: OrderedFloat(0.0),
+    ///     enemy_type: 3,
+    ///     respawn: true,
+    /// };
+    /// assert!(spawn.respawn);
+    /// assert_eq!(spawn.enemy_type, 3);
+    /// ```
+    pub struct SpawnPointRecord {
+        /// Unique identifier derived from Bevy Entity bits.
+        pub id: i64,
+        /// World-space X coordinate.
+        pub x: OrderedFloat<f64>,
+        /// World-space Y coordinate.
+        pub y: OrderedFloat<f64>,
+        /// World-space Z coordinate.
+        pub z: OrderedFloat<f64>,
+        /// Enemy type identifier for archetype lookup.
+        pub enemy_type: u32,
+        /// Whether this spawn point respawns after use.
+        pub respawn: bool,
+    }
+}

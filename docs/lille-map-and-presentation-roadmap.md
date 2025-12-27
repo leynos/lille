@@ -79,7 +79,7 @@ What we will build: Event-driven systems that interpret Tiled object layers as
 spawn locations and gameplay markers, ensuring Lille entities are created at
 authored positions.
 
-- [ ] Task 1.3.1 — Define PlayerSpawn and spawn point components
+- [x] Task 1.3.1 — Define PlayerSpawn and spawn point components
   - Outcome: Typed components such as `PlayerSpawn` and `SpawnPoint` (with
     enemy metadata) are added, registered, and serialised from Tiled classes.
   - Completion criteria: Loading a map with these objects results in ECS

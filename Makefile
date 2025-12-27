@@ -1,4 +1,4 @@
-.PHONY: all clean build fmt check-fmt test test-observers-v1 lint build-support-run markdownlint nixie
+.PHONY: all clean build fmt check-fmt test test-observers-v1 lint build-support-run markdownlint nixie typecheck
 
 .ONESHELL:
 SHELL := bash
@@ -24,6 +24,9 @@ test:
 
 test-observers-v1:
 	$(RUST_FLAGS_ENV) cargo test --features "test-support observers-v1-spike"
+
+typecheck:
+	$(RUST_FLAGS_ENV) cargo check $(WORKSPACE_PACKAGES)
 
 fmt:
 	cargo fmt $(WORKSPACE_PACKAGES)
