@@ -8,11 +8,11 @@ be kept up to date as work proceeds.
 
 Extend the map translation system to attach `BlockSlope` components to tiles
 that carry `SlopeProperties` metadata from Tiled. This enables the Differential
-Dataflow-Based Stream Processing (DBSP) physics
-circuit to calculate gradient-adjusted floor heights for sloped terrain,
-providing smooth movement on inclines. When complete, sloped tiles expose
-gradient data that DBSP consumes, enabling terrain-aware physics without
-breaking maps that contain no slopes.
+Dataflow-Based Stream Processing (DBSP) physics circuit to calculate
+gradient-adjusted floor heights for sloped terrain, providing smooth movement
+on inclines. When complete, sloped tiles expose gradient data that DBSP
+consumes, enabling terrain-aware physics without breaking maps that contain no
+slopes.
 
 ## Progress
 

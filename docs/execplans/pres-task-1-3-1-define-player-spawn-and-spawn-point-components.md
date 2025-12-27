@@ -83,12 +83,12 @@ refactored to:
 
 ## Design Decisions
 
-| Decision | Rationale |
-|----------|-----------|
-| Feed spawns each tick | Consistent with blocks pattern; DBSP clears inputs anyway |
-| Use `entity.to_bits() as i64` for IDs | Guaranteed unique per entity; no counter state needed |
-| No output streams initially | Spawn floor heights can be added later if needed |
-| Conditional compilation | Respects existing `map` feature gate |
+| Decision                              | Rationale                                                 |
+| ------------------------------------- | --------------------------------------------------------- |
+| Feed spawns each tick                 | Consistent with blocks pattern; DBSP clears inputs anyway |
+| Use `entity.to_bits() as i64` for IDs | Guaranteed unique per entity; no counter state needed     |
+| No output streams initially           | Spawn floor heights can be added later if needed          |
+| Conditional compilation               | Respects existing `map` feature gate                      |
 
 ## Files Modified
 
@@ -109,8 +109,8 @@ All quality gates pass:
   - Doc tests for new DBSP types
 
 The existing test suite in `tests/map_plugin_rspec_custom_properties.rs`
-validates the end-to-end flow: Tiled map loading → component hydration →
-DBSP sync (via `app.update()` in the test harness).
+validates the end-to-end flow: Tiled map loading → component hydration → DBSP
+sync (via `app.update()` in the test harness).
 
 ## Completion Criteria
 
