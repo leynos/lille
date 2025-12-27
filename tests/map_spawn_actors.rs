@@ -74,14 +74,75 @@ fn find_npcs(world: &mut World) -> Vec<Entity> {
     query.iter(world).collect()
 }
 
+/// Triggers the spawn system by sending a `MapCreated` event and updating the app.
+fn execute_spawn_system(app: &mut App) {
+    trigger_map_created(app.world_mut());
+    app.update();
+}
+
+/// Asserts that a transform's translation matches the expected position.
+fn assert_position_matches(transform: &Transform, expected: Vec3, entity_name: &str) {
+    assert!(
+        (transform.translation.x - expected.x).abs() < f32::EPSILON,
+        "{entity_name} x position should match spawn point"
+    );
+    assert!(
+        (transform.translation.y - expected.y).abs() < f32::EPSILON,
+        "{entity_name} y position should match spawn point"
+    );
+    assert!(
+        (transform.translation.z - expected.z).abs() < f32::EPSILON,
+        "{entity_name} z position should match spawn point"
+    );
+}
+
+/// Asserts that an entity has all required actor components.
+fn assert_has_actor_components(world: &World, entity: Entity, entity_name: &str) {
+    assert!(
+        world.get::<MapSpawned>(entity).is_some(),
+        "{entity_name} should have MapSpawned marker"
+    );
+    assert!(
+        world.get::<DdlogId>(entity).is_some(),
+        "{entity_name} should have DdlogId for DBSP sync"
+    );
+    assert!(
+        world.get::<Health>(entity).is_some(),
+        "{entity_name} should have Health"
+    );
+    assert!(
+        world.get::<VelocityComp>(entity).is_some(),
+        "{entity_name} should have VelocityComp"
+    );
+    assert!(
+        world.get::<Name>(entity).is_some(),
+        "{entity_name} should have Name"
+    );
+}
+
+/// Asserts that a spawn point entity has been marked as consumed.
+fn assert_spawn_consumed<T: Component>(world: &World, entity: Entity, marker_name: &str) {
+    assert!(
+        world.get::<T>(entity).is_some(),
+        "{marker_name} should be marked as consumed"
+    );
+}
+
+/// Asserts that a spawn point entity has NOT been marked as consumed.
+fn assert_spawn_not_consumed<T: Component>(world: &World, entity: Entity, marker_name: &str) {
+    assert!(
+        world.get::<T>(entity).is_none(),
+        "{marker_name} should NOT be marked as consumed"
+    );
+}
+
 // --- Player spawning tests ---
 
 #[rstest]
 fn spawns_player_at_player_spawn_location(mut test_app: App) {
-    spawn_player_spawn_point(test_app.world_mut(), Vec3::new(100.0, 200.0, 5.0));
-    trigger_map_created(test_app.world_mut());
-
-    test_app.update();
+    let expected_position = Vec3::new(100.0, 200.0, 5.0);
+    spawn_player_spawn_point(test_app.world_mut(), expected_position);
+    execute_spawn_system(&mut test_app);
 
     let player_entity =
         find_player(test_app.world_mut()).expect("expected Player entity to be spawned");
@@ -90,26 +151,13 @@ fn spawns_player_at_player_spawn_location(mut test_app: App) {
         .get::<Transform>(player_entity)
         .expect("player should have Transform");
 
-    assert!(
-        (transform.translation.x - 100.0).abs() < f32::EPSILON,
-        "player x position should match spawn point"
-    );
-    assert!(
-        (transform.translation.y - 200.0).abs() < f32::EPSILON,
-        "player y position should match spawn point"
-    );
-    assert!(
-        (transform.translation.z - 5.0).abs() < f32::EPSILON,
-        "player z position should match spawn point"
-    );
+    assert_position_matches(transform, expected_position, "player");
 }
 
 #[rstest]
 fn spawned_player_has_required_components(mut test_app: App) {
     spawn_player_spawn_point(test_app.world_mut(), Vec3::ZERO);
-    trigger_map_created(test_app.world_mut());
-
-    test_app.update();
+    execute_spawn_system(&mut test_app);
 
     let player_entity = find_player(test_app.world_mut()).expect("expected Player entity");
 
@@ -117,59 +165,31 @@ fn spawned_player_has_required_components(mut test_app: App) {
         test_app.world().get::<Player>(player_entity).is_some(),
         "player should have Player marker"
     );
-    assert!(
-        test_app.world().get::<MapSpawned>(player_entity).is_some(),
-        "player should have MapSpawned marker"
-    );
-    assert!(
-        test_app.world().get::<DdlogId>(player_entity).is_some(),
-        "player should have DdlogId for DBSP sync"
-    );
-    assert!(
-        test_app.world().get::<Health>(player_entity).is_some(),
-        "player should have Health"
-    );
-    assert!(
-        test_app
-            .world()
-            .get::<VelocityComp>(player_entity)
-            .is_some(),
-        "player should have VelocityComp"
-    );
-    assert!(
-        test_app.world().get::<Name>(player_entity).is_some(),
-        "player should have Name"
-    );
+    assert_has_actor_components(test_app.world(), player_entity, "player");
 }
 
 #[rstest]
 fn player_spawn_is_marked_consumed(mut test_app: App) {
     let spawn_entity = spawn_player_spawn_point(test_app.world_mut(), Vec3::new(50.0, 75.0, 0.0));
-    trigger_map_created(test_app.world_mut());
+    execute_spawn_system(&mut test_app);
 
-    test_app.update();
-
-    assert!(
-        test_app
-            .world()
-            .get::<PlayerSpawnConsumed>(spawn_entity)
-            .is_some(),
-        "PlayerSpawn entity should be marked as consumed"
+    assert_spawn_consumed::<PlayerSpawnConsumed>(
+        test_app.world(),
+        spawn_entity,
+        "PlayerSpawn entity",
     );
 }
 
 #[rstest]
 fn does_not_spawn_player_at_consumed_spawn(mut test_app: App) {
     let spawn_entity = spawn_player_spawn_point(test_app.world_mut(), Vec3::new(100.0, 100.0, 0.0));
-    trigger_map_created(test_app.world_mut());
-    test_app.update();
+    execute_spawn_system(&mut test_app);
 
     // Verify first player exists.
     let first_player = find_player(test_app.world_mut()).expect("first player should be spawned");
 
     // Trigger another map created event.
-    trigger_map_created(test_app.world_mut());
-    test_app.update();
+    execute_spawn_system(&mut test_app);
 
     // Player should still be the same, and spawn point should still be consumed.
     let second_player = find_player(test_app.world_mut()).expect("player should still exist");
@@ -177,13 +197,7 @@ fn does_not_spawn_player_at_consumed_spawn(mut test_app: App) {
         first_player, second_player,
         "should not spawn a second player"
     );
-    assert!(
-        test_app
-            .world()
-            .get::<PlayerSpawnConsumed>(spawn_entity)
-            .is_some(),
-        "spawn point should remain consumed"
-    );
+    assert_spawn_consumed::<PlayerSpawnConsumed>(test_app.world(), spawn_entity, "spawn point");
 }
 
 #[rstest]
@@ -193,8 +207,7 @@ fn only_uses_first_player_spawn_when_multiple_exist(mut test_app: App) {
     spawn_player_spawn_point(test_app.world_mut(), Vec3::new(30.0, 40.0, 0.0));
     spawn_player_spawn_point(test_app.world_mut(), Vec3::new(50.0, 60.0, 0.0));
 
-    trigger_map_created(test_app.world_mut());
-    test_app.update();
+    execute_spawn_system(&mut test_app);
 
     // Should only spawn one player.
     let mut player_query = test_app
@@ -209,15 +222,9 @@ fn only_uses_first_player_spawn_when_multiple_exist(mut test_app: App) {
 
 #[rstest]
 fn spawns_npc_at_spawn_point_location(mut test_app: App) {
-    spawn_npc_spawn_point(
-        test_app.world_mut(),
-        Vec3::new(150.0, 250.0, 10.0),
-        1,
-        false,
-    );
-    trigger_map_created(test_app.world_mut());
-
-    test_app.update();
+    let expected_position = Vec3::new(150.0, 250.0, 10.0);
+    spawn_npc_spawn_point(test_app.world_mut(), expected_position, 1, false);
+    execute_spawn_system(&mut test_app);
 
     let npcs = find_npcs(test_app.world_mut());
     assert_eq!(npcs.len(), 1, "expected one NPC to be spawned");
@@ -228,63 +235,29 @@ fn spawns_npc_at_spawn_point_location(mut test_app: App) {
         .get::<Transform>(npc)
         .expect("NPC should have Transform");
 
-    assert!(
-        (transform.translation.x - 150.0).abs() < f32::EPSILON,
-        "NPC x position should match spawn point"
-    );
-    assert!(
-        (transform.translation.y - 250.0).abs() < f32::EPSILON,
-        "NPC y position should match spawn point"
-    );
-    assert!(
-        (transform.translation.z - 10.0).abs() < f32::EPSILON,
-        "NPC z position should match spawn point"
-    );
+    assert_position_matches(transform, expected_position, "NPC");
 }
 
 #[rstest]
 fn spawned_npc_has_required_components(mut test_app: App) {
     spawn_npc_spawn_point(test_app.world_mut(), Vec3::ZERO, 3, false);
-    trigger_map_created(test_app.world_mut());
-
-    test_app.update();
+    execute_spawn_system(&mut test_app);
 
     let npcs = find_npcs(test_app.world_mut());
     assert_eq!(npcs.len(), 1, "expected one NPC");
     let npc = *npcs.first().expect("NPC entity should exist");
 
-    assert!(
-        test_app.world().get::<MapSpawned>(npc).is_some(),
-        "NPC should have MapSpawned marker"
-    );
-    assert!(
-        test_app.world().get::<DdlogId>(npc).is_some(),
-        "NPC should have DdlogId for DBSP sync"
-    );
-    assert!(
-        test_app.world().get::<Health>(npc).is_some(),
-        "NPC should have Health"
-    );
-    assert!(
-        test_app.world().get::<VelocityComp>(npc).is_some(),
-        "NPC should have VelocityComp"
-    );
+    assert_has_actor_components(test_app.world(), npc, "NPC");
     assert!(
         test_app.world().get::<UnitType>(npc).is_some(),
         "NPC should have UnitType"
-    );
-    assert!(
-        test_app.world().get::<Name>(npc).is_some(),
-        "NPC should have Name"
     );
 }
 
 #[rstest]
 fn spawned_npc_has_correct_unit_type_for_civvy(mut test_app: App) {
     spawn_npc_spawn_point(test_app.world_mut(), Vec3::ZERO, 0, false);
-    trigger_map_created(test_app.world_mut());
-
-    test_app.update();
+    execute_spawn_system(&mut test_app);
 
     let npcs = find_npcs(test_app.world_mut());
     let npc = *npcs.first().expect("NPC entity should exist");
@@ -302,9 +275,7 @@ fn spawned_npc_has_correct_unit_type_for_civvy(mut test_app: App) {
 #[rstest]
 fn spawned_npc_has_correct_unit_type_for_baddie(mut test_app: App) {
     spawn_npc_spawn_point(test_app.world_mut(), Vec3::ZERO, 3, false);
-    trigger_map_created(test_app.world_mut());
-
-    test_app.update();
+    execute_spawn_system(&mut test_app);
 
     let npcs = find_npcs(test_app.world_mut());
     let npc = *npcs.first().expect("NPC entity should exist");
@@ -322,32 +293,24 @@ fn spawned_npc_has_correct_unit_type_for_baddie(mut test_app: App) {
 #[rstest]
 fn non_respawning_spawn_point_is_marked_consumed(mut test_app: App) {
     let spawn_entity = spawn_npc_spawn_point(test_app.world_mut(), Vec3::ZERO, 1, false);
-    trigger_map_created(test_app.world_mut());
+    execute_spawn_system(&mut test_app);
 
-    test_app.update();
-
-    assert!(
-        test_app
-            .world()
-            .get::<SpawnPointConsumed>(spawn_entity)
-            .is_some(),
-        "non-respawning SpawnPoint should be marked as consumed"
+    assert_spawn_consumed::<SpawnPointConsumed>(
+        test_app.world(),
+        spawn_entity,
+        "non-respawning SpawnPoint",
     );
 }
 
 #[rstest]
 fn respawning_spawn_point_is_not_marked_consumed(mut test_app: App) {
     let spawn_entity = spawn_npc_spawn_point(test_app.world_mut(), Vec3::ZERO, 1, true);
-    trigger_map_created(test_app.world_mut());
+    execute_spawn_system(&mut test_app);
 
-    test_app.update();
-
-    assert!(
-        test_app
-            .world()
-            .get::<SpawnPointConsumed>(spawn_entity)
-            .is_none(),
-        "respawning SpawnPoint should NOT be marked as consumed"
+    assert_spawn_not_consumed::<SpawnPointConsumed>(
+        test_app.world(),
+        spawn_entity,
+        "respawning SpawnPoint",
     );
 }
 
@@ -357,8 +320,7 @@ fn spawns_multiple_npcs_from_multiple_spawn_points(mut test_app: App) {
     spawn_npc_spawn_point(test_app.world_mut(), Vec3::new(20.0, 20.0, 0.0), 1, false);
     spawn_npc_spawn_point(test_app.world_mut(), Vec3::new(30.0, 30.0, 0.0), 8, true);
 
-    trigger_map_created(test_app.world_mut());
-    test_app.update();
+    execute_spawn_system(&mut test_app);
 
     let npcs = find_npcs(test_app.world_mut());
     assert_eq!(npcs.len(), 3, "should spawn three NPCs");
@@ -373,8 +335,7 @@ fn spawned_entities_have_unique_ddlog_ids(mut test_app: App) {
     spawn_npc_spawn_point(test_app.world_mut(), Vec3::new(20.0, 20.0, 0.0), 2, false);
     spawn_npc_spawn_point(test_app.world_mut(), Vec3::new(30.0, 30.0, 0.0), 3, true);
 
-    trigger_map_created(test_app.world_mut());
-    test_app.update();
+    execute_spawn_system(&mut test_app);
 
     let player = find_player(test_app.world_mut()).expect("player should exist");
     let npcs = find_npcs(test_app.world_mut());
@@ -419,16 +380,14 @@ fn spawning_is_idempotent(mut test_app: App) {
     spawn_player_spawn_point(test_app.world_mut(), Vec3::new(50.0, 50.0, 0.0));
     spawn_npc_spawn_point(test_app.world_mut(), Vec3::new(100.0, 100.0, 0.0), 1, false);
 
-    trigger_map_created(test_app.world_mut());
-    test_app.update();
+    execute_spawn_system(&mut test_app);
 
     let first_player = find_player(test_app.world_mut()).expect("player should exist");
     let first_npcs = find_npcs(test_app.world_mut());
     assert_eq!(first_npcs.len(), 1, "should have one NPC");
 
     // Second map created event.
-    trigger_map_created(test_app.world_mut());
-    test_app.update();
+    execute_spawn_system(&mut test_app);
 
     let second_player = find_player(test_app.world_mut()).expect("player should still exist");
     let second_npcs = find_npcs(test_app.world_mut());
