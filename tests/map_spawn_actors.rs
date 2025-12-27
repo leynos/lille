@@ -32,22 +32,16 @@ fn test_app() -> App {
 }
 
 /// Spawns a `PlayerSpawn` marker entity at the given position.
-fn spawn_player_spawn_point(world: &mut World, x: f32, y: f32, z: f32) -> Entity {
+fn spawn_player_spawn_point(world: &mut World, position: Vec3) -> Entity {
     world
-        .spawn((PlayerSpawn, Transform::from_xyz(x, y, z)))
+        .spawn((PlayerSpawn, Transform::from_translation(position)))
         .id()
 }
 
 /// Spawns a `SpawnPoint` marker entity at the given position.
-#[expect(
-    clippy::too_many_arguments,
-    reason = "Test helper needs position, enemy type, and respawn flag; consolidating would obscure test intent."
-)]
 fn spawn_npc_spawn_point(
     world: &mut World,
-    x: f32,
-    y: f32,
-    z: f32,
+    position: Vec3,
     enemy_type: u32,
     respawn: bool,
 ) -> Entity {
@@ -57,7 +51,7 @@ fn spawn_npc_spawn_point(
                 enemy_type,
                 respawn,
             },
-            Transform::from_xyz(x, y, z),
+            Transform::from_translation(position),
         ))
         .id()
 }
@@ -84,7 +78,7 @@ fn find_npcs(world: &mut World) -> Vec<Entity> {
 
 #[rstest]
 fn spawns_player_at_player_spawn_location(mut test_app: App) {
-    spawn_player_spawn_point(test_app.world_mut(), 100.0, 200.0, 5.0);
+    spawn_player_spawn_point(test_app.world_mut(), Vec3::new(100.0, 200.0, 5.0));
     trigger_map_created(test_app.world_mut());
 
     test_app.update();
@@ -112,7 +106,7 @@ fn spawns_player_at_player_spawn_location(mut test_app: App) {
 
 #[rstest]
 fn spawned_player_has_required_components(mut test_app: App) {
-    spawn_player_spawn_point(test_app.world_mut(), 0.0, 0.0, 0.0);
+    spawn_player_spawn_point(test_app.world_mut(), Vec3::ZERO);
     trigger_map_created(test_app.world_mut());
 
     test_app.update();
@@ -150,7 +144,7 @@ fn spawned_player_has_required_components(mut test_app: App) {
 
 #[rstest]
 fn player_spawn_is_marked_consumed(mut test_app: App) {
-    let spawn_entity = spawn_player_spawn_point(test_app.world_mut(), 50.0, 75.0, 0.0);
+    let spawn_entity = spawn_player_spawn_point(test_app.world_mut(), Vec3::new(50.0, 75.0, 0.0));
     trigger_map_created(test_app.world_mut());
 
     test_app.update();
@@ -166,7 +160,7 @@ fn player_spawn_is_marked_consumed(mut test_app: App) {
 
 #[rstest]
 fn does_not_spawn_player_at_consumed_spawn(mut test_app: App) {
-    let spawn_entity = spawn_player_spawn_point(test_app.world_mut(), 100.0, 100.0, 0.0);
+    let spawn_entity = spawn_player_spawn_point(test_app.world_mut(), Vec3::new(100.0, 100.0, 0.0));
     trigger_map_created(test_app.world_mut());
     test_app.update();
 
@@ -195,9 +189,9 @@ fn does_not_spawn_player_at_consumed_spawn(mut test_app: App) {
 #[rstest]
 fn only_uses_first_player_spawn_when_multiple_exist(mut test_app: App) {
     // Spawn multiple PlayerSpawn points.
-    spawn_player_spawn_point(test_app.world_mut(), 10.0, 20.0, 0.0);
-    spawn_player_spawn_point(test_app.world_mut(), 30.0, 40.0, 0.0);
-    spawn_player_spawn_point(test_app.world_mut(), 50.0, 60.0, 0.0);
+    spawn_player_spawn_point(test_app.world_mut(), Vec3::new(10.0, 20.0, 0.0));
+    spawn_player_spawn_point(test_app.world_mut(), Vec3::new(30.0, 40.0, 0.0));
+    spawn_player_spawn_point(test_app.world_mut(), Vec3::new(50.0, 60.0, 0.0));
 
     trigger_map_created(test_app.world_mut());
     test_app.update();
@@ -215,7 +209,12 @@ fn only_uses_first_player_spawn_when_multiple_exist(mut test_app: App) {
 
 #[rstest]
 fn spawns_npc_at_spawn_point_location(mut test_app: App) {
-    spawn_npc_spawn_point(test_app.world_mut(), 150.0, 250.0, 10.0, 1, false);
+    spawn_npc_spawn_point(
+        test_app.world_mut(),
+        Vec3::new(150.0, 250.0, 10.0),
+        1,
+        false,
+    );
     trigger_map_created(test_app.world_mut());
 
     test_app.update();
@@ -245,7 +244,7 @@ fn spawns_npc_at_spawn_point_location(mut test_app: App) {
 
 #[rstest]
 fn spawned_npc_has_required_components(mut test_app: App) {
-    spawn_npc_spawn_point(test_app.world_mut(), 0.0, 0.0, 0.0, 3, false);
+    spawn_npc_spawn_point(test_app.world_mut(), Vec3::ZERO, 3, false);
     trigger_map_created(test_app.world_mut());
 
     test_app.update();
@@ -282,7 +281,7 @@ fn spawned_npc_has_required_components(mut test_app: App) {
 
 #[rstest]
 fn spawned_npc_has_correct_unit_type_for_civvy(mut test_app: App) {
-    spawn_npc_spawn_point(test_app.world_mut(), 0.0, 0.0, 0.0, 0, false);
+    spawn_npc_spawn_point(test_app.world_mut(), Vec3::ZERO, 0, false);
     trigger_map_created(test_app.world_mut());
 
     test_app.update();
@@ -302,7 +301,7 @@ fn spawned_npc_has_correct_unit_type_for_civvy(mut test_app: App) {
 
 #[rstest]
 fn spawned_npc_has_correct_unit_type_for_baddie(mut test_app: App) {
-    spawn_npc_spawn_point(test_app.world_mut(), 0.0, 0.0, 0.0, 3, false);
+    spawn_npc_spawn_point(test_app.world_mut(), Vec3::ZERO, 3, false);
     trigger_map_created(test_app.world_mut());
 
     test_app.update();
@@ -322,7 +321,7 @@ fn spawned_npc_has_correct_unit_type_for_baddie(mut test_app: App) {
 
 #[rstest]
 fn non_respawning_spawn_point_is_marked_consumed(mut test_app: App) {
-    let spawn_entity = spawn_npc_spawn_point(test_app.world_mut(), 0.0, 0.0, 0.0, 1, false);
+    let spawn_entity = spawn_npc_spawn_point(test_app.world_mut(), Vec3::ZERO, 1, false);
     trigger_map_created(test_app.world_mut());
 
     test_app.update();
@@ -338,7 +337,7 @@ fn non_respawning_spawn_point_is_marked_consumed(mut test_app: App) {
 
 #[rstest]
 fn respawning_spawn_point_is_not_marked_consumed(mut test_app: App) {
-    let spawn_entity = spawn_npc_spawn_point(test_app.world_mut(), 0.0, 0.0, 0.0, 1, true);
+    let spawn_entity = spawn_npc_spawn_point(test_app.world_mut(), Vec3::ZERO, 1, true);
     trigger_map_created(test_app.world_mut());
 
     test_app.update();
@@ -354,9 +353,9 @@ fn respawning_spawn_point_is_not_marked_consumed(mut test_app: App) {
 
 #[rstest]
 fn spawns_multiple_npcs_from_multiple_spawn_points(mut test_app: App) {
-    spawn_npc_spawn_point(test_app.world_mut(), 10.0, 10.0, 0.0, 0, false);
-    spawn_npc_spawn_point(test_app.world_mut(), 20.0, 20.0, 0.0, 1, false);
-    spawn_npc_spawn_point(test_app.world_mut(), 30.0, 30.0, 0.0, 8, true);
+    spawn_npc_spawn_point(test_app.world_mut(), Vec3::new(10.0, 10.0, 0.0), 0, false);
+    spawn_npc_spawn_point(test_app.world_mut(), Vec3::new(20.0, 20.0, 0.0), 1, false);
+    spawn_npc_spawn_point(test_app.world_mut(), Vec3::new(30.0, 30.0, 0.0), 8, true);
 
     trigger_map_created(test_app.world_mut());
     test_app.update();
@@ -369,10 +368,10 @@ fn spawns_multiple_npcs_from_multiple_spawn_points(mut test_app: App) {
 
 #[rstest]
 fn spawned_entities_have_unique_ddlog_ids(mut test_app: App) {
-    spawn_player_spawn_point(test_app.world_mut(), 0.0, 0.0, 0.0);
-    spawn_npc_spawn_point(test_app.world_mut(), 10.0, 10.0, 0.0, 1, false);
-    spawn_npc_spawn_point(test_app.world_mut(), 20.0, 20.0, 0.0, 2, false);
-    spawn_npc_spawn_point(test_app.world_mut(), 30.0, 30.0, 0.0, 3, true);
+    spawn_player_spawn_point(test_app.world_mut(), Vec3::ZERO);
+    spawn_npc_spawn_point(test_app.world_mut(), Vec3::new(10.0, 10.0, 0.0), 1, false);
+    spawn_npc_spawn_point(test_app.world_mut(), Vec3::new(20.0, 20.0, 0.0), 2, false);
+    spawn_npc_spawn_point(test_app.world_mut(), Vec3::new(30.0, 30.0, 0.0), 3, true);
 
     trigger_map_created(test_app.world_mut());
     test_app.update();
@@ -417,8 +416,8 @@ fn spawned_entities_have_unique_ddlog_ids(mut test_app: App) {
 
 #[rstest]
 fn spawning_is_idempotent(mut test_app: App) {
-    spawn_player_spawn_point(test_app.world_mut(), 50.0, 50.0, 0.0);
-    spawn_npc_spawn_point(test_app.world_mut(), 100.0, 100.0, 0.0, 1, false);
+    spawn_player_spawn_point(test_app.world_mut(), Vec3::new(50.0, 50.0, 0.0));
+    spawn_npc_spawn_point(test_app.world_mut(), Vec3::new(100.0, 100.0, 0.0), 1, false);
 
     trigger_map_created(test_app.world_mut());
     test_app.update();
