@@ -3,8 +3,13 @@
 use std::convert::TryFrom;
 
 use bevy::prelude::{Entity, Query};
+#[cfg(feature = "map")]
+use bevy::prelude::{Transform, With};
 use dbsp::operator::input::ZSetHandle;
 use log::{debug, warn};
+
+#[cfg(feature = "map")]
+use crate::map::{PlayerSpawn, SpawnPoint};
 
 use crate::components::{
     Block, BlockSlope, DdlogId, ForceComp, Health, Target as TargetComp, VelocityComp,
@@ -273,5 +278,57 @@ pub(super) fn forces(state: &mut DbspState, query: &Query<(Entity, &DdlogId, &Fo
         } else {
             warn!("force component for unknown entity {entity:?} ignored");
         }
+    }
+}
+
+/// Synchronises player spawn locations with the DBSP circuit.
+#[cfg(feature = "map")]
+#[expect(
+    clippy::cast_possible_wrap,
+    reason = "Entity bits fit in i64 for practical entity counts."
+)]
+pub(super) fn player_spawns(
+    circuit: &mut DbspCircuit,
+    query: &Query<(Entity, &Transform), With<PlayerSpawn>>,
+) {
+    use crate::dbsp_circuit::PlayerSpawnLocation;
+
+    for (entity, transform) in query.iter() {
+        circuit.player_spawn_in().push(
+            PlayerSpawnLocation {
+                id: entity.to_bits() as i64,
+                x: f64::from(transform.translation.x).into(),
+                y: f64::from(transform.translation.y).into(),
+                z: f64::from(transform.translation.z).into(),
+            },
+            1,
+        );
+    }
+}
+
+/// Synchronises NPC spawn points with the DBSP circuit.
+#[cfg(feature = "map")]
+#[expect(
+    clippy::cast_possible_wrap,
+    reason = "Entity bits fit in i64 for practical entity counts."
+)]
+pub(super) fn spawn_points(
+    circuit: &mut DbspCircuit,
+    query: &Query<(Entity, &Transform, &SpawnPoint)>,
+) {
+    use crate::dbsp_circuit::SpawnPointRecord;
+
+    for (entity, transform, sp) in query.iter() {
+        circuit.spawn_point_in().push(
+            SpawnPointRecord {
+                id: entity.to_bits() as i64,
+                x: f64::from(transform.translation.x).into(),
+                y: f64::from(transform.translation.y).into(),
+                z: f64::from(transform.translation.z).into(),
+                enemy_type: sp.enemy_type,
+                respawn: sp.respawn,
+            },
+            1,
+        );
     }
 }

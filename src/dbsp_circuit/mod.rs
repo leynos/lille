@@ -24,7 +24,8 @@ pub use streams::{
 };
 pub use types::{
     DamageEvent, DamageSource, EntityId, FearLevel, FloorHeightAt, Force, HealthDelta, HealthState,
-    HighestBlockAt, MovementDecision, NewPosition, NewVelocity, Position, Target, Tick, Velocity,
+    HighestBlockAt, MovementDecision, NewPosition, NewVelocity, PlayerSpawnLocation, Position,
+    SpawnPointRecord, Target, Tick, Velocity,
 };
 
 #[cfg(test)]

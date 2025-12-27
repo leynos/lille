@@ -8,6 +8,8 @@ use crate::components::{
     Block, BlockSlope, DdlogId, ForceComp, Health, Target as TargetComp, VelocityComp,
 };
 use crate::dbsp_circuit::{DamageEvent, DbspCircuit, HealthState};
+#[cfg(feature = "map")]
+use crate::map::{PlayerSpawn, SpawnPoint};
 use crate::world_handle::WorldHandle;
 
 use super::{DamageInbox, DbspState, IdQueries};
@@ -45,6 +47,7 @@ pub fn init_dbsp_system(world: &mut World) -> Result<(), dbsp::Error> {
 /// ensuring the lookup is maintained without rebuilding the map each frame. It
 /// also refreshes the [`WorldHandle`] resource with the same cached data for
 /// tests and diagnostics.
+#[cfg(not(feature = "map"))]
 #[expect(
     clippy::too_many_arguments,
     reason = "System boundary requires multiple Bevy resources."
@@ -58,23 +61,81 @@ pub fn cache_state_for_dbsp_system(
     mut damage_inbox: ResMut<DamageInbox>,
     mut world_handle: ResMut<WorldHandle>,
 ) {
+    cache_state_for_dbsp_impl(
+        &mut state,
+        &mut entity_query,
+        &force_query,
+        &block_query,
+        &mut id_queries,
+        &mut damage_inbox,
+        &mut world_handle,
+    );
+}
+
+/// Caches current ECS state into the DBSP circuit inputs (with map feature).
+///
+/// This variant includes spawn point synchronisation when the `map` feature is
+/// enabled. It gathers `Transform`, optional `Velocity`, `Block`, `PlayerSpawn`,
+/// and `SpawnPoint` components and pushes them into the circuit's input handles.
+#[cfg(feature = "map")]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "System boundary requires multiple Bevy resources."
+)]
+pub fn cache_state_for_dbsp_system(
+    mut state: NonSendMut<DbspState>,
+    mut entity_query: Query<EntityRow<'_>>,
+    force_query: Query<(Entity, &DdlogId, &ForceComp)>,
+    block_query: Query<(&Block, Option<&BlockSlope>)>,
+    player_spawn_query: Query<(Entity, &Transform), With<PlayerSpawn>>,
+    spawn_point_query: Query<(Entity, &Transform, &SpawnPoint)>,
+    mut id_queries: IdQueries,
+    mut damage_inbox: ResMut<DamageInbox>,
+    mut world_handle: ResMut<WorldHandle>,
+) {
+    sync::player_spawns(&mut state.circuit, &player_spawn_query);
+    sync::spawn_points(&mut state.circuit, &spawn_point_query);
+    cache_state_for_dbsp_impl(
+        &mut state,
+        &mut entity_query,
+        &force_query,
+        &block_query,
+        &mut id_queries,
+        &mut damage_inbox,
+        &mut world_handle,
+    );
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Helper coordinates multiple Bevy resources from system boundary."
+)]
+fn cache_state_for_dbsp_impl(
+    state: &mut DbspState,
+    entity_query: &mut Query<EntityRow<'_>>,
+    force_query: &Query<(Entity, &DdlogId, &ForceComp)>,
+    block_query: &Query<(&Block, Option<&BlockSlope>)>,
+    id_queries: &mut IdQueries,
+    damage_inbox: &mut DamageInbox,
+    world_handle: &mut WorldHandle,
+) {
     world_handle.blocks.clear();
     world_handle.slopes.clear();
     world_handle.entities.clear();
 
-    let previous_snapshots = collect_previous_health_snapshots(&mut state);
+    let previous_snapshots = collect_previous_health_snapshots(state);
     let pending_damage = mem::take(&mut state.pending_damage_retractions);
     state.expected_health_retractions.clear();
 
-    sync::blocks(&mut state.circuit, &block_query, world_handle.as_mut());
-    sync::id_maps(&mut state, &mut id_queries);
-    sync::entities(&mut state, &mut entity_query, world_handle.as_mut());
-    sync::forces(&mut state, &force_query);
+    sync::blocks(&mut state.circuit, block_query, world_handle);
+    sync::id_maps(state, id_queries);
+    sync::entities(state, entity_query, world_handle);
+    sync::forces(state, force_query);
 
     apply_health_snapshot_retractions(&mut state.circuit, &previous_snapshots);
-    apply_damage_retractions(&mut state, pending_damage);
+    apply_damage_retractions(state, pending_damage);
 
-    ingest_damage_events(&mut state, damage_inbox.as_mut());
+    ingest_damage_events(state, damage_inbox);
 }
 
 fn collect_previous_health_snapshots(state: &mut DbspState) -> Vec<HealthState> {
