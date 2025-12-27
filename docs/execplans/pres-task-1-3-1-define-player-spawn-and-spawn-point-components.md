@@ -3,8 +3,9 @@
 ## Summary
 
 This task extends the existing `PlayerSpawn` and `SpawnPoint` Bevy components
-with DBSP circuit integration, enabling the circuit to be the source of truth
-for spawn-related behaviour such as floor height queries at spawn locations.
+with Differential Dataflow for Batch and Stream Processing (DBSP) circuit
+integration, enabling the circuit to be the source of truth for spawn-related
+behaviour such as floor height queries at spawn locations.
 
 **Roadmap reference:** Phase 1, Step 1.3, Task 1.3.1
 
@@ -113,8 +114,8 @@ DBSP sync (via `app.update()` in the test harness).
 
 ## Completion Criteria
 
-> Loading a map with these objects results in ECS entities carrying the
-> expected component values.
+> Loading a map with these objects results in Entity Component System (ECS)
+> entities carrying the expected component values.
 
 This criterion is satisfied by:
 

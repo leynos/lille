@@ -281,12 +281,48 @@ pub(super) fn forces(state: &mut DbspState, query: &Query<(Entity, &DdlogId, &Fo
     }
 }
 
+/// Common spawn coordinate data extracted from an entity and its transform.
+///
+/// This helper centralises the entity-to-id conversion and transform-to-coordinate
+/// mapping used by spawn sync functions. The `id` field uses the entity's bit
+/// representation cast to `i64`, which is safe for practical entity counts.
+#[cfg(feature = "map")]
+struct SpawnCoords {
+    id: i64,
+    x: ordered_float::OrderedFloat<f64>,
+    y: ordered_float::OrderedFloat<f64>,
+    z: ordered_float::OrderedFloat<f64>,
+}
+
+#[cfg(feature = "map")]
+impl SpawnCoords {
+    /// Extracts spawn coordinates from an entity and its transform.
+    ///
+    /// # Panics
+    ///
+    /// Debug builds panic if the entity's bit representation exceeds `i64::MAX`,
+    /// which would indicate an unexpectedly large entity count.
+    #[expect(
+        clippy::cast_possible_wrap,
+        reason = "Entity bits fit in i64 for practical entity counts."
+    )]
+    fn from_entity_transform(entity: Entity, transform: &Transform) -> Self {
+        let bits = entity.to_bits();
+        debug_assert!(
+            i64::try_from(bits).is_ok(),
+            "Entity bits {bits} exceed i64::MAX; spawn ID would wrap"
+        );
+        Self {
+            id: bits as i64,
+            x: f64::from(transform.translation.x).into(),
+            y: f64::from(transform.translation.y).into(),
+            z: f64::from(transform.translation.z).into(),
+        }
+    }
+}
+
 /// Synchronises player spawn locations with the DBSP circuit.
 #[cfg(feature = "map")]
-#[expect(
-    clippy::cast_possible_wrap,
-    reason = "Entity bits fit in i64 for practical entity counts."
-)]
 pub(super) fn player_spawns(
     circuit: &mut DbspCircuit,
     query: &Query<(Entity, &Transform), With<PlayerSpawn>>,
@@ -294,12 +330,13 @@ pub(super) fn player_spawns(
     use crate::dbsp_circuit::PlayerSpawnLocation;
 
     for (entity, transform) in query.iter() {
+        let coords = SpawnCoords::from_entity_transform(entity, transform);
         circuit.player_spawn_in().push(
             PlayerSpawnLocation {
-                id: entity.to_bits() as i64,
-                x: f64::from(transform.translation.x).into(),
-                y: f64::from(transform.translation.y).into(),
-                z: f64::from(transform.translation.z).into(),
+                id: coords.id,
+                x: coords.x,
+                y: coords.y,
+                z: coords.z,
             },
             1,
         );
@@ -308,10 +345,6 @@ pub(super) fn player_spawns(
 
 /// Synchronises NPC spawn points with the DBSP circuit.
 #[cfg(feature = "map")]
-#[expect(
-    clippy::cast_possible_wrap,
-    reason = "Entity bits fit in i64 for practical entity counts."
-)]
 pub(super) fn spawn_points(
     circuit: &mut DbspCircuit,
     query: &Query<(Entity, &Transform, &SpawnPoint)>,
@@ -319,12 +352,13 @@ pub(super) fn spawn_points(
     use crate::dbsp_circuit::SpawnPointRecord;
 
     for (entity, transform, sp) in query.iter() {
+        let coords = SpawnCoords::from_entity_transform(entity, transform);
         circuit.spawn_point_in().push(
             SpawnPointRecord {
-                id: entity.to_bits() as i64,
-                x: f64::from(transform.translation.x).into(),
-                y: f64::from(transform.translation.y).into(),
-                z: f64::from(transform.translation.z).into(),
+                id: coords.id,
+                x: coords.x,
+                y: coords.y,
+                z: coords.z,
                 enemy_type: sp.enemy_type,
                 respawn: sp.respawn,
             },
