@@ -15,6 +15,17 @@ use crate::map::{
     MapSpawned, Player, PlayerSpawn, PlayerSpawnConsumed, SpawnPoint, SpawnPointConsumed,
 };
 
+/// Resource tracking the next NPC ID to assign.
+///
+/// This counter persists across map loads within an application session,
+/// ensuring unique `DdlogId` values for all spawned NPCs. The counter starts
+/// at 0 and increments with each NPC spawned; the final ID is computed as
+/// `NPC_ID_BASE + counter` to avoid collision with player entity IDs.
+///
+/// For cross-session persistence, serialise this resource before shutdown.
+#[derive(Resource, Debug, Default)]
+pub struct NpcIdCounter(pub i64);
+
 /// Bundle of components for the player entity.
 ///
 /// This bundle provides the minimal set of components needed for the player
@@ -200,8 +211,13 @@ fn archetype_from_enemy_type(enemy_type: u32) -> (UnitType, Health, &'static str
 /// # Entity ID generation
 ///
 /// Spawned entities receive `DdlogId` values derived from their spawn point
-/// entity bits. For NPCs, a `Local<i64>` counter provides additional uniqueness
-/// to handle respawning spawn points in future phases.
+/// entity bits. For NPCs, the `NpcIdCounter` resource provides additional
+/// uniqueness to handle respawning spawn points in future phases.
+///
+/// # Player spawn selection
+///
+/// When multiple `PlayerSpawn` points exist, the spawn with the lowest entity
+/// ID is selected to ensure deterministic behaviour across runs.
 ///
 /// # Coordinate source
 ///
@@ -222,7 +238,7 @@ pub fn spawn_actors_at_spawn_points(
     mut map_events: EventReader<TiledEvent<MapCreated>>,
     player_spawns: Query<(Entity, &Transform), (With<PlayerSpawn>, Without<PlayerSpawnConsumed>)>,
     npc_spawns: Query<(Entity, &Transform, &SpawnPoint), Without<SpawnPointConsumed>>,
-    mut npc_id_counter: Local<i64>,
+    mut npc_id_counter: ResMut<NpcIdCounter>,
 ) {
     // Only process when a map has just finished loading.
     if map_events.is_empty() {
@@ -233,10 +249,13 @@ pub fn spawn_actors_at_spawn_points(
     for _ in map_events.read() {}
 
     spawn_player(&mut commands, &player_spawns);
-    spawn_npcs(&mut commands, &npc_spawns, &mut npc_id_counter);
+    spawn_npcs(&mut commands, &npc_spawns, &mut npc_id_counter.0);
 }
 
-/// Spawns the player entity at the first available `PlayerSpawn` point.
+/// Spawns the player entity at the lowest-ID `PlayerSpawn` point.
+///
+/// When multiple spawn points exist, the one with the lowest entity ID is
+/// selected to ensure deterministic behaviour across runs.
 #[expect(
     clippy::type_complexity,
     reason = "Bevy ECS query with filter combinators is inherently verbose."
@@ -245,12 +264,16 @@ fn spawn_player(
     commands: &mut Commands,
     player_spawns: &Query<(Entity, &Transform), (With<PlayerSpawn>, Without<PlayerSpawnConsumed>)>,
 ) {
-    if let Some((spawn_entity, transform)) = player_spawns.iter().next() {
+    // Collect and sort by entity ID for deterministic selection.
+    let mut spawns: Vec<_> = player_spawns.iter().collect();
+    spawns.sort_by_key(|(entity, _)| *entity);
+
+    if let Some((spawn_entity, transform)) = spawns.first() {
         let player_entity = commands
-            .spawn(PlayerBundle::new(spawn_entity, *transform))
+            .spawn(PlayerBundle::new(*spawn_entity, **transform))
             .id();
 
-        commands.entity(spawn_entity).insert(PlayerSpawnConsumed);
+        commands.entity(*spawn_entity).insert(PlayerSpawnConsumed);
 
         log::info!(
             "Spawned player at ({}, {}, {}) from spawn point {:?} -> entity {:?}",

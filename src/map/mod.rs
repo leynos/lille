@@ -16,7 +16,7 @@
 pub mod spawn;
 mod translate;
 
-pub use spawn::spawn_actors_at_spawn_points;
+pub use spawn::{spawn_actors_at_spawn_points, NpcIdCounter};
 pub use translate::attach_collision_blocks;
 
 use bevy::asset::RecursiveDependencyLoadState;
@@ -407,6 +407,7 @@ impl Plugin for LilleMapPlugin {
         app.add_observer(log_map_error);
         app.init_resource::<LilleMapSettings>();
         app.init_resource::<PrimaryMapAssetTracking>();
+        app.init_resource::<NpcIdCounter>();
         try_spawn_primary_map_on_build(app);
         #[cfg(feature = "render")]
         app.add_systems(Startup, bootstrap_camera_if_missing);

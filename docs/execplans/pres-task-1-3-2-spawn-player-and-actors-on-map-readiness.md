@@ -54,13 +54,19 @@ Created `src/map/spawn.rs` containing:
 - `NpcBundle` — Components for spawned NPC entities: `MapSpawned`, `DdlogId`,
   `Transform`, `Name`, `Health`, `VelocityComp`, `UnitType`
 
+**Resources:**
+
+- `NpcIdCounter` — Persistent counter for NPC ID generation; survives across
+  map loads within a session (for cross-session persistence, serialise before
+  shutdown)
+
 **Spawning System:**
 
 - `spawn_actors_at_spawn_points` — Main system triggered by
   `TiledEvent<MapCreated>`:
   - Queries `PlayerSpawn` entities `Without<PlayerSpawnConsumed>`
   - Queries `SpawnPoint` entities `Without<SpawnPointConsumed>`
-  - Spawns player at first available `PlayerSpawn`, marks it consumed
+  - Spawns player at lowest-ID `PlayerSpawn` (deterministic selection)
   - Spawns NPCs at each `SpawnPoint`, marks non-respawning ones consumed
 
 **Helper Functions:**
@@ -71,12 +77,14 @@ Created `src/map/spawn.rs` containing:
 
 ### ID Assignment Strategy
 
-| Entity | ID Source                          |
-| ------ | ---------------------------------- |
-| Player | `spawn_entity.to_bits() as i64`    |
-| NPC    | `NPC_ID_BASE (i64::MIN) + counter` |
+| Entity | ID Source                                       |
+| ------ | ----------------------------------------------- |
+| Player | `spawn_entity.to_bits() as i64`                 |
+| NPC    | `NPC_ID_BASE (i64::MIN) + NpcIdCounter.0`       |
 
-The offset ensures no collision between player entity bits and NPC IDs.
+The offset ensures no collision between player entity bits and NPC IDs. The
+`NpcIdCounter` resource persists across map loads within a session, preventing
+ID reuse when maps are reloaded.
 
 ### System Integration
 
@@ -98,6 +106,8 @@ app.add_systems(Update, (
 | `*Consumed` marker components    | Idempotency via `Without<T>` filter (matches Block) |
 | `Player` marker component        | Simple, query-friendly player identification        |
 | ID = entity bits + counter       | Unique, traceable, handles respawns                 |
+| `NpcIdCounter` resource          | Persists across map loads; visible for testing      |
+| Deterministic player spawn       | Sort by entity ID; reproducible across runs         |
 | `TiledEvent<MapCreated>` trigger | Consistent with collision block system              |
 | Floor height query deferred      | Z from Tiled sufficient for Phase 1                 |
 
