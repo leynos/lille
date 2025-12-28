@@ -155,8 +155,14 @@ fn spawned_npc_has_required_components(mut test_app: App) {
 }
 
 #[rstest]
-fn spawned_npc_has_correct_unit_type_for_civvy(mut test_app: App) {
-    spawn_npc_spawn_point(test_app.world_mut(), Vec3::ZERO, 0, false);
+#[case(0, "Civvy")]
+#[case(3, "Baddie")]
+fn spawned_npc_has_correct_unit_type(
+    mut test_app: App,
+    #[case] enemy_type: u32,
+    #[case] expected_type: &str,
+) {
+    spawn_npc_spawn_point(test_app.world_mut(), Vec3::ZERO, enemy_type, false);
     execute_spawn_system(&mut test_app);
 
     let npcs = find_npcs(test_app.world_mut());
@@ -166,27 +172,15 @@ fn spawned_npc_has_correct_unit_type_for_civvy(mut test_app: App) {
         .get::<UnitType>(npc)
         .expect("NPC should have UnitType");
 
-    assert!(
-        matches!(unit_type, UnitType::Civvy { .. }),
-        "enemy_type 0 should map to Civvy"
-    );
-}
-
-#[rstest]
-fn spawned_npc_has_correct_unit_type_for_baddie(mut test_app: App) {
-    spawn_npc_spawn_point(test_app.world_mut(), Vec3::ZERO, 3, false);
-    execute_spawn_system(&mut test_app);
-
-    let npcs = find_npcs(test_app.world_mut());
-    let npc = *npcs.first().expect("NPC entity should exist");
-    let unit_type = test_app
-        .world()
-        .get::<UnitType>(npc)
-        .expect("NPC should have UnitType");
+    let matches_expected = match expected_type {
+        "Civvy" => matches!(unit_type, UnitType::Civvy { .. }),
+        "Baddie" => matches!(unit_type, UnitType::Baddie { .. }),
+        _ => panic!("Unknown unit type: {expected_type}"),
+    };
 
     assert!(
-        matches!(unit_type, UnitType::Baddie { .. }),
-        "enemy_type 3 should map to Baddie"
+        matches_expected,
+        "enemy_type {enemy_type} should map to {expected_type}"
     );
 }
 
