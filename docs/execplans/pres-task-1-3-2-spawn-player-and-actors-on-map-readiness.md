@@ -2,10 +2,11 @@
 
 ## Summary
 
-This task implements the spawning system that instantiates player and NPC
-entities at their Tiled-authored coordinates when `TiledEvent<MapCreated>`
-fires. The system ensures spawning happens exactly once per map load through
-idempotent marker components, maintaining the DBSP circuit as the source of
+This task implements the spawning system that instantiates player and
+non-player character (NPC) entities at their Tiled-authored coordinates when
+`TiledEvent<MapCreated>` fires. The system ensures spawning happens exactly
+once per map load through idempotent marker components, maintaining the
+Differential Dataflow-Based Stream Processing (DBSP) circuit as the source of
 truth for inferred behaviour.
 
 **Roadmap reference:** Phase 1, Step 1.3, Task 1.3.2
@@ -70,10 +71,10 @@ Created `src/map/spawn.rs` containing:
 
 ### ID Assignment Strategy
 
-| Entity | ID Source                                |
-| ------ | ---------------------------------------- |
-| Player | `spawn_entity.to_bits() as i64`          |
-| NPC    | `NPC_ID_BASE (i64::MIN) + counter`       |
+| Entity | ID Source                          |
+| ------ | ---------------------------------- |
+| Player | `spawn_entity.to_bits() as i64`    |
+| NPC    | `NPC_ID_BASE (i64::MIN) + counter` |
 
 The offset ensures no collision between player entity bits and NPC IDs.
 
@@ -91,14 +92,14 @@ app.add_systems(Update, (
 
 ## Design Decisions
 
-| Decision                             | Rationale                                             |
-| ------------------------------------ | ----------------------------------------------------- |
-| New `spawn.rs` module                | Single responsibility; parallel to `translate.rs`    |
-| `*Consumed` marker components        | Idempotency via `Without<T>` filter (matches Block)   |
-| `Player` marker component            | Simple, query-friendly player identification          |
-| ID = entity bits + counter           | Unique, traceable, handles respawns                   |
-| `TiledEvent<MapCreated>` trigger     | Consistent with collision block system                |
-| Floor height query deferred          | Z from Tiled sufficient for Phase 1                   |
+| Decision                         | Rationale                                           |
+| -------------------------------- | --------------------------------------------------- |
+| New `spawn.rs` module            | Single responsibility; parallel to `translate.rs`   |
+| `*Consumed` marker components    | Idempotency via `Without<T>` filter (matches Block) |
+| `Player` marker component        | Simple, query-friendly player identification        |
+| ID = entity bits + counter       | Unique, traceable, handles respawns                 |
+| `TiledEvent<MapCreated>` trigger | Consistent with collision block system              |
+| Floor height query deferred      | Z from Tiled sufficient for Phase 1                 |
 
 ## Files Modified
 
@@ -118,7 +119,8 @@ app.add_systems(Update, (
   - Respawning SpawnPoints NOT marked consumed
   - Unique DdlogId assignment
 
-- `tests/map_spawn_actors_rspec.rs` — 2 BDD scenarios with 15 assertions:
+- `tests/map_spawn_actors_rspec.rs` — 2 behaviour-driven development (BDD)
+  scenarios with 15 assertions:
   - Player spawning scenario (position, components, consumption)
   - NPC spawning scenario (position, UnitType, consumption logic)
 

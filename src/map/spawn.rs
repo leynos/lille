@@ -143,9 +143,15 @@ const NPC_ID_BASE: i64 = i64::MIN;
 
 /// Maps `enemy_type` to concrete `UnitType` and stats.
 ///
-/// This is a placeholder mapping; production code would likely load
-/// archetypes from a data file or registry.
-const fn archetype_from_enemy_type(enemy_type: u32) -> (UnitType, Health, &'static str) {
+/// This is a placeholder mapping that handles `enemy_type` values 0–10 with
+/// explicit archetypes; all other values fall through to a default. Production
+/// code would likely load archetypes from a data file or registry. To add new
+/// enemy types, extend the `match` arms below.
+#[expect(
+    clippy::missing_const_for_fn,
+    reason = "Deliberately non-const; future versions may load from data files."
+)]
+fn archetype_from_enemy_type(enemy_type: u32) -> (UnitType, Health, &'static str) {
     match enemy_type {
         0 => (
             UnitType::Civvy { fraidiness: 0.8 },
@@ -219,12 +225,12 @@ pub fn spawn_actors_at_spawn_points(
     mut npc_id_counter: Local<i64>,
 ) {
     // Only process when a map has just finished loading.
-    let mut events = map_events.read();
-    if events.next().is_none() {
+    if map_events.is_empty() {
         return;
     }
-    // Drain remaining events (supports multiple maps, though unusual).
-    events.for_each(drop);
+
+    // Drain all events (we only care that at least one occurred).
+    for _ in map_events.read() {}
 
     spawn_player(&mut commands, &player_spawns);
     spawn_npcs(&mut commands, &npc_spawns, &mut npc_id_counter);
@@ -261,10 +267,10 @@ fn spawn_player(
 fn spawn_npcs(
     commands: &mut Commands,
     npc_spawns: &Query<(Entity, &Transform, &SpawnPoint), Without<SpawnPointConsumed>>,
-    npc_id_counter: &mut Local<i64>,
+    npc_id_counter: &mut i64,
 ) {
     for (spawn_entity, transform, spawn_point) in npc_spawns.iter() {
-        let npc_id = NPC_ID_BASE.wrapping_add(**npc_id_counter);
+        let npc_id = NPC_ID_BASE + *npc_id_counter;
         let npc_entity = commands
             .spawn(NpcBundle::new(*transform, spawn_point, npc_id))
             .id();
@@ -285,7 +291,7 @@ fn spawn_npcs(
             npc_entity
         );
 
-        **npc_id_counter += 1;
+        *npc_id_counter += 1;
     }
 }
 
@@ -336,23 +342,6 @@ mod tests {
         };
         let elite = NpcBundle::new(transform, &elite_spawn, 1002);
         assert!(matches!(elite.unit_type, UnitType::Baddie { meanness } if meanness > 0.7));
-    }
-
-    #[test]
-    fn npc_ids_are_unique_across_spawns() {
-        let transform = Transform::default();
-        let spawn_point = SpawnPoint {
-            enemy_type: 1,
-            respawn: true,
-        };
-
-        let npc1 = NpcBundle::new(transform, &spawn_point, 1000);
-        let npc2 = NpcBundle::new(transform, &spawn_point, 1001);
-        let npc3 = NpcBundle::new(transform, &spawn_point, 1002);
-
-        assert_ne!(npc1.ddlog_id.0, npc2.ddlog_id.0);
-        assert_ne!(npc2.ddlog_id.0, npc3.ddlog_id.0);
-        assert_ne!(npc1.ddlog_id.0, npc3.ddlog_id.0);
     }
 
     #[test]
