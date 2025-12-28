@@ -22,7 +22,7 @@ use crate::map::{
 /// at 0 and increments with each NPC spawned; the final ID is computed as
 /// `NPC_ID_BASE + counter` to avoid collision with player entity IDs.
 ///
-/// For cross-session persistence, serialise this resource before shutdown.
+/// For cross-session persistence, serialize this resource before shutdown.
 #[derive(Resource, Debug, Default)]
 pub struct NpcIdCounter(pub i64);
 

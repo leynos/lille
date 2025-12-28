@@ -57,7 +57,7 @@ Created `src/map/spawn.rs` containing:
 **Resources:**
 
 - `NpcIdCounter` — Persistent counter for NPC ID generation; survives across
-  map loads within a session (for cross-session persistence, serialise before
+  map loads within a session (for cross-session persistence, serialize before
   shutdown)
 
 **Spawning System:**
