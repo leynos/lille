@@ -13,8 +13,10 @@
 //! in the game world; this module translates authored data into typed
 //! components and feeds them into DBSP.
 
+pub mod spawn;
 mod translate;
 
+pub use spawn::{spawn_actors_at_spawn_points, NpcIdCounter};
 pub use translate::attach_collision_blocks;
 
 use bevy::asset::RecursiveDependencyLoadState;
@@ -130,6 +132,38 @@ pub struct SpawnPoint {
     /// Whether the spawn point should respawn after use.
     pub respawn: bool,
 }
+
+/// Marker indicating that this entity represents the player character.
+///
+/// Applied to the spawned player entity to distinguish it from NPCs and
+/// to enable player-specific queries.
+#[derive(Component, Reflect, Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[reflect(Component, Default)]
+pub struct Player;
+
+/// Marker indicating that this `PlayerSpawn` point has been consumed.
+///
+/// Ensures idempotent spawning: the spawn system skips entities with this
+/// marker, making it safe to run multiple times or on map reloads.
+#[derive(Component, Reflect, Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[reflect(Component, Default)]
+pub struct PlayerSpawnConsumed;
+
+/// Marker indicating that this `SpawnPoint` has spawned its actor.
+///
+/// For non-respawning spawn points, this prevents duplicate spawning.
+/// Respawning spawn points will have different logic in later phases.
+#[derive(Component, Reflect, Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[reflect(Component, Default)]
+pub struct SpawnPointConsumed;
+
+/// Marker for entities spawned by the map spawn system.
+///
+/// Allows queries to identify map-spawned actors versus programmatically
+/// created entities.
+#[derive(Component, Reflect, Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[reflect(Component, Default)]
+pub struct MapSpawned;
 
 #[derive(Component, Debug, Default)]
 struct PrimaryTiledMap;
@@ -365,10 +399,15 @@ impl Plugin for LilleMapPlugin {
         app.register_type::<Collidable>()
             .register_type::<SlopeProperties>()
             .register_type::<PlayerSpawn>()
-            .register_type::<SpawnPoint>();
+            .register_type::<SpawnPoint>()
+            .register_type::<Player>()
+            .register_type::<PlayerSpawnConsumed>()
+            .register_type::<SpawnPointConsumed>()
+            .register_type::<MapSpawned>();
         app.add_observer(log_map_error);
         app.init_resource::<LilleMapSettings>();
         app.init_resource::<PrimaryMapAssetTracking>();
+        app.init_resource::<NpcIdCounter>();
         try_spawn_primary_map_on_build(app);
         #[cfg(feature = "render")]
         app.add_systems(Startup, bootstrap_camera_if_missing);
@@ -378,6 +417,7 @@ impl Plugin for LilleMapPlugin {
             (
                 monitor_primary_map_load_state,
                 translate::attach_collision_blocks,
+                spawn::spawn_actors_at_spawn_points,
             ),
         );
     }

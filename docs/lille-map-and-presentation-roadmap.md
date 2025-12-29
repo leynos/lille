@@ -85,7 +85,7 @@ authored positions.
   - Completion criteria: Loading a map with these objects results in ECS
     entities carrying the expected component values.
   - Dependencies: Task 1.1.3.
-- [ ] Task 1.3.2 — Spawn player and actors on map readiness
+- [x] Task 1.3.2 — Spawn player and actors on map readiness
   - Outcome: The map readiness system locates `PlayerSpawn` entities and
     instantiates the player, NPCs, and other scripted actors at those
     transforms.

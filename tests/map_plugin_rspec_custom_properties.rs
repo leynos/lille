@@ -206,12 +206,14 @@ fn map_plugin_hydrates_tiled_custom_properties() {
                     );
                 });
 
-                ctx.then("DBSP world handle stays empty", |state| {
-                    assert_eq!(state.world_handle_entity_count(), 0);
+                ctx.then("DBSP world handle includes spawned entities", |state| {
+                    // The spawn system creates 1 player + 1 NPC = 2 entities.
+                    assert_eq!(state.world_handle_entity_count(), 2);
                 });
 
-                ctx.then("no DdlogId entities are inferred", |state| {
-                    assert!(state.ddlog_ids().is_empty());
+                ctx.then("spawned entities have DdlogId for DBSP sync", |state| {
+                    // Player and NPC are spawned with DdlogId components.
+                    assert_eq!(state.ddlog_ids().len(), 2);
                 });
 
                 ctx.then("no map errors are emitted", |state| {
