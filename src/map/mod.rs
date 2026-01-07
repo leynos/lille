@@ -43,6 +43,13 @@ pub enum LilleMapError {
         /// Human-readable detail describing why the load failed.
         detail: String,
     },
+    /// Attempted to load a second map while one is already active.
+    DuplicateMapAttempted {
+        /// Asset-server path of the map that was requested.
+        requested_path: String,
+        /// Asset-server path of the map currently loaded.
+        active_path: String,
+    },
 }
 
 /// Newtype representing a Bevy asset-server path (relative to the asset root).
@@ -165,8 +172,29 @@ pub struct SpawnPointConsumed;
 #[reflect(Component, Default)]
 pub struct MapSpawned;
 
+/// Event to request unloading the currently active primary map.
+///
+/// When triggered, the map unload system will:
+/// 1. Despawn the `PrimaryTiledMap` entity and all its children
+/// 2. Despawn all `MapSpawned` entities (player and NPCs)
+/// 3. Reset `PrimaryMapAssetTracking` state
+/// 4. Allow a new map to be loaded
+#[derive(Event, Debug, Clone, Default)]
+pub struct UnloadPrimaryMap;
+
+/// Event emitted when the primary map has been fully unloaded.
+///
+/// Systems that depend on map state can observe this event to know
+/// when it is safe to load a new map or perform cleanup.
+#[derive(Event, Debug, Clone, Default)]
+pub struct PrimaryMapUnloaded;
+
+/// Marker component for the root entity of the primary loaded map.
+///
+/// Used internally to track the currently loaded map entity. Tests can spawn
+/// entities with this marker to simulate an existing map without loading assets.
 #[derive(Component, Debug, Default)]
-struct PrimaryTiledMap;
+pub struct PrimaryTiledMap;
 
 #[cfg(feature = "render")]
 #[derive(Component, Debug)]
@@ -175,11 +203,18 @@ struct MapBootstrapCamera;
 #[derive(Resource, Default)]
 struct LilleMapPluginInstalled;
 
+/// Resource tracking the primary map asset loading state.
+///
+/// This resource persists the asset handle and path so that load failures
+/// can be reported even if the map entity is despawned during error handling.
 #[derive(Resource, Debug, Default)]
-struct PrimaryMapAssetTracking {
-    asset_path: Option<String>,
-    handle: Option<Handle<TiledMapAsset>>,
-    has_finalised: bool,
+pub struct PrimaryMapAssetTracking {
+    /// Asset-server path of the currently loaded or loading map.
+    pub asset_path: Option<String>,
+    /// Strong handle to the map asset, kept alive during loading.
+    pub handle: Option<Handle<TiledMapAsset>>,
+    /// Whether loading has completed (successfully or with failure).
+    pub has_finalised: bool,
 }
 
 #[derive(Bundle)]
@@ -258,7 +293,27 @@ fn spawn_primary_map_if_enabled(mut commands: Commands, mut context: PrimaryMapS
         return;
     }
 
+    // If tracking already has an asset path, we've already committed to loading a map.
+    // This is normal operation after the first tick - just return silently.
+    if context.tracking.asset_path.is_some() {
+        return;
+    }
+
+    // If a map entity exists but tracking doesn't have a path, something external
+    // spawned a map. Emit an error since this violates single-map semantics.
     if !context.existing_maps.is_empty() {
+        let requested_path = context.settings.primary_map.as_str().to_owned();
+        let active_path = "[external]".to_owned();
+
+        log::warn!(
+            "Attempted to load map '{requested_path}' while an external map is already active; \
+             ignoring request"
+        );
+
+        commands.trigger(LilleMapError::DuplicateMapAttempted {
+            requested_path,
+            active_path,
+        });
         return;
     }
 
@@ -338,6 +393,49 @@ fn try_spawn_primary_map_on_build(app: &mut App) {
     world.spawn(PrimaryTiledMapBundle::new(handle));
 }
 
+/// Observer that handles `UnloadPrimaryMap` events by despawning map entities.
+///
+/// This observer enables safe hot-reload by:
+/// 1. Despawning the `PrimaryTiledMap` entity and all children (tiles, layers)
+/// 2. Despawning all `MapSpawned` entities (player, NPCs)
+/// 3. Resetting `PrimaryMapAssetTracking` to allow new map loads
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Bevy observer systems require query parameters; grouping would obscure intent."
+)]
+fn handle_unload_primary_map(
+    _event: bevy::ecs::prelude::On<UnloadPrimaryMap>,
+    mut commands: Commands,
+    map_query: Query<Entity, With<PrimaryTiledMap>>,
+    spawned_query: Query<Entity, With<MapSpawned>>,
+    mut tracking: ResMut<PrimaryMapAssetTracking>,
+) {
+    let mut unloaded_any = false;
+
+    for map_entity in &map_query {
+        commands.entity(map_entity).despawn();
+        unloaded_any = true;
+        log::info!("Unloaded primary map entity {map_entity:?}");
+    }
+
+    for spawned_entity in &spawned_query {
+        commands.entity(spawned_entity).despawn();
+        log::debug!("Despawned map-spawned entity {spawned_entity:?}");
+    }
+
+    tracking.asset_path = None;
+    tracking.handle = None;
+    tracking.has_finalised = false;
+
+    if unloaded_any {
+        commands.trigger(PrimaryMapUnloaded);
+    }
+}
+
+fn log_map_unloaded(_event: bevy::ecs::prelude::On<PrimaryMapUnloaded>) {
+    log::info!("Primary map unloaded successfully");
+}
+
 /// Bevy plugin exposing Tiled map support for Lille.
 ///
 /// The plugin is safe to add multiple times: it guarantees `TiledPlugin` is
@@ -405,6 +503,8 @@ impl Plugin for LilleMapPlugin {
             .register_type::<SpawnPointConsumed>()
             .register_type::<MapSpawned>();
         app.add_observer(log_map_error);
+        app.add_observer(handle_unload_primary_map);
+        app.add_observer(log_map_unloaded);
         app.init_resource::<LilleMapSettings>();
         app.init_resource::<PrimaryMapAssetTracking>();
         app.init_resource::<NpcIdCounter>();

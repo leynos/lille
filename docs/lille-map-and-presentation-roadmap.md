@@ -92,7 +92,7 @@ authored positions.
   - Completion criteria: Running the game spawns player and sample NPCs at
     their Tiled-authored coordinates exactly once per map load.
   - Dependencies: Task 1.3.1.
-- [ ] Task 1.3.3 — Enforce single active map lifecycle
+- [x] Task 1.3.3 — Enforce single active map lifecycle
   - Outcome: `LilleMapPlugin` guards against loading multiple maps at once and
     provides a cleanup path for reloading during development hot reload.
   - Completion criteria: Attempting to spawn a second map logs a warning and
