@@ -1,4 +1,4 @@
-# ExecPlan: Task 1.3.3 - Enforce single active map lifecycle
+# ExecPlan: Task 1.3.3 — Enforce single active map lifecycle
 
 **Task reference**:
 [docs/lille-map-and-presentation-roadmap.md](../lille-map-and-presentation-roadmap.md)
@@ -67,21 +67,23 @@ continue incrementing across loads. This is acceptable because block IDs only
 need per-map uniqueness for the DBSP join operations, and monotonically
 increasing values satisfy this constraint.
 
-### D5: Recursive despawn for actors
+### D5: Despawn behaviour for actors
 
-**Decision**: Use `despawn_recursive()` for `MapSpawned` entities, not just
-`despawn()`.
+**Decision**: Use `despawn()` for all entities (`PrimaryTiledMap` and
+`MapSpawned`).
 
-**Rationale**: Future-proofs the unload system for actors that may have child
-entities (sprites, particle effects, UI elements). The slight performance cost
-is negligible for the small number of actors involved.
+**Rationale**: In Bevy 0.17+, `despawn()` automatically despawns all
+descendants via the `ChildOf` relationship. The deprecated
+`despawn_recursive()` is no longer available on `EntityCommands`. Child
+entities (tiles, layers, sprites, particle effects) are removed when their
+parent is despawned.
 
 ### D6: DBSP sync unchanged
 
 **Decision**: No changes to `src/dbsp_sync/` code.
 
 **Rationale**: The sync system already clears `WorldHandle` each tick and
-re-pushes currently-existing `Block` components to the circuit. When entities
+re-pushes currently existing `Block` components to the circuit. When entities
 are despawned, the next sync pass simply omits them—the circuit handles absence
 correctly without explicit retraction.
 
@@ -154,40 +156,46 @@ if !context.existing_maps.is_empty() {
 }
 ```
 
-### Step 3: Add unload system to `src/map/mod.rs`
+### Step 3: Add unload observer to `src/map/mod.rs`
 
-Add new system (before the `Plugin` impl):
+Add new observer function (before the `Plugin` impl):
 
 ```rust
-/// Handles `UnloadPrimaryMap` events by despawning all map-related entities.
+/// Observer that handles `UnloadPrimaryMap` events by despawning map entities.
 ///
-/// This system enables safe hot-reload by:
+/// This observer enables safe hot-reload by:
 /// 1. Despawning the `PrimaryTiledMap` entity and all children (tiles, layers)
 /// 2. Despawning all `MapSpawned` entities (player, NPCs)
 /// 3. Resetting `PrimaryMapAssetTracking` to allow new map loads
-fn unload_primary_map_system(
+///
+/// # Bevy 0.17 Despawn Behaviour
+///
+/// In Bevy 0.17+, `despawn()` automatically despawns all descendants via the
+/// `ChildOf` relationship. The deprecated `despawn_recursive()` is no longer
+/// available on `EntityCommands`. Child entities (tiles, layers from
+/// `bevy_ecs_tiled`) are removed when their parent is despawned.
+fn handle_unload_primary_map(
+    _event: bevy::ecs::prelude::On<UnloadPrimaryMap>,
     mut commands: Commands,
-    mut events: EventReader<UnloadPrimaryMap>,
     map_query: Query<Entity, With<PrimaryTiledMap>>,
     spawned_query: Query<Entity, With<MapSpawned>>,
     mut tracking: ResMut<PrimaryMapAssetTracking>,
 ) {
-    if events.read().next().is_none() {
-        return;
-    }
-    events.read().for_each(drop);
-
     let mut unloaded_any = false;
 
+    // Note: Bevy 0.17's despawn() handles ChildOf relationships automatically,
+    // removing all descendant entities (tiles, layers) when the root is despawned.
     for map_entity in &map_query {
-        commands.entity(map_entity).despawn_recursive();
+        commands.entity(map_entity).despawn();
         unloaded_any = true;
-        log::info!("Unloaded primary map entity {:?}", map_entity);
+        log::info!("Unloaded primary map entity {map_entity:?}");
     }
 
+    // Note: Bevy 0.17's despawn() handles ChildOf relationships automatically,
+    // removing any child entities (sprites, effects) when the actor is despawned.
     for spawned_entity in &spawned_query {
-        commands.entity(spawned_entity).despawn_recursive();
-        log::debug!("Despawned map-spawned entity {:?}", spawned_entity);
+        commands.entity(spawned_entity).despawn();
+        log::debug!("Despawned map-spawned entity {spawned_entity:?}");
     }
 
     tracking.asset_path = None;
@@ -206,30 +214,18 @@ fn log_map_unloaded(_event: bevy::ecs::prelude::On<PrimaryMapUnloaded>) {
 
 ### Step 4: Update plugin build in `LilleMapPlugin::build()`
 
-Add event registration (after line 410, `app.init_resource::<NpcIdCounter>();`):
+Register the unload observer and the logging observer (after the existing
+observer registrations):
 
 ```rust
-app.add_event::<UnloadPrimaryMap>();
+app.add_observer(handle_unload_primary_map);
 app.add_observer(log_map_unloaded);
 ```
 
-Update the Update schedule systems (replace lines 415-422):
-
-```rust
-app.add_systems(
-    Update,
-    (
-        unload_primary_map_system,
-        monitor_primary_map_load_state,
-        translate::attach_collision_blocks,
-        spawn::spawn_actors_at_spawn_points,
-    )
-        .chain(),
-);
-```
-
-The `.chain()` ensures unload runs before other systems, preventing stale
-queries.
+The observer pattern in Bevy 0.17 replaces the previous `EventReader`-based
+approach. Observers run automatically when their trigger event is emitted via
+`commands.trigger()` or `world.trigger()`, without requiring explicit system
+scheduling.
 
 ### Step 5: Export new types from module
 

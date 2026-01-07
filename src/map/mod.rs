@@ -427,6 +427,8 @@ fn handle_unload_primary_map(
         log::info!("Unloaded primary map entity {map_entity:?}");
     }
 
+    // Note: Bevy 0.17's despawn() handles ChildOf relationships automatically,
+    // removing any child entities (sprites, effects) when the actor is despawned.
     for spawned_entity in &spawned_query {
         commands.entity(spawned_entity).despawn();
         log::debug!("Despawned map-spawned entity {spawned_entity:?}");

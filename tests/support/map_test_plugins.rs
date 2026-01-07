@@ -2,7 +2,10 @@
 // The `captured_errors` function is used by some test binaries (map_lifecycle,
 // map_lifecycle_rspec) but not others. Clippy's allow_attributes lint conflicts
 // with the dead_code warning in binaries that don't use it.
-#![allow(clippy::allow_attributes, reason = "Required for dead_code allowance on shared helpers.")]
+#![allow(
+    clippy::allow_attributes,
+    reason = "Required for dead_code allowance on shared helpers."
+)]
 //! Shared test harness helpers for map-related integration tests.
 //!
 //! These tests must run under `cargo test --all-features` (and `cargo llvm-cov
@@ -103,7 +106,10 @@ pub fn map_test_app() -> App {
 /// Returns errors captured by the map error capture observer.
 ///
 /// Requires `install_map_error_capture` to have been called on the app.
-#[allow(dead_code, reason = "Used by map_lifecycle tests but not all test binaries.")]
+#[allow(
+    dead_code,
+    reason = "Used by map_lifecycle tests but not all test binaries."
+)]
 pub fn captured_errors(app: &App) -> Vec<LilleMapError> {
     app.world()
         .get_resource::<CapturedMapErrors>()

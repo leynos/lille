@@ -28,7 +28,7 @@ use std::sync::MutexGuard;
 
 use bevy::prelude::*;
 use lille::map::{LilleMapError, LilleMapSettings, MapAssetPath, MapSpawned, UnloadPrimaryMap};
-use lille::{DbspPlugin, LilleMapPlugin};
+use lille::{DbspPlugin, LilleMapPlugin, WorldHandle};
 use rspec::block::Context as Scenario;
 use rspec_runner::run_serial;
 use thread_safe_app::ThreadSafeApp;
@@ -102,6 +102,13 @@ impl MapLifecycleFixture {
             .iter()
             .any(|e| matches!(e, LilleMapError::DuplicateMapAttempted { .. }))
     }
+
+    fn world_handle_block_count(&self) -> usize {
+        let app = self.app_guard();
+        app.world()
+            .get_resource::<WorldHandle>()
+            .map_or(0, WorldHandle::block_count)
+    }
 }
 
 #[test]
@@ -129,6 +136,14 @@ fn map_plugin_supports_safe_unload_and_reload() {
                     assert!(
                         !state.has_duplicate_map_error(),
                         "unload should not cause duplicate map errors"
+                    );
+
+                    // Tick again to let DBSP sync run and clear the world handle.
+                    state.tick();
+                    assert_eq!(
+                        state.world_handle_block_count(),
+                        0,
+                        "DBSP world handle should reflect empty state after unload"
                     );
                 });
             });
