@@ -17,17 +17,17 @@ Implement safeguards in `LilleMapPlugin` to:
 1. Log a warning and emit an event when a second map load is attempted while one
    is active
 2. Provide an unload mechanism for safe map cleanup during development hot
-   reload
-3. Ensure the DBSP circuit correctly reflects world state after unload/reload
-   cycles
+   reload scenarios
+3. Ensure the DBSP (Differential Dataflow-based Stream Processing) circuit
+   correctly reflects world state after unload/reload cycles
 
 ## Completion criteria
 
 - Attempting to spawn a second map logs a warning and leaves the existing map
   intact
 - Unloading recreates components safely (no orphaned state, no duplicate IDs)
-- Unit tests (rstest) and BDD tests (rust-rspec) validate both happy and
-  unhappy paths
+- Unit tests (rstest) and BDD (Behaviour-Driven Development) tests (rust-rspec)
+  validate both happy and unhappy paths
 
 ## Design decisions
 
@@ -609,10 +609,10 @@ make test
 
 | Scenario                 | Unit test                         | BDD test                                 |
 | ------------------------ | --------------------------------- | ---------------------------------------- |
-| Duplicate map warning    | `emits_duplicate_map_error_...`   | -                                        |
-| Existing map preserved   | `existing_map_preserved_...`      | -                                        |
-| Unload despawns actors   | `unload_despawns_map_spawned_...` | `spawned actors are despawned`           |
-| Tracking state reset     | `unload_resets_tracking_state`    | -                                        |
-| NpcIdCounter persistence | `unload_preserves_npc_id_counter` | -                                        |
-| Reload after unload      | `can_load_new_map_after_unload`   | -                                        |
-| DBSP state after unload  | -                                 | `DBSP world handle reflects empty state` |
+| Duplicate map warning    | `emits_duplicate_map_error_…`     | —                                        |
+| Existing map preserved   | `existing_map_preserved_…`        | —                                        |
+| Unload despawns actors   | `unload_despawns_map_spawned_…`   | `spawned actors are despawned`           |
+| Tracking state reset     | `unload_resets_tracking_state`    | —                                        |
+| NpcIdCounter persistence | `unload_preserves_npc_id_counter` | —                                        |
+| Reload after unload      | `can_load_new_map_after_unload`   | —                                        |
+| DBSP state after unload  | —                                 | `DBSP world handle reflects empty state` |

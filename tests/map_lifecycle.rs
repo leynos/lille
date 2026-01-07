@@ -19,7 +19,6 @@ use lille::map::{
     PrimaryTiledMap, UnloadPrimaryMap, PRIMARY_ISOMETRIC_MAP_PATH,
 };
 use lille::LilleMapPlugin;
-use map_test_plugins::CapturedMapErrors;
 use rstest::{fixture, rstest};
 
 // -- Fixtures --
@@ -53,10 +52,7 @@ fn spawn_mock_map_spawned_entity(world: &mut World) -> Entity {
 }
 
 fn captured_errors(app: &App) -> Vec<LilleMapError> {
-    app.world()
-        .get_resource::<CapturedMapErrors>()
-        .map(|e| e.0.clone())
-        .unwrap_or_default()
+    map_test_plugins::captured_errors(app)
 }
 
 // -- Tests --
@@ -146,6 +142,10 @@ fn unload_resets_tracking_state(mut test_app: App) {
         !tracking.has_finalised,
         "has_finalised should be reset after unload"
     );
+    assert!(
+        tracking.handle.is_none(),
+        "handle should be cleared after unload"
+    );
 }
 
 #[rstest]
@@ -170,12 +170,17 @@ fn can_load_new_map_after_unload(mut test_app: App) {
     test_app.update();
 
     // Attempt to spawn (should succeed without duplicate error since unload cleared state).
+    // NOTE: The spawn system runs in PostStartup (one-shot), so we cannot verify a new
+    // map load is initiated in this unit test. The BDD test covers the full reload cycle.
     {
         let mut settings = test_app.world_mut().resource_mut::<LilleMapSettings>();
         settings.should_spawn_primary_map = true;
     }
     test_app.update();
 
+    // After unloading, re-enabling primary map spawn should not emit a duplicate-map error.
+    // This validates the tracking state was reset correctly, even though the spawn system
+    // only runs once in PostStartup.
     let errors = captured_errors(&test_app);
     assert!(
         !errors

@@ -29,7 +29,6 @@ use std::sync::MutexGuard;
 use bevy::prelude::*;
 use lille::map::{LilleMapError, LilleMapSettings, MapAssetPath, MapSpawned, UnloadPrimaryMap};
 use lille::{DbspPlugin, LilleMapPlugin};
-use map_test_plugins::CapturedMapErrors;
 use rspec::block::Context as Scenario;
 use rspec_runner::run_serial;
 use thread_safe_app::ThreadSafeApp;
@@ -95,10 +94,7 @@ impl MapLifecycleFixture {
 
     fn captured_errors(&self) -> Vec<LilleMapError> {
         let app = self.app_guard();
-        app.world()
-            .get_resource::<CapturedMapErrors>()
-            .map(|e| e.0.clone())
-            .unwrap_or_default()
+        map_test_plugins::captured_errors(&app)
     }
 
     fn has_duplicate_map_error(&self) -> bool {

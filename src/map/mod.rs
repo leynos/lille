@@ -399,6 +399,13 @@ fn try_spawn_primary_map_on_build(app: &mut App) {
 /// 1. Despawning the `PrimaryTiledMap` entity and all children (tiles, layers)
 /// 2. Despawning all `MapSpawned` entities (player, NPCs)
 /// 3. Resetting `PrimaryMapAssetTracking` to allow new map loads
+///
+/// # Bevy 0.17 Despawn Behaviour
+///
+/// In Bevy 0.17+, `despawn()` automatically despawns all descendants via the
+/// `ChildOf` relationship. The deprecated `despawn_recursive()` is no longer
+/// available on `EntityCommands`. Child entities (tiles, layers from
+/// `bevy_ecs_tiled`) are removed when their parent is despawned.
 #[expect(
     clippy::too_many_arguments,
     reason = "Bevy observer systems require query parameters; grouping would obscure intent."
@@ -412,6 +419,8 @@ fn handle_unload_primary_map(
 ) {
     let mut unloaded_any = false;
 
+    // Note: Bevy 0.17's despawn() handles ChildOf relationships automatically,
+    // removing all descendant entities (tiles, layers) when the root is despawned.
     for map_entity in &map_query {
         commands.entity(map_entity).despawn();
         unloaded_any = true;
