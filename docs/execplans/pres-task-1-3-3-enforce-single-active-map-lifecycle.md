@@ -487,6 +487,9 @@ impl MapLifecycleFixture {
             if self.map_spawned_count() > 0 {
                 return true;
             }
+            if !self.captured_errors().is_empty() {
+                return false;
+            }
         }
         false
     }
@@ -503,26 +506,22 @@ impl MapLifecycleFixture {
         query.iter(world).count()
     }
 
-    fn world_handle_block_count(&self) -> usize {
-        let app = self.app_guard();
-        app.world()
-            .get_resource::<WorldHandle>()
-            .map(|h| h.blocks.len())
-            .unwrap_or(0)
-    }
-
     fn captured_errors(&self) -> Vec<LilleMapError> {
         let app = self.app_guard();
-        app.world()
-            .get_resource::<CapturedMapErrors>()
-            .map(|e| e.0.clone())
-            .unwrap_or_default()
+        map_test_plugins::captured_errors(&app)
     }
 
     fn has_duplicate_map_error(&self) -> bool {
         self.captured_errors()
             .iter()
             .any(|e| matches!(e, LilleMapError::DuplicateMapAttempted { .. }))
+    }
+
+    fn world_handle_block_count(&self) -> usize {
+        let app = self.app_guard();
+        app.world()
+            .get_resource::<WorldHandle>()
+            .map_or(0, WorldHandle::block_count)
     }
 }
 
@@ -535,36 +534,30 @@ fn map_plugin_supports_safe_unload_and_reload() {
         fixture,
         |scenario: &mut Scenario<MapLifecycleFixture>| {
             scenario.when("a loaded map is unloaded", |ctx| {
-                ctx.before_each(|state| {
+                ctx.then("spawned actors are despawned without errors", |state| {
                     let loaded = state.tick_until_map_loaded(MAX_LOAD_TICKS);
                     assert!(loaded, "map should load within {MAX_LOAD_TICKS} ticks");
 
                     state.trigger_unload();
                     state.tick();
-                });
 
-                ctx.then("spawned actors are despawned", |state| {
                     assert_eq!(
                         state.map_spawned_count(),
                         0,
                         "all MapSpawned entities should be despawned"
                     );
-                });
 
-                ctx.then("DBSP world handle reflects empty state", |state| {
-                    // Tick again to let DBSP sync run
+                    assert!(
+                        !state.has_duplicate_map_error(),
+                        "unload should not cause duplicate map errors"
+                    );
+
+                    // Tick again to let DBSP sync run and clear the world handle.
                     state.tick();
                     assert_eq!(
                         state.world_handle_block_count(),
                         0,
-                        "blocks should be removed from world handle"
-                    );
-                });
-
-                ctx.then("no duplicate map errors are present", |state| {
-                    assert!(
-                        !state.has_duplicate_map_error(),
-                        "unload should not cause duplicate map errors"
+                        "DBSP world handle should reflect empty state after unload"
                     );
                 });
             });

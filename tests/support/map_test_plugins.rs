@@ -106,6 +106,9 @@ pub fn map_test_app() -> App {
 /// Returns errors captured by the map error capture observer.
 ///
 /// Requires `install_map_error_capture` to have been called on the app.
+// Note: #[expect(dead_code)] cannot be used here because it would fail in test
+// binaries that DO use this function (map_lifecycle, map_lifecycle_rspec).
+// The crate-level allow_attributes permit is required for this asymmetric case.
 #[allow(
     dead_code,
     reason = "Used by map_lifecycle tests but not all test binaries."
