@@ -1,12 +1,12 @@
 #![cfg_attr(
-    feature = "test-support",
+    all(feature = "test-support", feature = "render"),
     doc = "Behavioural tests for `PresentationPlugin` using rust-rspec."
 )]
 #![cfg_attr(
-    not(feature = "test-support"),
-    doc = "Behavioural tests require `test-support`."
+    not(all(feature = "test-support", feature = "render")),
+    doc = "Behavioural tests require `test-support` and `render` features."
 )]
-#![cfg(feature = "test-support")]
+#![cfg(all(feature = "test-support", feature = "render"))]
 //! Behavioural test: `PresentationPlugin` spawns a camera with `CameraController` marker.
 //!
 //! This file contains a single test because it ticks the Bevy app under

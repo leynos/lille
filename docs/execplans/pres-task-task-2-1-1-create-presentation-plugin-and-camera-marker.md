@@ -108,11 +108,13 @@ Thresholds that trigger escalation when breached:
     `src/main.rs` (line 1). Presentation is meaningless without rendering.
   - Date/Author: 2026-01-08 / Planning phase
 
-- **Decision**: Use `Camera2d` with explicit `OrthographicProjection` component
+- **Decision**: Use `Camera2d` and rely on Required Components for projection
   - Rationale: Design doc (`docs/lille-presentational-layer.md` lines 121-124)
-    specifies spawning "Camera2d plus a 2D Projection". Explicit projection
-    allows future zoom control (Task 2.1.3).
-  - Date/Author: 2026-01-08 / Planning phase
+    specifies spawning "Camera2d plus a 2D Projection". Bevy 0.17's Required
+    Components mechanism automatically inserts `Projection` when `Camera2d` is
+    spawned, making explicit `OrthographicProjection` unnecessary. Future zoom
+    control (Task 2.1.3) can query/mutate the auto-inserted component.
+  - Date/Author: 2026-01-08 / Planning phase (updated during implementation)
 
 - **Decision**: Remove `should_bootstrap_camera` setting from `LilleMapSettings`
   - Rationale: Setting becomes meaningless once `PresentationPlugin` owns camera
