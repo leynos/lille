@@ -84,7 +84,6 @@ fn map_plugin_disabled_spawn_leaves_dbsp_authoritative_and_is_idempotent() {
     let fixture = MapPluginFixture::bootstrap_with_settings(LilleMapSettings {
         primary_map: MapAssetPath::from(PRIMARY_ISOMETRIC_MAP_PATH),
         should_spawn_primary_map: false,
-        should_bootstrap_camera: false,
     });
 
     run_serial(&rspec::given(

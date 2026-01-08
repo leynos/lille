@@ -4,6 +4,11 @@
 //! [`FontFetcher`], checks its SHA-256 digest and writes the verified font to
 //! disk. This ensures deterministic builds without shipping the font in the
 //! repository.
+//!
+//! Build scripts require ambient filesystem authority to create asset
+//! directories and write files to paths determined by Cargo environment
+//! variables. The `cap_std` capability model cannot be applied here because
+//! Cargo does not provide directory handles.
 use anyhow::{anyhow, Context, Result};
 use reqwest::blocking::Client;
 use sha2::{Digest, Sha256};

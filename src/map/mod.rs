@@ -96,8 +96,6 @@ pub struct LilleMapSettings {
     pub primary_map: MapAssetPath,
     /// When true, the plugin spawns the primary map in `Startup`.
     pub should_spawn_primary_map: bool,
-    /// When true, the plugin spawns a minimal `Camera2d` if none exists.
-    pub should_bootstrap_camera: bool,
 }
 
 impl Default for LilleMapSettings {
@@ -105,7 +103,6 @@ impl Default for LilleMapSettings {
         Self {
             primary_map: MapAssetPath::default(),
             should_spawn_primary_map: true,
-            should_bootstrap_camera: true,
         }
     }
 }
@@ -196,10 +193,6 @@ pub struct PrimaryMapUnloaded;
 #[derive(Component, Debug, Default)]
 pub struct PrimaryTiledMap;
 
-#[cfg(feature = "render")]
-#[derive(Component, Debug)]
-struct MapBootstrapCamera;
-
 #[derive(Resource, Default)]
 struct LilleMapPluginInstalled;
 
@@ -265,27 +258,6 @@ struct PrimaryMapSpawnContext<'w, 's> {
     settings: Res<'w, LilleMapSettings>,
     existing_maps: Query<'w, 's, (), With<PrimaryTiledMap>>,
     tracking: ResMut<'w, PrimaryMapAssetTracking>,
-}
-
-#[cfg(feature = "render")]
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "Bevy system parameters use `Res<T>` by value."
-)]
-fn bootstrap_camera_if_missing(
-    mut commands: Commands,
-    settings: Res<LilleMapSettings>,
-    cameras: Query<(), With<Camera2d>>,
-) {
-    if !settings.should_bootstrap_camera || !cameras.is_empty() {
-        return;
-    }
-
-    commands.spawn((
-        Camera2d,
-        Name::new("MapBootstrapCamera"),
-        MapBootstrapCamera,
-    ));
 }
 
 fn spawn_primary_map_if_enabled(mut commands: Commands, mut context: PrimaryMapSpawnContext) {
@@ -520,8 +492,6 @@ impl Plugin for LilleMapPlugin {
         app.init_resource::<PrimaryMapAssetTracking>();
         app.init_resource::<NpcIdCounter>();
         try_spawn_primary_map_on_build(app);
-        #[cfg(feature = "render")]
-        app.add_systems(Startup, bootstrap_camera_if_missing);
         app.add_systems(PostStartup, spawn_primary_map_if_enabled);
         app.add_systems(
             Update,

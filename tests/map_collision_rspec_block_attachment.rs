@@ -59,7 +59,6 @@ impl BlockAttachmentFixture {
         app.insert_resource(LilleMapSettings {
             primary_map: MapAssetPath::from(CUSTOM_PROPERTIES_MAP_PATH),
             should_spawn_primary_map: true,
-            should_bootstrap_camera: false,
         });
         app.add_plugins(LilleMapPlugin);
 

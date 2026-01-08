@@ -29,7 +29,6 @@ fn missing_primary_map_triggers_error_and_map_does_not_load(mut map_test_app: Ap
     map_test_app.insert_resource(LilleMapSettings {
         primary_map: MapAssetPath::from("maps/does-not-exist.tmx"),
         should_spawn_primary_map: true,
-        should_bootstrap_camera: false,
     });
 
     map_test_app.add_plugins(LilleMapPlugin);

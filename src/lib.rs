@@ -14,6 +14,9 @@ mod macros;
 pub mod map;
 pub mod numeric;
 pub mod physics;
+#[cfg(feature = "render")]
+#[cfg_attr(docsrs, doc(cfg(feature = "render")))]
+pub mod presentation;
 pub mod vector_math;
 pub mod world_handle;
 pub use constants::*;
@@ -50,6 +53,9 @@ pub use logging::init as init_logging;
 #[cfg_attr(docsrs, doc(cfg(feature = "map")))]
 pub use map::LilleMapPlugin;
 pub use physics::{applied_acceleration, apply_ground_friction};
+#[cfg(feature = "render")]
+#[cfg_attr(docsrs, doc(cfg(feature = "render")))]
+pub use presentation::{CameraController, PresentationPlugin};
 pub use vector_math::{vec_mag, vec_normalize};
 pub use world_handle::{init_world_handle_system, WorldHandle};
 
