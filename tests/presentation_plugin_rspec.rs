@@ -127,12 +127,15 @@ fn presentation_plugin_spawns_camera_with_controller_marker() {
                     );
                 });
 
-                ctx.then("the camera has both Camera2d and CameraController", |state| {
-                    assert!(
-                        state.camera_is_properly_configured(),
-                        "expected camera to have both Camera2d and CameraController"
-                    );
-                });
+                ctx.then(
+                    "the camera has both Camera2d and CameraController",
+                    |state| {
+                        assert!(
+                            state.camera_is_properly_configured(),
+                            "expected camera to have both Camera2d and CameraController"
+                        );
+                    },
+                );
 
                 ctx.then("the camera is named PresentationCamera", |state| {
                     assert_eq!(

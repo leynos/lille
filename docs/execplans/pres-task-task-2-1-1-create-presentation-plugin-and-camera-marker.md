@@ -70,13 +70,15 @@ Thresholds that trigger escalation when breached:
 ## Progress
 
 - [x] (2026-01-08) Stage A: Understand current camera bootstrap mechanism
-- [x] (2026-01-08) Stage B: Create `src/presentation.rs` with `PresentationPlugin` skeleton
+- [x] (2026-01-08) Stage B: Create `src/presentation.rs` with
+      `PresentationPlugin` skeleton
 - [x] (2026-01-08) Stage C: Define `CameraController` marker component
 - [x] (2026-01-08) Stage D: Implement `camera_setup` Startup system
 - [x] (2026-01-08) Stage E: Wire module into `src/lib.rs` and `src/main.rs`
 - [x] (2026-01-08) Stage F: Remove legacy camera bootstrap from `LilleMapPlugin`
 - [x] (2026-01-08) Stage G: Add unit tests for component definitions
-- [x] (2026-01-08) Stage H: Add behavioural test (rust-rspec) verifying camera spawns
+- [x] (2026-01-08) Stage H: Add behavioural test (rust-rspec) verifying camera
+      spawns
 - [x] (2026-01-08) Stage I: Run quality gates (fmt, lint, test)
 - [x] (2026-01-08) Stage J: Update roadmap to mark task complete
 - [x] (2026-01-08) Stage K: Commit with descriptive message
