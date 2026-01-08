@@ -53,7 +53,6 @@ impl MapLifecycleFixture {
         app.insert_resource(LilleMapSettings {
             primary_map: MapAssetPath::from(TEST_MAP_PATH),
             should_spawn_primary_map: true,
-            should_bootstrap_camera: false,
         });
         app.add_plugins(LilleMapPlugin);
 

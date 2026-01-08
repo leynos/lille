@@ -7,7 +7,7 @@ use bevy::prelude::*;
 use clap::Parser;
 #[cfg(feature = "map")]
 use lille::LilleMapPlugin;
-use lille::{init_logging, DbspPlugin};
+use lille::{init_logging, DbspPlugin, PresentationPlugin};
 
 /// A realtime strategy game
 #[derive(Parser)]
@@ -31,6 +31,7 @@ fn main() -> Result<()> {
     let mut app = App::new();
     app.add_plugins(DefaultPlugins.build().disable::<LogPlugin>());
     app.add_plugins(DbspPlugin);
+    app.add_plugins(PresentationPlugin);
 
     #[cfg(feature = "map")]
     {

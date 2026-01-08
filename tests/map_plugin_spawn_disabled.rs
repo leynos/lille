@@ -25,7 +25,6 @@ fn does_not_spawn_primary_map_when_disabled() {
     app.insert_resource(LilleMapSettings {
         primary_map: MapAssetPath::from(PRIMARY_ISOMETRIC_MAP_PATH),
         should_spawn_primary_map: false,
-        should_bootstrap_camera: false,
     });
 
     app.add_plugins(LilleMapPlugin);

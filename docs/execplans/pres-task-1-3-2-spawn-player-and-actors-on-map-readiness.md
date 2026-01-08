@@ -77,10 +77,10 @@ Created `src/map/spawn.rs` containing:
 
 ### ID Assignment Strategy
 
-| Entity | ID Source                                       |
-| ------ | ----------------------------------------------- |
-| Player | `spawn_entity.to_bits() as i64`                 |
-| NPC    | `NPC_ID_BASE (i64::MIN) + NpcIdCounter.0`       |
+| Entity | ID Source                                 |
+| ------ | ----------------------------------------- |
+| Player | `spawn_entity.to_bits() as i64`           |
+| NPC    | `NPC_ID_BASE (i64::MIN) + NpcIdCounter.0` |
 
 The offset ensures no collision between player entity bits and NPC IDs. The
 `NpcIdCounter` resource persists across map loads within a session, preventing

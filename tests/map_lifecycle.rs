@@ -34,7 +34,6 @@ fn test_app() -> App {
     app.insert_resource(LilleMapSettings {
         primary_map: MapAssetPath::from(PRIMARY_ISOMETRIC_MAP_PATH),
         should_spawn_primary_map: false,
-        should_bootstrap_camera: false,
     });
     app.add_plugins(LilleMapPlugin);
     app.finish();

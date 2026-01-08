@@ -25,7 +25,6 @@ fn invalid_primary_map_path_triggers_error(mut map_test_app: App) {
     map_test_app.insert_resource(LilleMapSettings {
         primary_map: MapAssetPath::from("/not-a-valid-asset-path.tmx"),
         should_spawn_primary_map: true,
-        should_bootstrap_camera: false,
     });
 
     map_test_app.add_plugins(LilleMapPlugin);

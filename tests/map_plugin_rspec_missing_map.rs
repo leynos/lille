@@ -52,7 +52,6 @@ impl MapPluginFixture {
         app.insert_resource(LilleMapSettings {
             primary_map: MapAssetPath::from("maps/does-not-exist.tmx"),
             should_spawn_primary_map: true,
-            should_bootstrap_camera: false,
         });
 
         map_test_plugins::install_map_error_capture(&mut app);

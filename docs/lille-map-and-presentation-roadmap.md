@@ -110,7 +110,7 @@ between simulation and presentation.
 What we will build: A dedicated `PresentationPlugin` that owns camera setup and
 input handling while remaining a passive observer of simulation state.
 
-- [ ] Task 2.1.1 — Create PresentationPlugin and camera marker
+- [x] Task 2.1.1 — Create PresentationPlugin and camera marker
   - Outcome: `src/presentation.rs` defines `PresentationPlugin`, spawns a
     `Camera2d` with a 2D `Projection`, and tags it with a `CameraController`
     component.
