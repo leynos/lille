@@ -7,7 +7,8 @@ use bevy::prelude::*;
 use clap::Parser;
 #[cfg(feature = "map")]
 use lille::LilleMapPlugin;
-use lille::{init_logging, DbspPlugin, PresentationPlugin};
+use lille::PresentationPlugin;
+use lille::{init_logging, DbspPlugin};
 
 /// A realtime strategy game
 #[derive(Parser)]

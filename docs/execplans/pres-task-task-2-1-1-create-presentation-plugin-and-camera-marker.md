@@ -16,7 +16,8 @@ camera setup. After this change, the application will render through a camera
 spawned by `PresentationPlugin` rather than the temporary bootstrap camera in
 `LilleMapPlugin`. This separates rendering concerns from map loading, allowing
 the presentation layer to evolve independently (panning, zooming, Y-sorting in
-later tasks) whilst keeping the simulation authoritative via the DBSP circuit.
+later tasks) whilst keeping the simulation authoritative via the Differential
+Dataflow-Based Stream Processing (DBSP) circuit.
 
 The user-visible outcome: launching the game produces the same visual output,
 but the camera is now controlled by a dedicated presentation module that can be
@@ -165,7 +166,8 @@ superseded by `PresentationPlugin` in Task 2.1.1.
 
 ### Test Infrastructure
 
-- `tests/support/rspec_runner.rs` - `run_serial()` function for BDD tests
+- `tests/support/rspec_runner.rs` - `run_serial()` function for behaviour-driven
+  development (BDD) tests
 - `tests/support/map_fixture.rs` - `MapPluginFixtureBase` pattern
 - `tests/support/thread_safe_app.rs` - `SharedApp` wrapper
 - `tests/support/map_test_plugins.rs` - Headless test plugin helpers
@@ -174,7 +176,9 @@ superseded by `PresentationPlugin` in Task 2.1.1.
 
 DBSP systems run in `Update` schedule (or `PostUpdate` with feature flag):
 
-    cache_state_for_dbsp_system → apply_dbsp_outputs_system
+```text
+cache_state_for_dbsp_system → apply_dbsp_outputs_system
+```
 
 Presentation systems needing current transforms must use
 `.after(apply_dbsp_outputs_system)`. This task (2.1.1) only creates the camera;
@@ -203,9 +207,11 @@ Create `src/presentation.rs` with:
 
 In `src/presentation.rs`, define:
 
-    #[derive(Component, Reflect, Default, Debug, Clone, Copy, PartialEq, Eq)]
-    #[reflect(Component, Default)]
-    pub struct CameraController;
+```rust
+#[derive(Component, Reflect, Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[reflect(Component, Default)]
+pub struct CameraController;
+```
 
 This follows the pattern from `src/map/mod.rs` (e.g., `Collidable` line 114).
 
@@ -220,19 +226,23 @@ Create Startup system that:
 
 Example:
 
-    fn camera_setup(mut commands: Commands) {
-        commands.spawn((
-            Camera2d,
-            OrthographicProjection::default_2d(),
-            CameraController,
-            Name::new("PresentationCamera"),
-        ));
-    }
+```rust
+fn camera_setup(mut commands: Commands) {
+    commands.spawn((
+        Camera2d,
+        OrthographicProjection::default_2d(),
+        CameraController,
+        Name::new("PresentationCamera"),
+    ));
+}
+```
 
 Register in plugin's `build()` method:
 
-    app.register_type::<CameraController>();
-    app.add_systems(Startup, camera_setup);
+```rust
+app.register_type::<CameraController>();
+app.add_systems(Startup, camera_setup);
+```
 
 ### Stage E: Wire Module into Crate
 
@@ -277,9 +287,11 @@ Create `tests/presentation_plugin_rspec.rs`:
 
 Execute in order:
 
-    make check-fmt 2>&1 | tee /tmp/fmt.log
-    make lint 2>&1 | tee /tmp/lint.log
-    make test 2>&1 | tee /tmp/test.log
+```shell
+make check-fmt 2>&1 | tee /tmp/fmt.log
+make lint 2>&1 | tee /tmp/lint.log
+make test 2>&1 | tee /tmp/test.log
+```
 
 Fix any failures before proceeding.
 
@@ -287,29 +299,35 @@ Fix any failures before proceeding.
 
 In `docs/lille-map-and-presentation-roadmap.md`, change line 113:
 
-    - [ ] Task 2.1.1
+```markdown
+- [ ] Task 2.1.1
+```
 
 To:
 
-    - [x] Task 2.1.1
+```markdown
+- [x] Task 2.1.1
+```
 
 ### Stage K: Commit
 
 Create atomic commit with message:
 
-    Add PresentationPlugin with CameraController marker
+```text
+Add PresentationPlugin with CameraController marker
 
-    Introduce src/presentation.rs defining PresentationPlugin, which spawns
-    a Camera2d with CameraController marker component. This supersedes the
-    temporary bootstrap camera in LilleMapPlugin.
+Introduce src/presentation.rs defining PresentationPlugin, which spawns
+a Camera2d with CameraController marker component. This supersedes the
+temporary bootstrap camera in LilleMapPlugin.
 
-    - Add CameraController component with Reflect derives
-    - Add camera_setup Startup system spawning presentation camera
-    - Remove MapBootstrapCamera and bootstrap_camera_if_missing from map module
-    - Remove should_bootstrap_camera setting from LilleMapSettings
-    - Add behavioural test verifying camera spawns with marker
+- Add CameraController component with Reflect derives
+- Add camera_setup Startup system spawning presentation camera
+- Remove MapBootstrapCamera and bootstrap_camera_if_missing from map module
+- Remove should_bootstrap_camera setting from LilleMapSettings
+- Add behavioural test verifying camera spawns with marker
 
-    Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+```
 
 ## Concrete Steps
 
@@ -337,9 +355,11 @@ Write `tests/presentation_plugin_rspec.rs`.
 
 ### 6. Run validation
 
-    make check-fmt 2>&1 | tee /tmp/fmt.log
-    make lint 2>&1 | tee /tmp/lint.log
-    make test 2>&1 | tee /tmp/test.log
+```shell
+make check-fmt 2>&1 | tee /tmp/fmt.log
+make lint 2>&1 | tee /tmp/lint.log
+make test 2>&1 | tee /tmp/test.log
+```
 
 Expected: All pass with no warnings.
 
@@ -349,24 +369,26 @@ Mark Task 2.1.1 as complete in roadmap.
 
 ### 8. Commit
 
-    git add src/presentation.rs src/lib.rs src/main.rs src/map/mod.rs \
-        tests/presentation_plugin_rspec.rs docs/lille-map-and-presentation-roadmap.md
-    git commit -m "$(cat <<'EOF'
-    Add PresentationPlugin with CameraController marker
+```shell
+git add src/presentation.rs src/lib.rs src/main.rs src/map/mod.rs \
+    tests/presentation_plugin_rspec.rs docs/lille-map-and-presentation-roadmap.md
+git commit -m "$(cat <<'EOF'
+Add PresentationPlugin with CameraController marker
 
-    Introduce src/presentation.rs defining PresentationPlugin, which spawns
-    a Camera2d with CameraController marker component. This supersedes the
-    temporary bootstrap camera in LilleMapPlugin.
+Introduce src/presentation.rs defining PresentationPlugin, which spawns
+a Camera2d with CameraController marker component. This supersedes the
+temporary bootstrap camera in LilleMapPlugin.
 
-    - Add CameraController component with Reflect derives
-    - Add camera_setup Startup system spawning presentation camera
-    - Remove MapBootstrapCamera and bootstrap_camera_if_missing from map module
-    - Remove should_bootstrap_camera setting from LilleMapSettings
-    - Add behavioural test verifying camera spawns with marker
+- Add CameraController component with Reflect derives
+- Add camera_setup Startup system spawning presentation camera
+- Remove MapBootstrapCamera and bootstrap_camera_if_missing from map module
+- Remove should_bootstrap_camera setting from LilleMapSettings
+- Add behavioural test verifying camera spawns with marker
 
-    Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
-    EOF
-    )"
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+EOF
+)"
+```
 
 ## Validation and Acceptance
 
@@ -380,7 +402,9 @@ Mark Task 2.1.1 as complete in roadmap.
 
 ### Quality Method
 
-    make check-fmt && make lint && make test
+```shell
+make check-fmt && make lint && make test
+```
 
 ### Acceptance Behaviour
 
@@ -400,40 +424,46 @@ After implementation:
 - Module creation is idempotent (overwrites existing file)
 - Git commit is safe to amend if not yet pushed
 
-## Artifacts and Notes
+## Artefacts and Notes
 
 ### Expected File Structure After Implementation
 
-    src/
-      presentation.rs    # NEW - ~80 lines
-      lib.rs             # MODIFIED - add module + exports
-      main.rs            # MODIFIED - add plugin
-      map/
-        mod.rs           # MODIFIED - remove bootstrap camera
-    tests/
-      presentation_plugin_rspec.rs  # NEW - ~80 lines
+```text
+src/
+  presentation.rs    # NEW - ~80 lines
+  lib.rs             # MODIFIED - add module + exports
+  main.rs            # MODIFIED - add plugin
+  map/
+    mod.rs           # MODIFIED - remove bootstrap camera
+tests/
+  presentation_plugin_rspec.rs  # NEW - ~80 lines
+```
 
 ### Component Definition Pattern (from src/map/mod.rs)
 
-    #[derive(Component, Reflect, Default, Debug, Clone, Copy, PartialEq, Eq)]
-    #[reflect(Component, Default)]
-    pub struct MarkerName;
+```rust
+#[derive(Component, Reflect, Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[reflect(Component, Default)]
+pub struct MarkerName;
+```
 
 ### Test Fixture Pattern (from tests/support/map_fixture.rs)
 
-    #[derive(Debug, Clone)]
-    struct PresentationPluginFixture {
-        base: MapPluginFixtureBase,
-    }
+```rust
+#[derive(Debug, Clone)]
+struct PresentationPluginFixture {
+    base: MapPluginFixtureBase,
+}
 
-    impl PresentationPluginFixture {
-        fn bootstrap() -> Self {
-            let mut app = App::new();
-            map_test_plugins::add_map_test_plugins(&mut app);
-            app.add_plugins(PresentationPlugin);
-            Self { base: MapPluginFixtureBase::new(app) }
-        }
+impl PresentationPluginFixture {
+    fn bootstrap() -> Self {
+        let mut app = App::new();
+        map_test_plugins::add_map_test_plugins(&mut app);
+        app.add_plugins(PresentationPlugin);
+        Self { base: MapPluginFixtureBase::new(app) }
     }
+}
+```
 
 ## Interfaces and Dependencies
 
@@ -441,27 +471,31 @@ After implementation:
 
 In `src/presentation.rs`:
 
-    /// Marker component for the main presentation camera.
-    #[derive(Component, Reflect, Default, Debug, Clone, Copy, PartialEq, Eq)]
-    #[reflect(Component, Default)]
-    pub struct CameraController;
+```rust
+/// Marker component for the main presentation camera.
+#[derive(Component, Reflect, Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[reflect(Component, Default)]
+pub struct CameraController;
 
-    /// Plugin owning camera setup and presentation layer systems.
-    pub struct PresentationPlugin;
+/// Plugin owning camera setup and presentation layer systems.
+pub struct PresentationPlugin;
 
-    impl Plugin for PresentationPlugin {
-        fn build(&self, app: &mut App) { … }
-    }
+impl Plugin for PresentationPlugin {
+    fn build(&self, app: &mut App) { /* … */ }
+}
+```
 
 ### Re-exports in `src/lib.rs`
 
-    #[cfg(feature = "render")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "render")))]
-    pub mod presentation;
+```rust
+#[cfg(feature = "render")]
+#[cfg_attr(docsrs, doc(cfg(feature = "render")))]
+pub mod presentation;
 
-    #[cfg(feature = "render")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "render")))]
-    pub use presentation::{PresentationPlugin, CameraController};
+#[cfg(feature = "render")]
+#[cfg_attr(docsrs, doc(cfg(feature = "render")))]
+pub use presentation::{PresentationPlugin, CameraController};
+```
 
 ### Dependencies
 

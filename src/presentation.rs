@@ -69,16 +69,21 @@ impl Plugin for PresentationPlugin {
     }
 }
 
-/// Spawns the presentation camera at startup.
+/// Spawns the presentation camera at startup if no camera exists.
 ///
 /// Creates a `Camera2d` entity with:
 /// - `CameraController` marker for presentation layer queries
 /// - `Name` component for inspector visibility
 ///
+/// If a `Camera2d` already exists (e.g. spawned by the host application), this
+/// system does nothing to avoid creating duplicate cameras.
+///
 /// Bevy's Required Components mechanism automatically inserts
 /// `OrthographicProjection` and other camera infrastructure.
-fn camera_setup(mut commands: Commands) {
-    commands.spawn((Camera2d, CameraController, Name::new("PresentationCamera")));
+fn camera_setup(mut commands: Commands, cameras: Query<&Camera2d>) {
+    if cameras.is_empty() {
+        commands.spawn((Camera2d, CameraController, Name::new("PresentationCamera")));
+    }
 }
 
 #[cfg(test)]
