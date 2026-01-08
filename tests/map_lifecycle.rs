@@ -12,6 +12,9 @@
 #[path = "support/map_test_plugins.rs"]
 mod map_test_plugins;
 
+#[path = "support/map_error_helpers.rs"]
+mod map_error_helpers;
+
 use bevy::prelude::*;
 use lille::map::NpcIdCounter;
 use lille::map::{
@@ -52,7 +55,7 @@ fn spawn_mock_map_spawned_entity(world: &mut World) -> Entity {
 }
 
 fn captured_errors(app: &App) -> Vec<LilleMapError> {
-    map_test_plugins::captured_errors(app)
+    map_error_helpers::captured_errors(app)
 }
 
 // -- Tests --
@@ -168,6 +171,31 @@ fn can_load_new_map_after_unload(mut test_app: App) {
     // Unload.
     test_app.world_mut().trigger(UnloadPrimaryMap);
     test_app.update();
+
+    // Verify the unload actually cleared the map entity.
+    {
+        let mut query = test_app
+            .world_mut()
+            .query_filtered::<Entity, With<PrimaryTiledMap>>();
+        assert_eq!(
+            query.iter(test_app.world()).count(),
+            0,
+            "PrimaryTiledMap should be despawned after unload"
+        );
+    }
+
+    // Verify tracking state is reset, which would allow a new map to load.
+    {
+        let tracking = test_app.world().resource::<PrimaryMapAssetTracking>();
+        assert!(
+            tracking.asset_path.is_none(),
+            "tracking.asset_path should be None after unload, allowing new map loads"
+        );
+        assert!(
+            tracking.handle.is_none(),
+            "tracking.handle should be None after unload"
+        );
+    }
 
     // Attempt to spawn (should succeed without duplicate error since unload cleared state).
     // NOTE: The spawn system runs in PostStartup (one-shot), so we cannot verify a new

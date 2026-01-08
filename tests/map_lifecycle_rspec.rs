@@ -24,6 +24,9 @@ mod rspec_runner;
 #[path = "support/map_fixture.rs"]
 mod map_fixture;
 
+#[path = "support/map_error_helpers.rs"]
+mod map_error_helpers;
+
 use std::sync::MutexGuard;
 
 use bevy::prelude::*;
@@ -94,7 +97,7 @@ impl MapLifecycleFixture {
 
     fn captured_errors(&self) -> Vec<LilleMapError> {
         let app = self.app_guard();
-        map_test_plugins::captured_errors(&app)
+        map_error_helpers::captured_errors(&app)
     }
 
     fn has_duplicate_map_error(&self) -> bool {
