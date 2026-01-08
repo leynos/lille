@@ -1,0 +1,8 @@
+# Dylint configuration for custom lint rules.
+#
+# Build scripts require ambient filesystem authority since Cargo provides paths
+# rather than directory handles. The `cap_std` capability model cannot be
+# applied in this context.
+
+[no_std_fs_operations]
+excluded_crates = ["build_support"]
