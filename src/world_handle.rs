@@ -61,6 +61,12 @@ impl WorldHandle {
     pub fn entity_count(&self) -> usize {
         self.entities.len()
     }
+
+    /// Returns the number of blocks in the world.
+    #[must_use]
+    pub const fn block_count(&self) -> usize {
+        self.blocks.len()
+    }
 }
 
 /// Inserts an empty [`WorldHandle`] resource.
