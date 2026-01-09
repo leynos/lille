@@ -167,7 +167,7 @@ fn camera_pans_with_wasd_keys() {
         |scenario: &mut Scenario<CameraPanFixture>| {
             scenario.when("the app initialises", |ctx| {
                 ctx.before_each(|state| {
-                    state.tick(); // Finalise plugins and spawn camera
+                    state.tick(); // Finalize plugins and spawn camera
                 });
 
                 ctx.then("camera starts at origin", |state| {
