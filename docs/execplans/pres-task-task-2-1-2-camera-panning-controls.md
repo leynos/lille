@@ -246,7 +246,7 @@ Create `tests/camera_panning_rspec.rs` following the pattern in
   - Arrow keys equivalent to WASD
   - Diagonal movement is normalized
 
-### Stage F: Quality Gates and Finalisation
+### Stage F: Quality Gates and Finalization
 
 1. Run `make check-fmt && make lint && make test`
 2. Fix any issues
