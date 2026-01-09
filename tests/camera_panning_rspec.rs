@@ -123,11 +123,40 @@ impl CameraPanFixture {
     }
 }
 
-#[test]
+/// Helper to test that pressing a key moves the camera in the expected direction.
 #[expect(
-    clippy::too_many_lines,
-    reason = "BDD test with multiple scenarios cannot be easily split."
+    clippy::too_many_arguments,
+    reason = "Test helper with semantically distinct parameters for BDD scenario construction"
 )]
+fn test_key_movement<F>(
+    scenario: &mut Scenario<CameraPanFixture>,
+    key: KeyCode,
+    when_desc: &'static str,
+    then_desc: &'static str,
+    assertion: F,
+    error_msg: &'static str,
+) where
+    F: Fn(&Vec3) -> bool + Clone + 'static,
+{
+    scenario.when(when_desc, move |ctx| {
+        ctx.before_each(move |state| {
+            state.reset_state();
+            state.tick();
+            state.press_key(key);
+            state.tick();
+        });
+
+        let check = assertion.clone();
+        ctx.then(then_desc, move |state| {
+            let pos = state
+                .camera_position()
+                .unwrap_or_else(|| panic!("camera should exist"));
+            assert!(check(&pos), "{error_msg}, got {pos:?}");
+        });
+    });
+}
+
+#[test]
 fn camera_pans_with_wasd_keys() {
     let fixture = CameraPanFixture::bootstrap();
 
@@ -149,73 +178,38 @@ fn camera_pans_with_wasd_keys() {
                 });
             });
 
-            scenario.when("W key is pressed", |ctx| {
-                ctx.before_each(|state| {
-                    state.reset_state();
-                    state.tick(); // Initial tick
-                    state.press_key(KeyCode::KeyW);
-                    state.tick(); // Process input
-                });
-
-                ctx.then("camera moves up (positive Y)", |state| {
-                    let pos = state.camera_position().expect("camera should exist");
-                    assert!(
-                        pos.y > 0.0,
-                        "camera Y should increase when W pressed, got {pos:?}"
-                    );
-                });
-            });
-
-            scenario.when("S key is pressed", |ctx| {
-                ctx.before_each(|state| {
-                    state.reset_state();
-                    state.tick();
-                    state.press_key(KeyCode::KeyS);
-                    state.tick();
-                });
-
-                ctx.then("camera moves down (negative Y)", |state| {
-                    let pos = state.camera_position().expect("camera should exist");
-                    assert!(
-                        pos.y < 0.0,
-                        "camera Y should decrease when S pressed, got {pos:?}"
-                    );
-                });
-            });
-
-            scenario.when("A key is pressed", |ctx| {
-                ctx.before_each(|state| {
-                    state.reset_state();
-                    state.tick();
-                    state.press_key(KeyCode::KeyA);
-                    state.tick();
-                });
-
-                ctx.then("camera moves left (negative X)", |state| {
-                    let pos = state.camera_position().expect("camera should exist");
-                    assert!(
-                        pos.x < 0.0,
-                        "camera X should decrease when A pressed, got {pos:?}"
-                    );
-                });
-            });
-
-            scenario.when("D key is pressed", |ctx| {
-                ctx.before_each(|state| {
-                    state.reset_state();
-                    state.tick();
-                    state.press_key(KeyCode::KeyD);
-                    state.tick();
-                });
-
-                ctx.then("camera moves right (positive X)", |state| {
-                    let pos = state.camera_position().expect("camera should exist");
-                    assert!(
-                        pos.x > 0.0,
-                        "camera X should increase when D pressed, got {pos:?}"
-                    );
-                });
-            });
+            test_key_movement(
+                scenario,
+                KeyCode::KeyW,
+                "W key is pressed",
+                "camera moves up (positive Y)",
+                |pos| pos.y > 0.0,
+                "camera Y should increase when W pressed",
+            );
+            test_key_movement(
+                scenario,
+                KeyCode::KeyS,
+                "S key is pressed",
+                "camera moves down (negative Y)",
+                |pos| pos.y < 0.0,
+                "camera Y should decrease when S pressed",
+            );
+            test_key_movement(
+                scenario,
+                KeyCode::KeyA,
+                "A key is pressed",
+                "camera moves left (negative X)",
+                |pos| pos.x < 0.0,
+                "camera X should decrease when A pressed",
+            );
+            test_key_movement(
+                scenario,
+                KeyCode::KeyD,
+                "D key is pressed",
+                "camera moves right (positive X)",
+                |pos| pos.x > 0.0,
+                "camera X should increase when D pressed",
+            );
         },
     ));
 }
