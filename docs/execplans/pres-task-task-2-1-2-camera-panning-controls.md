@@ -76,15 +76,34 @@ Diagonal movement (e.g., W+D) moves at the same speed as cardinal movement.
 
 ## Surprises & Discoveries
 
-(To be updated during implementation)
+No surprises encountered. The implementation proceeded as planned with all APIs
+behaving as documented.
 
 ## Decision Log
 
-(To be updated during implementation)
+- **Decision**: Use `PanInput` struct instead of four boolean parameters.
+  Rationale: Improves readability and allows future extension (e.g., analog
+  input). Date: Implementation phase.
+
+- **Decision**: Guard against non-positive `max_delta_seconds` by clamping to
+  `f32::EPSILON`. Rationale: Prevents division by zero or negative delta values
+  that could cause unexpected camera behaviour. Date: PR review feedback.
+
+- **Decision**: Use match-based `axis` helper function for direction
+  calculation. Rationale: More explicit than arithmetic approach, easier to
+  verify correctness. Date: PR review feedback.
 
 ## Outcomes & Retrospective
 
-(To be completed after implementation)
+Implementation completed successfully. All progress items achieved:
+
+- Camera panning works with WASD and arrow keys
+- Diagonal movement normalized to prevent faster diagonal speed
+- Frame-rate independent via delta time clamping
+- Behavioural and unit tests provide coverage for edge cases
+
+Lessons learned: The pure function approach (`compute_pan_direction`) made unit
+testing straightforward and kept the system function focused on I/O.
 
 ## Context and Orientation
 
@@ -268,7 +287,7 @@ Create `tests/camera_panning_rspec.rs` following the pattern in
 
 ## Concrete Steps
 
-All commands run from `/data/leynos/Projects/lille`.
+All commands run from the repository root.
 
 1. Edit `src/presentation.rs` to add `CameraSettings` resource
 2. Edit `src/presentation.rs` to add `compute_pan_direction` function
