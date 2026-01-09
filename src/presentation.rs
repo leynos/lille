@@ -99,10 +99,10 @@ pub struct PanInput {
     pub right: bool,
 }
 
-/// Computes a normalised pan direction from the given key states.
+/// Computes a normalized pan direction from the given key states.
 ///
 /// Returns `Vec2::ZERO` if no movement keys are pressed.
-/// Diagonal movement is normalised to prevent faster movement when
+/// Diagonal movement is normalized to prevent faster movement when
 /// multiple keys are held simultaneously.
 ///
 /// # Examples
@@ -116,16 +116,26 @@ pub struct PanInput {
 /// let dir = compute_pan_direction(input);
 /// assert!((dir.y - 1.0).abs() < f32::EPSILON);
 ///
-/// // Diagonal: normalised
+/// // Diagonal: normalized
 /// let input = PanInput { up: true, right: true, ..Default::default() };
 /// let diag = compute_pan_direction(input);
 /// assert!((diag.length() - 1.0).abs() < 0.001);
 /// ```
 #[must_use]
 pub fn compute_pan_direction(input: PanInput) -> Vec2 {
-    let x = f32::from(i8::from(input.right) - i8::from(input.left));
-    let y = f32::from(i8::from(input.up) - i8::from(input.down));
+    /// Maps a negative/positive key pair to an axis value.
+    const fn axis(neg: bool, pos: bool) -> f32 {
+        match (neg, pos) {
+            (true, false) => -1.0,
+            (false, true) => 1.0,
+            _ => 0.0,
+        }
+    }
+
+    let x = axis(input.left, input.right);
+    let y = axis(input.down, input.up);
     let raw = Vec2::new(x, y);
+
     if raw == Vec2::ZERO {
         Vec2::ZERO
     } else {
@@ -135,7 +145,7 @@ pub fn compute_pan_direction(input: PanInput) -> Vec2 {
 
 /// Updates camera position based on keyboard input.
 ///
-/// Reads WASD and arrow keys, computes a normalised direction, and moves
+/// Reads WASD and arrow keys, computes a normalized direction, and moves
 /// the camera at the configured speed scaled by `Time.delta_secs()`.
 /// Large delta times are clamped to `CameraSettings.max_delta_seconds`
 /// to prevent extreme jumps during frame hitches.
@@ -161,7 +171,7 @@ pub fn camera_pan_system(
     settings: Res<CameraSettings>,
     mut camera_query: Query<&mut Transform, With<CameraController>>,
 ) {
-    // Defensive: skip if no camera exists (e.g., during initialisation).
+    // Defensive: skip if no camera exists (e.g., during initialization).
     let Ok(mut transform) = camera_query.single_mut() else {
         return;
     };
@@ -179,7 +189,9 @@ pub fn camera_pan_system(
     }
 
     // Clamp delta to prevent teleporting during frame hitches.
-    let delta = time.delta_secs().min(settings.max_delta_seconds);
+    // Guard against non-positive max_delta_seconds to avoid zero or reversed motion.
+    let clamped_max = settings.max_delta_seconds.max(f32::EPSILON);
+    let delta = time.delta_secs().min(clamped_max);
     let velocity = direction * settings.pan_speed * delta;
 
     transform.translation.x += velocity.x;
@@ -295,19 +307,6 @@ mod tests {
 
     // --- compute_pan_direction tests ---
 
-    #[expect(
-        clippy::fn_params_excessive_bools,
-        reason = "Test helper that mirrors the PanInput struct fields."
-    )]
-    fn pan_input(up: bool, down: bool, left: bool, right: bool) -> PanInput {
-        PanInput {
-            up,
-            down,
-            left,
-            right,
-        }
-    }
-
     #[rstest]
     #[case::no_keys(PanInput::default(), Vec2::ZERO)]
     #[case::up_only(PanInput { up: true, ..Default::default() }, Vec2::new(0.0, 1.0))]
@@ -327,27 +326,27 @@ mod tests {
     #[case::up_left(PanInput { up: true, left: true, ..Default::default() })]
     #[case::down_right(PanInput { down: true, right: true, ..Default::default() })]
     #[case::down_left(PanInput { down: true, left: true, ..Default::default() })]
-    fn pan_direction_diagonal_is_normalised(#[case] input: PanInput) {
+    fn pan_direction_diagonal_is_normalized(#[case] input: PanInput) {
         let dir = compute_pan_direction(input);
         assert!(
             (dir.length() - 1.0).abs() < 0.001,
-            "diagonal should be normalised, got length {}",
+            "diagonal should be normalized, got length {}",
             dir.length()
         );
     }
 
     #[rstest]
-    #[case::up_and_down(pan_input(true, true, false, false), Vec2::ZERO)]
-    #[case::left_and_right(pan_input(false, false, true, true), Vec2::ZERO)]
-    #[case::all_keys(pan_input(true, true, true, true), Vec2::ZERO)]
+    #[case::up_and_down(PanInput { up: true, down: true, ..Default::default() }, Vec2::ZERO)]
+    #[case::left_and_right(PanInput { left: true, right: true, ..Default::default() }, Vec2::ZERO)]
+    #[case::all_keys(PanInput { up: true, down: true, left: true, right: true }, Vec2::ZERO)]
     fn pan_direction_opposing_keys_cancel(#[case] input: PanInput, #[case] expected: Vec2) {
         let dir = compute_pan_direction(input);
         assert_eq!(dir, expected, "opposing keys should cancel to zero");
     }
 
     #[rstest]
-    #[case::up_left_and_right(pan_input(true, false, true, true))]
-    #[case::down_left_and_right(pan_input(false, true, true, true))]
+    #[case::up_left_and_right(PanInput { up: true, left: true, right: true, ..Default::default() })]
+    #[case::down_left_and_right(PanInput { down: true, left: true, right: true, ..Default::default() })]
     fn pan_direction_partial_cancellation(#[case] input: PanInput) {
         let dir = compute_pan_direction(input);
         // When left and right cancel, only vertical movement remains.

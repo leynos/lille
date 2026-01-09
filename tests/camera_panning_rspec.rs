@@ -10,7 +10,7 @@
 //! Behavioural test: Camera panning responds to WASD and arrow keys.
 //!
 //! These tests verify that keyboard input correctly moves the camera in the
-//! expected direction and that diagonal movement is normalised.
+//! expected direction and that diagonal movement is normalized.
 
 #[path = "support/map_test_plugins.rs"]
 mod map_test_plugins;
@@ -210,6 +210,25 @@ fn camera_pans_with_wasd_keys() {
                 |pos| pos.x > 0.0,
                 "camera X should increase when D pressed",
             );
+
+            scenario.when("no movement keys are pressed", |ctx| {
+                ctx.before_each(|state| {
+                    state.reset_state();
+                    state.tick();
+                    // No keys pressed
+                    state.tick();
+                });
+
+                ctx.then("camera position remains unchanged", |state| {
+                    let pos = state
+                        .camera_position()
+                        .unwrap_or_else(|| panic!("camera should exist"));
+                    assert!(
+                        pos.x.abs() < 0.001 && pos.y.abs() < 0.001,
+                        "camera should not move when no keys pressed, got {pos:?}"
+                    );
+                });
+            });
         },
     ));
 }
@@ -222,76 +241,44 @@ fn camera_pans_with_arrow_keys() {
         "PresentationPlugin camera responds to arrow key input",
         fixture,
         |scenario: &mut Scenario<CameraPanFixture>| {
-            scenario.when("ArrowUp is pressed", |ctx| {
-                ctx.before_each(|state| {
-                    state.reset_state();
-                    state.tick();
-                    state.press_key(KeyCode::ArrowUp);
-                    state.tick();
-                });
-
-                ctx.then("camera moves up", |state| {
-                    let pos = state.camera_position().expect("camera should exist");
-                    assert!(pos.y > 0.0, "ArrowUp should move camera up, got {pos:?}");
-                });
-            });
-
-            scenario.when("ArrowDown is pressed", |ctx| {
-                ctx.before_each(|state| {
-                    state.reset_state();
-                    state.tick();
-                    state.press_key(KeyCode::ArrowDown);
-                    state.tick();
-                });
-
-                ctx.then("camera moves down", |state| {
-                    let pos = state.camera_position().expect("camera should exist");
-                    assert!(
-                        pos.y < 0.0,
-                        "ArrowDown should move camera down, got {pos:?}"
-                    );
-                });
-            });
-
-            scenario.when("ArrowLeft is pressed", |ctx| {
-                ctx.before_each(|state| {
-                    state.reset_state();
-                    state.tick();
-                    state.press_key(KeyCode::ArrowLeft);
-                    state.tick();
-                });
-
-                ctx.then("camera moves left", |state| {
-                    let pos = state.camera_position().expect("camera should exist");
-                    assert!(
-                        pos.x < 0.0,
-                        "ArrowLeft should move camera left, got {pos:?}"
-                    );
-                });
-            });
-
-            scenario.when("ArrowRight is pressed", |ctx| {
-                ctx.before_each(|state| {
-                    state.reset_state();
-                    state.tick();
-                    state.press_key(KeyCode::ArrowRight);
-                    state.tick();
-                });
-
-                ctx.then("camera moves right", |state| {
-                    let pos = state.camera_position().expect("camera should exist");
-                    assert!(
-                        pos.x > 0.0,
-                        "ArrowRight should move camera right, got {pos:?}"
-                    );
-                });
-            });
+            test_key_movement(
+                scenario,
+                KeyCode::ArrowUp,
+                "ArrowUp is pressed",
+                "camera moves up",
+                |pos| pos.y > 0.0,
+                "ArrowUp should move camera up",
+            );
+            test_key_movement(
+                scenario,
+                KeyCode::ArrowDown,
+                "ArrowDown is pressed",
+                "camera moves down",
+                |pos| pos.y < 0.0,
+                "ArrowDown should move camera down",
+            );
+            test_key_movement(
+                scenario,
+                KeyCode::ArrowLeft,
+                "ArrowLeft is pressed",
+                "camera moves left",
+                |pos| pos.x < 0.0,
+                "ArrowLeft should move camera left",
+            );
+            test_key_movement(
+                scenario,
+                KeyCode::ArrowRight,
+                "ArrowRight is pressed",
+                "camera moves right",
+                |pos| pos.x > 0.0,
+                "ArrowRight should move camera right",
+            );
         },
     ));
 }
 
 #[test]
-fn camera_diagonal_movement_is_normalised() {
+fn camera_diagonal_movement_is_normalized() {
     let fixture = CameraPanFixture::bootstrap();
 
     run_serial(&rspec::given(
@@ -307,7 +294,7 @@ fn camera_diagonal_movement_is_normalised() {
                     state.tick();
                 });
 
-                ctx.then("camera moves diagonally at normalised speed", |state| {
+                ctx.then("camera moves diagonally at normalized speed", |state| {
                     let pos = state.camera_position().expect("camera should exist");
                     // Diagonal movement should be roughly sqrt(2)/2 in each axis,
                     // not 1.0 in each axis.
@@ -315,7 +302,7 @@ fn camera_diagonal_movement_is_normalised() {
                         pos.x > 0.0 && pos.y > 0.0,
                         "diagonal should move in both positive axes, got {pos:?}"
                     );
-                    // With normalisation, X and Y components should be roughly equal.
+                    // With normalization, X and Y components should be roughly equal.
                     let ratio = pos.x / pos.y;
                     assert!(
                         (ratio - 1.0).abs() < 0.1,

@@ -1,6 +1,6 @@
 # Task 2.1.2: Implement Camera Panning Controls
 
-This ExecPlan is a living document. The sections `Constraints`, `Tolerances`,
+This Execution Plan (ExecPlan) is a living document. The sections `Constraints`, `Tolerances`,
 `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`, and
 `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
@@ -25,8 +25,8 @@ Diagonal movement (e.g., W+D) moves at the same speed as cardinal movement.
 - **Read-only presentation layer**: The camera system must not modify any
   gameplay or simulation components. It only reads input and modifies the
   camera's `Transform`.
-- **DBSP is source of truth**: No inferred game behaviour may originate from
-  presentation code.
+- **Differential Dataflow-Based Stream Processing (DBSP) is source of truth**:
+  No inferred game behaviour may originate from presentation code.
 - **Feature gating**: All presentation code must be gated behind
   `#[cfg(feature = "render")]`.
 - **File size limit**: `src/presentation.rs` must not exceed 400 lines.
@@ -46,9 +46,9 @@ Diagonal movement (e.g., W+D) moves at the same speed as cardinal movement.
 
 ## Risks
 
-- **Risk**: `ButtonInput<KeyCode>` may not be initialised in headless test
+- **Risk**: `ButtonInput<KeyCode>` may not be initialized in headless test
   environment. Severity: medium Likelihood: low Mitigation: The
-  `map_test_plugins::add_map_test_plugins` helper initialises `MinimalPlugins`
+  `map_test_plugins::add_map_test_plugins` helper initializes `MinimalPlugins`
   which includes input. Verify during testing.
 
 - **Risk**: `Time::delta_secs()` may return zero or very small values during
@@ -56,9 +56,9 @@ Diagonal movement (e.g., W+D) moves at the same speed as cardinal movement.
   `max_delta_seconds` in `CameraSettings` set to 1.0 in tests; accept that
   movement distances may be small but non-zero.
 
-- **Risk**: Diagonal movement faster than cardinal if direction not normalised.
+- **Risk**: Diagonal movement faster than cardinal if direction not normalized.
   Severity: medium Likelihood: high (if forgotten) Mitigation: Pure
-  `compute_pan_direction` function always normalises; unit tests verify
+  `compute_pan_direction` function always normalizes; unit tests verify
   diagonal length equals 1.0.
 
 ## Progress
@@ -143,22 +143,39 @@ Location: `src/presentation.rs`, after `CameraController` definition.
 
 ### Stage B: Add Pure Direction Function
 
-Add `compute_pan_direction` as a pure, testable function:
+Add `PanInput` struct and `compute_pan_direction` as a pure, testable function:
+
+    #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+    pub struct PanInput {
+        pub up: bool,
+        pub down: bool,
+        pub left: bool,
+        pub right: bool,
+    }
 
     #[must_use]
-    pub fn compute_pan_direction(up: bool, down: bool, left: bool, right: bool) -> Vec2 {
-        let x = (right as i8 - left as i8) as f32;
-        let y = (up as i8 - down as i8) as f32;
+    pub fn compute_pan_direction(input: PanInput) -> Vec2 {
+        fn axis(neg: bool, pos: bool) -> f32 {
+            match (neg, pos) {
+                (true, false) => -1.0,
+                (false, true) => 1.0,
+                _ => 0.0,
+            }
+        }
+
+        let x = axis(input.left, input.right);
+        let y = axis(input.down, input.up);
         let raw = Vec2::new(x, y);
+
         if raw == Vec2::ZERO { Vec2::ZERO } else { raw.normalize() }
     }
 
 Location: `src/presentation.rs`, after `CameraSettings`.
 
-Add unit tests using rstest parameterisation:
+Add unit tests using rstest parameterization:
 
 - Cardinal directions return unit vectors
-- Diagonal directions return normalised vectors (length ≈ 1.0)
+- Diagonal directions return normalized vectors (length ≈ 1.0)
 - Opposing keys cancel out
 
 ### Stage C: Add Camera Pan System
@@ -171,17 +188,21 @@ Add `camera_pan_system`:
         settings: Res<CameraSettings>,
         mut camera_query: Query<&mut Transform, With<CameraController>>,
     ) {
-        let Ok(mut transform) = camera_query.get_single_mut() else { return };
+        let Ok(mut transform) = camera_query.single_mut() else { return };
 
-        let up = keyboard.pressed(KeyCode::KeyW) || keyboard.pressed(KeyCode::ArrowUp);
-        let down = keyboard.pressed(KeyCode::KeyS) || keyboard.pressed(KeyCode::ArrowDown);
-        let left = keyboard.pressed(KeyCode::KeyA) || keyboard.pressed(KeyCode::ArrowLeft);
-        let right = keyboard.pressed(KeyCode::KeyD) || keyboard.pressed(KeyCode::ArrowRight);
+        let input = PanInput {
+            up: keyboard.pressed(KeyCode::KeyW) || keyboard.pressed(KeyCode::ArrowUp),
+            down: keyboard.pressed(KeyCode::KeyS) || keyboard.pressed(KeyCode::ArrowDown),
+            left: keyboard.pressed(KeyCode::KeyA) || keyboard.pressed(KeyCode::ArrowLeft),
+            right: keyboard.pressed(KeyCode::KeyD) || keyboard.pressed(KeyCode::ArrowRight),
+        };
 
-        let direction = compute_pan_direction(up, down, left, right);
+        let direction = compute_pan_direction(input);
         if direction == Vec2::ZERO { return }
 
-        let delta = time.delta_secs().min(settings.max_delta_seconds);
+        // Guard against non-positive max_delta_seconds.
+        let clamped_max = settings.max_delta_seconds.max(f32::EPSILON);
+        let delta = time.delta_secs().min(clamped_max);
         let velocity = direction * settings.pan_speed * delta;
         transform.translation.x += velocity.x;
         transform.translation.y += velocity.y;
@@ -223,7 +244,7 @@ Create `tests/camera_panning_rspec.rs` following the pattern in
   - A key moves camera left (negative X)
   - D key moves camera right (positive X)
   - Arrow keys equivalent to WASD
-  - Diagonal movement is normalised
+  - Diagonal movement is normalized
 
 ### Stage F: Quality Gates and Finalisation
 
@@ -295,17 +316,17 @@ If a step fails, fix the issue and retry from that step.
 ### Unit Test Cases
 
     #[rstest]
-    #[case::no_keys(false, false, false, false, Vec2::ZERO)]
-    #[case::up_only(true, false, false, false, Vec2::new(0.0, 1.0))]
-    #[case::down_only(false, true, false, false, Vec2::new(0.0, -1.0))]
-    #[case::left_only(false, false, true, false, Vec2::new(-1.0, 0.0))]
-    #[case::right_only(false, false, false, true, Vec2::new(1.0, 0.0))]
+    #[case::no_keys(PanInput::default(), Vec2::ZERO)]
+    #[case::up_only(PanInput { up: true, ..Default::default() }, Vec2::new(0.0, 1.0))]
+    #[case::down_only(PanInput { down: true, ..Default::default() }, Vec2::new(0.0, -1.0))]
+    #[case::left_only(PanInput { left: true, ..Default::default() }, Vec2::new(-1.0, 0.0))]
+    #[case::right_only(PanInput { right: true, ..Default::default() }, Vec2::new(1.0, 0.0))]
     fn pan_direction_cardinal(…) { … }
 
     #[rstest]
-    #[case::up_right(true, false, false, true)]
-    #[case::up_left(true, false, true, false)]
-    fn pan_direction_diagonal_is_normalised(…) { … }
+    #[case::up_right(PanInput { up: true, right: true, ..Default::default() })]
+    #[case::up_left(PanInput { up: true, left: true, ..Default::default() })]
+    fn pan_direction_diagonal_is_normalized(…) { … }
 
 ### Edge Cases Handled
 
@@ -326,7 +347,14 @@ If a step fails, fix the issue and retry from that step.
         pub max_delta_seconds: f32,
     }
 
-    pub fn compute_pan_direction(up: bool, down: bool, left: bool, right: bool) -> Vec2
+    pub struct PanInput {
+        pub up: bool,
+        pub down: bool,
+        pub left: bool,
+        pub right: bool,
+    }
+
+    pub fn compute_pan_direction(input: PanInput) -> Vec2
 
     pub fn camera_pan_system(
         keyboard: Res<ButtonInput<KeyCode>>,
