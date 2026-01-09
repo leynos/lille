@@ -1,8 +1,9 @@
 # Task 2.1.2: Implement Camera Panning Controls
 
-This Execution Plan (ExecPlan) is a living document. The sections `Constraints`, `Tolerances`,
-`Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`, and
-`Outcomes & Retrospective` must be kept up to date as work proceeds.
+This Execution Plan (ExecPlan) is a living document. The sections
+`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
+`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
+proceeds.
 
 Status: COMPLETE
 
@@ -11,7 +12,7 @@ This document must be maintained in accordance with
 
 ## Purpose / Big Picture
 
-Enable keyboard-based camera panning so users can navigate the isometric map
+Enable keyboard-based camera panning, so users can navigate the isometric map
 using WASD or arrow keys. After this change, holding any of these keys pans the
 camera smoothly across the map at a configurable speed, independent of frame
 rate. This completes Task 2.1.2 of the Lille development roadmap.
@@ -51,8 +52,8 @@ Diagonal movement (e.g., W+D) moves at the same speed as cardinal movement.
   `map_test_plugins::add_map_test_plugins` helper initializes `MinimalPlugins`
   which includes input. Verify during testing.
 
-- **Risk**: `Time::delta_secs()` may return zero or very small values during
-  rapid test ticks. Severity: low Likelihood: medium Mitigation: Use
+- **Risk**: `Time::delta_secs()` may return zero or minimal values during rapid
+  test ticks. Severity: low Likelihood: medium Mitigation: Use
   `max_delta_seconds` in `CameraSettings` set to 1.0 in tests; accept that
   movement distances may be small but non-zero.
 
@@ -99,6 +100,8 @@ No input handling exists yet. The camera is stationary after spawn.
 
 ### Key Files
 
+Table: Files modified or referenced by this task
+
 | File                                         | Purpose                                             |
 | -------------------------------------------- | --------------------------------------------------- |
 | `src/presentation.rs`                        | Core module to modify (add settings, system, tests) |
@@ -122,22 +125,24 @@ No input handling exists yet. The camera is stationary after spawn.
 
 Add a `CameraSettings` resource following the `LilleMapSettings` pattern:
 
-    #[derive(Resource, Clone, Debug, PartialEq)]
-    pub struct CameraSettings {
-        /// Camera pan speed in world units per second.
-        pub pan_speed: f32,
-        /// Maximum delta time to prevent teleporting during frame hitches.
-        pub max_delta_seconds: f32,
-    }
+```rust
+#[derive(Resource, Clone, Debug, PartialEq)]
+pub struct CameraSettings {
+    /// Camera pan speed in world units per second.
+    pub pan_speed: f32,
+    /// Maximum delta time to prevent teleporting during frame hitches.
+    pub max_delta_seconds: f32,
+}
 
-    impl Default for CameraSettings {
-        fn default() -> Self {
-            Self {
-                pan_speed: 500.0,
-                max_delta_seconds: 0.1,
-            }
+impl Default for CameraSettings {
+    fn default() -> Self {
+        Self {
+            pan_speed: 500.0,
+            max_delta_seconds: 0.1,
         }
     }
+}
+```
 
 Location: `src/presentation.rs`, after `CameraController` definition.
 
@@ -145,30 +150,32 @@ Location: `src/presentation.rs`, after `CameraController` definition.
 
 Add `PanInput` struct and `compute_pan_direction` as a pure, testable function:
 
-    #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-    pub struct PanInput {
-        pub up: bool,
-        pub down: bool,
-        pub left: bool,
-        pub right: bool,
-    }
+```rust
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct PanInput {
+    pub up: bool,
+    pub down: bool,
+    pub left: bool,
+    pub right: bool,
+}
 
-    #[must_use]
-    pub fn compute_pan_direction(input: PanInput) -> Vec2 {
-        fn axis(neg: bool, pos: bool) -> f32 {
-            match (neg, pos) {
-                (true, false) => -1.0,
-                (false, true) => 1.0,
-                _ => 0.0,
-            }
+#[must_use]
+pub fn compute_pan_direction(input: PanInput) -> Vec2 {
+    fn axis(neg: bool, pos: bool) -> f32 {
+        match (neg, pos) {
+            (true, false) => -1.0,
+            (false, true) => 1.0,
+            _ => 0.0,
         }
-
-        let x = axis(input.left, input.right);
-        let y = axis(input.down, input.up);
-        let raw = Vec2::new(x, y);
-
-        if raw == Vec2::ZERO { Vec2::ZERO } else { raw.normalize() }
     }
+
+    let x = axis(input.left, input.right);
+    let y = axis(input.down, input.up);
+    let raw = Vec2::new(x, y);
+
+    if raw == Vec2::ZERO { Vec2::ZERO } else { raw.normalize() }
+}
+```
 
 Location: `src/presentation.rs`, after `CameraSettings`.
 
@@ -182,31 +189,33 @@ Add unit tests using rstest parameterization:
 
 Add `camera_pan_system`:
 
-    pub fn camera_pan_system(
-        keyboard: Res<ButtonInput<KeyCode>>,
-        time: Res<Time>,
-        settings: Res<CameraSettings>,
-        mut camera_query: Query<&mut Transform, With<CameraController>>,
-    ) {
-        let Ok(mut transform) = camera_query.single_mut() else { return };
+```rust
+pub fn camera_pan_system(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    time: Res<Time>,
+    settings: Res<CameraSettings>,
+    mut camera_query: Query<&mut Transform, With<CameraController>>,
+) {
+    let Ok(mut transform) = camera_query.single_mut() else { return };
 
-        let input = PanInput {
-            up: keyboard.pressed(KeyCode::KeyW) || keyboard.pressed(KeyCode::ArrowUp),
-            down: keyboard.pressed(KeyCode::KeyS) || keyboard.pressed(KeyCode::ArrowDown),
-            left: keyboard.pressed(KeyCode::KeyA) || keyboard.pressed(KeyCode::ArrowLeft),
-            right: keyboard.pressed(KeyCode::KeyD) || keyboard.pressed(KeyCode::ArrowRight),
-        };
+    let input = PanInput {
+        up: keyboard.pressed(KeyCode::KeyW) || keyboard.pressed(KeyCode::ArrowUp),
+        down: keyboard.pressed(KeyCode::KeyS) || keyboard.pressed(KeyCode::ArrowDown),
+        left: keyboard.pressed(KeyCode::KeyA) || keyboard.pressed(KeyCode::ArrowLeft),
+        right: keyboard.pressed(KeyCode::KeyD) || keyboard.pressed(KeyCode::ArrowRight),
+    };
 
-        let direction = compute_pan_direction(input);
-        if direction == Vec2::ZERO { return }
+    let direction = compute_pan_direction(input);
+    if direction == Vec2::ZERO { return }
 
-        // Guard against non-positive max_delta_seconds.
-        let clamped_max = settings.max_delta_seconds.max(f32::EPSILON);
-        let delta = time.delta_secs().min(clamped_max);
-        let velocity = direction * settings.pan_speed * delta;
-        transform.translation.x += velocity.x;
-        transform.translation.y += velocity.y;
-    }
+    // Guard against non-positive max_delta_seconds.
+    let clamped_max = settings.max_delta_seconds.max(f32::EPSILON);
+    let delta = time.delta_secs().min(clamped_max);
+    let velocity = direction * settings.pan_speed * delta;
+    transform.translation.x += velocity.x;
+    transform.translation.y += velocity.y;
+}
+```
 
 Location: `src/presentation.rs`, after `compute_pan_direction`.
 
@@ -214,22 +223,26 @@ Location: `src/presentation.rs`, after `compute_pan_direction`.
 
 Modify `PresentationPlugin::build`:
 
-    fn build(&self, app: &mut App) {
-        app.register_type::<CameraController>();
-        app.init_resource::<CameraSettings>();
-        app.add_systems(Startup, camera_setup);
-        app.add_systems(
-            Update,
-            camera_pan_system.after(apply_dbsp_outputs_system),
-        );
-    }
+```rust
+fn build(&self, app: &mut App) {
+    app.register_type::<CameraController>();
+    app.init_resource::<CameraSettings>();
+    app.add_systems(Startup, camera_setup);
+    app.add_systems(
+        Update,
+        camera_pan_system.after(apply_dbsp_outputs_system),
+    );
+}
+```
 
 Update `src/lib.rs` to export new items:
 
-    #[cfg(feature = "render")]
-    pub use presentation::{
-        CameraController, CameraSettings, PresentationPlugin, compute_pan_direction
-    };
+```rust
+#[cfg(feature = "render")]
+pub use presentation::{
+    CameraController, CameraSettings, PresentationPlugin, compute_pan_direction
+};
+```
 
 ### Stage E: Add Behavioural Tests
 
@@ -271,10 +284,12 @@ All commands run from `/data/leynos/Projects/lille`.
 
 Expected output from `make test`:
 
-    running X tests
-    test presentation::tests::… ok
-    …
-    test result: ok. X passed; 0 failed
+```text
+running X tests
+test presentation::tests::… ok
+…
+test result: ok. X passed; 0 failed
+```
 
 ## Validation and Acceptance
 
@@ -286,17 +301,19 @@ Expected output from `make test`:
 
 **Quality method:**
 
-    make check-fmt && make lint && make test
+```sh
+make check-fmt && make lint && make test
+```
 
 **Manual verification:**
 
 Run the game with `cargo run --features render` and verify:
 
 1. Camera starts at origin (0, 0)
-2. Holding W pans up smoothly
-3. Holding S pans down smoothly
-4. Holding A pans left smoothly
-5. Holding D pans right smoothly
+2. Holding W pans the camera upward
+3. Holding S pans the camera downward
+4. Holding A pans the camera leftward
+5. Holding D pans the camera rightward
 6. Arrow keys work identically to WASD
 7. Diagonal movement (W+D) moves at same speed as single key
 8. Releasing keys stops camera movement
@@ -309,26 +326,30 @@ All steps are idempotent:
 - Tests can be run repeatedly
 - Commits can be amended if not pushed
 
-If a step fails, fix the issue and retry from that step.
+If a step fails, resolve the issue and retry from that step.
 
 ## Artifacts and Notes
 
 ### Unit Test Cases
 
-    #[rstest]
-    #[case::no_keys(PanInput::default(), Vec2::ZERO)]
-    #[case::up_only(PanInput { up: true, ..Default::default() }, Vec2::new(0.0, 1.0))]
-    #[case::down_only(PanInput { down: true, ..Default::default() }, Vec2::new(0.0, -1.0))]
-    #[case::left_only(PanInput { left: true, ..Default::default() }, Vec2::new(-1.0, 0.0))]
-    #[case::right_only(PanInput { right: true, ..Default::default() }, Vec2::new(1.0, 0.0))]
-    fn pan_direction_cardinal(…) { … }
+```rust
+#[rstest]
+#[case::no_keys(PanInput::default(), Vec2::ZERO)]
+#[case::up_only(PanInput { up: true, ..Default::default() }, Vec2::new(0.0, 1.0))]
+#[case::down_only(PanInput { down: true, ..Default::default() }, Vec2::new(0.0, -1.0))]
+#[case::left_only(PanInput { left: true, ..Default::default() }, Vec2::new(-1.0, 0.0))]
+#[case::right_only(PanInput { right: true, ..Default::default() }, Vec2::new(1.0, 0.0))]
+fn pan_direction_cardinal(…) { … }
 
-    #[rstest]
-    #[case::up_right(PanInput { up: true, right: true, ..Default::default() })]
-    #[case::up_left(PanInput { up: true, left: true, ..Default::default() })]
-    fn pan_direction_diagonal_is_normalized(…) { … }
+#[rstest]
+#[case::up_right(PanInput { up: true, right: true, ..Default::default() })]
+#[case::up_left(PanInput { up: true, left: true, ..Default::default() })]
+fn pan_direction_diagonal_is_normalized(…) { … }
+```
 
 ### Edge Cases Handled
+
+Table: Edge cases and their handling in the camera pan system
 
 | Edge Case           | Handling                                       |
 | ------------------- | ---------------------------------------------- |
@@ -342,26 +363,28 @@ If a step fails, fix the issue and retry from that step.
 
 ### New Public Items in `lille::presentation`
 
-    pub struct CameraSettings {
-        pub pan_speed: f32,
-        pub max_delta_seconds: f32,
-    }
+```rust
+pub struct CameraSettings {
+    pub pan_speed: f32,
+    pub max_delta_seconds: f32,
+}
 
-    pub struct PanInput {
-        pub up: bool,
-        pub down: bool,
-        pub left: bool,
-        pub right: bool,
-    }
+pub struct PanInput {
+    pub up: bool,
+    pub down: bool,
+    pub left: bool,
+    pub right: bool,
+}
 
-    pub fn compute_pan_direction(input: PanInput) -> Vec2
+pub fn compute_pan_direction(input: PanInput) -> Vec2
 
-    pub fn camera_pan_system(
-        keyboard: Res<ButtonInput<KeyCode>>,
-        time: Res<Time>,
-        settings: Res<CameraSettings>,
-        mut camera_query: Query<&mut Transform, With<CameraController>>,
-    )
+pub fn camera_pan_system(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    time: Res<Time>,
+    settings: Res<CameraSettings>,
+    mut camera_query: Query<&mut Transform, With<CameraController>>,
+)
+```
 
 ### Dependencies
 
