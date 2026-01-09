@@ -103,11 +103,12 @@ impl CameraPanFixture {
             keyboard.release(KeyCode::ArrowRight);
             keyboard.clear();
         }
-        // Reset camera to origin
+        // Reset camera X/Y to origin, preserving Z (camera depth).
         let world = app.world_mut();
         let mut query = world.query::<(&mut Transform, &CameraController)>();
         for (mut transform, _) in query.iter_mut(world) {
-            transform.translation = Vec3::ZERO;
+            transform.translation.x = 0.0;
+            transform.translation.y = 0.0;
         }
     }
 

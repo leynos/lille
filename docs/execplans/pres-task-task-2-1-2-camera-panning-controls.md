@@ -372,7 +372,7 @@ Table: Edge cases and their handling in the camera pan system
 
 | Edge Case           | Handling                                       |
 | ------------------- | ---------------------------------------------- |
-| No camera entity    | `get_single_mut()` returns `Err`, early return |
+| No camera entity    | `single_mut()` returns `Err`, early return     |
 | No keys pressed     | `direction == Vec2::ZERO`, early return        |
 | Opposing keys (W+S) | Cancel to zero on that axis                    |
 | Diagonal movement   | `normalize()` prevents faster speed            |
