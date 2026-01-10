@@ -52,7 +52,7 @@ impl CameraPanFixture {
         // Insert custom settings before plugin to override defaults.
         app.insert_resource(CameraSettings {
             pan_speed: TEST_PAN_SPEED,
-            max_delta_seconds: 1.0, // Allow large deltas in tests
+            max_delta_seconds: 1.0, // Deterministic timing for tests
         });
 
         app.add_plugins(PresentationPlugin);
@@ -165,7 +165,7 @@ fn camera_pans_with_wasd_keys() {
         "PresentationPlugin camera responds to WASD input",
         fixture,
         |scenario: &mut Scenario<CameraPanFixture>| {
-            scenario.when("the app initialises", |ctx| {
+            scenario.when("the app initializes", |ctx| {
                 ctx.before_each(|state| {
                     state.tick(); // Finalize plugins and spawn camera
                 });
