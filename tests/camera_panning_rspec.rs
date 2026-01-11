@@ -90,18 +90,9 @@ impl CameraPanFixture {
     /// Clears all keyboard input and resets camera to origin.
     fn reset_state(&self) {
         let mut app = self.app_guard();
-        // Release all movement keys explicitly
         {
             let mut keyboard = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
-            keyboard.release(KeyCode::KeyW);
-            keyboard.release(KeyCode::KeyA);
-            keyboard.release(KeyCode::KeyS);
-            keyboard.release(KeyCode::KeyD);
-            keyboard.release(KeyCode::ArrowUp);
-            keyboard.release(KeyCode::ArrowDown);
-            keyboard.release(KeyCode::ArrowLeft);
-            keyboard.release(KeyCode::ArrowRight);
-            keyboard.clear();
+            keyboard.reset_all();
         }
         // Reset camera X/Y to origin, preserving Z (camera depth).
         let world = app.world_mut();
@@ -124,22 +115,24 @@ impl CameraPanFixture {
     }
 }
 
+/// Scenario descriptions for key movement tests.
+#[derive(Clone, Copy)]
+struct KeyMovementDesc {
+    when_desc: &'static str,
+    then_desc: &'static str,
+    error_msg: &'static str,
+}
+
 /// Helper to test that pressing a key moves the camera in the expected direction.
-#[expect(
-    clippy::too_many_arguments,
-    reason = "Test helper with semantically distinct parameters for BDD scenario construction"
-)]
 fn test_key_movement<F>(
     scenario: &mut Scenario<CameraPanFixture>,
     key: KeyCode,
-    when_desc: &'static str,
-    then_desc: &'static str,
+    desc: KeyMovementDesc,
     assertion: F,
-    error_msg: &'static str,
 ) where
     F: Fn(&Vec3) -> bool + Clone + 'static,
 {
-    scenario.when(when_desc, move |ctx| {
+    scenario.when(desc.when_desc, move |ctx| {
         ctx.before_each(move |state| {
             state.reset_state();
             state.tick();
@@ -148,11 +141,33 @@ fn test_key_movement<F>(
         });
 
         let check = assertion.clone();
-        ctx.then(then_desc, move |state| {
+        let error_msg = desc.error_msg;
+        ctx.then(desc.then_desc, move |state| {
             let pos = state
                 .camera_position()
                 .unwrap_or_else(|| panic!("camera should exist"));
             assert!(check(&pos), "{error_msg}, got {pos:?}");
+        });
+    });
+}
+
+/// Helper to test that no movement occurs when no keys are pressed.
+fn test_no_movement(scenario: &mut Scenario<CameraPanFixture>) {
+    scenario.when("no movement keys are pressed", |ctx| {
+        ctx.before_each(|state| {
+            state.reset_state();
+            state.tick();
+            state.tick();
+        });
+
+        ctx.then("camera position remains unchanged", |state| {
+            let pos = state
+                .camera_position()
+                .unwrap_or_else(|| panic!("camera should exist"));
+            assert!(
+                pos.x.abs() < 0.001 && pos.y.abs() < 0.001,
+                "camera should not move when no keys pressed, got {pos:?}"
+            );
         });
     });
 }
@@ -182,54 +197,45 @@ fn camera_pans_with_wasd_keys() {
             test_key_movement(
                 scenario,
                 KeyCode::KeyW,
-                "W key is pressed",
-                "camera moves up (positive Y)",
+                KeyMovementDesc {
+                    when_desc: "W key is pressed",
+                    then_desc: "camera moves up (positive Y)",
+                    error_msg: "camera Y should increase when W pressed",
+                },
                 |pos| pos.y > 0.0,
-                "camera Y should increase when W pressed",
             );
             test_key_movement(
                 scenario,
                 KeyCode::KeyS,
-                "S key is pressed",
-                "camera moves down (negative Y)",
+                KeyMovementDesc {
+                    when_desc: "S key is pressed",
+                    then_desc: "camera moves down (negative Y)",
+                    error_msg: "camera Y should decrease when S pressed",
+                },
                 |pos| pos.y < 0.0,
-                "camera Y should decrease when S pressed",
             );
             test_key_movement(
                 scenario,
                 KeyCode::KeyA,
-                "A key is pressed",
-                "camera moves left (negative X)",
+                KeyMovementDesc {
+                    when_desc: "A key is pressed",
+                    then_desc: "camera moves left (negative X)",
+                    error_msg: "camera X should decrease when A pressed",
+                },
                 |pos| pos.x < 0.0,
-                "camera X should decrease when A pressed",
             );
             test_key_movement(
                 scenario,
                 KeyCode::KeyD,
-                "D key is pressed",
-                "camera moves right (positive X)",
+                KeyMovementDesc {
+                    when_desc: "D key is pressed",
+                    then_desc: "camera moves right (positive X)",
+                    error_msg: "camera X should increase when D pressed",
+                },
                 |pos| pos.x > 0.0,
-                "camera X should increase when D pressed",
             );
 
-            scenario.when("no movement keys are pressed", |ctx| {
-                ctx.before_each(|state| {
-                    state.reset_state();
-                    state.tick();
-                    // No keys pressed
-                    state.tick();
-                });
-
-                ctx.then("camera position remains unchanged", |state| {
-                    let pos = state
-                        .camera_position()
-                        .unwrap_or_else(|| panic!("camera should exist"));
-                    assert!(
-                        pos.x.abs() < 0.001 && pos.y.abs() < 0.001,
-                        "camera should not move when no keys pressed, got {pos:?}"
-                    );
-                });
-            });
+            test_no_movement(scenario);
         },
     ));
 }
@@ -245,34 +251,42 @@ fn camera_pans_with_arrow_keys() {
             test_key_movement(
                 scenario,
                 KeyCode::ArrowUp,
-                "ArrowUp is pressed",
-                "camera moves up",
+                KeyMovementDesc {
+                    when_desc: "ArrowUp is pressed",
+                    then_desc: "camera moves up",
+                    error_msg: "ArrowUp should move camera up",
+                },
                 |pos| pos.y > 0.0,
-                "ArrowUp should move camera up",
             );
             test_key_movement(
                 scenario,
                 KeyCode::ArrowDown,
-                "ArrowDown is pressed",
-                "camera moves down",
+                KeyMovementDesc {
+                    when_desc: "ArrowDown is pressed",
+                    then_desc: "camera moves down",
+                    error_msg: "ArrowDown should move camera down",
+                },
                 |pos| pos.y < 0.0,
-                "ArrowDown should move camera down",
             );
             test_key_movement(
                 scenario,
                 KeyCode::ArrowLeft,
-                "ArrowLeft is pressed",
-                "camera moves left",
+                KeyMovementDesc {
+                    when_desc: "ArrowLeft is pressed",
+                    then_desc: "camera moves left",
+                    error_msg: "ArrowLeft should move camera left",
+                },
                 |pos| pos.x < 0.0,
-                "ArrowLeft should move camera left",
             );
             test_key_movement(
                 scenario,
                 KeyCode::ArrowRight,
-                "ArrowRight is pressed",
-                "camera moves right",
+                KeyMovementDesc {
+                    when_desc: "ArrowRight is pressed",
+                    then_desc: "camera moves right",
+                    error_msg: "ArrowRight should move camera right",
+                },
                 |pos| pos.x > 0.0,
-                "ArrowRight should move camera right",
             );
         },
     ));
