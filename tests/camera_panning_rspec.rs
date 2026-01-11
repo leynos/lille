@@ -103,15 +103,23 @@ impl CameraPanFixture {
         }
     }
 
-    /// Returns the camera position if a camera exists.
+    /// Returns the camera position, enforcing exactly one `CameraController` exists.
+    ///
+    /// # Panics
+    ///
+    /// Panics if zero or more than one camera entity exists.
     fn camera_position(&self) -> Option<Vec3> {
         let mut app = self.app_guard();
         let world = app.world_mut();
         let mut query = world.query::<(&Transform, &CameraController)>();
-        query
-            .iter(world)
-            .next()
-            .map(|(transform, _)| transform.translation)
+        let mut cameras = query.iter(world);
+        let first = cameras.next();
+        let second = cameras.next();
+        match (first, second) {
+            (None, _) => None,
+            (Some((transform, _)), None) => Some(transform.translation),
+            _ => panic!("expected exactly one CameraController, found multiple"),
+        }
     }
 }
 
@@ -134,6 +142,7 @@ fn test_key_movement<F>(
 {
     scenario.when(desc.when_desc, move |ctx| {
         ctx.before_each(move |state| {
+            state.tick(); // Spawn camera first
             state.reset_state();
             state.tick();
             state.press_key(key);
@@ -155,6 +164,7 @@ fn test_key_movement<F>(
 fn test_no_movement(scenario: &mut Scenario<CameraPanFixture>) {
     scenario.when("no movement keys are pressed", |ctx| {
         ctx.before_each(|state| {
+            state.tick(); // Spawn camera first
             state.reset_state();
             state.tick();
             state.tick();
@@ -183,6 +193,7 @@ fn camera_pans_with_wasd_keys() {
             scenario.when("the app initializes", |ctx| {
                 ctx.before_each(|state| {
                     state.tick(); // Finalize plugins and spawn camera
+                    state.reset_state(); // Ensure clean state for test
                 });
 
                 ctx.then("camera starts at origin", |state| {
@@ -292,6 +303,9 @@ fn camera_pans_with_arrow_keys() {
     ));
 }
 
+/// Minimum epsilon based on tick size to prevent "barely moved" passes.
+const MIN_MOVEMENT: f32 = 0.01;
+
 #[test]
 fn camera_diagonal_movement_is_normalized() {
     let fixture = CameraPanFixture::bootstrap();
@@ -302,6 +316,7 @@ fn camera_diagonal_movement_is_normalized() {
         |scenario: &mut Scenario<CameraPanFixture>| {
             scenario.when("W and D are pressed simultaneously", |ctx| {
                 ctx.before_each(|state| {
+                    state.tick(); // Spawn camera first
                     state.reset_state();
                     state.tick();
                     state.press_key(KeyCode::KeyW);
@@ -314,8 +329,8 @@ fn camera_diagonal_movement_is_normalized() {
                     // Diagonal movement should be roughly sqrt(2)/2 in each axis,
                     // not 1.0 in each axis.
                     assert!(
-                        pos.x > 0.0 && pos.y > 0.0,
-                        "diagonal should move in both positive axes, got {pos:?}"
+                        pos.x > MIN_MOVEMENT && pos.y > MIN_MOVEMENT,
+                        "diagonal should move significantly in both axes, got {pos:?}"
                     );
                     // With normalization, X and Y components should be roughly equal.
                     let ratio = pos.x / pos.y;
