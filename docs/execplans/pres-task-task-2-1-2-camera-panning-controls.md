@@ -370,13 +370,13 @@ fn pan_direction_diagonal_is_normalized(…) { … }
 
 Table: Edge cases and their handling in the camera pan system
 
-| Edge Case           | Handling                                       |
-| ------------------- | ---------------------------------------------- |
-| No camera entity    | `single_mut()` returns `Err`, early return     |
-| No keys pressed     | `direction == Vec2::ZERO`, early return        |
-| Opposing keys (W+S) | Cancel to zero on that axis                    |
-| Diagonal movement   | `normalize()` prevents faster speed            |
-| Frame hitch         | Clamped to `max_delta_seconds`                 |
+| Edge Case           | Handling                                   |
+| ------------------- | ------------------------------------------ |
+| No camera entity    | `single_mut()` returns `Err`, early return |
+| No keys pressed     | `direction == Vec2::ZERO`, early return    |
+| Opposing keys (W+S) | Cancel to zero on that axis                |
+| Diagonal movement   | `normalize()` prevents faster speed        |
+| Frame hitch         | Clamped to `max_delta_seconds`             |
 
 ## Interfaces and Dependencies
 

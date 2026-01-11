@@ -132,6 +132,7 @@ struct KeyMovementDesc {
 }
 
 /// Helper to test that pressing a key moves the camera in the expected direction.
+#[expect(clippy::expect_used, reason = "test assertions use expect for clarity")]
 fn test_key_movement<F>(
     scenario: &mut Scenario<CameraPanFixture>,
     key: KeyCode,
@@ -152,15 +153,14 @@ fn test_key_movement<F>(
         let check = assertion.clone();
         let error_msg = desc.error_msg;
         ctx.then(desc.then_desc, move |state| {
-            let pos = state
-                .camera_position()
-                .unwrap_or_else(|| panic!("camera should exist"));
+            let pos = state.camera_position().expect("camera should exist");
             assert!(check(&pos), "{error_msg}, got {pos:?}");
         });
     });
 }
 
 /// Helper to test that no movement occurs when no keys are pressed.
+#[expect(clippy::expect_used, reason = "test assertions use expect for clarity")]
 fn test_no_movement(scenario: &mut Scenario<CameraPanFixture>) {
     scenario.when("no movement keys are pressed", |ctx| {
         ctx.before_each(|state| {
@@ -171,9 +171,7 @@ fn test_no_movement(scenario: &mut Scenario<CameraPanFixture>) {
         });
 
         ctx.then("camera position remains unchanged", |state| {
-            let pos = state
-                .camera_position()
-                .unwrap_or_else(|| panic!("camera should exist"));
+            let pos = state.camera_position().expect("camera should exist");
             assert!(
                 pos.x.abs() < 0.001 && pos.y.abs() < 0.001,
                 "camera should not move when no keys pressed, got {pos:?}"
