@@ -55,7 +55,10 @@ pub use map::LilleMapPlugin;
 pub use physics::{applied_acceleration, apply_ground_friction};
 #[cfg(feature = "render")]
 #[cfg_attr(docsrs, doc(cfg(feature = "render")))]
-pub use presentation::{CameraController, PresentationPlugin};
+pub use presentation::{
+    camera_pan_system, compute_pan_direction, CameraController, CameraSettings, PanInput,
+    PresentationPlugin,
+};
 pub use vector_math::{vec_mag, vec_normalize};
 pub use world_handle::{init_world_handle_system, WorldHandle};
 

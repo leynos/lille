@@ -117,7 +117,7 @@ input handling while remaining a passive observer of simulation state.
   - Completion criteria: The application renders through the presentation
     camera and legacy camera setup code is removed from map systems.
   - Dependencies: Task 1.1.1.
-- [ ] Task 2.1.2 — Implement camera panning controls
+- [x] Task 2.1.2 — Implement camera panning controls
   - Outcome: An update system reads keyboard input to move the camera based on
     configurable speed scaled by `Time.delta_seconds()`.
   - Completion criteria: Holding WASD or arrow keys pans smoothly across the
