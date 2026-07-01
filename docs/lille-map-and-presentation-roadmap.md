@@ -5,14 +5,14 @@ integration and presentation layer described in the design proposals. The
 roadmap is structured into phases, steps, and tasks so each increment is
 measurable and achievable without binding to calendar commitments.
 
-## Phase 1: Data-driven world foundation
+## 1. Data-driven world foundation
 
 Why this matters: This phase replaces hardcoded world geometry with a
 data-driven pipeline sourced from the Tiled editor. Completing it enables level
 designers to describe environments that flow directly into Lille's ECS and DBSP
 physics circuit.
 
-### Step 1.1: Integrate LilleMapPlugin and asset pipeline
+### 1.1. Integrate LilleMapPlugin and asset pipeline
 
 What we will build: A Bevy plugin that encapsulates map asset loading and
 exposes a single entry point for spawning the active isometric map.
@@ -37,7 +37,7 @@ exposes a single entry point for spawning the active isometric map.
     entities with matching components populated from Tiled data.
   - Dependencies: Task 1.1.2.
 
-### Step 1.2: Translate map data into engine state
+### 1.2. Translate map data into engine state
 
 What we will build: Systems that honour Tiled annotations by attaching Lille
 components and feeding static geometry into DBSP precisely once per map load.
@@ -73,7 +73,7 @@ components and feeding static geometry into DBSP precisely once per map load.
     without panics, even if the initial map contains no slopes.
   - Dependencies: Task 1.2.2.
 
-### Step 1.3: Spawn entities from map metadata
+### 1.3. Spawn entities from map metadata
 
 What we will build: Event-driven systems that interpret Tiled object layers as
 spawn locations and gameplay markers, ensuring Lille entities are created at
@@ -99,13 +99,13 @@ authored positions.
     leaves the existing map intact; unloading recreates components safely.
   - Dependencies: Task 1.1.2.
 
-## Phase 2: Visualisation and interaction layer
+## 2. Visualisation and interaction layer
 
 Why this matters: This phase gives life to the data-driven world by rendering
 entities with sprites, managing camera control, and preserving the separation
 between simulation and presentation.
 
-### Step 2.1: Establish presentation plugin
+### 2.1. Establish presentation plugin
 
 What we will build: A dedicated `PresentationPlugin` that owns camera setup and
 input handling while remaining a passive observer of simulation state.
@@ -136,7 +136,7 @@ input handling while remaining a passive observer of simulation state.
     stale positions reach the presentation layer.
   - Dependencies: Task 2.1.1.
 
-### Step 2.2: Render dynamic entities
+### 2.2. Render dynamic entities
 
 What we will build: Sprite-based representations for the player and NPCs,
 including atlas loading, Y-sorting, and integration with map-driven spawns.
@@ -167,7 +167,7 @@ including atlas loading, Y-sorting, and integration with map-driven spawns.
     locations and respect depth ordering.
   - Dependencies: Task 2.2.2, Task 1.3.2.
 
-### Step 2.3: Maintain separation between logic and rendering
+### 2.3. Maintain separation between logic and rendering
 
 What we will build: Guardrails that keep presentation code observational so the
 simulation remains authoritative.

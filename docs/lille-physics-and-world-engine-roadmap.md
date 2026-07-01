@@ -1,6 +1,6 @@
 # Lille Physics and World Engine Roadmap
 
-## 1. Vision and Strategy
+## Vision and Strategy
 
 This document outlines the development roadmap for Lille's physics and
 world-interaction engine. The strategy is to build a highly performant,
@@ -39,7 +39,7 @@ behaviours.
 - [ ] Phase 4 — Upgrade Bevy crates from 0.15 to 0.16.
 - [ ] Phase 5 — Upgrade Bevy crates from 0.16 to 0.17.3.
 
-## Phase 1: Foundational Migration to DBSP
+## 1. Foundational Migration to DBSP
 
 **Goal**: To completely remove the DDlog dependency and establish a working,
 pure-Rust build where the core physics logic is handled by a minimal DBSP
@@ -98,7 +98,7 @@ parity.
 - Core BDD and unit tests pass, establishing the testing pattern for subsequent
   phases.
 
-## Phase 2: Achieving Physics Parity
+## 2. Achieving Physics Parity
 
 **Goal**: To re-implement the full set of existing physics and geometry rules
 within the DBSP circuit, achieving parity with the capabilities of the final
@@ -150,7 +150,7 @@ DDlog-based version.
 - The project is considered stable and feature-complete with respect to its
   original design.
 
-## Phase 3: Expanding Physics and Agent Dynamics
+## 3. Expanding Physics and Agent Dynamics
 
 **Goal**: To move beyond the original feature set and introduce more dynamic
 physical properties and agent behaviours.
@@ -192,7 +192,7 @@ physical properties and agent behaviours.
           Enforce `0 ≤ current ≤ max` at all times.
 
         - [x] Type aliases: use the
-          [canonical type definitions][health-type-defs]
+          [canonical type definitions](./lille-physics-engine-design.md#canonical-type-definitions)
           (`type EntityId = u64; type Tick = u64`). `Tick` counts simulation
           ticks and advances monotonically.
 
@@ -255,7 +255,7 @@ physical properties and agent behaviours.
         - Debounce: add a per-entity cooldown of `LANDING_COOLDOWN_TICKS: u32`
           (default: 6 ticks). Document how ticks map to wall time in the engine.
 
-### Tick timing
+**Tick timing:**
 
 The fixed-step simulation runs at 1 Hz, as configured by `DELTA_TIME = 1.0` in
 `src/constants.rs`. Each tick therefore spans 1,000 milliseconds of wall time.
@@ -292,8 +292,6 @@ lasts for 6,000 milliseconds before another fall-damage event may trigger.
         - Tests: cover stair-step jitter (single hit), terminal-velocity caps,
           cooldown enforcement, and mixed external plus fall damage.
 
-[health-type-defs]: ./lille-physics-engine-design.md#canonical-type-definitions
-
 **Acceptance Criteria**:
 
 - Entities exhibit momentum and are affected by forces.
@@ -302,7 +300,7 @@ lasts for 6,000 milliseconds before another fall-damage event may trigger.
 
 - A basic health and damage system is operational.
 
-## Phase 4: Advanced Features and Polish
+## 4. Advanced Features and Polish
 
 **Goal**: To investigate and implement more complex features and ensure the
 long-term stability and performance of the engine.
