@@ -63,7 +63,7 @@ members = ["build_support", "test_utils"]
 
 [workspace.dependencies]
 anyhow = "1"
-glam = "0.30"
+glam = "0.33"
 ordered-float = { version = "3", features = ["serde", "rkyv_64"] }
 bevy = { version = "0.17.3", default-features = false, features = ["reflect_auto_register"] }
 
