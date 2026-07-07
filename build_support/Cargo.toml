@@ -14,7 +14,7 @@ anyhow = { workspace = true }
 
 [dev-dependencies]
 rstest = "0.26.1"
-mockall = "0.13.1"
+mockall = "0.15.0"
 test_utils = { path = "../test_utils" }
 
 
