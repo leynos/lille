@@ -130,6 +130,7 @@ pub fn floor_to_i32(value: OrderedFloat<f64>) -> i32 {
 
 #[cfg(test)]
 mod tests {
+    //! Tests for numeric conversion helpers.
     use super::*;
 
     #[test]

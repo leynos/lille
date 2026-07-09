@@ -256,6 +256,7 @@ fn camera_setup(mut commands: Commands, cameras: Query<&Camera2d>) {
 
 #[cfg(test)]
 mod tests {
+    //! Tests for the presentation plugin.
     use super::*;
     use rstest::rstest;
 

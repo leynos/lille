@@ -1,6 +1,7 @@
 //! Helpers for running `rspec` suites with predictable threading.
 
-use rspec::{block::Suite, ConfigurationBuilder, Logger, Runner};
+use rspec::block::Suite;
+use rspec::{Configuration, Logger, Runner};
 use std::sync::Arc;
 
 /// Runs an rspec suite serially to keep `NonSend` Bevy resources on a single
@@ -10,12 +11,12 @@ where
     T: Clone + Send + Sync + std::fmt::Debug,
 {
     let logger = Arc::new(Logger::new(std::io::stdout()));
-    let config = ConfigurationBuilder::default()
-        .parallel(false)
-        // Ensure rspec failures fail the Rust test binary (by exiting with the
-        // standard `cargo test` failure code via rspec's runner).
-        .exit_on_failure(true)
-        .build()
-        .unwrap_or_else(|e| panic!("rspec configuration failed: {e}"));
+    // Construct the configuration directly rather than via the fallible
+    // builder so no panicking fallback is required. `exit_on_failure`
+    // ensures rspec failures fail the Rust test binary.
+    let config = Configuration {
+        parallel: false,
+        exit_on_failure: true,
+    };
     Runner::new(config, vec![logger]).run(suite);
 }

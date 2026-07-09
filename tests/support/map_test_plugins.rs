@@ -1,4 +1,3 @@
-#![cfg(feature = "test-support")]
 //! Shared test harness helpers for map-related integration tests.
 //!
 //! These tests must run under `cargo test --all-features` (and `cargo llvm-cov
@@ -11,6 +10,7 @@
 //!   a single test function.
 //! - Other tests in the same binary may still build apps, but should avoid
 //!   ticking them.
+#![cfg(feature = "test-support")]
 
 use bevy::ecs::prelude::On;
 use bevy::prelude::*;

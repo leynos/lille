@@ -71,13 +71,14 @@ impl DbspState {
 
 #[cfg(test)]
 mod tests {
+    //! Tests for duplicate damage-event filtering.
     use super::*;
     use crate::dbsp_circuit::DamageSource;
     use rstest::rstest;
     use std::collections::HashSet;
 
-    fn fresh_state() -> DbspState {
-        DbspState::new().expect("failed to initialise DbspState for tests")
+    fn fresh_state() -> Result<DbspState, dbsp::Error> {
+        DbspState::new()
     }
 
     fn sequenced_event(seq: u32) -> DamageEvent {
@@ -102,7 +103,7 @@ mod tests {
 
     #[rstest]
     fn sequenced_duplicate_is_counted() {
-        let mut state = fresh_state();
+        let mut state = fresh_state().expect("failed to initialise DbspState");
         let mut seen = HashSet::new();
         let event = sequenced_event(5);
         assert!(!state.record_duplicate_sequenced_damage(&event, &mut seen));
@@ -113,7 +114,7 @@ mod tests {
 
     #[rstest]
     fn sequenced_event_reapplied_in_next_frame_is_ignored() {
-        let mut state = fresh_state();
+        let mut state = fresh_state().expect("failed to initialise DbspState");
         let mut seen = HashSet::new();
         let event = sequenced_event(7);
         state
@@ -125,7 +126,7 @@ mod tests {
 
     #[rstest]
     fn unsequenced_duplicate_is_counted() {
-        let mut state = fresh_state();
+        let mut state = fresh_state().expect("failed to initialise DbspState");
         let mut seen = HashSet::new();
         let event = unsequenced_event(2, 12);
         assert!(!state.record_duplicate_unsequenced_damage(&event, &mut seen));
@@ -135,7 +136,7 @@ mod tests {
 
     #[rstest]
     fn unsequenced_events_reset_each_tick() {
-        let mut state = fresh_state();
+        let mut state = fresh_state().expect("failed to initialise DbspState");
         let mut first_seen = HashSet::new();
         let mut second_seen = HashSet::new();
         let first = unsequenced_event(3, 5);

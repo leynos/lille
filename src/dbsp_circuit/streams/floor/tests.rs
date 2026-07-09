@@ -20,7 +20,7 @@ fn fh(x: i32, y: i32, height: f64) -> FloorHeightAt {
 
 #[test]
 fn test_highest_block_aggregation() {
-    let mut circuit = new_circuit();
+    let mut circuit = new_circuit().expect("failed to build DBSP circuit");
 
     circuit.block_in().push(block(0, (10, 20, 5)), 1);
     circuit.block_in().push(block(1, (10, 20, 8)), 1);
@@ -45,7 +45,7 @@ fn test_highest_block_aggregation() {
 #[case::duplicate_same_height(vec![block(1, (1, 1, 5)), block(2, (1, 1, 5))], vec![hb(1,1,5)])]
 #[case::mixed(vec![block(1, (0, 0, 3)), block(2, (0, 0, 1)), block(3, (0, 1, 4))], vec![hb(0,0,3), hb(0,1,4)])]
 fn highest_block_cases(#[case] blocks: Vec<Block>, #[case] expected: Vec<HighestBlockAt>) {
-    let mut circuit = new_circuit();
+    let mut circuit = new_circuit().expect("failed to build DBSP circuit");
     for blk in blocks {
         circuit.block_in().push(blk, 1);
     }
@@ -78,7 +78,7 @@ fn floor_height_cases(
     #[case] slopes: Vec<BlockSlope>,
     #[case] expected: Vec<FloorHeightAt>,
 ) {
-    let mut circuit = new_circuit();
+    let mut circuit = new_circuit().expect("failed to build DBSP circuit");
     for b in blocks {
         circuit.block_in().push(b, 1);
     }
@@ -100,7 +100,7 @@ fn floor_height_cases(
 
 #[test]
 fn unmatched_slope_is_ignored() {
-    let mut circuit = new_circuit();
+    let mut circuit = new_circuit().expect("failed to build DBSP circuit");
     circuit.block_in().push(block(1, (0, 0, 0)), 1);
     circuit.block_slope_in().push(slope(2, (1.0, 0.0)), 1);
 
@@ -118,7 +118,7 @@ fn unmatched_slope_is_ignored() {
 
 #[test]
 fn slope_without_block_yields_no_height() {
-    let mut circuit = new_circuit();
+    let mut circuit = new_circuit().expect("failed to build DBSP circuit");
     circuit.block_slope_in().push(slope(1, (1.0, 0.0)), 1);
 
     step_named(&mut circuit, "slope_without_block_yields_no_height");

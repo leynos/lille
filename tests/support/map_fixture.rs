@@ -1,10 +1,10 @@
-#![cfg(feature = "test-support")]
 //! Shared fixture infrastructure for map plugin behavioural tests.
 //!
 //! The rspec-based map tests tick a Bevy `App` and need to:
 //! - safely share that `App` across rspec closures,
 //! - ensure `app.finish()` / `app.cleanup()` is run exactly once, and
 //! - provide a single place for the per-tick sleep used to reduce busy-waiting.
+#![cfg(feature = "test-support")]
 
 use std::sync::MutexGuard;
 

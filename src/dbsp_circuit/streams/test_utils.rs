@@ -34,30 +34,26 @@ macro_rules! impl_test_helper {
 
 /// Builds a new [`DbspCircuit`] for tests.
 ///
+/// Fixtures arrange state and arrangement can fail, so construction errors
+/// propagate to the calling test rather than panicking here.
+///
+/// # Errors
+/// Returns an error when the underlying [`DbspCircuit::new`] call fails to
+/// construct the circuit.
+///
 /// # Examples
 /// ```rust,no_run
 /// use lille::dbsp_circuit::streams::test_utils::new_circuit;
 ///
 /// # fn demo() -> Result<(), dbsp::Error> {
-/// let mut circuit = new_circuit();
+/// let mut circuit = new_circuit()?;
 /// // push inputs here, e.g. circuit.position_in().push(position, 1);
 /// circuit.step()?; // propagate evaluation errors with `?`
 /// # Ok(())
 /// # }
 /// ```
-///
-/// Builds a new [`DbspCircuit`] configured for stream tests.
-///
-/// # Panics
-/// Panics if the underlying [`DbspCircuit::new`] call fails to construct the circuit.
-#[cfg_attr(test, deny(clippy::expect_used))]
-#[expect(
-    clippy::expect_used,
-    reason = "Test helper must panic loudly on circuit construction failure"
-)]
-#[must_use]
-pub fn new_circuit() -> DbspCircuit {
-    DbspCircuit::new().expect("failed to build DBSP circuit")
+pub fn new_circuit() -> Result<DbspCircuit, dbsp::Error> {
+    DbspCircuit::new()
 }
 
 /// Constructs a [`Block`] with the given identifier and coordinates.

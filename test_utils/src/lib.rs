@@ -83,8 +83,11 @@ pub fn assert_valid_rust_syntax(code: &str) {
 /// # Examples
 /// ```rust
 /// use test_utils::{new_circuit, step};
-/// let mut circuit = new_circuit();
+/// # fn main() -> Result<(), dbsp::Error> {
+/// let mut circuit = new_circuit()?;
 /// step(&mut circuit);
+/// # Ok(())
+/// # }
 /// ```
 pub use lille::dbsp_circuit::step;
 
@@ -93,7 +96,10 @@ pub use lille::dbsp_circuit::step;
 /// # Examples
 /// ```rust
 /// use test_utils::{new_circuit, step_named};
-/// let mut circuit = new_circuit();
+/// # fn main() -> Result<(), dbsp::Error> {
+/// let mut circuit = new_circuit()?;
 /// step_named(&mut circuit, "ctx");
+/// # Ok(())
+/// # }
 /// ```
 pub use lille::dbsp_circuit::step_named;

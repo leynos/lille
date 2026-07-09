@@ -95,6 +95,7 @@ impl DamageInbox {
 
 #[cfg(test)]
 mod tests {
+    //! Tests for the damage inbox resource.
     use super::*;
     use crate::dbsp_circuit::{DamageEvent, DamageSource};
     use rstest::rstest;

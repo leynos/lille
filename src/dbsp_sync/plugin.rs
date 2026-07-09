@@ -92,6 +92,7 @@ impl Plugin for DbspPlugin {
 
 #[cfg(test)]
 mod tests {
+    //! Tests for the DBSP synchronisation plugin.
     use super::*;
     use crate::dbsp_sync::DbspState;
     use crate::world_handle::WorldHandle;
