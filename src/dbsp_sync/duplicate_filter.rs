@@ -101,15 +101,32 @@ mod tests {
         }
     }
 
+    /// Asserts the record-twice duplicate-counting contract shared by the
+    /// sequenced and unsequenced ingestion paths: the first application is
+    /// not a duplicate, reapplying the same event is, and exactly one
+    /// duplicate is counted. A macro keeps panic locations in the calling
+    /// test.
+    macro_rules! assert_duplicate_counted {
+        ($record:ident, $event:expr) => {{
+            let mut state = fresh_state().expect("failed to initialise DbspState");
+            let mut seen = HashSet::new();
+            let event = $event;
+            assert!(
+                !state.$record(&event, &mut seen),
+                "first application must not count as a duplicate"
+            );
+            assert_eq!(state.applied_health_duplicates(), 0);
+            assert!(
+                state.$record(&event, &mut seen),
+                "reapplying the same event must count as a duplicate"
+            );
+            assert_eq!(state.applied_health_duplicates(), 1);
+        }};
+    }
+
     #[rstest]
     fn sequenced_duplicate_is_counted() {
-        let mut state = fresh_state().expect("failed to initialise DbspState");
-        let mut seen = HashSet::new();
-        let event = sequenced_event(5);
-        assert!(!state.record_duplicate_sequenced_damage(&event, &mut seen));
-        assert_eq!(state.applied_health_duplicates(), 0);
-        assert!(state.record_duplicate_sequenced_damage(&event, &mut seen));
-        assert_eq!(state.applied_health_duplicates(), 1);
+        assert_duplicate_counted!(record_duplicate_sequenced_damage, sequenced_event(5));
     }
 
     #[rstest]
@@ -126,12 +143,10 @@ mod tests {
 
     #[rstest]
     fn unsequenced_duplicate_is_counted() {
-        let mut state = fresh_state().expect("failed to initialise DbspState");
-        let mut seen = HashSet::new();
-        let event = unsequenced_event(2, 12);
-        assert!(!state.record_duplicate_unsequenced_damage(&event, &mut seen));
-        assert!(state.record_duplicate_unsequenced_damage(&event, &mut seen));
-        assert_eq!(state.applied_health_duplicates(), 1);
+        assert_duplicate_counted!(
+            record_duplicate_unsequenced_damage,
+            unsequenced_event(2, 12)
+        );
     }
 
     #[rstest]
