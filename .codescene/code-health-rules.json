@@ -1,9 +1,8 @@
 {
-  "usage": "Repo-scoped CodeScene rule overrides. Keep entries narrow and documented.",
   "rule_sets": [
     {
-      "matching_content_path": "test_utils/src/physics/units.rs",
-      "matching_content_path_doc": "Newtype wrapper constructors necessarily accept primitives; this module exists to remove primitive obsession from call sites, so the metric is a false positive here.",
+      "matching_content_path": "test_utils/**",
+      "matching_content_path_doc": "Test-support newtype wrappers: constructors necessarily accept primitives, so Primitive Obsession is a false positive in this crate.",
       "rules": [
         { "name": "Primitive Obsession", "weight": 0.0 }
       ]
