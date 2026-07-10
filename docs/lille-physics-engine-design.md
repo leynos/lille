@@ -294,7 +294,7 @@ Semantics:
   gameplay rules (documented in AI/agent sections if applicable).
 - Round fractional damage and healing magnitudes down before applying deltas.
 
-The Bevy synchronisation layer clamps snapshot data before handing it to the
+The Bevy synchronization layer clamps snapshot data before handing it to the
 DBSP circuit. `Health.current` values greater than `max` are reduced to the
 ceiling and the clamp is logged at debug level so drift can be investigated.
 This keeps the ECS authoritative state within the documented invariant while
@@ -309,7 +309,7 @@ the full record for unsequenced events. Filtered events increment the same
 counter, providing a single telemetry surface that reports discarded work
 irrespective of whether the duplicate was spotted at ingress or egress.
 
-To prevent stale data from compounding, the synchronisation system retracts the
+To prevent stale data from compounding, the synchronization system retracts the
 prior frame's health snapshots and damage events before ingesting new records.
 `DbspState` caches the last `HealthState` per entity alongside the batch of
 pushed `DamageEvent`s, draining both collections with negative weights at the
@@ -402,7 +402,7 @@ impact speed from `vz_before_contact`, clamps it against the default
 `DamageEvent` is emitted only when the clamped impact exceeds the safe
 threshold.
 
-The implementation materialises an internal tick counter that lives entirely
+The implementation materializes an internal tick counter that lives entirely
 within the DBSP circuit. The generator wraps a mutable counter, increments it
 on each invocation, and yields the pre-increment value so downstream consumers
 observe the zero-based tick directly, without any integrate-or-delay stage.
@@ -491,7 +491,7 @@ declarative dataflow model.
   `health < threshold`, and then `join` the result with the fleeing-behaviour
   sub-graph.
 
-It is crucial to recognise the limitations of this approach. DBSP is not suited
+It is crucial to recognize the limitations of this approach. DBSP is not suited
 for complex, stateful search algorithms. **A\* pathfinding**, for instance,
 should remain implemented in imperative Rust. The *output* of such an algorithm
 (e.g., the next waypoint in a path) can be fed as an input stream to the DBSP

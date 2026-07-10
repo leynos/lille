@@ -90,7 +90,7 @@ graph TD
 
 1. **DBSP Calculation**: The DBSP circuit calculates the new `(x, y, z)`
    logical position for an entity and emits it as a `NewPosition` record.
-2. **State Synchronisation**: The existing `apply_dbsp_outputs_system` reads
+2. **State Synchronization**: The existing `apply_dbsp_outputs_system` reads
    this `NewPosition` record and updates the `Transform` component of the
    corresponding Bevy entity. At this point, the entity is in the correct
    logical position in the ECS.

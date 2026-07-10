@@ -18,3 +18,11 @@ provide further detail:
 - [Rust testing with rstest fixtures](rust-testing-with-rstest-fixtures.md)
 - [Testing declarative game logic in DBSP](testing-declarative-game-logic-in-dbsp.md)
 - [Test utilities](test_utils.md)
+
+## Spelling policy
+
+Run `make spelling` to enforce en-GB-oxendict prose spelling. The generated
+`typos.toml` starts from the shared estate dictionary, refreshes its untracked
+local cache only when the authority is newer, and then applies the narrow
+repository policy in `typos.local.toml`. Edit the local policy and regenerate
+the configuration rather than changing generated entries by hand.

@@ -58,7 +58,7 @@ executes on every simulation tick.
    is where all physics calculations, geometry checks, and AI decisions occur,
    resulting in a new set of output streams.
 
-3. **State Synchronisation (DBSP → ECS)**: A final set of Bevy "output systems"
+3. **State Synchronization (DBSP → ECS)**: A final set of Bevy "output systems"
    run. They read the records from the circuit's output handles (e.g.,
    `NewPosition`, `NewVelocity`). For each output record, the system finds the
    corresponding entity in the ECS and updates its components with the new,

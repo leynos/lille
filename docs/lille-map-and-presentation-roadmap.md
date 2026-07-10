@@ -81,7 +81,7 @@ authored positions.
 
 - [x] Task 1.3.1 — Define PlayerSpawn and spawn point components
   - Outcome: Typed components such as `PlayerSpawn` and `SpawnPoint` (with
-    enemy metadata) are added, registered, and serialised from Tiled classes.
+    enemy metadata) are added, registered, and serialized from Tiled classes.
   - Completion criteria: Loading a map with these objects results in ECS
     entities carrying the expected component values.
   - Dependencies: Task 1.1.3.
@@ -99,7 +99,7 @@ authored positions.
     leaves the existing map intact; unloading recreates components safely.
   - Dependencies: Task 1.1.2.
 
-## Phase 2: Visualisation and interaction layer
+## Phase 2: Visualization and interaction layer
 
 Why this matters: This phase gives life to the data-driven world by rendering
 entities with sprites, managing camera control, and preserving the separation

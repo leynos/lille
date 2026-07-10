@@ -3,7 +3,7 @@
 A simple real-time strategy prototype demonstrating a dataflow-driven game loop
 with optional Bevy subsystems. Rendering is enabled with the `render` feature,
 while text rendering builds on top via the `text` feature. The project
-currently implements "Phase 1" of the migration roadmap, synchronising the
+currently implements "Phase 1" of the migration roadmap, synchronizing the
 legacy `GameWorld` state into Bevy and rendering static entities.
 
 ## Features & usage
