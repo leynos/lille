@@ -10,3 +10,10 @@ tiled_types_export.json
 .crush/
 .serena/
 .cargo-home/
+.coverage
+.pytest_cache/
+__pycache__/
+.uv-cache/
+.uv-tools/
+.typos-oxendict-base.json
+.typos-oxendict-base.toml

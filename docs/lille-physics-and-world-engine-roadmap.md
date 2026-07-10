@@ -43,7 +43,7 @@ behaviours.
 
 **Goal**: To completely remove the DDlog dependency and establish a working,
 pure-Rust build where the core physics logic is handled by a minimal DBSP
-circuit. This phase prioritises architectural simplification over feature
+circuit. This phase prioritizes architectural simplification over feature
 parity.
 
 **Key Tasks**:
@@ -199,7 +199,7 @@ physical properties and agent behaviours.
         - [x] Arithmetic: apply saturating add/sub inside the circuit so health
           never underflows below `0` or overflows above `max`.
 
-        - [x] Serialisation: mirror the component layout into a `HealthState`
+        - [x] Serialization: mirror the component layout into a `HealthState`
           input collection for the circuit.
 
         - [x] Rounding: if non-integer sources emerge, round damage down and
@@ -232,10 +232,10 @@ physical properties and agent behaviours.
         - [x] Idempotency: apply each `HealthDelta` at most once per
           `(entity, at_tick, seq)` triple; ignore duplicates and log at debug
           with a counter. On missing deltas, carry forward last applied state
-          (no-op) and emit a resynchronisation metric.
+          (no-op) and emit a resynchronization metric.
 
       - [x] Add data-driven tests—`rstest` fixtures and headless Bevy BDD
-        scenarios—covering health synchronisation across the circuit boundary.
+        scenarios—covering health synchronization across the circuit boundary.
 
         - [x] Acceptance: achieve tick-bounded convergence where ECS and circuit
           health match within one tick.
@@ -324,7 +324,7 @@ long-term stability and performance of the engine.
    - [ ] Feed the *results* of the pathfinder (e.g., the next waypoint) into the
      DBSP circuit as a `PathGoal` input stream to drive agent movement.
 
-3. **Performance and Optimisation**:
+3. **Performance and Optimization**:
 
    - [ ] Conduct performance profiling of the DBSP circuit in complex scenes.
 

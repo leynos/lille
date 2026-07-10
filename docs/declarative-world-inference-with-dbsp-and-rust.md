@@ -180,7 +180,7 @@ let gravity_applied = unsupported_entities.map(|(pos, _z_floor)| {
 
 ```
 
-## Data Synchronisation with Bevy ECS
+## Data Synchronization with Bevy ECS
 
 The DBSP circuit operates as a self-contained computational engine driven by
 the Bevy ECS. The interaction is orchestrated by a set of Bevy systems that

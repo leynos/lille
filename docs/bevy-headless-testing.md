@@ -32,7 +32,7 @@ testing in CI environments where graphical output is typically unavailable or
 undesirable. Headless mode allows the Bevy application to run its core logic,
 update systems, and manage its ECS world without attempting to create a window
 or render to a screen.4 This is particularly useful for integration tests that
-simulate application behavior without the overhead and flakiness associated
+simulate application behaviour without the overhead and flakiness associated
 with UI rendering.
 
 To configure a Bevy application for headless operation, modifications to the
@@ -102,7 +102,7 @@ initialization. However, for most integration-style tests, the modified
 
 ## 3. Foundations: Testing Bevy Systems and Components
 
-The core of testing Bevy applications lies in verifying the behavior of its
+The core of testing Bevy applications lies in verifying the behaviour of its
 systems and the state of its components within the ECS framework. Bevy's
 architecture lends itself well to a structured testing approach where
 individual pieces of logic can be instantiated and examined with relative ease.
@@ -288,7 +288,7 @@ state transitions. Such a structured approach enhances the readability and
 maintainability of tests and reduces the likelihood of errors arising from
 manually managed setup and teardown logic scattered across test functions.
 Furthermore, it mirrors how the actual game might utilize states, making the
-tests more representative of real application behavior. The `StateScoped`
+tests more representative of real application behaviour. The `StateScoped`
 component, in particular, directly addresses the common problem of resource
 leakage or entity persistence between test runs, which is crucial for
 maintaining the stability and reliability of CI pipelines.10
@@ -386,7 +386,7 @@ operating in different Bevy schedules.
 ## 5. Advanced Testing Strategies for Bevy
 
 Beyond foundational system and component testing, more advanced strategies can
-provide deeper insights into application behavior and help catch a wider range
+provide deeper insights into application behaviour and help catch a wider range
 of regressions. These include snapshot testing, comprehensive integration
 testing, and adopting Test-Driven Development.
 
@@ -411,7 +411,7 @@ regressions.
   Nauseam.2 Its current focus is on capturing sequences of input events during
   a test run and serializing them (as RON files in a `snapshots/inputs`
   directory). These recorded inputs can then be replayed in subsequent test
-  runs (`cargo test --test $TEST_NAME -- -r`) to ensure consistent behavior. It
+  runs (`cargo test --test $TEST_NAME -- -r`) to ensure consistent behaviour. It
   also supports capturing inputs at a specified frame rate
   (`cargo test --test $TEST_NAME -- -c $FRAMES_PER_SEC`). A notable
   characteristic of `bevy_geppetto` is its requirement to run tests on the main
@@ -435,7 +435,7 @@ Developers are seeking more comprehensive methods for regression testing that
 go beyond simple value assertions, aiming for techniques common in other
 domains like web development (e.g., Jest's snapshot testing, visual diffing
 tools). Input recording and replaying, as facilitated by `bevy_geppetto`, is a
-step towards testing emergent behaviors that arise from complex interactions
+step towards testing emergent behaviours that arise from complex interactions
 over simulated time. While powerful, snapshot tests, particularly visual ones,
 demand careful management regarding the updating of snapshots and handling
 minor, acceptable differences. Data snapshots are generally more robust and
@@ -446,7 +446,7 @@ accommodate.
 ### 5.2. Integration Testing Complex Interactions
 
 Integration tests verify how multiple systems, components, and events interact
-to produce a desired outcome or emergent game behavior. The focus is on the
+to produce a desired outcome or emergent game behaviour. The focus is on the
 "contracts" between different parts of the application: if System A produces an
 event or modifies a component, does System B (and subsequent systems) react
 correctly?
@@ -482,8 +482,8 @@ test the flow of data and control, mitigating the "spaghetti-code problem" that
 can make integration testing notoriously difficult in other programming
 paradigms.2 While unit tests are crucial for verifying the internal logic of
 individual systems, integration tests provide confidence that these systems
-compose correctly to produce the intended gameplay behaviors. In game
-development, where complex emergent behavior is a hallmark, robust integration
+compose correctly to produce the intended gameplay behaviours. In game
+development, where complex emergent behaviour is a hallmark, robust integration
 tests are particularly valuable. The balance between unit and integration tests
 can vary; some codebases, especially those with many interacting parts, may
 benefit significantly from a strong emphasis on integration testing.3
@@ -503,7 +503,7 @@ TDD cycle is "Red-Green-Refactor":
 
 Applying TDD to Bevy development involves 16:
 
-- Identifying a specific unit of behavior to implement, such as a new game
+- Identifying a specific unit of behaviour to implement, such as a new game
   system, a complex interaction between components, or a piece of resource
   management logic.
 - Writing a test function that sets up a Bevy `App`, spawns any necessary
@@ -523,7 +523,7 @@ after the animation system runs for the first time.16
 
 Adopting TDD in a Bevy context encourages developers to think critically about
 system interactions and data transformations from the perspective of
-testability and desired behavior *before* writing any implementation code. This
+testability and desired behaviour *before* writing any implementation code. This
 process naturally leads to clearer, more decoupled designs because, to write a
 test for a system, its inputs (queries, resources, events) and expected outputs
 (component changes, new events) must be precisely defined. This forced clarity
@@ -609,7 +609,7 @@ configurations observed in such workflows include:
     operating systems (e.g., `windows-latest`, `macos-latest`,
     `ubuntu-latest`), and Rust toolchain versions (stable, beta, nightly). This
     matrix testing is a best practice for ensuring broad compatibility.
-  - Execution with Miri (`miri`) to detect undefined behavior.
+  - Execution with Miri (`miri`) to detect undefined behaviour.
   - Static analysis and linting (`clippy`).
   - Code formatting checks (`check-fmt` wrapping `rustfmt`).
   - Spell checking in documentation and comments (`typos`).
@@ -650,10 +650,10 @@ also makes writing unit, integration, and headless tests considerably simpler.
     should generally be accessed at once".19 This avoids overly large
     components where only a fraction of the data is relevant to most systems,
     improving clarity and potentially performance.
-  - **Behavior vs. Data:** Components should primarily hold data. Logic
-    operating on this data resides in systems. Avoid writing "anemic tests"
+  - **Behaviour vs. Data:** Components should primarily hold data. Logic
+    operating on this data resides in systems. Avoid writing "anaemic tests"
     that merely check simple getters or setters on components if those
-    components encapsulate no inherent logic 20; instead, test the behavior of
+    components encapsulate no inherent logic 20; instead, test the behaviour of
     systems that interact with these components.
   - **Specialized Components:** Utilize marker components (empty structs
     deriving `Component`) for tagging entities or filtering queries
@@ -665,7 +665,7 @@ also makes writing unit, integration, and headless tests considerably simpler.
   is a powerful tool for enabling communication between systems without
   creating tight coupling.10
 
-  - **Decoupling:** Prefer events for signaling occurrences or passing data that
+  - **Decoupling:** Prefer events for signalling occurrences or passing data that
     may affect multiple, disparate parts of the game. Systems can subscribe to
     events (`EventReader`) or send them (`EventWriter`) without needing direct
     knowledge of each other.

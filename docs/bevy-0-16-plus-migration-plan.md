@@ -3,7 +3,7 @@
 ## Goal
 
 Upgrade Lille from Bevy 0.12 to Bevy 0.17.3 so we can adopt `bevy_ecs_tiled`
-0.9+ for the planned map pipeline, while keeping the DBSP synchronisation flow
+0.9+ for the planned map pipeline, while keeping the DBSP synchronization flow
 stable and headless builds reproducible.
 
 ## Current State Snapshot

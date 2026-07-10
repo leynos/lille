@@ -19,7 +19,7 @@ steps. The `before_all` and `before_each` hooks prepare that state before
 expectations are run.
 
 The following example demonstrates a basic RSpec test with shared state. It
-shows how `before_each` hooks initialise and mutate that state during each
+shows how `before_each` hooks initialize and mutate that state during each
 phase.
 
 ```rust

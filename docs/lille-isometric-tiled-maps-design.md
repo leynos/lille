@@ -62,7 +62,7 @@ encapsulate all map-loading functionality. It will be responsible for:
   hydrates into ECS components without adding non-DBSP inference.
 - Automated tests that rely on the asset pipeline use headless `DefaultPlugins`
   with `WinitPlugin` disabled, because the Rust test harness runs tests on
-  worker threads and `WinitPlugin` requires main-thread initialisation.
+  worker threads and `WinitPlugin` requires main-thread initialization.
 
 - **Asset Loading:** Initializing `bevy_ecs_tiled::TiledPlugin` to register the
   Tiled map loader and asset types. This hooks into Bevy’s asset system so that
@@ -337,9 +337,9 @@ general entity hierarchy and relevant components:
   rely on layer transforms.
 
 - Potentially a `TilemapAnchor` or similar component to control alignment (the
-  Tiled plugin provides a way to anchor maps, e.g., center vs
+  Tiled plugin provides a way to anchor maps, e.g., centre vs
   top-left)([1](https://github.com/adrien-bon/bevy_ecs_tiled#:~:text=You%20can%20customize%20how%20the,the%20map%20entity%2C%20such%20as)).
-   By default, an isometric map might be centered or bottom-aligned; we can
+   By default, an isometric map might be centred or bottom-aligned; we can
   adjust via this component if needed.
 
 - **Layer Entities (Children of Map)** – For each layer in Tiled (tile layer or
@@ -690,7 +690,7 @@ height per tile length in the X or Y direction. The DBSP circuit uses these
 values under the assumption that the base of the block is at height *z* and the
 height at an entity’s position offset within the tile is
 `z + grad_x*offset_x + grad_y*offset_y` (details in the physics design;
-currently it uses a center offset of 0.5 to sample the
+currently it uses a centre offset of 0.5 to sample the
 slope([3](https://github.com/leynos/lille/blob/8af31fc80ee2784e8ac40d96e49e33cb4b77e9f0/docs/lille-physics-engine-design.md#L79-L84))).
 
 When we register `SlopeProperties` as a reflect type and import it into Tiled,
@@ -757,7 +757,7 @@ this, our `add_collision_blocks` query might include
 
 After adding `Block` and `BlockSlope` components as described, the static map
 geometry is fully prepared for the physics engine. The existing **DBSP input
-synchronisation system** in Lille will automatically include these in the next
+synchronization system** in Lille will automatically include these in the next
 tick. As a recap:
 
 - The system `cache_state_for_dbsp_system` in `dbsp_sync/input.rs` queries all
