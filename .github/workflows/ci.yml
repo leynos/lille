@@ -16,7 +16,7 @@ jobs:
       # shared-action cargo wall-clock cap (default 600 s) accordingly.
       RUN_RUST_CARGO_WAIT_TIMEOUT: '1800'
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           # Full history so a future CodeScene changed-line gate
           # (`upload-codescene-coverage` with `mode: check`) can reach

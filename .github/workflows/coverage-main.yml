@@ -24,7 +24,7 @@ jobs:
       # shared-action cargo wall-clock cap (default 600 s) accordingly.
       RUN_RUST_CARGO_WAIT_TIMEOUT: '1800'
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Setup Rust
         uses: leynos/shared-actions/.github/actions/setup-rust@927edd45ae77be4251a8a18ca9eb5613a2e32cbd
       - name: Cache Rust dependencies
