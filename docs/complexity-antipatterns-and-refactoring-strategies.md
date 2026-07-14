@@ -456,11 +456,12 @@ together.
 CQRS promotes a clear separation that can prevent the kind of tangled logic
 that forms Bumpy Roads. By isolating write operations (commands) from read
 operations (queries), and by encouraging task-based commands, the system
-naturally tends towards smaller, more cohesive units of behaviour, thus reducing
-overall cognitive complexity within individual components.18 The separation
-allows for independent optimization and scaling of read and write sides, but
-more importantly for this discussion, it enforces a structural discipline that
-discourages methods from accumulating diverse responsibilities.18
+naturally tends towards smaller, more cohesive units of behaviour, thus
+reducing overall cognitive complexity within individual components.18 The
+separation allows for independent optimization and scaling of read and write
+sides, but more importantly for this discussion, it enforces a structural
+discipline that discourages methods from accumulating diverse
+responsibilities.18
 
 ### B. Avoiding Spaghetti Code Turning into Ravioli Code
 
@@ -632,9 +633,9 @@ When developers write declarative code, they operate at a higher level of
 abstraction, allowing them to reason about the program's intent more
 directly.34 This often leads to more concise, readable, and maintainable code
 because the "noise" of explicit iteration, temporary variables, and manual
-state updates is minimized.34 Many declarative approaches also inherently favour
-immutability and reduce side effects, which are common culprits for bugs and
-increased cognitive load in imperative code.35
+state updates is minimized.34 Many declarative approaches also inherently
+favour immutability and reduce side effects, which are common culprits for bugs
+and increased cognitive load in imperative code.35
 
 Examples include using SQL for database queries (specifying the desired
 dataset, not the retrieval algorithm) 34, or employing functional programming

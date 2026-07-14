@@ -84,8 +84,8 @@ DBSP operators.
 
 #### Geometry Dataflow: Calculating Floor Height
 
-The first stage of the circuit calculates the height of the "floor" at any
-given `(x, y)` coordinate.
+The first stage of the circuit calculates the height of the "floor" at any given
+`(x, y)` coordinate.
 
 1. **Find Highest Block**: The `Block` input stream is grouped by its `(x, y)`
    coordinates, and we find the maximum `z` for each group.

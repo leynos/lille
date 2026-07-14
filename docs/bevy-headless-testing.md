@@ -332,8 +332,8 @@ for several frames, release), one would modify the input resource and call
 `app.update()` iteratively.
 
 The resource-based nature of Bevy's input system is a significant advantage for
-testability. Systems consuming input data do not need to be aware of whether
-the `ButtonInput` resource was populated by actual hardware events or by test
+testability. Systems consuming input data do not need to be aware of whether the
+`ButtonInput` resource was populated by actual hardware events or by test
 code; they only interact with its current state. This design avoids the need
 for complex mocking of hardware event loops or platform-specific input APIs.
 Consequently, testing game controls, UI interactions, and any logic contingent
@@ -410,8 +410,8 @@ regressions.
   snapshot testing for Bevy, drawing inspiration from ideas discussed by Chad
   Nauseam.2 Its current focus is on capturing sequences of input events during
   a test run and serializing them (as RON files in a `snapshots/inputs`
-  directory). These recorded inputs can then be replayed in subsequent test
-  runs (`cargo test --test $TEST_NAME -- -r`) to ensure consistent behaviour. It
+  directory). These recorded inputs can then be replayed in subsequent test runs
+  (`cargo test --test $TEST_NAME -- -r`) to ensure consistent behaviour. It
   also supports capturing inputs at a specified frame rate
   (`cargo test --test $TEST_NAME -- -c $FRAMES_PER_SEC`). A notable
   characteristic of `bevy_geppetto` is its requirement to run tests on the main
@@ -523,18 +523,19 @@ after the animation system runs for the first time.16
 
 Adopting TDD in a Bevy context encourages developers to think critically about
 system interactions and data transformations from the perspective of
-testability and desired behaviour *before* writing any implementation code. This
-process naturally leads to clearer, more decoupled designs because, to write a
-test for a system, its inputs (queries, resources, events) and expected outputs
-(component changes, new events) must be precisely defined. This forced clarity
-on a system's responsibilities and its API often results in more focused and
-less coupled code. While TDD can sometimes feel slower during rapid prototyping
-phases, which are common in game development, its benefits in terms of
-long-term maintainability and stability, especially for core game systems, can
-be substantial. The idea of "playing your tests," as mentioned in relation to
-creating interactive test scenes 2, can be seen as a game development-friendly
-adaptation of the TDD feedback loop, allowing for both automated verification
-and interactive debugging of the feature under development.
+testability and desired behaviour *before* writing any implementation code.
+This process naturally leads to clearer, more decoupled designs because, to
+write a test for a system, its inputs (queries, resources, events) and expected
+outputs (component changes, new events) must be precisely defined. This forced
+clarity on a system's responsibilities and its API often results in more
+focused and less coupled code. While TDD can sometimes feel slower during rapid
+prototyping phases, which are common in game development, its benefits in terms
+of long-term maintainability and stability, especially for core game systems,
+can be substantial. The idea of "playing your tests," as mentioned in relation
+to creating interactive test scenes 2, can be seen as a game
+development-friendly adaptation of the TDD feedback loop, allowing for both
+automated verification and interactive debugging of the feature under
+development.
 
 ## 6. Automating Bevy Tests with CI (GitHub Actions)
 
@@ -599,7 +600,7 @@ configurations observed in such workflows include:
     incremental builds.
   - `CARGO_PROFILE_TEST_DEBUG: 0`, `CARGO_PROFILE_DEV_DEBUG: 0`: To control the
     inclusion of debug information in test and development profiles,
-    potentially reducing binary sizes and compile times for CI artifacts.
+    potentially reducing binary sizes and compile times for CI artefacts.
   - Specialized flags like `RUSTFLAGS` and `MIRIFLAGS` for enabling tools like
     Miri.
 - **Jobs:** A comprehensive CI setup often includes multiple jobs:
@@ -665,7 +666,8 @@ also makes writing unit, integration, and headless tests considerably simpler.
   is a powerful tool for enabling communication between systems without
   creating tight coupling.10
 
-  - **Decoupling:** Prefer events for signalling occurrences or passing data that
+  - **Decoupling:** Prefer events for signalling occurrences or passing data
+    that
     may affect multiple, disparate parts of the game. Systems can subscribe to
     events (`EventReader`) or send them (`EventWriter`) without needing direct
     knowledge of each other.

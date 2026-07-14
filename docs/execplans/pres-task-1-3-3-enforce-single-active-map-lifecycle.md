@@ -2,7 +2,7 @@
 
 **Task reference**:
 [docs/lille-map-and-presentation-roadmap.md](../lille-map-and-presentation-roadmap.md)
- Phase 1 > Step 1.3 > Task 1.3.3
+Phase 1 > Step 1.3 > Task 1.3.3
 
 **Branch**: `pres-task-1-3-3-enforce-single-active-map-lifecycle`
 

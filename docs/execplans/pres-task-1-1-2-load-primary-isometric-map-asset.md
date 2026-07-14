@@ -230,7 +230,7 @@ Acceptance criteria for Task 1.1.2 is met when all of the following hold:
 - If asset generation fails, delete `assets/maps` and re-run the generation
   step; no other state should be affected.
 
-## Artifacts and Notes
+## Artefacts and Notes
 
 Quality gate logs captured during implementation:
 

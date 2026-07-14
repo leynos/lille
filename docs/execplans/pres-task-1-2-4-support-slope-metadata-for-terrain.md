@@ -160,7 +160,7 @@ The block attachment system uses `Without<Block>` filter, making it safe to run
 multiple times. BlockSlope is inserted in the same command as Block, so partial
 application is not possible. If tests fail, fix the reported error and re-run.
 
-## Artifacts and Notes
+## Artefacts and Notes
 
 - The test map `primary-isometric-custom-properties.tmx` contains 4 tiles with
   `grad_x=0.25` and `grad_y=0.5`.

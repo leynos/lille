@@ -78,9 +78,9 @@ The map integration lives in `src/map.rs` and is responsible only for asset
 loading and wiring in `bevy_ecs_tiled`. Custom properties require enabling the
 `user_properties` feature on the `bevy_ecs_tiled` dependency and registering
 the relevant component types with Bevy's type registry using
-`App::register_type`. The new property components must be reflectable and
-derive `Component` so they can be hydrated by `bevy_ecs_tiled` when parsing
-Tiled maps.
+`App::register_type`. The new property components must be reflectable and derive
+`Component` so they can be hydrated by `bevy_ecs_tiled` when parsing Tiled
+maps.
 
 The current tests for `LilleMapPlugin` live under `tests/`, with shared helpers
 in `tests/support/`. Behavioural tests use `rust-rspec` and must run in their
@@ -143,7 +143,7 @@ All edits are additive and can be re-applied safely. If tests fail, re-run the
 failing test binary after fixing the reported error. If map loading fails,
 remove the new test map and reintroduce it after validating the XML structure.
 
-## Artifacts and Notes
+## Artefacts and Notes
 
 - Expected evidence includes a rust-rspec scenario showing the custom
   properties load, plus the captured test logs in `/tmp/lille-*.log`.

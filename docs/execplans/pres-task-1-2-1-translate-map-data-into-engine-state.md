@@ -171,7 +171,7 @@ The block attachment system uses a `Without<Block>` filter, making it safe to
 run multiple times. If tests fail, fix the reported error and re-run. All edits
 are additive and can be re-applied safely.
 
-## Artifacts and Notes
+## Artefacts and Notes
 
 - Expected evidence includes rust-rspec scenario showing blocks attached to
   collidable tiles, plus captured test logs.
