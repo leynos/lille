@@ -2,10 +2,10 @@
 
 ## Summary
 
-Phase 3 upgrades the workspace to Bevy 0.15.1 and replaces deprecated bundles
-in `spawn_world_system` with the Required Components model introduced in 0.15.
-Sprites now spawn via `Sprite` + `Transform` + `Visibility`, and the camera
-uses `Camera2d` with an orthographic `Projection` positioned above the world to
+Phase 3 upgrades the workspace to Bevy 0.15.1 and replaces deprecated bundles in
+`spawn_world_system` with the Required Components model introduced in 0.15.
+Sprites now spawn via `Sprite` + `Transform` + `Visibility`, and the camera uses
+`Camera2d` with an orthographic `Projection` positioned above the world to
 keep render parity with the old bundle defaults. A `rust-rspec` scenario
 ensures the Differential Dataflow Stream Processing (DBSP) circuit stays
 authoritative when components go missing between ticks.
@@ -32,13 +32,14 @@ authoritative when components go missing between ticks.
 Logs for this phase live in `artifacts/bevy-0-17-upgrade/phase-3/`:
 
 - `make-check-fmt.log` – `cargo fmt --check` via `make check-fmt`.
-- `make-lint.log` – `cargo clippy --workspace --all-targets --all-features -D
-  warnings`.
+- `make-lint.log` –
+  `cargo clippy --workspace --all-targets --all-features -D warnings`.
 - `make-test.log` – `cargo test --workspace`.
 - `cargo-test-all-features.log` – `cargo test --all-features` including render
   coverage.
-- `cargo-run-render-help.log` – `cargo run -p lille --features render --
-  --help` to compile and exercise the render feature entrypoint headlessly.
+- `cargo-run-render-help.log` –
+  `cargo run -p lille --features render -- --help` to compile and exercise the
+  render feature entrypoint headlessly.
 
 ## Follow-ups
 

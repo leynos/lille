@@ -33,8 +33,9 @@ Logs live under `artifacts/bevy-0-17-upgrade/phase-2/`:
 - `cargo-tree-bevy.txt` – `cargo tree -i bevy` confirms the workspace resolves
   to Bevy 0.14.2 with no local forks.
 - `make-fmt.log` – `make fmt` output covering Rust and Markdown formatting.
-- `make-lint.log` – `make lint` (`cargo clippy --all-targets --all-features -D
-  warnings`) on the 0.14 toolchain.
+- `make-lint.log` – `make lint`
+  (`cargo clippy --all-targets --all-features -D warnings`) on the 0.14
+  toolchain.
 - `make-test.log` – `make test` integration/unit run.
 - `cargo-test-all-features.log` – `cargo test --all-features` to mirror the
   migration checklist.

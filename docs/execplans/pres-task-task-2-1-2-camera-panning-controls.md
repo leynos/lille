@@ -1,9 +1,8 @@
 # Task 2.1.2: Implement Camera Panning Controls
 
-This Execution Plan (ExecPlan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -347,7 +346,7 @@ All steps are idempotent:
 
 If a step fails, resolve the issue and retry from that step.
 
-## Artifacts and Notes
+## Artefacts and Notes
 
 ### Unit Test Cases
 

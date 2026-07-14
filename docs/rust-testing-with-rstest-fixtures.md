@@ -282,8 +282,8 @@ mutable `Repository` implementation.
 By default, `rstest` calls a fixture function anew for each test that uses it.
 This means if five different tests inject the same fixture, the fixture
 function will be executed five times, and each test will receive a fresh,
-independent instance of the fixture's result. This behaviour is crucial for test
-isolation. The `rstest` macro effectively desugars a test like
+independent instance of the fixture's result. This behaviour is crucial for
+test isolation. The `rstest` macro effectively desugars a test like
 `fn the_test(injected: i32)` into something conceptually similar to
 `#[test] fn the_test() { let injected = injected_fixture_func(); /*... */ }`
 within the test body, implying a new call each time.13
@@ -529,8 +529,8 @@ When using `#[once]`, there are critical caveats 12:
  passive data or resources whose cleanup is managed by the operating system
  upon process exit.
 2. **Functional Limitations:** `#[once]` fixtures cannot be `async` functions
- and cannot be generic functions (neither with generic type parameters nor
- using `impl Trait` in arguments or return types).
+ and cannot be generic functions (neither with generic type parameters nor using
+ `impl Trait` in arguments or return types).
 
 The "never dropped" behaviour arises because `rstest` typically creates a
 `static` variable to hold the result of the `#[once]` fixture. `static`
@@ -1211,7 +1211,7 @@ also be less straightforward if the developer is unfamiliar with how the macros
 expand.8
 - **Debugging Parameterized Tests:** `rstest` generates individual test
 functions for parameterized cases, often named like
-`test_function_name::case_N`.8 Understanding this naming convention is helpful
+`test_function_name::case_N` .8 Understanding this naming convention is helpful
 for identifying and running specific failing cases with
 `cargo test test_function_name::case_N`. Some IDEs or debuggers might require
 specific configurations or might not fully support stepping through the
@@ -1313,20 +1313,20 @@ provided by `rstest`:
 **Table 2: Key** `rstest` **Attributes Quick Reference** <!--
 markdownlint-disable MD013 -->
 
-| Attribute                      | Purpose                                                                             |
-| ------------------------------ | ----------------------------------------------------------------------------------- |
-| `#[rstest]`                    | Marks a function as an rstest test; enables fixture injection and parameterization. |
-| `#[fixture]`                   | Defines a fixture provider function.                                                |
-| `#[case(…)]`                   | Defines a single parameterized test case.                                           |
-| `#[values(…)]`                 | Specifies a set of values for parameterization.                                     |
-| `#[once]`                      | Initializes a fixture only once.                                                    |
-| `#[future]`                    | Simplifies async argument types by removing `impl Future`.                          |
-| `#[awt]`                       | Automatically awaits future arguments in async tests.                               |
-| `#[from(original_name)]`       | Renames an injected fixture argument.                                               |
-| `#[with(…)]`                   | Overrides default fixture arguments.                                                |
-| `#[default(…)]`                | Provides default values inside a fixture.                                           |
-| `#[timeout(…)]`                | Sets a timeout for an asynchronous test.                                            |
-| `#[files("glob_pattern",…)]`   | Injects file paths matching a glob pattern as test arguments.                       |
+| Attribute                    | Purpose                                                                             |
+| ---------------------------- | ----------------------------------------------------------------------------------- |
+| `#[rstest]`                  | Marks a function as an rstest test; enables fixture injection and parameterization. |
+| `#[fixture]`                 | Defines a fixture provider function.                                                |
+| `#[case(…)]`                 | Defines a single parameterized test case.                                           |
+| `#[values(…)]`               | Specifies a set of values for parameterization.                                     |
+| `#[once]`                    | Initializes a fixture only once.                                                    |
+| `#[future]`                  | Simplifies async argument types by removing `impl Future`.                          |
+| `#[awt]`                     | Automatically awaits future arguments in async tests.                               |
+| `#[from(original_name)]`     | Renames an injected fixture argument.                                               |
+| `#[with(…)]`                 | Overrides default fixture arguments.                                                |
+| `#[default(…)]`              | Provides default values inside a fixture.                                           |
+| `#[timeout(…)]`              | Sets a timeout for an asynchronous test.                                            |
+| `#[files("glob_pattern",…)]` | Injects file paths matching a glob pattern as test arguments.                       |
 <!-- markdownlint-enable MD013 -->
 
 By mastering `rstest`, Rust developers can significantly elevate the quality

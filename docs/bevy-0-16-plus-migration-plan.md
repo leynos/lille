@@ -195,9 +195,9 @@ before merging to keep the “two sets of eyes” policy meaningful.
   future `App::register_type` calls.[^2]
 - Ensure `DbspPlugin` error handling aligns with the Events V2 changes so that
   diagnostics continue to surface in logs.
-- Re-run all feature combos (`default`, `render`, `text`) plus `cargo test
-  --all-features` and `cargo test -p
-  build_support` to confirm the workspace is stable on the new stack.
+- Re-run all feature combos (`default`, `render`, `text`) plus
+  `cargo test --all-features` and `cargo test -p build_support` to confirm the
+  workspace is stable on the new stack.
 
 #### Phase 5 status (27 November 2025)
 
