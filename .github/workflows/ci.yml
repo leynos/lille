@@ -12,7 +12,7 @@ jobs:
     env:
       CARGO_TERM_COLOR: always
       BUILD_PROFILE: debug
-      WHITAKER_INSTALLER_VERSION: '0.2.5'
+      WHITAKER_INSTALLER_VERSION: '0.2.6'
       # Bevy's render features make the coverage build heavy; lift the
       # shared-action cargo wall-clock cap (default 600 s) accordingly.
       RUN_RUST_CARGO_WAIT_TIMEOUT: '1800'
