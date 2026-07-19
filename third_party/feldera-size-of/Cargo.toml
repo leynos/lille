@@ -1,0 +1,145 @@
+# Vendored fork of `feldera-size-of` 0.1.7 (crates.io), based on Cargo's
+# normalized manifest for that release. The ONLY substantive changes from the
+# published crate are:
+#   * the `ordered-float` dependency is widened from `3.0.0` to `5` so the
+#     `SizeOf` impl for `OrderedFloat`/`NotNan` applies to ordered-float 5.x;
+#   * the accompanying `SizeOf` impl bound is switched from `Float` to
+#     `FloatCore` (see `src/support/ordered_float.rs`);
+#   * the standalone-incompatible trybuild `ui` test and packaging cruft are
+#     removed.
+#
+# This fork exists only until `feldera-size-of` publishes ordered-float 5.x
+# support upstream (https://github.com/feldera/size-of). Remove it and revert
+# Lille to the upstream release once that lands. See `third_party/README.md`.
+
+[package]
+edition = "2021"
+name = "feldera-size-of"
+version = "0.1.7"
+authors = ["Chase Wilson <me@chasewilson.dev>"]
+build = false
+autolib = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
+description = "A crate for measuring the total memory usage of an object"
+keywords = [
+    "memory",
+    "heapsize",
+    "profiling",
+    "memory-usage",
+    "memory-profiling",
+]
+categories = [
+    "no-std",
+    "development-tools",
+    "memory-management",
+    "development-tools::debugging",
+    "development-tools::profiling",
+]
+license = "MIT OR Apache-2.0"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = [
+    "--cfg",
+    "docsrs",
+]
+
+[features]
+ahash-std = [
+    "ahash",
+    "ahash/std",
+    "std",
+]
+default = [
+    "derive",
+    "std",
+]
+derive = ["size-of-derive"]
+portable-simd = []
+std = []
+stdsimd = []
+time-std = [
+    "time",
+    "time/std",
+    "std",
+]
+xxhash-xxh3 = [
+    "xxhash-rust",
+    "xxhash-rust/xxh3",
+]
+xxhash-xxh32 = [
+    "xxhash-rust",
+    "xxhash-rust/xxh32",
+]
+xxhash-xxh64 = [
+    "xxhash-rust",
+    "xxhash-rust/xxh64",
+]
+
+[lib]
+name = "feldera_size_of"
+path = "src/lib.rs"
+
+[dependencies.ahash]
+version = "0.8.0"
+optional = true
+
+[dependencies.arcstr]
+version = "1.1.4"
+optional = true
+
+[dependencies.bigdecimal]
+version = "0.3.0"
+optional = true
+
+[dependencies.chrono]
+version = "0.4.38"
+features = [
+    "rkyv-64",
+    "serde",
+    "clock",
+]
+optional = true
+default-features = false
+
+[dependencies.fxhash]
+version = "0.2.1"
+optional = true
+
+[dependencies.hashbrown]
+version = "0.13.2"
+optional = true
+
+[dependencies.num-bigint]
+version = "0.4.3"
+optional = true
+default-features = false
+
+# Widened from the published `3.0.0` so the `OrderedFloat`/`NotNan` `SizeOf`
+# impls apply to ordered-float 5.x. See the header comment above.
+[dependencies.ordered-float]
+version = "5"
+features = ["std"]
+optional = true
+default-features = false
+
+[dependencies.rust_decimal]
+version = "1.33.1-feldera.1"
+optional = true
+package = "feldera_rust_decimal"
+
+[dependencies.size-of-derive]
+version = "0.1.2"
+optional = true
+
+[dependencies.time]
+version = "0.3.15"
+optional = true
+default-features = false
+
+[dependencies.xxhash-rust]
+version = "0.8.6"
+optional = true
