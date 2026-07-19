@@ -7,6 +7,7 @@ SHELL := bash
 RUSTFLAGS_STRICT := -D warnings
 RUST_FLAGS ?= $(RUSTFLAGS_STRICT)
 RUST_FLAGS_ENV := RUSTFLAGS="$(RUST_FLAGS)"
+WHITAKER ?= whitaker
 WORKSPACE_PACKAGES := --package lille --package build_support --package test_utils
 MARKDOWNLINT := $(shell which markdownlint-cli2)
 MDTABLEFIX := $(shell which mdtablefix)
@@ -53,6 +54,7 @@ RUSTDOC_FLAGS ?= --cfg docsrs -D warnings
 lint:
 	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" cargo doc --workspace --no-deps
 	cargo clippy --all-targets --all-features -- $(RUST_FLAGS)
+	$(RUST_FLAGS_ENV) $(WHITAKER) --all -- --all-targets --all-features
 
 markdownlint: spelling
 	if [[ -n "$(MD_FILES)" && -n "$(MARKDOWNLINT)" ]]; then $(MARKDOWNLINT) $(MD_FILES); fi

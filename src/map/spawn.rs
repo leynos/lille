@@ -320,6 +320,7 @@ fn spawn_npcs(
 
 #[cfg(test)]
 mod tests {
+    //! Tests for actor spawning from map spawn points.
     use super::*;
 
     #[test]

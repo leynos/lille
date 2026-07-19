@@ -130,7 +130,7 @@ fn motion_cases(#[case] scenario: MotionScenario) {
             },
     } = scenario;
     // DEFAULT_MASS is validated in `default_mass_is_positive`.
-    let mut circuit = new_circuit();
+    let mut circuit = new_circuit().expect("failed to build DBSP circuit");
 
     for block_record in blocks {
         circuit.block_in().push(block_record, 1);
@@ -190,7 +190,7 @@ fn non_finite_horizontal_velocity_propagates(
     #[case] vx: f64,
     #[case] expectation: NonFiniteVelocity,
 ) {
-    let mut circuit = new_circuit();
+    let mut circuit = new_circuit().expect("failed to build DBSP circuit");
 
     circuit.block_in().push(block(1, (0, 0, 0)), 1);
     circuit.position_in().push(
@@ -246,7 +246,7 @@ fn non_finite_horizontal_velocity_propagates(
 #[case::negative(-1.0)]
 #[case::zero(0.0)]
 fn standing_friction(#[case] vx: f64) {
-    let mut circuit = new_circuit();
+    let mut circuit = new_circuit().expect("failed to build DBSP circuit");
 
     circuit.block_in().push(block(1, (0, 0, 0)), 1);
     circuit.block_in().push(block(2, (-1, 0, 0)), 1);
@@ -288,7 +288,7 @@ fn standing_friction(#[case] vx: f64) {
 
 #[test]
 fn airborne_preserves_velocity() {
-    let mut circuit = new_circuit();
+    let mut circuit = new_circuit().expect("failed to build DBSP circuit");
 
     circuit.block_in().push(block(1, (0, 0, 0)), 1);
     circuit.position_in().push(
@@ -324,7 +324,7 @@ fn airborne_preserves_velocity() {
 #[case::near_zero_negative(-0.0001, -0.0001 + GRAVITY_PULL)]
 #[case::near_zero_positive(0.0001, 0.0001 + GRAVITY_PULL)]
 fn terminal_velocity_clamping(#[case] start_vz: f64, #[case] expected_vz: f64) {
-    let mut circuit = new_circuit();
+    let mut circuit = new_circuit().expect("failed to build DBSP circuit");
 
     circuit.block_in().push(block(1, (0, 0, -10)), 1);
     circuit.position_in().push(

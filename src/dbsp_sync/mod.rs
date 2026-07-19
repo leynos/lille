@@ -22,6 +22,7 @@ pub use state::{DbspState, IdQueries};
 
 #[cfg(test)]
 mod tests {
+    //! Tests for the DBSP synchronisation plumbing.
     use super::*;
     use bevy::prelude::World;
     use rstest::rstest;

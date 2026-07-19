@@ -38,7 +38,7 @@ fn position_floor_cases(
     #[case] positions: Vec<Position>,
     #[case] expected: Vec<PositionFloor>,
 ) {
-    let mut circuit = new_circuit();
+    let mut circuit = new_circuit().expect("failed to build DBSP circuit");
     for b in blocks {
         circuit.block_in().push(b, 1);
     }
@@ -64,7 +64,7 @@ fn position_floor_cases(
 
 #[test]
 fn multiple_positions_same_grid_cell() {
-    let mut circuit = new_circuit();
+    let mut circuit = new_circuit().expect("failed to build DBSP circuit");
     circuit.block_in().push(block(1, (0, 0, 0)), 1);
     circuit.position_in().push(pos(1, (0.1, 0.1, 2.0)), 1);
     circuit.position_in().push(pos(2, (0.8, 0.4, 3.0)), 1);

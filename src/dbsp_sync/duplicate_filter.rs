@@ -71,13 +71,26 @@ impl DbspState {
 
 #[cfg(test)]
 mod tests {
+    //! Tests for duplicate damage-event filtering.
     use super::*;
     use crate::dbsp_circuit::DamageSource;
     use rstest::rstest;
     use std::collections::HashSet;
 
-    fn fresh_state() -> DbspState {
-        DbspState::new().expect("failed to initialise DbspState for tests")
+    fn fresh_state() -> Result<DbspState, dbsp::Error> {
+        DbspState::new()
+    }
+
+    /// Builds a fresh [`DbspState`] alongside an empty sequenced-duplicate
+    /// `seen` set, sharing the fixture construction used by the sequenced
+    /// and unsequenced `record_duplicate_sequenced_damage` branch tests.
+    #[expect(
+        clippy::type_complexity,
+        reason = "fixture tuple mirrors record_duplicate_sequenced_damage's seen-set type"
+    )]
+    fn fresh_sequenced_filter() -> Result<(DbspState, HashSet<(EntityId, Tick, u32)>), dbsp::Error>
+    {
+        Ok((fresh_state()?, HashSet::new()))
     }
 
     fn sequenced_event(seq: u32) -> DamageEvent {
@@ -100,21 +113,48 @@ mod tests {
         }
     }
 
+    /// Asserts the record-twice duplicate-counting contract shared by the
+    /// sequenced and unsequenced ingestion paths: the first application is
+    /// not a duplicate, reapplying the same event is, and exactly one
+    /// duplicate is counted. A macro keeps panic locations in the calling
+    /// test.
+    macro_rules! assert_duplicate_counted {
+        ($record:ident, $event:expr) => {{
+            let mut state = fresh_state().expect("failed to initialise DbspState");
+            let mut seen = HashSet::new();
+            let event = $event;
+            assert!(
+                !state.$record(&event, &mut seen),
+                "first application must not count as a duplicate"
+            );
+            assert_eq!(state.applied_health_duplicates(), 0);
+            assert!(
+                state.$record(&event, &mut seen),
+                "reapplying the same event must count as a duplicate"
+            );
+            assert_eq!(state.applied_health_duplicates(), 1);
+        }};
+    }
+
     #[rstest]
     fn sequenced_duplicate_is_counted() {
-        let mut state = fresh_state();
-        let mut seen = HashSet::new();
-        let event = sequenced_event(5);
+        assert_duplicate_counted!(record_duplicate_sequenced_damage, sequenced_event(5));
+    }
+
+    #[rstest]
+    fn unsequenced_event_is_not_a_sequenced_duplicate() {
+        let (mut state, mut seen) =
+            fresh_sequenced_filter().expect("failed to initialise DbspState");
+        let event = unsequenced_event(1, 10);
+        assert!(!state.record_duplicate_sequenced_damage(&event, &mut seen));
         assert!(!state.record_duplicate_sequenced_damage(&event, &mut seen));
         assert_eq!(state.applied_health_duplicates(), 0);
-        assert!(state.record_duplicate_sequenced_damage(&event, &mut seen));
-        assert_eq!(state.applied_health_duplicates(), 1);
     }
 
     #[rstest]
     fn sequenced_event_reapplied_in_next_frame_is_ignored() {
-        let mut state = fresh_state();
-        let mut seen = HashSet::new();
+        let (mut state, mut seen) =
+            fresh_sequenced_filter().expect("failed to initialise DbspState");
         let event = sequenced_event(7);
         state
             .applied_health
@@ -125,17 +165,15 @@ mod tests {
 
     #[rstest]
     fn unsequenced_duplicate_is_counted() {
-        let mut state = fresh_state();
-        let mut seen = HashSet::new();
-        let event = unsequenced_event(2, 12);
-        assert!(!state.record_duplicate_unsequenced_damage(&event, &mut seen));
-        assert!(state.record_duplicate_unsequenced_damage(&event, &mut seen));
-        assert_eq!(state.applied_health_duplicates(), 1);
+        assert_duplicate_counted!(
+            record_duplicate_unsequenced_damage,
+            unsequenced_event(2, 12)
+        );
     }
 
     #[rstest]
     fn unsequenced_events_reset_each_tick() {
-        let mut state = fresh_state();
+        let mut state = fresh_state().expect("failed to initialise DbspState");
         let mut first_seen = HashSet::new();
         let mut second_seen = HashSet::new();
         let first = unsequenced_event(3, 5);

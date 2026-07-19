@@ -13,17 +13,15 @@
 //! in the game world; this module translates authored data into typed
 //! components and feeds them into DBSP.
 
+mod lifecycle;
 pub mod spawn;
 mod translate;
 
 pub use spawn::{spawn_actors_at_spawn_points, NpcIdCounter};
 pub use translate::attach_collision_blocks;
 
-use bevy::asset::RecursiveDependencyLoadState;
 use bevy::prelude::*;
-use bevy_ecs::system::SystemParam;
-use bevy_ecs_tiled::prelude::{TiledMap, TiledMapAsset, TiledPlugin};
-use log::error;
+use bevy_ecs_tiled::prelude::{TiledMapAsset, TiledPlugin};
 
 /// Default Tiled map asset path for the “primary” isometric map.
 pub const PRIMARY_ISOMETRIC_MAP_PATH: &str = "maps/primary-isometric.tmx";
@@ -210,261 +208,12 @@ pub struct PrimaryMapAssetTracking {
     pub has_finalised: bool,
 }
 
-#[derive(Bundle)]
-struct PrimaryTiledMapBundle {
-    name: Name,
-    marker: PrimaryTiledMap,
-    map: TiledMap,
-    respawn: bevy_ecs_tiled::prelude::RespawnTiledMap,
-    storage: bevy_ecs_tiled::prelude::TiledMapStorage,
-    layer_z_offset: bevy_ecs_tiled::prelude::TiledMapLayerZOffset,
-    image_repeat_margin: bevy_ecs_tiled::prelude::TiledMapImageRepeatMargin,
-    tilemap_render_settings: bevy_ecs_tiled::prelude::TilemapRenderSettings,
-    tilemap_anchor: bevy_ecs_tiled::prelude::TilemapAnchor,
-    visibility: Visibility,
-    transform: Transform,
-}
-
-impl PrimaryTiledMapBundle {
-    fn new(handle: Handle<TiledMapAsset>) -> Self {
-        Self {
-            map: TiledMap(handle),
-            ..Self::default()
-        }
-    }
-}
-
-impl Default for PrimaryTiledMapBundle {
-    fn default() -> Self {
-        Self {
-            name: Name::new("PrimaryTiledMap"),
-            marker: PrimaryTiledMap,
-            map: TiledMap(Handle::default()),
-            respawn: bevy_ecs_tiled::prelude::RespawnTiledMap,
-            storage: bevy_ecs_tiled::prelude::TiledMapStorage::default(),
-            layer_z_offset: bevy_ecs_tiled::prelude::TiledMapLayerZOffset::default(),
-            image_repeat_margin: bevy_ecs_tiled::prelude::TiledMapImageRepeatMargin::default(),
-            tilemap_render_settings: bevy_ecs_tiled::prelude::TilemapRenderSettings::default(),
-            tilemap_anchor: bevy_ecs_tiled::prelude::TilemapAnchor::default(),
-            visibility: Visibility::default(),
-            transform: Transform::default(),
-        }
-    }
-}
-
-#[derive(SystemParam)]
-struct PrimaryMapSpawnContext<'w, 's> {
-    asset_server: Res<'w, AssetServer>,
-    settings: Res<'w, LilleMapSettings>,
-    existing_maps: Query<'w, 's, (), With<PrimaryTiledMap>>,
-    tracking: ResMut<'w, PrimaryMapAssetTracking>,
-}
-
-fn spawn_primary_map_if_enabled(mut commands: Commands, mut context: PrimaryMapSpawnContext) {
-    if !context.settings.should_spawn_primary_map {
-        return;
-    }
-
-    // If tracking already has an asset path, we've already committed to loading a map.
-    // This is normal operation after the first tick - just return silently.
-    if context.tracking.asset_path.is_some() {
-        return;
-    }
-
-    // If a map entity exists but tracking doesn't have a path, something external
-    // spawned a map. Emit an error since this violates single-map semantics.
-    if !context.existing_maps.is_empty() {
-        let requested_path = context.settings.primary_map.as_str().to_owned();
-        let active_path = "[external]".to_owned();
-
-        log::warn!(
-            "Attempted to load map '{requested_path}' while an external map is already active; \
-             ignoring request"
-        );
-
-        commands.trigger(LilleMapError::DuplicateMapAttempted {
-            requested_path,
-            active_path,
-        });
-        return;
-    }
-
-    let asset_path = context.settings.primary_map.as_str().to_owned();
-    if let Err(err) = validate_asset_path(&asset_path) {
-        commands.trigger(err);
-        return;
-    }
-
-    let handle = context.asset_server.load(asset_path.clone());
-    context.tracking.asset_path = Some(asset_path.clone());
-    context.tracking.handle = Some(handle.clone());
-    context.tracking.has_finalised = false;
-    commands.spawn(PrimaryTiledMapBundle::new(handle));
-}
-
-fn validate_asset_path(asset_path: &str) -> Result<(), LilleMapError> {
-    if asset_path.is_empty() {
-        return Err(LilleMapError::InvalidPrimaryMapAssetPath {
-            path: asset_path.to_owned(),
-        });
-    }
-
-    if asset_path.starts_with('/') {
-        return Err(LilleMapError::InvalidPrimaryMapAssetPath {
-            path: asset_path.to_owned(),
-        });
-    }
-
-    if asset_path.contains("..") {
-        return Err(LilleMapError::InvalidPrimaryMapAssetPath {
-            path: asset_path.to_owned(),
-        });
-    }
-
-    Ok(())
-}
-
-fn try_spawn_primary_map_on_build(app: &mut App) {
-    let world = app.world_mut();
-
-    let (should_spawn_primary_map, asset_path) =
-        world
-            .get_resource::<LilleMapSettings>()
-            .map_or((false, String::new()), |settings| {
-                (
-                    settings.should_spawn_primary_map,
-                    settings.primary_map.as_str().to_owned(),
-                )
-            });
-
-    if !should_spawn_primary_map {
-        return;
-    }
-
-    let mut existing_maps = world.query_filtered::<Entity, With<PrimaryTiledMap>>();
-    if existing_maps.iter(world).next().is_some() {
-        return;
-    }
-
-    if let Err(err) = validate_asset_path(&asset_path) {
-        world.trigger(err);
-        return;
-    }
-
-    let Some(asset_server) = world.get_resource::<AssetServer>() else {
-        return;
-    };
-
-    let handle = asset_server.load(asset_path.clone());
-    {
-        let mut tracking = world.resource_mut::<PrimaryMapAssetTracking>();
-        tracking.asset_path = Some(asset_path.clone());
-        tracking.handle = Some(handle.clone());
-        tracking.has_finalised = false;
-    }
-    world.spawn(PrimaryTiledMapBundle::new(handle));
-}
-
-/// Observer that handles `UnloadPrimaryMap` events by despawning map entities.
-///
-/// This observer enables safe hot-reload by:
-/// 1. Despawning the `PrimaryTiledMap` entity and all children (tiles, layers)
-/// 2. Despawning all `MapSpawned` entities (player, NPCs)
-/// 3. Resetting `PrimaryMapAssetTracking` to allow new map loads
-///
-/// # Bevy 0.17 Despawn Behaviour
-///
-/// In Bevy 0.17+, `despawn()` automatically despawns all descendants via the
-/// `ChildOf` relationship. The deprecated `despawn_recursive()` is no longer
-/// available on `EntityCommands`. Child entities (tiles, layers from
-/// `bevy_ecs_tiled`) are removed when their parent is despawned.
-#[expect(
-    clippy::too_many_arguments,
-    reason = "Bevy observer systems require query parameters; grouping would obscure intent."
-)]
-fn handle_unload_primary_map(
-    _event: bevy::ecs::prelude::On<UnloadPrimaryMap>,
-    mut commands: Commands,
-    map_query: Query<Entity, With<PrimaryTiledMap>>,
-    spawned_query: Query<Entity, With<MapSpawned>>,
-    mut tracking: ResMut<PrimaryMapAssetTracking>,
-) {
-    let mut unloaded_any = false;
-
-    // Note: Bevy 0.17's despawn() handles ChildOf relationships automatically,
-    // removing all descendant entities (tiles, layers) when the root is despawned.
-    for map_entity in &map_query {
-        commands.entity(map_entity).despawn();
-        unloaded_any = true;
-        log::info!("Unloaded primary map entity {map_entity:?}");
-    }
-
-    // Note: Bevy 0.17's despawn() handles ChildOf relationships automatically,
-    // removing any child entities (sprites, effects) when the actor is despawned.
-    for spawned_entity in &spawned_query {
-        commands.entity(spawned_entity).despawn();
-        log::debug!("Despawned map-spawned entity {spawned_entity:?}");
-    }
-
-    tracking.asset_path = None;
-    tracking.handle = None;
-    tracking.has_finalised = false;
-
-    if unloaded_any {
-        commands.trigger(PrimaryMapUnloaded);
-    }
-}
-
-fn log_map_unloaded(_event: bevy::ecs::prelude::On<PrimaryMapUnloaded>) {
-    log::info!("Primary map unloaded successfully");
-}
-
 /// Bevy plugin exposing Tiled map support for Lille.
 ///
 /// The plugin is safe to add multiple times: it guarantees `TiledPlugin` is
 /// present, and installs Lille-specific systems only once.
 #[derive(Debug)]
 pub struct LilleMapPlugin;
-
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "Observer systems must accept On<T> by value for Events V2."
-)]
-fn log_map_error(event: bevy::ecs::prelude::On<LilleMapError>) {
-    error!("map error: {:?}", event.event());
-}
-
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "Bevy system parameters use `Res<T>` by value."
-)]
-fn monitor_primary_map_load_state(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    mut tracking: ResMut<PrimaryMapAssetTracking>,
-) {
-    if tracking.has_finalised {
-        return;
-    }
-
-    let Some(handle) = tracking.handle.clone() else {
-        return;
-    };
-
-    match asset_server.recursive_dependency_load_state(handle.id()) {
-        RecursiveDependencyLoadState::Loaded => {
-            tracking.has_finalised = true;
-        }
-        RecursiveDependencyLoadState::Failed(error) => {
-            commands.trigger(LilleMapError::PrimaryMapLoadFailed {
-                path: tracking.asset_path.clone().unwrap_or_default(),
-                detail: error.to_string(),
-            });
-            tracking.has_finalised = true;
-        }
-        RecursiveDependencyLoadState::NotLoaded | RecursiveDependencyLoadState::Loading => {}
-    }
-}
 
 impl Plugin for LilleMapPlugin {
     fn build(&self, app: &mut App) {
@@ -485,18 +234,18 @@ impl Plugin for LilleMapPlugin {
             .register_type::<PlayerSpawnConsumed>()
             .register_type::<SpawnPointConsumed>()
             .register_type::<MapSpawned>();
-        app.add_observer(log_map_error);
-        app.add_observer(handle_unload_primary_map);
-        app.add_observer(log_map_unloaded);
+        app.add_observer(lifecycle::log_map_error);
+        app.add_observer(lifecycle::handle_unload_primary_map);
+        app.add_observer(lifecycle::log_map_unloaded);
         app.init_resource::<LilleMapSettings>();
         app.init_resource::<PrimaryMapAssetTracking>();
         app.init_resource::<NpcIdCounter>();
-        try_spawn_primary_map_on_build(app);
-        app.add_systems(PostStartup, spawn_primary_map_if_enabled);
+        lifecycle::try_spawn_primary_map_on_build(app);
+        app.add_systems(PostStartup, lifecycle::spawn_primary_map_if_enabled);
         app.add_systems(
             Update,
             (
-                monitor_primary_map_load_state,
+                lifecycle::monitor_primary_map_load_state,
                 translate::attach_collision_blocks,
                 spawn::spawn_actors_at_spawn_points,
             ),

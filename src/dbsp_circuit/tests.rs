@@ -55,26 +55,28 @@ fn beyond_grace_or_at_boundary(#[case] z: f64, #[case] z_floor: f64) {
     }
 }
 
-fn run_health_delta(health: HealthState, events: &[(DamageEvent, i32)]) -> Vec<HealthDelta> {
+fn run_health_delta(
+    health: HealthState,
+    events: &[(DamageEvent, i32)],
+) -> Result<Vec<HealthDelta>, dbsp::Error> {
     let (circuit, (health_handle, damage_handle, output)) = RootCircuit::build(|circuit| {
         let (health_stream, health_handle) = circuit.add_input_zset::<HealthState>();
         let (damage_stream, damage_handle) = circuit.add_input_zset::<DamageEvent>();
         let output = health_delta_stream(&health_stream, &damage_stream).output();
         Ok((health_handle, damage_handle, output))
-    })
-    .expect("failed to build health circuit");
+    })?;
 
     health_handle.push(health, 1);
     for (event, weight) in events {
         damage_handle.push(*event, i64::from(*weight));
     }
 
-    circuit.step().expect("health circuit step failed");
-    output
+    circuit.step()?;
+    Ok(output
         .consolidate()
         .iter()
         .map(|(delta, (), _)| delta)
-        .collect()
+        .collect())
 }
 
 /// Specifies a damage event used by health delta tests, capturing the amount,
@@ -149,20 +151,29 @@ struct HealthDeltaExpectation {
     seq: Option<u32>,
 }
 
-/// Runs the health delta circuit for a test case and asserts the single emitted
-/// [`HealthDelta`] matches the expected delta, death flag, and optional
-/// sequence id, panicking if the circuit produces anything other than one result.
-fn assert_health_delta(case: &HealthDeltaTestCase, expected: HealthDeltaExpectation) {
-    let events = case.event_records();
-    let deltas = run_health_delta(case.state, &events);
-    match deltas.as_slice() {
-        [delta] => {
-            assert_eq!(delta.delta, expected.delta);
-            assert_eq!(delta.death, expected.death);
-            assert_eq!(delta.seq, expected.seq);
+/// Runs the health delta circuit for a test case and asserts the single
+/// emitted [`HealthDelta`] matches the expected delta, death flag, and
+/// optional sequence id, panicking if the circuit produces anything other
+/// than one result.
+///
+/// A macro rather than a function so panic locations point at the calling
+/// test, and so the fallible circuit run executes inside the test body.
+macro_rules! assert_health_delta {
+    ($case:expr, $expected:expr $(,)?) => {{
+        let case: &HealthDeltaTestCase = $case;
+        let expected: HealthDeltaExpectation = $expected;
+        let events = case.event_records();
+        let deltas =
+            run_health_delta(case.state, &events).expect("failed to run health delta circuit");
+        match deltas.as_slice() {
+            [delta] => {
+                assert_eq!(delta.delta, expected.delta);
+                assert_eq!(delta.death, expected.death);
+                assert_eq!(delta.seq, expected.seq);
+            }
+            _ => panic!("expected exactly one health delta, found {}", deltas.len()),
         }
-        _ => panic!("expected exactly one health delta, found {}", deltas.len()),
-    }
+    }};
 }
 
 #[rstest]
@@ -180,7 +191,7 @@ fn healing_clamped_to_max(
         max,
         vec![DamageEventSpec::new(heal, DamageSource::Script, 5, Some(1))],
     );
-    assert_health_delta(
+    assert_health_delta!(
         &case,
         HealthDeltaExpectation {
             delta: expected_delta,
@@ -196,7 +207,7 @@ fn healing_clamped_to_max(
 fn duplicate_damage_events_idempotent(#[case] seq: Option<u32>) {
     let event = DamageEventSpec::new(30, DamageSource::External, 9, seq);
     let case = HealthDeltaTestCase::new(2, 90, 100, vec![event, event]);
-    assert_health_delta(
+    assert_health_delta!(
         &case,
         HealthDeltaExpectation {
             delta: -30,
@@ -213,7 +224,7 @@ fn sequenced_events_with_same_seq_in_same_tick_are_deduplicated() {
     // first-write-wins policy: later `(entity, tick, seq)` writes are ignored, and
     // the matching payload ensures the circuit's debug assertions are satisfied.
     let case = HealthDeltaTestCase::new(7, 70, 100, vec![event, event]);
-    assert_health_delta(
+    assert_health_delta!(
         &case,
         HealthDeltaExpectation {
             delta: -20,
@@ -302,7 +313,7 @@ fn health_delta_scenarios(
     #[case] case: HealthDeltaTestCase,
     #[case] expected: HealthDeltaExpectation,
 ) {
-    assert_health_delta(&case, expected);
+    assert_health_delta!(&case, expected);
 }
 
 /// Parameters describing a lethal damage scenario, capturing entity id,
@@ -356,7 +367,7 @@ fn lethal_damage_sets_death_flag(#[case] params: LethalCase) {
             seq,
         )],
     );
-    assert_health_delta(
+    assert_health_delta!(
         &case,
         HealthDeltaExpectation {
             delta: expected_delta,

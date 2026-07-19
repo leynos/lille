@@ -101,6 +101,7 @@ pub fn attach_collision_blocks(
 
 #[cfg(test)]
 mod tests {
+    //! Tests for collision block attachment.
     use super::*;
 
     #[test]

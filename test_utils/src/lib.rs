@@ -83,8 +83,11 @@ pub fn assert_valid_rust_syntax(code: &str) {
 /// # Examples
 /// ```rust
 /// use test_utils::{new_circuit, step};
-/// let mut circuit = new_circuit();
+/// # fn main() -> Result<(), dbsp::Error> {
+/// let mut circuit = new_circuit()?;
 /// step(&mut circuit);
+/// # Ok(())
+/// # }
 /// ```
 pub use lille::dbsp_circuit::step;
 
@@ -93,7 +96,69 @@ pub use lille::dbsp_circuit::step;
 /// # Examples
 /// ```rust
 /// use test_utils::{new_circuit, step_named};
-/// let mut circuit = new_circuit();
+/// # fn main() -> Result<(), dbsp::Error> {
+/// let mut circuit = new_circuit()?;
 /// step_named(&mut circuit, "ctx");
+/// # Ok(())
+/// # }
 /// ```
 pub use lille::dbsp_circuit::step_named;
+
+#[cfg(test)]
+mod tests {
+    //! Tests for the shared assertion helpers.
+    use rstest::rstest;
+
+    use super::*;
+
+    #[rstest]
+    fn expect_single_returns_sole_item() {
+        let values = [7];
+        assert_eq!(*expect_single(&values, "sole item"), 7);
+    }
+
+    #[rstest]
+    #[should_panic(expected = "expected one item, found none")]
+    fn expect_single_panics_on_empty_slice() {
+        let _ = expect_single::<i32>(&[], "empty slice");
+    }
+
+    #[rstest]
+    #[should_panic(expected = "expected one item, found 2")]
+    fn expect_single_panics_on_multiple_items() {
+        let _ = expect_single(&[1, 2], "multiple items");
+    }
+
+    #[rstest]
+    fn assert_all_present_accepts_contained_keys() {
+        assert_all_present("fn main() {}", &["fn", "main"]);
+    }
+
+    #[rstest]
+    #[should_panic(expected = "missing not found in output")]
+    fn assert_all_present_panics_on_missing_key() {
+        assert_all_present("fn main() {}", &["missing"]);
+    }
+
+    #[rstest]
+    fn assert_all_absent_accepts_absent_keys() {
+        assert_all_absent("fn main() {}", &["struct", "enum"]);
+    }
+
+    #[rstest]
+    #[should_panic(expected = "fn should not be present")]
+    fn assert_all_absent_panics_on_present_key() {
+        assert_all_absent("fn main() {}", &["fn"]);
+    }
+
+    #[rstest]
+    fn assert_valid_rust_syntax_accepts_valid_code() {
+        assert_valid_rust_syntax("fn main() {}");
+    }
+
+    #[rstest]
+    #[should_panic(expected = "generated code is not valid Rust")]
+    fn assert_valid_rust_syntax_panics_on_invalid_code() {
+        assert_valid_rust_syntax("fn main( {");
+    }
+}

@@ -39,7 +39,7 @@ fn vel(entity: i64, vz: f64) -> Velocity {
     }
 }
 
-fn build_circuit() -> FallDamageHarness {
+fn build_circuit() -> Result<FallDamageHarness, dbsp::Error> {
     let (circuit, (standing_in, unsupported_in, velocity_in, output)) =
         RootCircuit::build(|circuit| {
             let (standing_stream, standing_in) = circuit.add_input_zset::<PositionFloor>();
@@ -49,7 +49,9 @@ fn build_circuit() -> FallDamageHarness {
                 let mut tick: Tick = 0;
                 move || {
                     let current = tick;
-                    tick = tick.checked_add(1).expect("tick counter overflowed u64");
+                    // Saturate rather than panic: tests never approach
+                    // u64::MAX ticks, and fixtures must not panic.
+                    tick = tick.saturating_add(1);
                     current
                 }
             }));
@@ -66,10 +68,9 @@ fn build_circuit() -> FallDamageHarness {
                 velocity_in,
                 fall_damage.output(),
             ))
-        })
-        .expect("build fall damage circuit");
+        })?;
 
-    (circuit, standing_in, unsupported_in, velocity_in, output)
+    Ok((circuit, standing_in, unsupported_in, velocity_in, output))
 }
 
 fn read_events(output: &dbsp::OutputHandle<OrdZSet<DamageEvent>>) -> Vec<DamageEvent> {
@@ -106,7 +107,8 @@ fn delta_events(
 
 #[rstest]
 fn fall_damage_emits_event() {
-    let (circuit, standing_in, unsupported_in, velocity_in, output) = build_circuit();
+    let (circuit, standing_in, unsupported_in, velocity_in, output) =
+        build_circuit().expect("failed to build fall damage circuit");
 
     let unsupported_pf = pf(1, 5.0, 0.0);
     let standing_pf = pf(1, 1.0, 1.0);
@@ -136,7 +138,8 @@ fn fall_damage_emits_event() {
 
 #[rstest]
 fn multiple_entities_land_without_interference() {
-    let (circuit, standing_in, unsupported_in, velocity_in, output) = build_circuit();
+    let (circuit, standing_in, unsupported_in, velocity_in, output) =
+        build_circuit().expect("failed to build fall damage circuit");
 
     let unsupported_pf_a = pf(1, 5.0, 0.0);
     let unsupported_pf_b = pf(2, 8.0, 0.0);
@@ -185,7 +188,8 @@ fn multiple_entities_land_without_interference() {
 
 #[rstest]
 fn safe_speed_emits_no_damage() {
-    let (circuit, standing_in, unsupported_in, velocity_in, output) = build_circuit();
+    let (circuit, standing_in, unsupported_in, velocity_in, output) =
+        build_circuit().expect("failed to build fall damage circuit");
     let unsupported_pf = pf(2, 5.0, 0.0);
     let standing_pf = pf(2, 1.0, 1.0);
     let falling_vel = vel(2, -4.0);
@@ -203,7 +207,8 @@ fn safe_speed_emits_no_damage() {
 
 #[rstest]
 fn cooldown_prevents_rapid_retrigger() {
-    let (circuit, standing_in, unsupported_in, velocity_in, output) = build_circuit();
+    let (circuit, standing_in, unsupported_in, velocity_in, output) =
+        build_circuit().expect("failed to build fall damage circuit");
     let unsupported_pf = pf(3, 5.0, 0.0);
     let standing_pf = pf(3, 1.0, 1.0);
     let falling_vel = vel(3, -9.0);

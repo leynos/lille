@@ -1,0 +1,11 @@
+{
+  "rule_sets": [
+    {
+      "matching_content_path": "test_utils/**",
+      "matching_content_path_doc": "Test-support newtype wrappers: constructors necessarily accept primitives, so Primitive Obsession is a false positive in this crate.",
+      "rules": [
+        { "name": "Primitive Obsession", "weight": 0.0 }
+      ]
+    }
+  ]
+}

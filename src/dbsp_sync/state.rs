@@ -120,6 +120,7 @@ impl DbspState {
 
 #[cfg(test)]
 mod tests {
+    //! Tests for the DBSP synchronisation state resource.
     use super::*;
     use bevy::prelude::Entity;
     use rstest::rstest;

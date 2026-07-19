@@ -55,6 +55,7 @@ pub fn init(verbose: bool) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    //! Tests for logging initialisation.
     use super::*;
     use anyhow::ensure;
     use std::fmt;

@@ -82,6 +82,7 @@ pub fn apply_ground_friction(v: f64) -> f64 {
 
 #[cfg(test)]
 mod tests {
+    //! Tests for physics constants and helpers.
     use super::*;
     use crate::GROUND_FRICTION;
     use approx::assert_relative_eq;

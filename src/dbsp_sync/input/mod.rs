@@ -177,12 +177,13 @@ fn ingest_damage_events(state: &mut DbspState, inbox: &mut DamageInbox) {
 
 #[cfg(test)]
 mod tests {
+    //! Tests for the DBSP input synchronisation systems.
     use super::*;
     use crate::dbsp_circuit::DamageSource;
     use rstest::rstest;
 
-    fn make_state() -> DbspState {
-        DbspState::new().expect("failed to initialise DbspState for tests")
+    fn make_state() -> Result<DbspState, dbsp::Error> {
+        DbspState::new()
     }
 
     fn sequenced_event(seq: u32) -> DamageEvent {
@@ -207,7 +208,7 @@ mod tests {
 
     #[rstest]
     fn sequenced_duplicates_are_dropped() {
-        let mut state = make_state();
+        let mut state = make_state().expect("failed to initialise DbspState");
         let mut inbox = DamageInbox::default();
         let event = sequenced_event(3);
         inbox.extend(vec![event, event]);
@@ -219,7 +220,7 @@ mod tests {
 
     #[rstest]
     fn unsequenced_duplicates_are_dropped() {
-        let mut state = make_state();
+        let mut state = make_state().expect("failed to initialise DbspState");
         let mut inbox = DamageInbox::default();
         let event = unsequenced_event(15);
         inbox.extend(vec![event, event]);
@@ -231,7 +232,7 @@ mod tests {
 
     #[rstest]
     fn unique_events_are_ingested() {
-        let mut state = make_state();
+        let mut state = make_state().expect("failed to initialise DbspState");
         let mut inbox = DamageInbox::default();
         let sequenced = sequenced_event(4);
         let unsequenced = unsequenced_event(12);
