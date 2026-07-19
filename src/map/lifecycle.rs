@@ -236,6 +236,38 @@ pub(super) fn log_map_error(event: bevy::ecs::prelude::On<LilleMapError>) {
     error!("map error: {:?}", event.event());
 }
 
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Bevy system parameters use `Res<T>` by value."
+)]
+pub(super) fn monitor_primary_map_load_state(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut tracking: ResMut<PrimaryMapAssetTracking>,
+) {
+    if tracking.has_finalised {
+        return;
+    }
+
+    let Some(handle) = tracking.handle.clone() else {
+        return;
+    };
+
+    match asset_server.recursive_dependency_load_state(handle.id()) {
+        RecursiveDependencyLoadState::Loaded => {
+            tracking.has_finalised = true;
+        }
+        RecursiveDependencyLoadState::Failed(error) => {
+            commands.trigger(LilleMapError::PrimaryMapLoadFailed {
+                path: tracking.asset_path.clone().unwrap_or_default(),
+                detail: error.to_string(),
+            });
+            tracking.has_finalised = true;
+        }
+        RecursiveDependencyLoadState::NotLoaded | RecursiveDependencyLoadState::Loading => {}
+    }
+}
+
 #[cfg(test)]
 mod tests {
     //! Tests for the map lifecycle helpers that need no asset backend.
@@ -306,37 +338,5 @@ mod tests {
         try_spawn_primary_map_on_build(&mut app);
         let tracking = app.world().resource::<PrimaryMapAssetTracking>();
         assert!(tracking.asset_path.is_none());
-    }
-}
-
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "Bevy system parameters use `Res<T>` by value."
-)]
-pub(super) fn monitor_primary_map_load_state(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    mut tracking: ResMut<PrimaryMapAssetTracking>,
-) {
-    if tracking.has_finalised {
-        return;
-    }
-
-    let Some(handle) = tracking.handle.clone() else {
-        return;
-    };
-
-    match asset_server.recursive_dependency_load_state(handle.id()) {
-        RecursiveDependencyLoadState::Loaded => {
-            tracking.has_finalised = true;
-        }
-        RecursiveDependencyLoadState::Failed(error) => {
-            commands.trigger(LilleMapError::PrimaryMapLoadFailed {
-                path: tracking.asset_path.clone().unwrap_or_default(),
-                detail: error.to_string(),
-            });
-            tracking.has_finalised = true;
-        }
-        RecursiveDependencyLoadState::NotLoaded | RecursiveDependencyLoadState::Loading => {}
     }
 }

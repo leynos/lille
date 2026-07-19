@@ -65,15 +65,15 @@ fn out_of_range_outputs_leave_components_unchanged() {
         .entity(entity)
         .get::<Transform>()
         .expect("Transform component should remain after applying DBSP outputs");
-    assert_eq!(transform.translation.x, 0.0);
-    assert_eq!(transform.translation.y, 0.0);
+    assert!(transform.translation.x.abs() < f32::EPSILON);
+    assert!(transform.translation.y.abs() < f32::EPSILON);
     let velocity = app
         .world()
         .entity(entity)
         .get::<VelocityComp>()
         .expect("Velocity component should remain after applying DBSP outputs");
-    assert_eq!(velocity.vx, 0.0);
-    assert_eq!(velocity.vy, 0.0);
+    assert!(velocity.vx.abs() < f32::EPSILON);
+    assert!(velocity.vy.abs() < f32::EPSILON);
 }
 
 #[rstest]
