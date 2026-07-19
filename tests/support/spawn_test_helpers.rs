@@ -34,9 +34,8 @@ pub fn spawn_npc_spawn_point(
 }
 
 /// Triggers a `MapCreated` event in the world.
-#[expect(deprecated, reason = "bevy_ecs_tiled 0.10 uses the legacy Event API.")]
 pub fn trigger_map_created(world: &mut World) {
-    world.send_event(TiledEvent::new(Entity::PLACEHOLDER, MapCreated));
+    world.write_message(TiledEvent::new(Entity::PLACEHOLDER, MapCreated));
 }
 
 /// Queries for the first entity with the `Player` component.
