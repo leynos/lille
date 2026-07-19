@@ -21,13 +21,13 @@ where
 
         install(level)
             .map_err(anyhow::Error::new)
-            .with_context(|| "initialising env_logger")?;
+            .with_context(|| "initializing env_logger")?;
         Ok::<(), anyhow::Error>(())
     })?;
     Ok(())
 }
 
-/// Initialises the global logger once for the entire process.
+/// Initializes the global logger once for the entire process.
 ///
 /// When `verbose` is `true`, all debug messages are printed. Otherwise only
 /// info level and above are shown.
@@ -55,7 +55,7 @@ pub fn init(verbose: bool) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    //! Tests for logging initialisation.
+    //! Tests for logging initialization.
     use super::*;
     use anyhow::ensure;
     use std::fmt;
@@ -89,7 +89,7 @@ mod tests {
 
         ensure!(
             called,
-            "installer should be invoked on first initialisation"
+            "installer should be invoked on first initialization"
         );
         ensure!(
             cell.get().is_some(),
@@ -97,7 +97,7 @@ mod tests {
         );
         ensure!(
             observed_level == Some(LevelFilter::Trace),
-            "expected trace level when verbose initialises"
+            "expected trace level when verbose initializes"
         );
         Ok(())
     }
@@ -118,11 +118,11 @@ mod tests {
 
         ensure!(
             !called,
-            "installer must not run when logger already initialised"
+            "installer must not run when logger already initialized"
         );
         ensure!(
             observed_level.is_none(),
-            "installer closure must not run when logger already initialised"
+            "installer closure must not run when logger already initialized"
         );
         Ok(())
     }
@@ -137,7 +137,7 @@ mod tests {
         assert!(result.is_err());
         assert!(
             cell.get().is_none(),
-            "failed initialisation should release the flag"
+            "failed initialization should release the flag"
         );
     }
 }

@@ -169,7 +169,7 @@ pub fn movement_decision_stream(
     dedupe_movement_decisions(&raw)
 }
 
-fn dedupe_movement_decisions(
+pub(super) fn dedupe_movement_decisions(
     movement: &Stream<RootCircuit, OrdZSet<MovementDecision>>,
 ) -> Stream<RootCircuit, OrdZSet<MovementDecision>> {
     movement
@@ -223,20 +223,12 @@ impl MovementAccumulator {
         self.sum_dx = OrderedFloat(self.sum_dx.into_inner() + dx * scaled);
         self.sum_dy = OrderedFloat(self.sum_dy.into_inner() + dy * scaled);
         self.total_weight += weight;
-        if self.total_weight == 0 {
-            self.sum_dx = OrderedFloat(0.0);
-            self.sum_dy = OrderedFloat(0.0);
-        }
     }
 
     fn merge(&mut self, other: &Self) {
         self.sum_dx = OrderedFloat(self.sum_dx.into_inner() + other.sum_dx.into_inner());
         self.sum_dy = OrderedFloat(self.sum_dy.into_inner() + other.sum_dy.into_inner());
         self.total_weight += other.total_weight;
-        if self.total_weight == 0 {
-            self.sum_dx = OrderedFloat(0.0);
-            self.sum_dy = OrderedFloat(0.0);
-        }
     }
 
     fn into_decision(self, entity: i64) -> Option<MovementDecision> {

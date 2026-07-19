@@ -124,7 +124,10 @@ fn validate_asset_path(asset_path: &str) -> Result<(), LilleMapError> {
         });
     }
 
-    if asset_path.contains("..") {
+    // Reject parent-directory traversal, but only when `..` is a whole path
+    // component. A substring check would wrongly reject legitimate filenames
+    // such as `maps/primary..backup.tmx`.
+    if asset_path.split('/').any(|component| component == "..") {
         return Err(LilleMapError::InvalidPrimaryMapAssetPath {
             path: asset_path.to_owned(),
         });
@@ -249,11 +252,11 @@ pub(super) fn monitor_primary_map_load_state(
         return;
     }
 
-    let Some(handle) = tracking.handle.clone() else {
+    let Some(asset_id) = tracking.handle.as_ref().map(bevy::prelude::Handle::id) else {
         return;
     };
 
-    match asset_server.recursive_dependency_load_state(handle.id()) {
+    match asset_server.recursive_dependency_load_state(asset_id) {
         RecursiveDependencyLoadState::Loaded => {
             tracking.has_finalised = true;
         }
@@ -302,8 +305,14 @@ mod tests {
     }
 
     #[rstest]
-    fn validate_asset_path_accepts_relative_paths() {
-        assert!(validate_asset_path("maps/primary-isometric.tmx").is_ok());
+    #[case::plain("maps/primary-isometric.tmx")]
+    // `..` inside a filename is not a path component, so it must be accepted.
+    #[case::dots_in_filename("maps/primary..backup.tmx")]
+    fn validate_asset_path_accepts_relative_paths(#[case] path: &str) {
+        assert!(
+            validate_asset_path(path).is_ok(),
+            "expected {path:?} to be accepted"
+        );
     }
 
     #[rstest]
@@ -323,10 +332,36 @@ mod tests {
         assert!(tracking.asset_path.is_none());
     }
 
+    #[derive(Resource, Default)]
+    struct InvalidPathObserved(bool);
+
     #[rstest]
     fn build_spawn_rejects_invalid_path_without_spawning() {
         let mut app = app_with_settings(true, "/absolute/path.tmx");
+        app.init_resource::<InvalidPathObserved>();
+        // Observe the rejection directly: `try_spawn_primary_map_on_build`
+        // returns early both for an invalid path and for a missing
+        // `AssetServer`, so the absence of a map entity alone cannot prove the
+        // path was rejected. The observer pins down the actual cause.
+        app.world_mut().add_observer(
+            |event: bevy::ecs::prelude::On<LilleMapError>,
+             mut observed: ResMut<InvalidPathObserved>| {
+                if matches!(
+                    event.event(),
+                    LilleMapError::InvalidPrimaryMapAssetPath { .. }
+                ) {
+                    observed.0 = true;
+                }
+            },
+        );
+
         try_spawn_primary_map_on_build(&mut app);
+
+        assert!(
+            app.world().resource::<InvalidPathObserved>().0,
+            "expected InvalidPrimaryMapAssetPath to be triggered"
+        );
+
         let world = app.world_mut();
         let mut maps = world.query_filtered::<Entity, With<PrimaryTiledMap>>();
         assert!(maps.iter(world).next().is_none());

@@ -7,6 +7,7 @@ use dbsp::{typed_batch::OrdZSet, RootCircuit, Stream};
 use log::warn;
 use ordered_float::OrderedFloat;
 
+use super::decide::dedupe_movement_decisions;
 use crate::dbsp_circuit::{MovementDecision, Position};
 
 /// Applies movement decisions to base positions.
@@ -70,11 +71,17 @@ pub fn apply_movement(
     movement: &Stream<RootCircuit, OrdZSet<MovementDecision>>,
 ) -> Stream<RootCircuit, OrdZSet<Position>> {
     let base_idx = base.map_index(|p| (p.entity, *p));
-    let mv_base = movement.map_index(|m| (m.entity, (m.dx, m.dy)));
+    // Fold duplicate decisions per entity into a single movement before the
+    // join, mirroring the decision stream's own dedupe. This keeps the join
+    // from applying a doubled delta when upstream emits more than one record
+    // for an entity in a tick. The deduped stream feeds both the duplicate
+    // validation below and the join.
+    let deduped = dedupe_movement_decisions(movement);
+    let mv_base = deduped.map_index(|m| (m.entity, (m.dx, m.dy)));
 
     let mv = mv_base.inspect(|batch| {
-        // Accumulate counts per entity to catch duplicates emitted within a
-        // single tick. Duplicates indicate a bug upstream; release builds log
+        // Accumulate counts per entity to catch duplicates surviving the
+        // dedupe above. Any duplicate here indicates a bug; release builds log
         // the issue while debug builds panic for visibility.
         use std::collections::HashMap;
 
@@ -102,4 +109,127 @@ pub fn apply_movement(
     let mv_entities = mv.map(|(e, _)| *e).map_index(|e| (*e, ()));
     let unmoved = base_idx.antijoin(&mv_entities).map(|(_, p)| *p);
     unmoved.plus(&moved)
+}
+
+#[cfg(test)]
+mod tests {
+    //! End-to-end tests for [`apply_movement`].
+    //!
+    //! Each test drives a minimal circuit, feeding base positions and movement
+    //! decisions, then asserts the consolidated positions the stream emits.
+
+    use super::apply_movement;
+    use crate::dbsp_circuit::{MovementDecision, Position};
+    use approx::assert_relative_eq;
+    use dbsp::RootCircuit;
+    use ordered_float::OrderedFloat;
+
+    type ApplyCircuit = (
+        dbsp::CircuitHandle,
+        (
+            dbsp::ZSetHandle<Position>,
+            dbsp::ZSetHandle<MovementDecision>,
+            dbsp::OutputHandle<dbsp::typed_batch::OrdZSet<Position>>,
+        ),
+    );
+
+    fn build_apply_circuit() -> Result<ApplyCircuit, dbsp::Error> {
+        RootCircuit::build(|circuit| {
+            let (base_stream, base_handle) = circuit.add_input_zset::<Position>();
+            let (movement_stream, movement_handle) = circuit.add_input_zset::<MovementDecision>();
+            let output_handle = apply_movement(&base_stream, &movement_stream).output();
+            Ok((base_handle, movement_handle, output_handle))
+        })
+    }
+
+    fn position(entity: i64, x: f64, y: f64) -> Position {
+        Position {
+            entity,
+            x: x.into(),
+            y: y.into(),
+            z: 0.0.into(),
+        }
+    }
+
+    fn movement(entity: i64, dx: f64, dy: f64) -> MovementDecision {
+        MovementDecision {
+            entity,
+            dx: OrderedFloat(dx),
+            dy: OrderedFloat(dy),
+        }
+    }
+
+    fn collect_positions(
+        handle: &dbsp::OutputHandle<dbsp::typed_batch::OrdZSet<Position>>,
+    ) -> Vec<(Position, i64)> {
+        handle
+            .consolidate()
+            .iter()
+            .map(|(position, (), weight)| {
+                let position_ref: &Position = &position;
+                (*position_ref, weight)
+            })
+            .collect()
+    }
+
+    /// Extracts the sole emitted position, panicking if there is not exactly
+    /// one (which keeps the tests free of panicking slice indexing).
+    fn single_position(positions: &[(Position, i64)]) -> (Position, i64) {
+        *test_utils::expect_single(positions, "expected exactly one output position")
+    }
+
+    #[test]
+    fn applies_movement_to_targeted_entity() {
+        let (circuit, (base_in, movement_in, out)) =
+            build_apply_circuit().expect("failed to build apply circuit");
+        base_in.push(position(1, 0.0, 0.0), 1);
+        movement_in.push(movement(1, 1.0, 0.0), 1);
+
+        circuit.step().expect("dbsp step");
+
+        // Entity 1 shifts by (1, 0) and is emitted exactly once.
+        let (moved, weight) = single_position(&collect_positions(&out));
+        assert_eq!(weight, 1);
+        assert_eq!(moved.entity, 1);
+        assert_relative_eq!(moved.x.into_inner(), 1.0);
+        assert_relative_eq!(moved.y.into_inner(), 0.0);
+    }
+
+    #[test]
+    fn passes_unmoved_entity_through() {
+        let (circuit, (base_in, _movement_in, out)) =
+            build_apply_circuit().expect("failed to build apply circuit");
+        base_in.push(position(2, 5.0, 5.0), 1);
+
+        circuit.step().expect("dbsp step");
+
+        // With no movement decision, the antijoin passes the base position
+        // through unchanged.
+        let (unmoved, weight) = single_position(&collect_positions(&out));
+        assert_eq!(weight, 1);
+        assert_eq!(unmoved.entity, 2);
+        assert_relative_eq!(unmoved.x.into_inner(), 5.0);
+        assert_relative_eq!(unmoved.y.into_inner(), 5.0);
+    }
+
+    #[test]
+    fn dedupes_duplicate_movement_decisions() {
+        let (circuit, (base_in, movement_in, out)) =
+            build_apply_circuit().expect("failed to build apply circuit");
+        base_in.push(position(1, 0.0, 0.0), 1);
+        // Two decisions for the same entity in one tick must collapse into one
+        // normalised movement rather than doubling the applied delta.
+        movement_in.push(movement(1, 2.0, 0.0), 1);
+        movement_in.push(movement(1, 2.0, 0.0), 1);
+
+        circuit.step().expect("dbsp step");
+
+        // Exactly one output position, emitted once (weight 1): the join must
+        // not see two decisions, and (2, 0) normalises to the unit vector (1, 0).
+        let (moved, weight) = single_position(&collect_positions(&out));
+        assert_eq!(weight, 1);
+        assert_eq!(moved.entity, 1);
+        assert_relative_eq!(moved.x.into_inner(), 1.0);
+        assert_relative_eq!(moved.y.into_inner(), 0.0);
+    }
 }
