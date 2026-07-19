@@ -182,3 +182,77 @@ impl FearValue {
         Self(val)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! Tests for the physics newtype constructors.
+    use ordered_float::OrderedFloat;
+    use rstest::rstest;
+
+    use super::*;
+
+    /// Asserts that a scalar newtype constructor stores its value verbatim.
+    /// A macro keeps panic locations in the calling test.
+    macro_rules! assert_scalar_newtype_stores {
+        ($ty:ident, $value:expr) => {{
+            let wrapped = $ty::new($value);
+            assert_eq!(wrapped.0, $value);
+        }};
+    }
+
+    #[rstest]
+    fn entity_id_stores_value() {
+        assert_scalar_newtype_stores!(EntityId, 7_i64);
+    }
+
+    #[rstest]
+    fn block_id_stores_value() {
+        assert_scalar_newtype_stores!(BlockId, 9_i64);
+    }
+
+    #[rstest]
+    fn mass_stores_value() {
+        assert_scalar_newtype_stores!(Mass, 5.5_f64);
+    }
+
+    #[rstest]
+    fn fear_value_stores_value() {
+        assert_scalar_newtype_stores!(FearValue, 0.25_f64);
+    }
+
+    #[rstest]
+    fn coords3d_stores_components() {
+        let coords = Coords3D::new(1.0, 2.0, 3.0);
+        assert_eq!((coords.x, coords.y, coords.z), (1.0, 2.0, 3.0));
+    }
+
+    #[rstest]
+    fn block_coords_stores_components() {
+        let coords = BlockCoords::new(4, 5, 6);
+        assert_eq!((coords.x, coords.y, coords.z), (4, 5, 6));
+    }
+
+    #[rstest]
+    fn coords2d_stores_components() {
+        let coords = Coords2D::new(7.0, 8.0);
+        assert_eq!((coords.x, coords.y), (7.0, 8.0));
+    }
+
+    #[rstest]
+    fn force_vector_stores_components() {
+        let force = ForceVector::new(1.0, -2.0, 0.5);
+        assert_eq!((force.x, force.y, force.z), (1.0, -2.0, 0.5));
+    }
+
+    #[rstest]
+    fn gradient_stores_components() {
+        let gradient = Gradient::new(0.5, -0.5);
+        assert_eq!((gradient.x, gradient.y), (0.5, -0.5));
+    }
+
+    #[rstest]
+    fn mass_converts_to_ordered_float() {
+        let value: OrderedFloat<f64> = Mass::new(2.5).into();
+        assert_eq!(value, OrderedFloat(2.5));
+    }
+}

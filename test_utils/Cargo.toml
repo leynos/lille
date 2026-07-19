@@ -10,3 +10,6 @@ dbsp = "0.98"
 lille = { path = ".." }
 ordered-float = { workspace = true }
 bevy = { workspace = true, default-features = false }
+
+[dev-dependencies]
+rstest = "0.18.0"

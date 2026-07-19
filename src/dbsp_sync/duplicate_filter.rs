@@ -130,6 +130,16 @@ mod tests {
     }
 
     #[rstest]
+    fn unsequenced_event_is_not_a_sequenced_duplicate() {
+        let mut state = fresh_state().expect("failed to initialise DbspState");
+        let mut seen = HashSet::new();
+        let event = unsequenced_event(1, 10);
+        assert!(!state.record_duplicate_sequenced_damage(&event, &mut seen));
+        assert!(!state.record_duplicate_sequenced_damage(&event, &mut seen));
+        assert_eq!(state.applied_health_duplicates(), 0);
+    }
+
+    #[rstest]
     fn sequenced_event_reapplied_in_next_frame_is_ignored() {
         let mut state = fresh_state().expect("failed to initialise DbspState");
         let mut seen = HashSet::new();

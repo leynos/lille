@@ -236,6 +236,79 @@ pub(super) fn log_map_error(event: bevy::ecs::prelude::On<LilleMapError>) {
     error!("map error: {:?}", event.event());
 }
 
+#[cfg(test)]
+mod tests {
+    //! Tests for the map lifecycle helpers that need no asset backend.
+    use bevy::prelude::*;
+    use rstest::rstest;
+
+    use super::*;
+
+    fn app_with_settings(should_spawn: bool, path: &str) -> App {
+        let mut app = App::new();
+        app.insert_resource(LilleMapSettings {
+            primary_map: super::super::MapAssetPath::from(path),
+            should_spawn_primary_map: should_spawn,
+        });
+        app.init_resource::<PrimaryMapAssetTracking>();
+        app
+    }
+
+    #[rstest]
+    #[case::empty_path("")]
+    #[case::absolute_path("/etc/maps/primary.tmx")]
+    #[case::parent_traversal("maps/../secrets.tmx")]
+    fn validate_asset_path_rejects_unsafe_paths(#[case] path: &str) {
+        let result = validate_asset_path(path);
+        assert!(
+            matches!(
+                result,
+                Err(LilleMapError::InvalidPrimaryMapAssetPath { path: ref p }) if p == path
+            ),
+            "expected InvalidPrimaryMapAssetPath for {path:?}, got {result:?}"
+        );
+    }
+
+    #[rstest]
+    fn validate_asset_path_accepts_relative_paths() {
+        assert!(validate_asset_path("maps/primary-isometric.tmx").is_ok());
+    }
+
+    #[rstest]
+    fn build_spawn_skips_when_disabled() {
+        let mut app = app_with_settings(false, "maps/primary-isometric.tmx");
+        try_spawn_primary_map_on_build(&mut app);
+        let tracking = app.world().resource::<PrimaryMapAssetTracking>();
+        assert!(tracking.asset_path.is_none());
+    }
+
+    #[rstest]
+    fn build_spawn_skips_when_map_already_present() {
+        let mut app = app_with_settings(true, "maps/primary-isometric.tmx");
+        app.world_mut().spawn(PrimaryTiledMap);
+        try_spawn_primary_map_on_build(&mut app);
+        let tracking = app.world().resource::<PrimaryMapAssetTracking>();
+        assert!(tracking.asset_path.is_none());
+    }
+
+    #[rstest]
+    fn build_spawn_rejects_invalid_path_without_spawning() {
+        let mut app = app_with_settings(true, "/absolute/path.tmx");
+        try_spawn_primary_map_on_build(&mut app);
+        let world = app.world_mut();
+        let mut maps = world.query_filtered::<Entity, With<PrimaryTiledMap>>();
+        assert!(maps.iter(world).next().is_none());
+    }
+
+    #[rstest]
+    fn build_spawn_skips_without_asset_server() {
+        let mut app = app_with_settings(true, "maps/primary-isometric.tmx");
+        try_spawn_primary_map_on_build(&mut app);
+        let tracking = app.world().resource::<PrimaryMapAssetTracking>();
+        assert!(tracking.asset_path.is_none());
+    }
+}
+
 #[expect(
     clippy::needless_pass_by_value,
     reason = "Bevy system parameters use `Res<T>` by value."

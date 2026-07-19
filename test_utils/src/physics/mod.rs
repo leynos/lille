@@ -248,3 +248,55 @@ where
         z: coords.z,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! Tests for the physics record constructors.
+    use rstest::rstest;
+
+    use super::*;
+
+    #[rstest]
+    fn new_circuit_constructs() {
+        let circuit = new_circuit();
+        assert!(
+            circuit.is_ok(),
+            "expected DBSP circuit construction to succeed"
+        );
+    }
+
+    #[rstest]
+    fn target_builds_record_from_tuple() {
+        let record = target(3, (1.5, -2.5));
+        assert_eq!(record.entity, 3);
+        assert_eq!(record.x.into_inner(), 1.5);
+        assert_eq!(record.y.into_inner(), -2.5);
+    }
+
+    #[rstest]
+    fn force_builds_record_without_mass() {
+        let record = force(4, (10.0, 0.0, -1.0));
+        assert_eq!(record.entity, 4);
+        assert_eq!(record.fx.into_inner(), 10.0);
+        assert_eq!(record.fy.into_inner(), 0.0);
+        assert_eq!(record.fz.into_inner(), -1.0);
+        assert!(record.mass.is_none());
+    }
+
+    #[rstest]
+    fn force_with_mass_builds_record_with_mass() {
+        let record = force_with_mass(5, (0.0, 2.0, 0.0), 5.0);
+        assert_eq!(record.entity, 5);
+        assert_eq!(record.fy.into_inner(), 2.0);
+        let mass = record.mass.expect("expected mass to be recorded");
+        assert_eq!(mass.into_inner(), 5.0);
+    }
+
+    #[rstest]
+    fn slope_builds_record_from_gradient() {
+        let record = slope(6, (1.0, 0.5));
+        assert_eq!(record.block_id, 6);
+        assert_eq!(record.grad_x.into_inner(), 1.0);
+        assert_eq!(record.grad_y.into_inner(), 0.5);
+    }
+}

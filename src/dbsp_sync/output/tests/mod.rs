@@ -1,5 +1,7 @@
 //! Tests for the DBSP output application systems.
 
+mod edge_cases;
+
 use super::*;
 use crate::components::{Block, DdlogId, Health, UnitType};
 use crate::dbsp_circuit::{DamageEvent, DamageSource, HealthState, Position, Velocity};
@@ -104,10 +106,14 @@ fn prime_state(app: &mut App, entity: Entity) {
 }
 
 fn push_health_inputs(app: &mut App, current: u16, amount: u16) {
+    push_health_inputs_for(app, 1, current, amount);
+}
+
+fn push_health_inputs_for(app: &mut App, entity: u64, current: u16, amount: u16) {
     let state = app.world_mut().non_send_resource_mut::<DbspState>();
     state.circuit.health_state_in().push(
         HealthState {
-            entity: 1,
+            entity,
             current,
             max: 100,
         },
@@ -115,7 +121,7 @@ fn push_health_inputs(app: &mut App, current: u16, amount: u16) {
     );
     state.circuit.damage_in().push(
         DamageEvent {
-            entity: 1,
+            entity,
             amount,
             source: DamageSource::External,
             at_tick: 1,
