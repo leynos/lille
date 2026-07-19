@@ -40,13 +40,22 @@ jobs:
           key: whitaker-installer-${{ runner.os }}-${{ runner.arch }}-${{ env.WHITAKER_INSTALLER_VERSION }}
       - name: Install the Whitaker Dylint suite
         run: |
-          if ! command -v whitaker-installer >/dev/null 2>&1; then
+          install_whitaker() {
             if cargo binstall --version >/dev/null 2>&1; then
               cargo binstall --no-confirm --locked "whitaker-installer@${WHITAKER_INSTALLER_VERSION}"
             else
               echo "cargo-binstall unavailable; building whitaker-installer from crates.io"
               cargo install --locked whitaker-installer --version "${WHITAKER_INSTALLER_VERSION}"
             fi
+          }
+          # Reuse a cached installer only when its reported version matches the
+          # pinned version; a bare `command -v` check would keep a stale binary.
+          if command -v whitaker-installer >/dev/null 2>&1 \
+            && whitaker-installer --version 2>/dev/null \
+              | grep -Fqw "${WHITAKER_INSTALLER_VERSION}"; then
+            echo "whitaker-installer ${WHITAKER_INSTALLER_VERSION} already present; skipping install"
+          else
+            install_whitaker
           fi
           whitaker-installer
       - name: Lint

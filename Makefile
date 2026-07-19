@@ -52,6 +52,7 @@ build-support-run:
 RUSTDOC_FLAGS ?= --cfg docsrs -D warnings
 
 lint:
+	set -euo pipefail
 	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" cargo doc --workspace --no-deps
 	cargo clippy --all-targets --all-features -- $(RUST_FLAGS)
 	$(RUST_FLAGS_ENV) $(WHITAKER) --all -- --all-targets --all-features

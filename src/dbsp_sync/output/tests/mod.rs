@@ -4,7 +4,7 @@ mod edge_cases;
 
 use super::*;
 use crate::components::{Block, DdlogId, Health, UnitType};
-use crate::dbsp_circuit::{DamageEvent, DamageSource, HealthState, Position, Velocity};
+use crate::dbsp_circuit::{try_step, DamageEvent, DamageSource, HealthState, Position, Velocity};
 use crate::world_handle::DdlogEntity;
 use crate::{DbspCircuit, DbspPlugin};
 use bevy::ecs::prelude::On;
@@ -243,4 +243,103 @@ fn step_failure_triggers_error_event() {
         .get::<Transform>()
         .expect("Transform should remain after failed step");
     assert_eq!(transform.translation, Vec3::ZERO);
+}
+
+#[rstest]
+fn failed_step_clears_inputs_so_they_do_not_replay() {
+    let mut app = setup_app().expect("failed to set up test app");
+    let entity = spawn_entity(&mut app);
+    prime_state(&mut app, entity);
+
+    // First run fails to step; the system must still clear circuit inputs so
+    // the buffered records cannot replay on a later, successful tick.
+    {
+        let mut state = app.world_mut().non_send_resource_mut::<DbspState>();
+        state.set_stepper_for_testing(force_step_error);
+    }
+    app.world_mut()
+        .run_system_once(apply_dbsp_outputs_system)
+        .expect("system should run even when the step fails");
+
+    // Restore a working stepper and run again. Because the failed run cleared
+    // the inputs, nothing is stepped and the transform stays at the origin.
+    {
+        let mut state = app.world_mut().non_send_resource_mut::<DbspState>();
+        state.set_stepper_for_testing(try_step);
+    }
+    app.world_mut()
+        .run_system_once(apply_dbsp_outputs_system)
+        .expect("applying DBSP outputs should succeed");
+
+    let transform = app
+        .world()
+        .entity(entity)
+        .get::<Transform>()
+        .expect("Transform should remain after retry");
+    assert_eq!(
+        transform.translation,
+        Vec3::ZERO,
+        "stale inputs must not replay after a failed step"
+    );
+}
+
+#[rstest]
+fn negative_weight_position_is_not_applied() {
+    let mut app = setup_app().expect("failed to set up test app");
+    let entity = spawn_entity(&mut app);
+
+    {
+        let mut world_handle = app.world_mut().resource_mut::<WorldHandle>();
+        world_handle.entities.insert(
+            1,
+            DdlogEntity {
+                position: Vec3::ZERO,
+                unit: UnitType::Civvy { fraidiness: 0.0 },
+                health_current: 90,
+                health_max: 100,
+                target: None,
+            },
+        );
+    }
+    {
+        let mut state = app.world_mut().non_send_resource_mut::<DbspState>();
+        state.id_map.insert(1, entity);
+        state.rev_map.insert(entity, 1);
+        state.circuit.block_in().push(
+            Block {
+                id: 1,
+                x: 0,
+                y: 0,
+                z: 0,
+            },
+            1,
+        );
+        // Push the position as a retraction (weight -1). The consolidated
+        // output carries a negative weight and must be skipped rather than
+        // written to the Transform.
+        state.circuit.position_in().push(
+            Position {
+                entity: 1,
+                x: 5.0.into(),
+                y: 5.0.into(),
+                z: 1.0.into(),
+            },
+            -1,
+        );
+    }
+
+    app.world_mut()
+        .run_system_once(apply_dbsp_outputs_system)
+        .expect("applying DBSP outputs should succeed");
+
+    let transform = app
+        .world()
+        .entity(entity)
+        .get::<Transform>()
+        .expect("Transform component should remain present");
+    assert_eq!(
+        transform.translation,
+        Vec3::ZERO,
+        "a negative-weight position must not mutate the Transform"
+    );
 }

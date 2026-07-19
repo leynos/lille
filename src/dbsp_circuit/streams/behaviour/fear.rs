@@ -8,16 +8,6 @@ use ordered_float::OrderedFloat;
 
 use crate::dbsp_circuit::{FearLevel, Position};
 
-trait StreamConcat {
-    fn concat(&self, other: &Self) -> Self;
-}
-
-impl StreamConcat for Stream<RootCircuit, OrdZSet<FearLevel>> {
-    fn concat(&self, other: &Self) -> Self {
-        self.plus(other)
-    }
-}
-
 /// Merges explicit fear inputs with entity positions, defaulting to zero.
 ///
 /// Each position yields a [`FearLevel`] record. Explicit fear levels flow
@@ -74,15 +64,13 @@ pub fn fear_level_stream(
     positions: &Stream<RootCircuit, OrdZSet<Position>>,
     fears: &Stream<RootCircuit, OrdZSet<FearLevel>>,
 ) -> Stream<RootCircuit, OrdZSet<FearLevel>> {
-    let explicit = fears.clone();
-
     let missing = positions
         .map_index(|p| (p.entity, ()))
-        .antijoin(&explicit.map_index(|f| (f.entity, ())))
+        .antijoin(&fears.map_index(|f| (f.entity, ())))
         .map(|(entity, ())| FearLevel {
             entity: *entity,
             level: OrderedFloat(0.0),
         });
 
-    explicit.concat(&missing)
+    fears.plus(&missing)
 }
