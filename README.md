@@ -1,5 +1,8 @@
 # Lille
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](
+https://deepwiki.com/leynos/lille)
+
 A simple real-time strategy prototype demonstrating a dataflow-driven game loop
 with optional Bevy subsystems. Rendering is enabled with the `render` feature,
 while text rendering builds on top via the `text` feature. The project
