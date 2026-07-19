@@ -65,7 +65,7 @@ members = ["build_support", "test_utils"]
 anyhow = "1"
 glam = "0.33"
 ordered-float = { version = "3", features = ["serde", "rkyv_64"] }
-bevy = { version = "0.17.3", default-features = false, features = ["reflect_auto_register"] }
+bevy = { version = "0.19.0", default-features = false, features = ["reflect_auto_register"] }
 
 [dev-dependencies]
 lille = { path = ".", features = ["test-support"] }
