@@ -43,6 +43,16 @@ The changes are deliberately minimal:
   the only source change required by the ordered-float 5.x upgrade.
 - **`src/tests/mod.rs`** — adds a unit test demonstrating
   `OrderedFloat<f64>: SizeOf`, and removes the upstream `ui` trybuild test.
+- **`src/lib.rs`** — besides the `#![allow(warnings)]` lint cap and the inline
+  crate doc (replacing `include_str!("../README.md")`), adds crate-level
+  `#![cfg_attr(coverage_nightly, feature(coverage_attribute))]` and
+  `#![cfg_attr(coverage_nightly, coverage(off))]`. As a path dependency the
+  fork's source lives under the workspace root, which cargo-llvm-cov's default
+  ignore list does not exclude (it only skips the registry, git checkouts, the
+  target dir, and the toolchain); the largely-unexercised upstream code would
+  otherwise dilute the coverage denominator. cargo-llvm-cov sets
+  `cfg(coverage_nightly)` on nightly runs, so the attributes are inert during
+  ordinary builds.
 - The `src/tests/pass/*.rs` trybuild fixtures and packaging cruft
   (`Cargo.toml.orig`, `Cargo.lock`, `.cargo_vcs_info.json`, `release.toml`,
   `.github/`) are removed. The trybuild fixtures and the crate's doctests use

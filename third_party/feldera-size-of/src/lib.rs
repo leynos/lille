@@ -11,7 +11,17 @@
 //! otherwise be subject to this workspace's `-D warnings` gate. The crate-level
 //! `allow` below caps them instead: this vendored copy is not the place to
 //! police upstream lint hygiene.
+//!
+//! Coverage: this crate is a path dependency, so its source lives under the
+//! workspace root and is not covered by cargo-llvm-cov's default ignore list
+//! (which only excludes the registry, git checkouts, the target dir, and the
+//! toolchain). Without the crate-level `#[coverage(off)]` below, the fork's
+//! largely-unexercised upstream code would dilute the coverage denominator.
+//! cargo-llvm-cov sets `cfg(coverage_nightly)` on nightly runs, so this is
+//! inert during ordinary builds and only activates under coverage.
 #![allow(warnings)]
+#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
+#![cfg_attr(coverage_nightly, coverage(off))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(feature = "stdsimd", feature(stdsimd))]
