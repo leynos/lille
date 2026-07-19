@@ -81,6 +81,18 @@ mod tests {
         DbspState::new()
     }
 
+    /// Builds a fresh [`DbspState`] alongside an empty sequenced-duplicate
+    /// `seen` set, sharing the fixture construction used by the sequenced
+    /// and unsequenced `record_duplicate_sequenced_damage` branch tests.
+    #[expect(
+        clippy::type_complexity,
+        reason = "fixture tuple mirrors record_duplicate_sequenced_damage's seen-set type"
+    )]
+    fn fresh_sequenced_filter() -> Result<(DbspState, HashSet<(EntityId, Tick, u32)>), dbsp::Error>
+    {
+        Ok((fresh_state()?, HashSet::new()))
+    }
+
     fn sequenced_event(seq: u32) -> DamageEvent {
         DamageEvent {
             entity: 1,
@@ -131,8 +143,8 @@ mod tests {
 
     #[rstest]
     fn unsequenced_event_is_not_a_sequenced_duplicate() {
-        let mut state = fresh_state().expect("failed to initialise DbspState");
-        let mut seen = HashSet::new();
+        let (mut state, mut seen) =
+            fresh_sequenced_filter().expect("failed to initialise DbspState");
         let event = unsequenced_event(1, 10);
         assert!(!state.record_duplicate_sequenced_damage(&event, &mut seen));
         assert!(!state.record_duplicate_sequenced_damage(&event, &mut seen));
@@ -141,8 +153,8 @@ mod tests {
 
     #[rstest]
     fn sequenced_event_reapplied_in_next_frame_is_ignored() {
-        let mut state = fresh_state().expect("failed to initialise DbspState");
-        let mut seen = HashSet::new();
+        let (mut state, mut seen) =
+            fresh_sequenced_filter().expect("failed to initialise DbspState");
         let event = sequenced_event(7);
         state
             .applied_health
