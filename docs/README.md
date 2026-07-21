@@ -4,7 +4,9 @@ This directory gathers design notes and testing references. The following pages
 provide further detail:
 
 - [Architecture](architecture.md)
+- [Developer's guide](developers-guide.md)
 - [Bevy headless testing](bevy-headless-testing.md)
+- [Bevy 0.16+ migration plan (archived)](bevy-0-16-plus-migration-plan.md)
 - [Behavioural testing in Rust with RSpec](behavioural-testing-in-rust-with-rspec.md)
 - [Complexity antipatterns and refactoring strategies](
   complexity-antipatterns-and-refactoring-strategies.md)
