@@ -120,7 +120,7 @@ mod tests {
 
     use super::apply_movement;
     use crate::dbsp_circuit::{MovementDecision, Position};
-    use approx::assert_relative_eq;
+    use approx::{assert_relative_eq, relative_eq};
     use dbsp::RootCircuit;
     use ordered_float::OrderedFloat;
 
@@ -179,37 +179,59 @@ mod tests {
     }
 
     #[test]
-    fn applies_movement_to_targeted_entity() {
-        let (circuit, (base_in, movement_in, out)) =
-            build_apply_circuit().expect("failed to build apply circuit");
-        base_in.push(position(1, 0.0, 0.0), 1);
-        movement_in.push(movement(1, 1.0, 0.0), 1);
+    fn applies_or_preserves_positions() {
+        struct Case {
+            name: &'static str,
+            base: Position,
+            movement: Option<MovementDecision>,
+            expected: Position,
+        }
 
-        circuit.step().expect("dbsp step");
+        let cases = [
+            // A targeted entity shifts by its decision's delta.
+            Case {
+                name: "applies movement to targeted entity",
+                base: position(1, 0.0, 0.0),
+                movement: Some(movement(1, 1.0, 0.0)),
+                expected: position(1, 1.0, 0.0),
+            },
+            // Without a decision, the base position passes through unchanged.
+            Case {
+                name: "passes unmoved entity through",
+                base: position(2, 5.0, 5.0),
+                movement: None,
+                expected: position(2, 5.0, 5.0),
+            },
+        ];
 
-        // Entity 1 shifts by (1, 0) and is emitted exactly once.
-        let (moved, weight) = single_position(&collect_positions(&out));
-        assert_eq!(weight, 1);
-        assert_eq!(moved.entity, 1);
-        assert_relative_eq!(moved.x.into_inner(), 1.0);
-        assert_relative_eq!(moved.y.into_inner(), 0.0);
-    }
+        for case in cases {
+            let (circuit, (base_in, movement_in, out)) =
+                build_apply_circuit().expect("failed to build apply circuit");
+            base_in.push(case.base, 1);
+            if let Some(decision) = case.movement {
+                movement_in.push(decision, 1);
+            }
 
-    #[test]
-    fn passes_unmoved_entity_through() {
-        let (circuit, (base_in, _movement_in, out)) =
-            build_apply_circuit().expect("failed to build apply circuit");
-        base_in.push(position(2, 5.0, 5.0), 1);
+            circuit.step().expect("dbsp step");
 
-        circuit.step().expect("dbsp step");
-
-        // With no movement decision, the antijoin passes the base position
-        // through unchanged.
-        let (unmoved, weight) = single_position(&collect_positions(&out));
-        assert_eq!(weight, 1);
-        assert_eq!(unmoved.entity, 2);
-        assert_relative_eq!(unmoved.x.into_inner(), 5.0);
-        assert_relative_eq!(unmoved.y.into_inner(), 5.0);
+            let (actual, weight) = single_position(&collect_positions(&out));
+            assert_eq!(weight, 1, "{}: output weight", case.name);
+            assert_eq!(actual.entity, case.expected.entity, "{}: entity", case.name);
+            assert!(
+                relative_eq!(actual.x.into_inner(), case.expected.x.into_inner()),
+                "{}: x (expected {}, got {})",
+                case.name,
+                case.expected.x.into_inner(),
+                actual.x.into_inner()
+            );
+            assert!(
+                relative_eq!(actual.y.into_inner(), case.expected.y.into_inner()),
+                "{}: y (expected {}, got {})",
+                case.name,
+                case.expected.y.into_inner(),
+                actual.y.into_inner()
+            );
+        }
     }
 
     #[test]
