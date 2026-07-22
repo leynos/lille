@@ -33,12 +33,17 @@ pub struct DbspState {
     pub(crate) expected_health_retractions: HashSet<(EntityId, Tick, Option<u32>)>,
     /// Damage events pending retraction at the start of the next frame.
     pub(crate) pending_damage_retractions: Vec<DamageEvent>,
-    /// Pre-frame backup of [`Self::health_snapshot`], taken before the cache
-    /// system advances it so a failed circuit step can roll it back.
-    health_snapshot_backup: Option<HashMap<EntityId, HealthState>>,
-    /// Pre-frame backup of [`Self::pending_damage_retractions`], restored on a
-    /// failed circuit step.
+    /// Pre-frame health snapshots the cache pass drains out of
+    /// [`Self::health_snapshot`], stashed (not cloned) so a failed circuit step
+    /// can rebuild the map from them.
+    health_snapshot_backup: Option<Vec<HealthState>>,
+    /// Pre-frame value of [`Self::pending_damage_retractions`] the cache pass
+    /// takes, restored on a failed circuit step.
     pending_damage_backup: Option<Vec<DamageEvent>>,
+    /// Undo log of [`Self::applied_unsequenced`] entries mutated during the
+    /// cache pass. Records each touched entity's prior value once, so a failed
+    /// step can restore it without deep-cloning the whole map every frame.
+    applied_unsequenced_undo: HashMap<EntityId, Option<(Tick, HashSet<DamageEvent>)>>,
     /// Running count of duplicate health/damage events filtered.
     /// Used for diagnostics and monitoring deduplication effectiveness.
     pub(crate) health_duplicate_count: u64,
@@ -74,6 +79,7 @@ impl DbspState {
             pending_damage_retractions: Vec::new(),
             health_snapshot_backup: None,
             pending_damage_backup: None,
+            applied_unsequenced_undo: HashMap::new(),
             health_duplicate_count: 0,
         })
     }
@@ -111,19 +117,47 @@ impl DbspState {
         (self.stepper)(&mut self.circuit)
     }
 
-    /// Records the health/damage tracking that the cache system is about to
-    /// advance, so [`Self::rollback_frame_tracking`] can restore it if the
-    /// circuit step fails. Called once per frame before the tracking is drained.
-    pub(crate) fn begin_frame_tracking_backup(&mut self) {
-        self.health_snapshot_backup = Some(self.health_snapshot.clone());
-        self.pending_damage_backup = Some(self.pending_damage_retractions.clone());
+    /// Starts a fresh per-frame rollback log at the top of a cache pass.
+    ///
+    /// The health/damage backups are populated later ([`Self::stash_frame_rollback`])
+    /// from values the cache pass has already moved out of the live state, and
+    /// the `applied_unsequenced` undo log is populated lazily
+    /// ([`Self::record_unsequenced_undo`]) as entries are mutated. This avoids
+    /// deep-cloning the whole tracking state every frame.
+    pub(crate) fn begin_frame_rollback(&mut self) {
+        self.health_snapshot_backup = None;
+        self.pending_damage_backup = None;
+        self.applied_unsequenced_undo.clear();
     }
 
-    /// Discards the pre-frame tracking backup once a successful step has
-    /// committed the frame's circuit inputs.
+    /// Stashes the pre-frame health snapshots and pending damage retractions —
+    /// values the cache pass has already extracted from the live state — so a
+    /// failed step can restore them without an extra clone.
+    pub(crate) fn stash_frame_rollback(
+        &mut self,
+        health_snapshot: Vec<HealthState>,
+        pending_damage: Vec<DamageEvent>,
+    ) {
+        self.health_snapshot_backup = Some(health_snapshot);
+        self.pending_damage_backup = Some(pending_damage);
+    }
+
+    /// Records the pre-frame [`Self::applied_unsequenced`] entry for `entity`
+    /// once per frame, before the cache pass mutates it, so a failed step can
+    /// undo the change. Repeat calls for the same entity in a frame are no-ops.
+    pub(crate) fn record_unsequenced_undo(&mut self, entity: EntityId) {
+        if !self.applied_unsequenced_undo.contains_key(&entity) {
+            let previous = self.applied_unsequenced.get(&entity).cloned();
+            self.applied_unsequenced_undo.insert(entity, previous);
+        }
+    }
+
+    /// Discards the frame rollback log once a successful step has committed the
+    /// frame's circuit inputs.
     pub(crate) fn commit_frame_tracking(&mut self) {
         self.health_snapshot_backup = None;
         self.pending_damage_backup = None;
+        self.applied_unsequenced_undo.clear();
     }
 
     /// Restores the pre-frame health/damage tracking after a failed step whose
@@ -131,11 +165,24 @@ impl DbspState {
     /// bookkeeping consistent with the circuit's actual records. A no-op when no
     /// backup was taken (e.g. the output system run in isolation by a test).
     pub(crate) fn rollback_frame_tracking(&mut self) {
-        if let Some(snapshot) = self.health_snapshot_backup.take() {
-            self.health_snapshot = snapshot;
+        if let Some(snapshots) = self.health_snapshot_backup.take() {
+            self.health_snapshot = snapshots
+                .into_iter()
+                .map(|snapshot| (snapshot.entity, snapshot))
+                .collect();
         }
         if let Some(pending) = self.pending_damage_backup.take() {
             self.pending_damage_retractions = pending;
+        }
+        for (entity, previous) in std::mem::take(&mut self.applied_unsequenced_undo) {
+            match previous {
+                Some(entry) => {
+                    self.applied_unsequenced.insert(entity, entry);
+                }
+                None => {
+                    self.applied_unsequenced.remove(&entity);
+                }
+            }
         }
     }
 
@@ -189,5 +236,99 @@ mod tests {
         let mut state = DbspState::new().expect("failed to initialise DbspState for tests");
         state.health_duplicate_count = 3;
         assert_eq!(state.applied_health_duplicates(), 3);
+    }
+
+    fn damage_event(entity: EntityId, at_tick: Tick) -> DamageEvent {
+        DamageEvent {
+            entity,
+            amount: 10,
+            source: crate::dbsp_circuit::DamageSource::External,
+            at_tick,
+            seq: None,
+        }
+    }
+
+    #[rstest]
+    fn rollback_restores_health_snapshot_and_pending_damage() {
+        let mut state = DbspState::new().expect("failed to initialise DbspState for tests");
+        let snapshot = HealthState {
+            entity: 3,
+            current: 50,
+            max: 100,
+        };
+        let pending = damage_event(3, 1);
+        state.health_snapshot.insert(3, snapshot);
+        state.pending_damage_retractions.push(pending);
+
+        // Simulate a cache pass: back up, drain/advance the live tracking.
+        state.begin_frame_rollback();
+        let previous_snapshots: Vec<_> = state.health_snapshot.values().copied().collect();
+        state.health_snapshot.clear();
+        let previous_pending = std::mem::take(&mut state.pending_damage_retractions);
+        state.health_snapshot.insert(
+            3,
+            HealthState {
+                entity: 3,
+                current: 10,
+                max: 100,
+            },
+        );
+        state.pending_damage_retractions.push(damage_event(3, 2));
+        state.stash_frame_rollback(previous_snapshots, previous_pending);
+
+        state.rollback_frame_tracking();
+
+        assert_eq!(state.health_snapshot.get(&3), Some(&snapshot));
+        assert_eq!(state.pending_damage_retractions, vec![pending]);
+    }
+
+    #[rstest]
+    fn rollback_restores_applied_unsequenced() {
+        let mut state = DbspState::new().expect("failed to initialise DbspState for tests");
+        let original = damage_event(7, 1);
+        state
+            .applied_unsequenced
+            .insert(7, (1, HashSet::from([original])));
+
+        state.begin_frame_rollback();
+        // Entity 7 already had an entry; entity 8 is new this frame.
+        state.record_unsequenced_undo(7);
+        state.applied_unsequenced.insert(7, (2, HashSet::new()));
+        state.record_unsequenced_undo(8);
+        state.applied_unsequenced.insert(8, (2, HashSet::new()));
+        // A repeat undo record for 7 must not overwrite the captured value.
+        state.record_unsequenced_undo(7);
+        state.stash_frame_rollback(Vec::new(), Vec::new());
+
+        state.rollback_frame_tracking();
+
+        assert_eq!(
+            state.applied_unsequenced.get(&7),
+            Some(&(1, HashSet::from([original]))),
+            "entity 7 restored to its pre-frame bucket"
+        );
+        assert!(
+            !state.applied_unsequenced.contains_key(&8),
+            "entity 8 was absent pre-frame, so it is removed on rollback"
+        );
+    }
+
+    #[rstest]
+    fn commit_discards_rollback_log() {
+        let mut state = DbspState::new().expect("failed to initialise DbspState for tests");
+        state.begin_frame_rollback();
+        state.record_unsequenced_undo(5);
+        state.applied_unsequenced.insert(5, (9, HashSet::new()));
+        state.stash_frame_rollback(Vec::new(), Vec::new());
+
+        state.commit_frame_tracking();
+        // A stray rollback after commit must not revert the committed state.
+        state.rollback_frame_tracking();
+
+        assert_eq!(
+            state.applied_unsequenced.get(&5).map(|(tick, _)| *tick),
+            Some(9),
+            "committed applied_unsequenced state must survive a later rollback"
+        );
     }
 }

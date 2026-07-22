@@ -287,3 +287,48 @@ impl Semigroup<MovementAccumulator> for MovementAccumulatorSemigroup {
         combined
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! Unit tests for the private movement accumulator.
+    use super::*;
+    use approx::assert_relative_eq;
+
+    fn decision(dx: f64, dy: f64) -> MovementDecision {
+        MovementDecision {
+            entity: 1,
+            dx: OrderedFloat(dx),
+            dy: OrderedFloat(dy),
+        }
+    }
+
+    /// Order-sensitive cancellation: an east +1 contribution merged with a
+    /// north -1 contribution nets the weight to zero, but the accumulated
+    /// displacement must be preserved (an earlier reset-on-zero bug zeroed the
+    /// sums). Re-adding north +1 then cancels the north component, leaving the
+    /// original east direction. If the sums were reset on the net-zero merge,
+    /// the final decision would wrongly point north.
+    #[test]
+    fn net_zero_merge_preserves_pending_direction() {
+        // Axes: east = (+1, 0), north = (0, +1).
+        let mut acc = MovementAccumulator::default();
+        acc.apply(&decision(1.0, 0.0), 1); // east +1
+
+        let mut north_retraction = MovementAccumulator::default();
+        north_retraction.apply(&decision(0.0, 1.0), -1); // north -1
+
+        acc.merge(&north_retraction);
+        assert_eq!(
+            acc.total_weight, 0,
+            "east +1 and north -1 net to zero weight"
+        );
+
+        acc.apply(&decision(0.0, 1.0), 1); // north +1 restores unit weight
+
+        let movement = acc
+            .into_decision(1)
+            .expect("net weight of one must yield a decision");
+        assert_relative_eq!(movement.dx.into_inner(), 1.0);
+        assert_relative_eq!(movement.dy.into_inner(), 0.0);
+    }
+}
