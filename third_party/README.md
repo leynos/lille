@@ -5,6 +5,21 @@ depends on. Each fork is wired into the build through `[patch.crates-io]` in
 the workspace `Cargo.toml`, and is excluded from the workspace via
 `[workspace] exclude`.
 
+## Scope: carried, not adopted
+
+These crates are carried verbatim from upstream to deliver a specific fix, not
+adopted as maintained Lille code. Except for the deliberately minimal changes
+listed for each fork below, the source is byte-identical to the named upstream
+release, and Lille does not hold it to this repository's code-health, testing,
+documentation, or lint standards (hence the crate-level `#![allow(warnings)]`
+and the CodeScene `third_party/**` overrides).
+
+Review feedback about the upstream code that is outside the scope of the
+vendored fix — for example requests to test, refactor, or re-architect upstream
+functionality Lille does not use — is therefore out of scope here. Raise such
+concerns upstream against the source project instead. In-scope feedback is
+anything touching the fix itself or the wiring that carries it.
+
 ## `feldera-size-of`
 
 A fork of [`feldera-size-of`](https://github.com/feldera/size-of) `0.1.7`
