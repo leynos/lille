@@ -142,13 +142,17 @@ mod tests {
         })
     }
 
-    fn position(entity: i64, x: f64, y: f64) -> Position {
+    fn position_at(entity: i64, x: f64, y: f64, z: f64) -> Position {
         Position {
             entity,
             x: x.into(),
             y: y.into(),
-            z: 0.0.into(),
+            z: z.into(),
         }
+    }
+
+    fn position(entity: i64, x: f64, y: f64) -> Position {
+        position_at(entity, x, y, 0.0)
     }
 
     fn movement(entity: i64, dx: f64, dy: f64) -> MovementDecision {
@@ -188,19 +192,20 @@ mod tests {
         }
 
         let cases = [
-            // A targeted entity shifts by its decision's delta.
+            // A targeted entity shifts by its decision's delta in x/y while its
+            // z coordinate is carried through unchanged.
             Case {
                 name: "applies movement to targeted entity",
-                base: position(1, 0.0, 0.0),
+                base: position_at(1, 0.0, 0.0, 2.0),
                 movement: Some(movement(1, 1.0, 0.0)),
-                expected: position(1, 1.0, 0.0),
+                expected: position_at(1, 1.0, 0.0, 2.0),
             },
             // Without a decision, the base position passes through unchanged.
             Case {
                 name: "passes unmoved entity through",
-                base: position(2, 5.0, 5.0),
+                base: position_at(2, 5.0, 5.0, 3.0),
                 movement: None,
-                expected: position(2, 5.0, 5.0),
+                expected: position_at(2, 5.0, 5.0, 3.0),
             },
         ];
 
@@ -230,6 +235,13 @@ mod tests {
                 case.name,
                 case.expected.y.into_inner(),
                 actual.y.into_inner()
+            );
+            assert!(
+                relative_eq!(actual.z.into_inner(), case.expected.z.into_inner()),
+                "{}: z (expected {}, got {}) — movement must preserve z",
+                case.name,
+                case.expected.z.into_inner(),
+                actual.z.into_inner()
             );
         }
     }

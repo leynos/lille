@@ -169,6 +169,21 @@ pub fn movement_decision_stream(
     dedupe_movement_decisions(&raw)
 }
 
+/// Collapses per-tick movement decisions so each entity has at most one.
+///
+/// Decisions are indexed by entity and folded through [`MovementAccumulator`],
+/// which sums each decision's `dx`/`dy` weighted by its Z-set weight and
+/// tracks the total weight. The summed vector is then normalised back to a
+/// unit direction; entities whose total weight nets to zero are dropped
+/// entirely. This guarantees a single decision per entity downstream, so a
+/// join cannot apply a doubled delta.
+///
+/// # Examples
+/// ```text
+/// let movement = movement_decision_stream(&fear, &targets, &positions);
+/// let deduped = dedupe_movement_decisions(&movement);
+/// // `deduped` carries at most one `MovementDecision` per entity per tick.
+/// ```
 pub(super) fn dedupe_movement_decisions(
     movement: &Stream<RootCircuit, OrdZSet<MovementDecision>>,
 ) -> Stream<RootCircuit, OrdZSet<MovementDecision>> {

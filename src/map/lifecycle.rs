@@ -126,8 +126,13 @@ fn validate_asset_path(asset_path: &str) -> Result<(), LilleMapError> {
 
     // Reject parent-directory traversal, but only when `..` is a whole path
     // component. A substring check would wrongly reject legitimate filenames
-    // such as `maps/primary..backup.tmx`.
-    if asset_path.split('/').any(|component| component == "..") {
+    // such as `maps/primary..backup.tmx`. Split on both slash forms so a
+    // Windows-style separator (`maps\..\secret.tmx`) cannot smuggle a `..`
+    // component past this check.
+    if asset_path
+        .split(['/', '\\'])
+        .any(|component| component == "..")
+    {
         return Err(LilleMapError::InvalidPrimaryMapAssetPath {
             path: asset_path.to_owned(),
         });
@@ -293,6 +298,8 @@ mod tests {
     #[case::empty_path("")]
     #[case::absolute_path("/etc/maps/primary.tmx")]
     #[case::parent_traversal("maps/../secrets.tmx")]
+    // Windows-style separators must also be rejected as parent traversal.
+    #[case::windows_parent_traversal("maps\\..\\secrets.tmx")]
     fn validate_asset_path_rejects_unsafe_paths(#[case] path: &str) {
         let result = validate_asset_path(path);
         assert!(
@@ -333,7 +340,7 @@ mod tests {
     }
 
     #[derive(Resource, Default)]
-    struct InvalidPathObserved(bool);
+    struct InvalidPathObserved(Option<String>);
 
     #[rstest]
     fn build_spawn_rejects_invalid_path_without_spawning() {
@@ -342,24 +349,23 @@ mod tests {
         // Observe the rejection directly: `try_spawn_primary_map_on_build`
         // returns early both for an invalid path and for a missing
         // `AssetServer`, so the absence of a map entity alone cannot prove the
-        // path was rejected. The observer pins down the actual cause.
+        // path was rejected. Capturing the offending path pins down not just
+        // that a rejection fired but that it named the configured path.
         app.world_mut().add_observer(
             |event: bevy::ecs::prelude::On<LilleMapError>,
              mut observed: ResMut<InvalidPathObserved>| {
-                if matches!(
-                    event.event(),
-                    LilleMapError::InvalidPrimaryMapAssetPath { .. }
-                ) {
-                    observed.0 = true;
+                if let LilleMapError::InvalidPrimaryMapAssetPath { path } = event.event() {
+                    observed.0 = Some(path.clone());
                 }
             },
         );
 
         try_spawn_primary_map_on_build(&mut app);
 
-        assert!(
-            app.world().resource::<InvalidPathObserved>().0,
-            "expected InvalidPrimaryMapAssetPath to be triggered"
+        assert_eq!(
+            app.world().resource::<InvalidPathObserved>().0.as_deref(),
+            Some("/absolute/path.tmx"),
+            "expected InvalidPrimaryMapAssetPath to be triggered for the configured path"
         );
 
         let world = app.world_mut();

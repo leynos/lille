@@ -33,6 +33,12 @@ pub struct DbspState {
     pub(crate) expected_health_retractions: HashSet<(EntityId, Tick, Option<u32>)>,
     /// Damage events pending retraction at the start of the next frame.
     pub(crate) pending_damage_retractions: Vec<DamageEvent>,
+    /// Pre-frame backup of [`Self::health_snapshot`], taken before the cache
+    /// system advances it so a failed circuit step can roll it back.
+    health_snapshot_backup: Option<HashMap<EntityId, HealthState>>,
+    /// Pre-frame backup of [`Self::pending_damage_retractions`], restored on a
+    /// failed circuit step.
+    pending_damage_backup: Option<Vec<DamageEvent>>,
     /// Running count of duplicate health/damage events filtered.
     /// Used for diagnostics and monitoring deduplication effectiveness.
     pub(crate) health_duplicate_count: u64,
@@ -66,6 +72,8 @@ impl DbspState {
             health_snapshot: HashMap::new(),
             expected_health_retractions: HashSet::new(),
             pending_damage_retractions: Vec::new(),
+            health_snapshot_backup: None,
+            pending_damage_backup: None,
             health_duplicate_count: 0,
         })
     }
@@ -101,6 +109,34 @@ impl DbspState {
     /// Invokes the configured circuit stepper.
     pub(crate) fn step_circuit(&mut self) -> Result<(), dbsp::Error> {
         (self.stepper)(&mut self.circuit)
+    }
+
+    /// Records the health/damage tracking that the cache system is about to
+    /// advance, so [`Self::rollback_frame_tracking`] can restore it if the
+    /// circuit step fails. Called once per frame before the tracking is drained.
+    pub(crate) fn begin_frame_tracking_backup(&mut self) {
+        self.health_snapshot_backup = Some(self.health_snapshot.clone());
+        self.pending_damage_backup = Some(self.pending_damage_retractions.clone());
+    }
+
+    /// Discards the pre-frame tracking backup once a successful step has
+    /// committed the frame's circuit inputs.
+    pub(crate) fn commit_frame_tracking(&mut self) {
+        self.health_snapshot_backup = None;
+        self.pending_damage_backup = None;
+    }
+
+    /// Restores the pre-frame health/damage tracking after a failed step whose
+    /// circuit inputs were cleared without being applied, keeping the Rust-side
+    /// bookkeeping consistent with the circuit's actual records. A no-op when no
+    /// backup was taken (e.g. the output system run in isolation by a test).
+    pub(crate) fn rollback_frame_tracking(&mut self) {
+        if let Some(snapshot) = self.health_snapshot_backup.take() {
+            self.health_snapshot = snapshot;
+        }
+        if let Some(pending) = self.pending_damage_backup.take() {
+            self.pending_damage_retractions = pending;
+        }
     }
 
     /// Overrides the circuit stepper for tests that need to force an error

@@ -63,23 +63,36 @@ fn f32_from_f64(value: f64) -> Option<f32> {
     Some(value as f32)
 }
 
+/// Converts a `f64` axis value to `f32` and writes it to `target`, warning and
+/// leaving `target` unchanged when the value is out of range. `field` names the
+/// axis (e.g. `"position.x"`) for the warning's entity-specific context.
+fn assign_axis(target: &mut f32, value: f64, entity: i64, field: &str) {
+    match f32_from_f64(value) {
+        Some(converted) => *target = converted,
+        None => warn!("{field} out of range for entity {entity}"),
+    }
+}
+
 /// Writes a DBSP position onto a `Transform`, warning on out-of-range axes.
 fn write_position(pos: &Position, transform: &mut Transform) {
-    if let Some(x) = f32_from_f64(pos.x.into_inner()) {
-        transform.translation.x = x;
-    } else {
-        warn!("position.x out of range for entity {}", pos.entity);
-    }
-    if let Some(y) = f32_from_f64(pos.y.into_inner()) {
-        transform.translation.y = y;
-    } else {
-        warn!("position.y out of range for entity {}", pos.entity);
-    }
-    if let Some(z) = f32_from_f64(pos.z.into_inner()) {
-        transform.translation.z = z;
-    } else {
-        warn!("position.z out of range for entity {}", pos.entity);
-    }
+    assign_axis(
+        &mut transform.translation.x,
+        pos.x.into_inner(),
+        pos.entity,
+        "position.x",
+    );
+    assign_axis(
+        &mut transform.translation.y,
+        pos.y.into_inner(),
+        pos.entity,
+        "position.y",
+    );
+    assign_axis(
+        &mut transform.translation.z,
+        pos.z.into_inner(),
+        pos.entity,
+        "position.z",
+    );
 }
 
 fn apply_positions(
@@ -116,21 +129,24 @@ fn apply_velocities(state: &DbspState, write_query: &mut DbspWriteQuery<'_, '_>)
         else {
             continue;
         };
-        if let Some(vx) = f32_from_f64(vel.vx.into_inner()) {
-            velocity.vx = vx;
-        } else {
-            warn!("velocity.vx out of range for entity {}", vel.entity);
-        }
-        if let Some(vy) = f32_from_f64(vel.vy.into_inner()) {
-            velocity.vy = vy;
-        } else {
-            warn!("velocity.vy out of range for entity {}", vel.entity);
-        }
-        if let Some(vz) = f32_from_f64(vel.vz.into_inner()) {
-            velocity.vz = vz;
-        } else {
-            warn!("velocity.vz out of range for entity {}", vel.entity);
-        }
+        assign_axis(
+            &mut velocity.vx,
+            vel.vx.into_inner(),
+            vel.entity,
+            "velocity.vx",
+        );
+        assign_axis(
+            &mut velocity.vy,
+            vel.vy.into_inner(),
+            vel.entity,
+            "velocity.vy",
+        );
+        assign_axis(
+            &mut velocity.vz,
+            vel.vz.into_inner(),
+            vel.entity,
+            "velocity.vz",
+        );
     }
 }
 
@@ -176,26 +192,38 @@ fn apply_health_deltas(
         if weight <= 0 {
             continue;
         }
-        let key = (delta.at_tick, delta.seq);
-        let Some((entity_key, mut health)) = resolve_health_target(state, write_query, &delta)
-        else {
-            continue;
-        };
-        if !should_apply_health_delta(state, &delta, key) {
-            continue;
-        }
-        let Some(new_current) = clamped_health_value(&delta, &health) else {
-            continue;
-        };
-        health.current = new_current;
-        state.applied_health.insert(delta.entity, key);
-        if let Some(entry) = world_handle.entities.get_mut(&entity_key) {
-            entry.health_current = health.current;
-            entry.health_max = health.max;
-        }
-        if delta.death {
-            // Future hook: notify AI about deaths if needed.
-        }
+        apply_one_health_delta(state, write_query, world_handle, &delta);
+    }
+}
+
+/// Applies a single positive-weight health delta: resolves the target entity's
+/// `Health`, honours the dedup/retraction rules, clamps the new value, then
+/// updates the component, `applied_health` bookkeeping, the world handle, and
+/// the death hook. Any guard failing simply skips this delta.
+fn apply_one_health_delta(
+    state: &mut DbspState,
+    write_query: &mut DbspWriteQuery<'_, '_>,
+    world_handle: &mut WorldHandle,
+    delta: &HealthDelta,
+) {
+    let key = (delta.at_tick, delta.seq);
+    let Some((entity_key, mut health)) = resolve_health_target(state, write_query, delta) else {
+        return;
+    };
+    if !should_apply_health_delta(state, delta, key) {
+        return;
+    }
+    let Some(new_current) = clamped_health_value(delta, &health) else {
+        return;
+    };
+    health.current = new_current;
+    state.applied_health.insert(delta.entity, key);
+    if let Some(entry) = world_handle.entities.get_mut(&entity_key) {
+        entry.health_current = health.current;
+        entry.health_max = health.max;
+    }
+    if delta.death {
+        // Future hook: notify AI about deaths if needed.
     }
 }
 
@@ -264,8 +292,13 @@ pub fn apply_dbsp_outputs_system(
             error.to_string(),
         ));
         // Clear inputs even when stepping fails so the buffered records are not
-        // replayed on the next tick.
+        // replayed on the next tick, then roll back the health/damage tracking
+        // that the cache system advanced this frame. Clearing the inputs alone
+        // would leave `health_snapshot`/`pending_damage_retractions` pointing at
+        // records the circuit never accepted, corrupting next frame's
+        // retractions.
         state.circuit.clear_inputs();
+        state.rollback_frame_tracking();
         return;
     }
 
@@ -280,6 +313,9 @@ pub fn apply_dbsp_outputs_system(
 
     state.expected_health_retractions.clear();
     state.circuit.clear_inputs();
+    // The step succeeded and its inputs are now folded into the circuit; drop
+    // the pre-frame tracking backup so it cannot be rolled back later.
+    state.commit_frame_tracking();
 }
 
 #[cfg(test)]
