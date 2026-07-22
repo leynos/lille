@@ -80,6 +80,13 @@ static_assertions = "^1"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 rspec = "1.0"
 test_utils = { path = "test_utils" }
+trybuild = "1.0"
+# Non-optional in dev builds so the `trybuild` compile-pass fixture, which is a
+# standalone crate, can name `bevy_ecs_tiled` directly. In-package tests already
+# reach it through the optional `map`/`test-support` path; this only surfaces the
+# same crate to the isolated fixture. Kept in lockstep with the optional
+# dependency above (0.12, png + user_properties).
+bevy_ecs_tiled = { version = "0.12.0", default-features = false, features = ["png", "user_properties"] }
 
 [profile.dev]
 debug = 1  # Line numbers in stack traces

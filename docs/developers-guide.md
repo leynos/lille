@@ -9,8 +9,7 @@ historical record and must not be used to infer current versions.
 ## Toolchain
 
 - `rust-toolchain.toml` pins `nightly-2025-09-14` (rustc 1.91.0-nightly) with
-  the
-  `rustfmt` and `clippy` components.
+  the `rustfmt` and `clippy` components.
 - The nightly channel is required: `src/lib.rs` uses
   `#![cfg_attr(docsrs, feature(doc_cfg))]`, and `make lint` builds the docs with
   `--cfg docsrs`, which needs the unstable `doc_cfg` feature.
@@ -55,6 +54,23 @@ Bevy 0.18 split buffered events from observer events:
 `App` is `#[must_use]` in Bevy 0.18, so do not add a bare `#[must_use]` to
 functions that return `App`; `clippy::double_must_use` will reject it.
 
+The migrated buffered-message surface is guarded two ways. The runtime map
+integration tests exercise it dynamically, and a `trybuild` compile-pass
+harness pins it statically: `tests/compile_pass.rs` compiles the fixture
+`tests/compile_pass/message_reader_migration.rs`, which uses
+`MessageReader<TiledEvent<MapCreated>>` and `World::write_message`.
+Reintroducing the legacy `EventReader` / `World::send_event` names breaks the
+fixture. Run it with:
+
+```sh
+cargo test --features test-support --test compile_pass
+```
+
+The harness is gated on `test-support` (like the other map tests), so it also
+runs as part of `make test` (which passes `--features test-support`) and the CI
+coverage step. The fixture is a standalone crate, so `bevy_ecs_tiled` is
+carried as a non-optional dev-dependency purely to make it nameable there.
+
 ## Map support: `bevy_ecs_tiled`
 
 - Version **0.12.0** (optional, behind the `map` feature),
@@ -62,14 +78,17 @@ functions that return `App`; `clippy::double_must_use` will reject it.
 - Features: `png` and `user_properties` are always enabled with the crate;
   `render` is added by the `render` feature and `atlas` by `test-support`.
 - 0.12 is the `bevy_ecs_tiled` line that tracks Bevy 0.18 (upstream
-  compatibility
-  table: 0.11–0.12 target Bevy 0.18). The Bevy-0.19 line is 0.13, which cannot
-  be adopted until the toolchain constraint above is lifted.
+  compatibility table: 0.11–0.12 target Bevy 0.18). The Bevy-0.19 line is 0.13,
+  which cannot be adopted until the toolchain constraint above is lifted.
 
 ## Commit gates
 
 Run the deterministic gates before committing (see `AGENTS.md` and the
 `Makefile`): `make check-fmt`, `make test`, `make typecheck`, and `make lint`.
+`make test` passes `--features test-support`, so it also runs the
+buffered-message compile-pass harness
+(`cargo test --features test-support --test compile_pass`; see
+[Buffered events use the Message API](#buffered-events-use-the-message-api)).
 `make lint` runs rustdoc (`--cfg docsrs`),
 `cargo clippy --all-targets --all-features -- -D warnings`, and the Whitaker
 Dylint suite.
