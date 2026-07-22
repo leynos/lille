@@ -11,12 +11,14 @@
 
 use lille::components::BlockSlope;
 use lille::dbsp_circuit::Position;
-use ordered_float::OrderedFloat;
+use ordered_float::{NotNan, OrderedFloat};
 use size_of::SizeOf;
 use static_assertions::assert_impl_all;
 
-// The root cause: the wrapper itself must implement `SizeOf`.
+// The root cause: the wrappers themselves must implement `SizeOf`. The vendored
+// fork provides the impl for both `OrderedFloat<T>` and `NotNan<T>`.
 assert_impl_all!(OrderedFloat<f64>: SizeOf);
+assert_impl_all!(NotNan<f64>: SizeOf);
 
 // The DBSP records that embed it, which previously failed the derive.
 assert_impl_all!(Position: SizeOf);
