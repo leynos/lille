@@ -12,8 +12,11 @@
 //! upstream; this fixture deliberately exercises only the buffered-message path,
 //! keeping it distinct from the observer `Event` surface (`On<T>` / `trigger`).
 //!
-//! It depends on `bevy_ecs_tiled`, which is only available through the `map`
-//! feature; the harness activates it via `lille`'s `test-support` feature.
+//! `trybuild` compiles this file as its own standalone crate, so it names
+//! `bevy_ecs_tiled` through that crate's *direct, non-optional* `bevy_ecs_tiled`
+//! dev-dependency. That is distinct from the repository's `lille` dependency,
+//! whose `test-support` feature activates `map` and pulls in `bevy_ecs_tiled`
+//! for the in-crate map integration tests.
 
 use bevy::prelude::*;
 use bevy_ecs_tiled::prelude::{MapCreated, TiledEvent};

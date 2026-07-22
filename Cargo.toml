@@ -10,6 +10,16 @@ name = "lille"
 path = "src/main.rs"
 required-features = ["render", "map"]
 
+# The compile-pass migration harness (tests/compile_pass.rs) is gated on
+# `test-support`. Declaring `required-features` lets Cargo skip building it when
+# the feature is absent, instead of compiling an empty target that reports zero
+# tests. The in-file `#![cfg(feature = "test-support")]` gate stays as a
+# belt-and-braces guard, and CI/`make test` still invoke it with the feature on.
+[[test]]
+name = "compile_pass"
+path = "tests/compile_pass.rs"
+required-features = ["test-support"]
+
 [dependencies]
 hashbrown = "0.14"  # High performance HashMap implementation
 clap = { version = "4.4", features = ["derive"] }  # Command line argument parsing

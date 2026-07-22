@@ -15,8 +15,8 @@ historical record and must not be used to infer current versions.
   `--cfg docsrs`, which needs the unstable `doc_cfg` feature.
 - **Do not bump the toolchain or Bevy to 0.19 without also satisfying the
   constraint below.** Bevy 0.19 requires Rust 1.95.0, which this nightly cannot
-  provide, and `bevy_ecs_tiled` has no Bevy-0.19 release compatible with the
-  rest of the stack yet.
+  provide. `bevy_ecs_tiled` 0.13 already tracks Bevy 0.19, so the plugin is not
+  the blocker; the toolchain is.
 
 ## Bevy
 
@@ -79,7 +79,8 @@ carried as a non-optional dev-dependency purely to make it nameable there.
   `render` is added by the `render` feature and `atlas` by `test-support`.
 - 0.12 is the `bevy_ecs_tiled` line that tracks Bevy 0.18 (upstream
   compatibility table: 0.11–0.12 target Bevy 0.18). The Bevy-0.19 line is 0.13,
-  which cannot be adopted until the toolchain constraint above is lifted.
+  which already supports Bevy 0.19; adopting it is blocked solely by the Rust
+  1.95.0 toolchain constraint above, not by plugin availability.
 
 ## Commit gates
 

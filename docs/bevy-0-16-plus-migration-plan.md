@@ -258,10 +258,11 @@ before merging to keep the “two sets of eyes” policy meaningful.
     `clippy::double_must_use`).
 - **Toolchain constraint.** `rust-toolchain.toml` stays pinned to
   `nightly-2025-09-14` (rustc 1.91). Bevy **0.19 is deliberately out of
-  scope**: it requires Rust 1.95.0, which this nightly cannot satisfy, and
-  `bevy_ecs_tiled` has no Bevy-0.19 release compatible with the rest of the
-  stack yet. A 0.19 bump must first pin `rust-toolchain.toml` to a nightly
-  reporting Rust 1.95.0+ and migrate every direct Bevy subcrate together.
+  scope**: it requires Rust 1.95.0, which this nightly cannot satisfy.
+  `bevy_ecs_tiled` 0.13 already supports Bevy 0.19, so the toolchain is the
+  only remaining blocker. A 0.19 bump must first pin `rust-toolchain.toml` to a
+  nightly reporting Rust 1.95.0+ and migrate every direct Bevy subcrate
+  together.
 
 ## Testing and Validation Strategy
 

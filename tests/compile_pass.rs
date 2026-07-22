@@ -1,3 +1,22 @@
+//! Guards the Bevy 0.17 -> 0.18 buffered-message migration against regressions.
+//!
+//! The runtime map integration tests exercise the migrated APIs dynamically;
+//! this harness adds an *isolated* compile-pass check via `trybuild`, so that a
+//! future edit reintroducing the legacy `EventReader` / `World::send_event`
+//! surface fails to compile the fixture rather than silently drifting.
+//!
+//! `trybuild` builds the fixture as its own standalone crate, which names
+//! `bevy_ecs_tiled` directly. The repository therefore carries a *non-optional*
+//! `bevy_ecs_tiled` dev-dependency purely so that separate crate can name it; an
+//! optional dependency is only linked into `lille`'s own targets, not into the
+//! trybuild fixture crate. Independently, the `lille` dev-dependency enables the
+//! `test-support` feature (which activates `map` and pulls in `bevy_ecs_tiled`),
+//! mirroring the feature path the production map integration uses. Run it
+//! explicitly with:
+//!
+//! ```sh
+//! cargo test --features test-support --test compile_pass
+//! ```
 #![cfg_attr(
     feature = "test-support",
     doc = "Compile-time coverage for the Bevy 0.18 buffered-message migration."
@@ -7,21 +26,6 @@
     doc = "Compile-time migration tests require `test-support`."
 )]
 #![cfg(feature = "test-support")]
-//! Guards the Bevy 0.17 -> 0.18 buffered-message migration against regressions.
-//!
-//! The runtime map integration tests exercise the migrated APIs dynamically;
-//! this harness adds an *isolated* compile-pass check via `trybuild`, so that a
-//! future edit reintroducing the legacy `EventReader` / `World::send_event`
-//! surface fails to compile the fixture rather than silently drifting.
-//!
-//! The fixture is compiled as a standalone crate that depends on `lille` with
-//! the `test-support` feature (which activates `map` and pulls in
-//! `bevy_ecs_tiled`), mirroring the feature path used by the production map
-//! integration. Run it explicitly with:
-//!
-//! ```sh
-//! cargo test --features test-support --test compile_pass
-//! ```
 
 /// Asserts the migrated buffered-message API surface still compiles.
 ///
