@@ -123,10 +123,12 @@ fn cache_state_for_dbsp_impl(
     world_handle.slopes.clear();
     world_handle.entities.clear();
 
-    // Back up the health/damage tracking before advancing it, so a failed
-    // circuit step in `apply_dbsp_outputs_system` can roll it back to match the
-    // circuit inputs it clears.
-    state.begin_frame_tracking_backup();
+    // Start a fresh per-frame rollback log. Its backups are recorded lazily
+    // from values this pass already extracts (below) rather than deep-cloning
+    // the whole tracking state every frame, so a failed circuit step in
+    // `apply_dbsp_outputs_system` can still roll back to match the inputs it
+    // clears.
+    state.begin_frame_rollback();
 
     let previous_snapshots = collect_previous_health_snapshots(state);
     let pending_damage = mem::take(&mut state.pending_damage_retractions);
@@ -138,9 +140,13 @@ fn cache_state_for_dbsp_impl(
     sync::forces(state, force_query);
 
     apply_health_snapshot_retractions(&mut state.circuit, &previous_snapshots);
-    apply_damage_retractions(state, pending_damage);
+    apply_damage_retractions(state, &pending_damage);
 
     ingest_damage_events(state, damage_inbox);
+
+    // Stash the pre-frame health/damage tracking (already moved out above, so no
+    // extra clone) for failure rollback.
+    state.stash_frame_rollback(previous_snapshots, pending_damage);
 }
 
 fn collect_previous_health_snapshots(state: &mut DbspState) -> Vec<HealthState> {
@@ -155,9 +161,9 @@ fn apply_health_snapshot_retractions(circuit: &mut DbspCircuit, snapshots: &[Hea
     }
 }
 
-fn apply_damage_retractions(state: &mut DbspState, retractions: Vec<DamageEvent>) {
+fn apply_damage_retractions(state: &mut DbspState, retractions: &[DamageEvent]) {
     for event in retractions {
-        state.circuit.damage_in().push(event, -1);
+        state.circuit.damage_in().push(*event, -1);
         state
             .expected_health_retractions
             .insert((event.entity, event.at_tick, event.seq));
@@ -168,9 +174,13 @@ fn ingest_damage_events(state: &mut DbspState, inbox: &mut DamageInbox) {
     let mut sequenced_damage = HashSet::new();
     let mut unsequenced_damage = HashSet::new();
     for event in inbox.drain() {
-        let duplicate = match event.seq {
-            Some(_) => state.record_duplicate_sequenced_damage(&event, &mut sequenced_damage),
-            None => state.record_duplicate_unsequenced_damage(&event, &mut unsequenced_damage),
+        let duplicate = if event.seq.is_some() {
+            state.record_duplicate_sequenced_damage(&event, &mut sequenced_damage)
+        } else {
+            // Record the pre-frame entry before the dedup filter mutates it, so
+            // a failed step can restore it.
+            state.record_unsequenced_undo(event.entity);
+            state.record_duplicate_unsequenced_damage(&event, &mut unsequenced_damage)
         };
         if duplicate {
             continue;
