@@ -300,6 +300,11 @@ mod tests {
     #[case::parent_traversal("maps/../secrets.tmx")]
     // Windows-style separators must also be rejected as parent traversal.
     #[case::windows_parent_traversal("maps\\..\\secrets.tmx")]
+    #[case::leading_parent("../secrets.tmx")]
+    #[case::bare_parent("..")]
+    #[case::nested_parent("maps/tiles/../../secrets.tmx")]
+    // A `..` component reached via either separator style must be rejected.
+    #[case::mixed_separator_parent("maps/tiles\\../secrets.tmx")]
     fn validate_asset_path_rejects_unsafe_paths(#[case] path: &str) {
         let result = validate_asset_path(path);
         assert!(
@@ -315,6 +320,9 @@ mod tests {
     #[case::plain("maps/primary-isometric.tmx")]
     // `..` inside a filename is not a path component, so it must be accepted.
     #[case::dots_in_filename("maps/primary..backup.tmx")]
+    #[case::nested("levels/act1/room.tmx")]
+    // `..` embedded in a directory name is not a standalone component.
+    #[case::dots_in_dir("map..data/level.tmx")]
     fn validate_asset_path_accepts_relative_paths(#[case] path: &str) {
         assert!(
             validate_asset_path(path).is_ok(),
