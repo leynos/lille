@@ -123,6 +123,11 @@ fn cache_state_for_dbsp_impl(
     world_handle.slopes.clear();
     world_handle.entities.clear();
 
+    // Back up the health/damage tracking before advancing it, so a failed
+    // circuit step in `apply_dbsp_outputs_system` can roll it back to match the
+    // circuit inputs it clears.
+    state.begin_frame_tracking_backup();
+
     let previous_snapshots = collect_previous_health_snapshots(state);
     let pending_damage = mem::take(&mut state.pending_damage_retractions);
     state.expected_health_retractions.clear();
