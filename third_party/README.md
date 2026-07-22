@@ -34,7 +34,7 @@ records that embed `OrderedFloat<f64>` (for example `Position` and
 `SizeOf` impl for `OrderedFloat`/`NotNan` applies only to ordered-float 3.x.
 Against ordered-float 5.x the derive fails to compile with:
 
-```text
+```plaintext
 error[E0277]: the trait bound `ordered_float::OrderedFloat<f64>:
 feldera_size_of::SizeOf` is not satisfied
 ```

@@ -20,7 +20,7 @@ published `feldera-size-of` release up to and including `0.1.7` — and the
 to ordered-float 3.x. Against ordered-float 5.x the derive fails to compile
 with:
 
-```text
+```plaintext
 error[E0277]: the trait bound `ordered_float::OrderedFloat<f64>:
 feldera_size_of::SizeOf` is not satisfied
 ```

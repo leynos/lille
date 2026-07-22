@@ -89,7 +89,6 @@ ordered-float = { workspace = true }
 serial_test = "3.2"
 mockall = "0.13.1"
 static_assertions = "^1"
-size-of = { version = "0.1", package = "feldera-size-of", features = ["ordered-float"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 rspec = "1.0"
 test_utils = { path = "test_utils" }
