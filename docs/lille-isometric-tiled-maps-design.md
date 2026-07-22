@@ -910,6 +910,27 @@ respective game systems (be it AI spawn systems or trigger systems) can
 operate. This approach reinforces Lille’s separation: the map defines *data*,
 and the logic systems use that data. The plugin is just the bridge.
 
+### 5.5 Primary Map Asset Path Validation
+
+Before spawning the primary map, the plugin validates the `primary_map` path
+configured on `LilleMapSettings`. The path must be a relative asset-server
+path; anything else is rejected and no primary map is spawned. Rejection
+emits a `LilleMapError::InvalidPrimaryMapAssetPath` event carrying the
+offending path, which the plugin’s observer logs rather than panicking on.
+Parent-directory traversal is rejected only when `..` forms a whole path
+component (checked against both `/` and `\` separators), so a filename that
+merely contains `..` as a substring is still accepted.
+
+- **Rejected:** an empty path.
+- **Rejected:** an absolute path, for example `/etc/maps/primary.tmx`.
+- **Rejected:** a path containing a `..` component, for example
+  `maps/../secrets.tmx`, including the Windows-style separator form
+  `maps\..\secrets.tmx`.
+- **Accepted:** an ordinary relative path, for example
+  `maps/primary-isometric.tmx`.
+- **Accepted:** a filename that merely contains `..` as a substring rather
+  than a standalone component, for example `maps/primary..backup.tmx`.
+
 ## 6. Plugin Implementation Blueprint
 
 Putting it all together, here’s how we would implement the `LilleMapPlugin` in
