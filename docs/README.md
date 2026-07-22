@@ -10,6 +10,7 @@ provide further detail:
   complexity-antipatterns-and-refactoring-strategies.md)
 - [Declarative world inference with DBSP and Rust](
   declarative-world-inference-with-dbsp-and-rust.md)
+- [Developer guide](developers-guide.md)
 - [Documentation style guide](documentation-style-guide.md)
 - [Lille physics and world engine roadmap](
   lille-physics-and-world-engine-roadmap.md)
