@@ -117,7 +117,7 @@ The fork's changes from upstream `0.1.7` are deliberately minimal:
   fork's source lives under the workspace root, which `cargo-llvm-cov`'s
   default ignore list does not exclude (it only skips the registry, git
   checkouts, the target directory, and the toolchain); without this attribute
-  the largely-unexercised upstream code diluted the coverage denominator,
+  the largely unexercised upstream code diluted the coverage denominator,
   dropping measured coverage from approximately 89.5% to approximately 72.9%.
 - `.codescene/code-health-rules.json` gains a `third_party/**` rule set that
   disables the "Code Duplication" check, since the fork's per-type `SizeOf`

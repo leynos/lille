@@ -64,7 +64,7 @@ The changes are deliberately minimal:
   `#![cfg_attr(coverage_nightly, coverage(off))]`. As a path dependency the
   fork's source lives under the workspace root, which cargo-llvm-cov's default
   ignore list does not exclude (it only skips the registry, git checkouts, the
-  target dir, and the toolchain); the largely-unexercised upstream code would
+  target dir, and the toolchain); the largely unexercised upstream code would
   otherwise dilute the coverage denominator. cargo-llvm-cov sets
   `cfg(coverage_nightly)` on nightly runs, so the attributes are inert during
   ordinary builds.
