@@ -60,12 +60,24 @@ anyhow = { workspace = true }
 
 [workspace]
 members = ["build_support", "test_utils"]
+# The vendored `feldera-size-of` fork is wired in via `[patch.crates-io]`, not as
+# a workspace member; exclude it so Cargo does not fold it into this workspace.
+exclude = ["third_party/feldera-size-of"]
 
 [workspace.dependencies]
 anyhow = "1"
 glam = "0.33"
-ordered-float = { version = "3", features = ["serde", "rkyv_64"] }
+ordered-float = { version = "5", features = ["serde", "rkyv_64"] }
 bevy = { version = "0.17.3", default-features = false, features = ["reflect_auto_register"] }
+
+# `feldera-size-of` 0.1.x pins its optional `ordered-float` dependency at
+# `^3.0.0`, so its `SizeOf` impl for `OrderedFloat`/`NotNan` does not apply to
+# the ordered-float 5.x used across this workspace. Until upstream publishes
+# ordered-float 5.x support (https://github.com/feldera/size-of), redirect the
+# crate to a minimal vendored fork that widens the constraint. Remove this patch
+# and the `third_party/feldera-size-of` directory once an upstream release ships.
+[patch.crates-io]
+feldera-size-of = { path = "third_party/feldera-size-of" }
 
 [dev-dependencies]
 lille = { path = ".", features = ["test-support"] }

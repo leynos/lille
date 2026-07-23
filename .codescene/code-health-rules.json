@@ -6,6 +6,13 @@
       "rules": [
         { "name": "Primitive Obsession", "weight": 0.0 }
       ]
+    },
+    {
+      "matching_content_path": "third_party/**",
+      "matching_content_path_doc": "Vendored upstream crate forks (see third_party/README.md). This is upstream code we do not maintain; its per-type SizeOf impls are intentionally uniform in structure, so Code Duplication is not held to this repo's standard here.",
+      "rules": [
+        { "name": "Code Duplication", "weight": 0.0 }
+      ]
     }
   ]
 }
