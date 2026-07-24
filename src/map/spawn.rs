@@ -224,7 +224,6 @@ fn archetype_from_enemy_type(enemy_type: u32) -> (UnitType, Health, &'static str
 /// Spawn coordinates come from the `Transform` component on spawn point
 /// entities, which is hydrated by `bevy_ecs_tiled` from the Tiled object
 /// positions.
-#[expect(deprecated, reason = "bevy_ecs_tiled 0.10 uses the legacy Event API.")]
 #[expect(
     clippy::type_complexity,
     reason = "Bevy ECS query with filter combinators is inherently verbose."
@@ -235,7 +234,7 @@ fn archetype_from_enemy_type(enemy_type: u32) -> (UnitType, Health, &'static str
 )]
 pub fn spawn_actors_at_spawn_points(
     mut commands: Commands,
-    mut map_events: EventReader<TiledEvent<MapCreated>>,
+    mut map_events: MessageReader<TiledEvent<MapCreated>>,
     player_spawns: Query<(Entity, &Transform), (With<PlayerSpawn>, Without<PlayerSpawnConsumed>)>,
     npc_spawns: Query<(Entity, &Transform, &SpawnPoint), Without<SpawnPointConsumed>>,
     mut npc_id_counter: ResMut<NpcIdCounter>,

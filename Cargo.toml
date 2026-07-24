@@ -10,20 +10,30 @@ name = "lille"
 path = "src/main.rs"
 required-features = ["render", "map"]
 
+# The compile-pass migration harness (tests/compile_pass.rs) is gated on
+# `test-support`. Declaring `required-features` lets Cargo skip building it when
+# the feature is absent, instead of compiling an empty target that reports zero
+# tests. The in-file `#![cfg(feature = "test-support")]` gate stays as a
+# belt-and-braces guard, and CI/`make test` still invoke it with the feature on.
+[[test]]
+name = "compile_pass"
+path = "tests/compile_pass.rs"
+required-features = ["test-support"]
+
 [dependencies]
 hashbrown = "0.14"  # High performance HashMap implementation
 clap = { version = "4.4", features = ["derive"] }  # Command line argument parsing
 glam = { workspace = true }  # Linear algebra for games
 bevy = { workspace = true, default-features = false }
-bevy_app = "0.17.3"
-bevy_ecs = "0.17.3"
-bevy_math = "0.17.3"
-bevy_reflect = { version = "0.17.3", features = ["auto_register_inventory"] }
-bevy_transform = "0.17.3"
-bevy_log = { version = "0.17.3", optional = true }
+bevy_app = "0.18.1"
+bevy_ecs = "0.18.1"
+bevy_math = "0.18.1"
+bevy_reflect = { version = "0.18.1", features = ["auto_register_inventory"] }
+bevy_transform = "0.18.1"
+bevy_log = { version = "0.18.1", optional = true }
 log = "0.4"  # Structured logging facade
 env_logger = "0.10"  # Logger implementation controlled via RUST_LOG
-bevy_ecs_tiled = { version = "0.10.0", optional = true, default-features = false, features = ["png", "user_properties"] }
+bevy_ecs_tiled = { version = "0.12.0", optional = true, default-features = false, features = ["png", "user_properties"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 anyhow = { workspace = true }
@@ -65,7 +75,7 @@ members = ["build_support", "test_utils"]
 anyhow = "1"
 glam = "0.33"
 ordered-float = { version = "3", features = ["serde", "rkyv_64"] }
-bevy = { version = "0.17.3", default-features = false, features = ["reflect_auto_register"] }
+bevy = { version = "0.18.1", default-features = false, features = ["reflect_auto_register"] }
 
 [dev-dependencies]
 lille = { path = ".", features = ["test-support"] }
@@ -80,6 +90,13 @@ static_assertions = "^1"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 rspec = "1.0"
 test_utils = { path = "test_utils" }
+trybuild = "1.0"
+# Non-optional in dev builds so the `trybuild` compile-pass fixture, which is a
+# standalone crate, can name `bevy_ecs_tiled` directly. In-package tests already
+# reach it through the optional `map`/`test-support` path; this only surfaces the
+# same crate to the isolated fixture. Kept in lockstep with the optional
+# dependency above (0.12, png + user_properties).
+bevy_ecs_tiled = { version = "0.12.0", default-features = false, features = ["png", "user_properties"] }
 
 [profile.dev]
 debug = 1  # Line numbers in stack traces

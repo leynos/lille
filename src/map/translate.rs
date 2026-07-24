@@ -46,14 +46,13 @@ use crate::map::{Collidable, SlopeProperties};
 /// inserted with:
 /// - `block_id` matching the `Block::id`
 /// - `grad_x` and `grad_y` converted from `f32` to `OrderedFloat<f64>`
-#[expect(deprecated, reason = "bevy_ecs_tiled 0.10 uses the legacy Event API.")]
 #[expect(
     clippy::type_complexity,
     reason = "Bevy ECS query with filter combinators is inherently verbose."
 )]
 pub fn attach_collision_blocks(
     mut commands: Commands,
-    mut map_events: EventReader<TiledEvent<MapCreated>>,
+    mut map_events: MessageReader<TiledEvent<MapCreated>>,
     collidable_tiles: Query<
         (Entity, &TilePos, Option<&SlopeProperties>),
         (With<Collidable>, Without<Block>),

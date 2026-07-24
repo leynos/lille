@@ -1,5 +1,16 @@
 # Bevy 0.16+ Migration Plan
 
+> **Archived — historical record only.** This plan tracked the incremental
+> upgrade from Bevy 0.12 through 0.17.3 and the initial `bevy_ecs_tiled`
+> 0.9/0.10
+> map enablement. It is retained for provenance and is no longer the source of
+> truth for the active stack. The workspace has since moved to **Bevy 0.18.1**
+> and **`bevy_ecs_tiled` 0.12** (see the "Bevy 0.17.3 → 0.18.1" section below
+> for
+> the migration record). For the current dependency versions, feature flags, and
+> toolchain constraint, consult [`developers-guide.md`](developers-guide.md); do
+> not treat the version numbers earlier in this document as current.
+
 ## Goal
 
 Upgrade Lille from Bevy 0.12 to Bevy 0.17.3 so we can adopt `bevy_ecs_tiled`
@@ -218,6 +229,41 @@ before merging to keep the “two sets of eyes” policy meaningful.
   `bevy_ecs_tiled` and stream tiles into the DBSP bridge.
 - Update docs/roadmaps to mark the Bevy dependency as unblocked.
 
+### Bevy 0.17.3 → 0.18.1 (map dependency refresh)
+
+- Status: done (July 2026).
+- Workspace `bevy` and every direct Bevy subcrate (`bevy_app`, `bevy_ecs`,
+  `bevy_math`, `bevy_reflect`, `bevy_transform`, `bevy_log`) moved to the
+  **0.18.1** release line. `bevy_reflect` keeps its `auto_register_inventory`
+  feature and the workspace `bevy` keeps `reflect_auto_register`.
+- `bevy_ecs_tiled` upgraded from 0.10 to **0.12**, the release line that tracks
+  Bevy 0.18, preserving the `png` and `user_properties` features (plus `atlas`
+  and `render` behind the relevant feature flags).[^7]
+- **Message API migration.** Bevy 0.18 renamed the buffered-event surface:
+  buffered events derive `Message` (not `Event`), and the reader/writer/world
+  APIs are renamed accordingly. Concretely:
+  - `EventReader<T>` → `MessageReader<T>` (used for
+    `TiledEvent<MapCreated>` readers in `src/map/spawn.rs` and
+    `src/map/translate.rs`; `TiledEvent` now derives `Message` + `EntityEvent`
+    upstream).
+  - `World::send_event` → `World::write_message` (map test helpers).
+  - Observer events (`#[derive(Event)]` consumed via `On<T>` with
+    `Commands::trigger` / `World::trigger` / `App::add_observer`) are unchanged;
+    the 0.18 `Event` trait now denotes observer events specifically, which is
+    already how Lille's `LilleMapError`, `UnloadPrimaryMap`, `PrimaryMapUnloaded`,
+    `DbspSyncError`, and `DbspDamageIngress` are used.
+  - Removed the stale `#[expect(deprecated)]` guards that referenced the legacy
+    bevy_ecs_tiled 0.10 event API, and the redundant `#[must_use]` on
+    `App`-returning test builders (`App` is `#[must_use]` in 0.18, which trips
+    `clippy::double_must_use`).
+- **Toolchain constraint.** `rust-toolchain.toml` stays pinned to
+  `nightly-2025-09-14` (rustc 1.91). Bevy **0.19 is deliberately out of
+  scope**: it requires Rust 1.95.0, which this nightly cannot satisfy.
+  `bevy_ecs_tiled` 0.13 already supports Bevy 0.19, so the toolchain is the
+  only remaining blocker. A 0.19 bump must first pin `rust-toolchain.toml` to a
+  nightly reporting Rust 1.95.0+ and migrate every direct Bevy subcrate
+  together.
+
 ## Testing and Validation Strategy
 
 - For each phase, run `make fmt`, `make lint`, `make test`, and
@@ -255,3 +301,4 @@ before merging to keep the “two sets of eyes” policy meaningful.
 [^4]: <https://bevyengine.org/news/bevy-0-15/>
 [^5]: <https://bevyengine.org/news/bevy-0-14/>
 [^6]: <https://bevyengine.org/news/bevy-0-13/>
+[^7]: <https://docs.rs/bevy_ecs_tiled/0.12.0/bevy_ecs_tiled/>

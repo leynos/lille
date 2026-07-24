@@ -185,7 +185,7 @@ The system function signature:
 ```rust
 pub fn attach_collision_blocks(
     mut commands: Commands,
-    mut map_events: EventReader<TiledEvent<MapCreated>>,
+    mut map_events: MessageReader<TiledEvent<MapCreated>>,
     collidable_tiles: Query<(Entity, &TilePos), (With<Collidable>, Without<Block>)>,
     mut block_id_counter: Local<i64>,
 )

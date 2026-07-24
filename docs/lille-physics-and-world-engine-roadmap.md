@@ -34,10 +34,24 @@ behaviours.
 - [x] Phase 1 — Upgrade Bevy crates from 0.12 to 0.13 (completed 18 November
   2025 with artefacts stored under `artifacts/bevy-0-17-upgrade/phase-1/` and
   regression coverage in `tests/physics_bdd/dbsp_authority.rs`).
-- [ ] Phase 2 — Upgrade Bevy crates from 0.13 to 0.14.
-- [ ] Phase 3 — Upgrade Bevy crates from 0.14 to 0.15.
-- [ ] Phase 4 — Upgrade Bevy crates from 0.15 to 0.16.
-- [ ] Phase 5 — Upgrade Bevy crates from 0.16 to 0.17.3.
+- [x] Phase 2 — Upgrade Bevy crates from 0.13 to 0.14 (completed 21 November
+  2025; see docs/migrations/bevy-0-17-phase-2.md).
+- [x] Phase 3 — Upgrade Bevy crates from 0.14 to 0.15 (completed 23 November
+  2025; pinned to 0.15.1 due to DBSP's uuid requirement; see
+  docs/migrations/bevy-0-17-phase-3.md).
+- [x] Phase 4 — Upgrade Bevy crates from 0.15 to 0.16 (completed 25 November
+  2025; upgraded to 0.16.1; see docs/migrations/bevy-0-17-phase-4.md).
+- [x] Phase 5 — Upgrade Bevy crates from 0.16 to 0.17.3 (completed 27 November
+  2025; `reflect_auto_register` enabled and `DbspPlugin` moved to Events V2
+  observers).
+- [x] Phase 6 — Upgrade Bevy crates from 0.17.3 to 0.18.1 and `bevy_ecs_tiled`
+  from 0.10 to 0.12 (completed July 2026). Migrated the buffered-event API to
+  Bevy 0.18's Message surface (`EventReader` → `MessageReader`,
+  `World::send_event` → `World::write_message`). `rust-toolchain.toml` remains
+  on `nightly-2025-09-14`; Bevy 0.19 is blocked solely because it needs Rust
+  1.95.0 (`bevy_ecs_tiled` 0.13 already supports Bevy 0.19). See
+  [`developers-guide.md`](developers-guide.md) for current versions and the
+  [Bevy migration plan](bevy-0-16-plus-migration-plan.md) for the full record.
 
 ## Phase 1: Foundational Migration to DBSP
 
