@@ -1020,9 +1020,9 @@ they run after the map spawn, but using events largely decouples that ordering):
 We have to be careful about system order. The map events (`MapCreated`,
 `ObjectCreated`, etc.) are emitted by the TiledPlugin likely in the
 `PostUpdate` or end of a frame when the asset finishes loading. We should
-ensure our event-reader systems run *after* that emission in the same frame. By
-default, if we put them in `Update` stage without further ordering, they might
-run before events are delivered. However, Bevy events are updated between
+ensure our message-reader systems run *after* that emission in the same frame.
+By default, if we put them in `Update` stage without further ordering, they
+might run before events are delivered. However, Bevy events are updated between
 stages, and since we’re adding our plugin after, it might align. To be sure, we
 could schedule some of them in `PostUpdate` or use explicit `.after(...)`
 dependencies if TiledPlugin declares a label.
@@ -1038,7 +1038,7 @@ Pseudo-code for a combined system using `MapCreated` event:
 ```rust
 fn on_map_loaded(
     mut commands: Commands,
-    mut map_events: EventReader<TiledEvent<MapCreated>>,
+    mut map_events: MessageReader<TiledEvent<MapCreated>>,
     coll_tiles: Query<(Entity, &TilePos, Option<&SlopeProperties>), With<Collidable>>,
     slope_tiles: Query<(Entity, &TilePos, &SlopeProperties)>,  // maybe covered by above
     player_spawns: Query<(Entity, &GlobalTransform), With<PlayerSpawn>>,

@@ -174,7 +174,7 @@ The extended system function signature:
 ```rust
 pub fn attach_collision_blocks(
     mut commands: Commands,
-    mut map_events: EventReader<TiledEvent<MapCreated>>,
+    mut map_events: MessageReader<TiledEvent<MapCreated>>,
     collidable_tiles: Query<
         (Entity, &TilePos, Option<&SlopeProperties>),
         (With<Collidable>, Without<Block>),

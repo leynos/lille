@@ -24,6 +24,8 @@ The workspace targets the **Bevy 0.18.1** release line. Keep the entire Bevy
 surface on one minor line: never mix major/minor families across type
 signatures, imports, plugins, events, or system parameters.
 
+*Active Bevy dependency versions (workspace and direct subcrates):*
+
 | Dependency       | Version | Notes                                                                                               |
 | ---------------- | ------- | --------------------------------------------------------------------------------------------------- |
 | `bevy`           | 0.18.1  | Workspace dependency, `default-features = false`, `reflect_auto_register`; Linux target adds `x11`. |
