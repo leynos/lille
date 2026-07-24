@@ -284,15 +284,21 @@ fn duplicate_targets_produce_single_decision() {
 
     circuit.step().expect("dbsp step");
 
-    let decisions: Vec<MovementDecision> = decisions_handle
+    // Retain the Z-set weight: duplicate targets must dedupe to a single
+    // decision with multiplicity 1, not a single decision emitted twice.
+    let decisions: Vec<(MovementDecision, i64)> = decisions_handle
         .consolidate()
         .iter()
-        .map(|(decision, (), _timestamp)| {
+        .map(|(decision, (), weight)| {
             let decision_ref: &MovementDecision = &decision;
-            *decision_ref
+            (*decision_ref, weight)
         })
         .collect();
-    let decision = test_utils::expect_single(&decisions, "movement decision result");
+    let (decision, weight) = test_utils::expect_single(&decisions, "movement decision result");
+    assert_eq!(
+        *weight, 1,
+        "duplicate targets must dedupe to multiplicity 1, not {weight}"
+    );
     let magnitude = (5_f64.powi(2) + (-3_f64).powi(2)).sqrt();
     assert_relative_eq!(decision.dx.into_inner(), 5.0 / magnitude);
     assert_relative_eq!(decision.dy.into_inner(), -3.0 / magnitude);

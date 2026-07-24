@@ -21,6 +21,7 @@ provide further detail:
 - [Rust testing with rstest fixtures](rust-testing-with-rstest-fixtures.md)
 - [Testing declarative game logic in DBSP](testing-declarative-game-logic-in-dbsp.md)
 - [Test utilities](test_utils.md)
+- [User's guide](users-guide.md)
 
 ## Spelling policy
 

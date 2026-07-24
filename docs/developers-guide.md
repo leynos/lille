@@ -255,3 +255,53 @@ step:
 > example, which `whitaker` binary version it installs and where) is not
 > defined in this repository's workflow; consult the `whitaker-installer`
 > tool's own documentation for details.
+
+## 6. Testing strategy for invariants
+
+The DBSP-sync and map lifecycle code has several small, finite invariants
+that must hold exactly — not merely "usually" — because they govern
+correctness properties such as at-most-one decision per entity or exact
+frame rollback. These invariants are covered by **bounded, near-exhaustive
+`rstest` case matrices** plus focused regression tests, using the `rstest`
+stack already in use throughout the codebase (see [Mastering test fixtures
+in Rust with `rstest`](rust-testing-with-rstest-fixtures.md)), rather than a
+property-testing framework.
+
+The invariant-heavy paths and their concrete test entry points are:
+
+- **Movement-decision dedupe** — one decision per entity, none for net-zero
+  total weight, and a consolidated Z-set multiplicity of exactly `1` for the
+  emitted decision. Covered by
+  `dedupe_emits_one_decision_for_positive_weight_and_none_for_zero` and
+  `net_zero_merge_preserves_pending_direction` in
+  `src/dbsp_circuit/streams/behaviour/decide/tests.rs`, and by
+  `duplicate_targets_produce_single_decision` in
+  `src/dbsp_circuit/streams/behaviour/tests.rs`.
+- **Frame rollback** — exact pre-frame restoration of `health_snapshot`,
+  `pending_damage_retractions`, and `applied_unsequenced` on a failed
+  `step_circuit()` call, versus retention of the frame's changes on commit.
+  Covered by `applied_unsequenced_rollback_matrix` in
+  `src/dbsp_sync/state.rs` (see [§2](#2-frame-rollback-api-on-dbspstate)).
+- **Asset-path validation** — rejection of rooted paths and standalone `..`
+  traversal components (checked against both `/` and `\` separators), versus
+  acceptance of relative paths where `..` appears only as a substring.
+  Covered by `validate_asset_path_component_matrix` in
+  `src/map/lifecycle/tests.rs`.
+- **Non-positive output weights** — retractions (negative-weight records)
+  are ignored rather than applied to ECS components. Covered by the tests
+  named in [§4](#4-output-weight-semantics).
+
+### Why not a property-testing framework
+
+Property-testing frameworks such as `proptest`, Kani, or Verus are
+deliberately **not** adopted for this work. None of them are workspace
+dependencies, and adding one is a supply-chain decision that this testing
+strategy does not need to make: every invariant above concerns a small,
+finite input space (a handful of weight combinations, a handful of path
+component forms, a handful of rollback/commit orderings). A bounded,
+enumerated `rstest` case matrix over that space gives equivalent coverage to
+a property test — every relevant case is exercised, not merely a
+randomly-sampled subset — without introducing a new dependency or a
+generator/shrinker to maintain. Should an invariant's input space grow large
+enough that exhaustive enumeration becomes impractical, adopting a
+property-testing framework would be a reasonable escalation at that point.

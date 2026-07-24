@@ -117,13 +117,50 @@ impl DbspState {
         (self.stepper)(&mut self.circuit)
     }
 
-    /// Starts a fresh per-frame rollback log at the top of a cache pass.
+    /// Starts a fresh per-frame rollback log — the first step of the
+    /// frame-rollback lifecycle that keeps the Rust-side tracking
+    /// (`health_snapshot`, `pending_damage_retractions`, `applied_unsequenced`)
+    /// consistent with the circuit even when a step fails.
     ///
-    /// The health/damage backups are populated later ([`Self::stash_frame_rollback`])
-    /// from values the cache pass has already moved out of the live state, and
-    /// the `applied_unsequenced` undo log is populated lazily
-    /// ([`Self::record_unsequenced_undo`]) as entries are mutated. This avoids
-    /// deep-cloning the whole tracking state every frame.
+    /// # Lifecycle
+    ///
+    /// Each frame the input cache pass and the output pass cooperate:
+    /// 1. [`begin_frame_rollback`](Self::begin_frame_rollback) clears the
+    ///    previous frame's rollback log at the top of the cache pass.
+    /// 2. [`record_unsequenced_undo`](Self::record_unsequenced_undo) captures an
+    ///    `applied_unsequenced` entry's pre-frame value *before* it is mutated.
+    /// 3. [`stash_frame_rollback`](Self::stash_frame_rollback) saves the health
+    ///    snapshot and pending-damage values the cache pass already extracted.
+    /// 4. Then exactly one of, after the circuit step:
+    ///    - [`commit_frame_tracking`](Self::commit_frame_tracking) on success —
+    ///      discards the log; the advanced tracking stands.
+    ///    - [`rollback_frame_tracking`](Self::rollback_frame_tracking) on failure
+    ///      (whose inputs were cleared) — restores the exact pre-frame state.
+    ///
+    /// Backups reuse values the cache pass already moved out of the live state,
+    /// so no frame deep-clones the whole tracking state.
+    ///
+    /// # Examples
+    ///
+    /// Successful frame keeps the advanced tracking:
+    /// ```text
+    /// state.begin_frame_rollback();
+    /// state.record_unsequenced_undo(entity);          // capture pre-frame entry
+    /// state.applied_unsequenced.insert(entity, next); // cache pass mutates it
+    /// state.stash_frame_rollback(prev_snapshots, prev_pending);
+    /// // ... step succeeds ...
+    /// state.commit_frame_tracking();                  // applied_unsequenced == next
+    /// ```
+    ///
+    /// Failed frame restores the pre-frame tracking:
+    /// ```text
+    /// state.begin_frame_rollback();
+    /// state.record_unsequenced_undo(entity);
+    /// state.applied_unsequenced.insert(entity, next);
+    /// state.stash_frame_rollback(prev_snapshots, prev_pending);
+    /// // ... step fails; inputs cleared ...
+    /// state.rollback_frame_tracking();                // entry back to pre-frame value
+    /// ```
     pub(crate) fn begin_frame_rollback(&mut self) {
         self.health_snapshot_backup = None;
         self.pending_damage_backup = None;
