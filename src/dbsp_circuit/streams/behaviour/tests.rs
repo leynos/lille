@@ -62,15 +62,8 @@ fn movement_decision_join(
     #[case] expected_dx: f64,
     #[case] expected_dy: f64,
 ) {
-    let (circuit, (fear_in, target_in, pos_in, decisions_handle)) = RootCircuit::build(|c| {
-        let (fear_input, fi) = c.add_input_zset::<FearLevel>();
-        let (targets, ti) = c.add_input_zset::<Target>();
-        let (pos_s, pi) = c.add_input_zset::<Position>();
-        let fear_stream = fear_level_stream(&pos_s, &fear_input);
-        let output_handle = movement_decision_stream(&fear_stream, &targets, &pos_s).output();
-        Ok((fi, ti, pi, output_handle))
-    })
-    .expect("failed to build circuit for movement_decision_join");
+    let (circuit, (fear_in, target_in, pos_in, decisions_handle)) =
+        build_decision_circuit().expect("failed to build circuit for movement_decision_join");
 
     if let Some(level) = fear {
         fear_in.push(
@@ -116,19 +109,10 @@ fn movement_decision_join(
 
 #[test]
 fn no_decision_without_target() {
-    #[expect(
-        unused_mut,
-        reason = "Mutable binding retained for compatibility with API expectations"
-    )]
-    let (mut circuit, (fear_in, pos_in, decisions_handle)) = RootCircuit::build(|c| {
-        let (fear_input, fi) = c.add_input_zset::<FearLevel>();
-        let (pos_s, pi) = c.add_input_zset::<Position>();
-        let targets = c.add_input_zset::<Target>().0;
-        let fear_stream = fear_level_stream(&pos_s, &fear_input);
-        let output_handle = movement_decision_stream(&fear_stream, &targets, &pos_s).output();
-        Ok((fi, pi, output_handle))
-    })
-    .expect("failed to build circuit for no_decision_without_target");
+    // The target handle is intentionally left unused: this test pushes no
+    // target, so no movement decision should be produced.
+    let (circuit, (fear_in, _target_in, pos_in, decisions_handle)) =
+        build_decision_circuit().expect("failed to build circuit for no_decision_without_target");
 
     fear_in.push(
         FearLevel {
@@ -269,16 +253,8 @@ fn conflicting_targets_normalise_to_one_decision(
 
 #[test]
 fn duplicate_targets_produce_single_decision() {
-    let (circuit, (fear_in, target_in, pos_in, decisions_handle)) = RootCircuit::build(|circuit| {
-        let (fear_input, fear_handle) = circuit.add_input_zset::<FearLevel>();
-        let (target_stream, target_handle) = circuit.add_input_zset::<Target>();
-        let (position_stream, position_handle) = circuit.add_input_zset::<Position>();
-        let fear_stream = fear_level_stream(&position_stream, &fear_input);
-        let output_handle =
-            movement_decision_stream(&fear_stream, &target_stream, &position_stream).output();
-        Ok((fear_handle, target_handle, position_handle, output_handle))
-    })
-    .expect("failed to build circuit for duplicate target test");
+    let (circuit, (fear_in, target_in, pos_in, decisions_handle)) =
+        build_decision_circuit().expect("failed to build circuit for duplicate target test");
 
     fear_in.push(
         FearLevel {

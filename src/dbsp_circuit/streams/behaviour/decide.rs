@@ -169,6 +169,21 @@ pub fn movement_decision_stream(
     dedupe_movement_decisions(&raw)
 }
 
+/// Collapses per-tick movement decisions so each entity has at most one.
+///
+/// Decisions are indexed by entity and folded through [`MovementAccumulator`],
+/// which sums each decision's `dx`/`dy` weighted by its Z-set weight and
+/// tracks the total weight. The summed vector is then normalised back to a
+/// unit direction; entities whose total weight nets to zero are dropped
+/// entirely. This guarantees a single decision per entity downstream, so a
+/// join cannot apply a doubled delta.
+///
+/// # Examples
+/// ```text
+/// let movement = movement_decision_stream(&fear, &targets, &positions);
+/// let deduped = dedupe_movement_decisions(&movement);
+/// // `deduped` carries at most one `MovementDecision` per entity per tick.
+/// ```
 fn dedupe_movement_decisions(
     movement: &Stream<RootCircuit, OrdZSet<MovementDecision>>,
 ) -> Stream<RootCircuit, OrdZSet<MovementDecision>> {
@@ -223,20 +238,12 @@ impl MovementAccumulator {
         self.sum_dx = OrderedFloat(self.sum_dx.into_inner() + dx * scaled);
         self.sum_dy = OrderedFloat(self.sum_dy.into_inner() + dy * scaled);
         self.total_weight += weight;
-        if self.total_weight == 0 {
-            self.sum_dx = OrderedFloat(0.0);
-            self.sum_dy = OrderedFloat(0.0);
-        }
     }
 
     fn merge(&mut self, other: &Self) {
         self.sum_dx = OrderedFloat(self.sum_dx.into_inner() + other.sum_dx.into_inner());
         self.sum_dy = OrderedFloat(self.sum_dy.into_inner() + other.sum_dy.into_inner());
         self.total_weight += other.total_weight;
-        if self.total_weight == 0 {
-            self.sum_dx = OrderedFloat(0.0);
-            self.sum_dy = OrderedFloat(0.0);
-        }
     }
 
     fn into_decision(self, entity: i64) -> Option<MovementDecision> {
@@ -278,5 +285,50 @@ impl Semigroup<MovementAccumulator> for MovementAccumulatorSemigroup {
         let mut combined = left.clone();
         combined.merge(right);
         combined
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    //! Unit tests for the private movement accumulator.
+    use super::*;
+    use approx::assert_relative_eq;
+
+    fn decision(dx: f64, dy: f64) -> MovementDecision {
+        MovementDecision {
+            entity: 1,
+            dx: OrderedFloat(dx),
+            dy: OrderedFloat(dy),
+        }
+    }
+
+    /// Order-sensitive cancellation: an east +1 contribution merged with a
+    /// north -1 contribution nets the weight to zero, but the accumulated
+    /// displacement must be preserved (an earlier reset-on-zero bug zeroed the
+    /// sums). Re-adding north +1 then cancels the north component, leaving the
+    /// original east direction. If the sums were reset on the net-zero merge,
+    /// the final decision would wrongly point north.
+    #[test]
+    fn net_zero_merge_preserves_pending_direction() {
+        // Axes: east = (+1, 0), north = (0, +1).
+        let mut acc = MovementAccumulator::default();
+        acc.apply(&decision(1.0, 0.0), 1); // east +1
+
+        let mut north_retraction = MovementAccumulator::default();
+        north_retraction.apply(&decision(0.0, 1.0), -1); // north -1
+
+        acc.merge(&north_retraction);
+        assert_eq!(
+            acc.total_weight, 0,
+            "east +1 and north -1 net to zero weight"
+        );
+
+        acc.apply(&decision(0.0, 1.0), 1); // north +1 restores unit weight
+
+        let movement = acc
+            .into_decision(1)
+            .expect("net weight of one must yield a decision");
+        assert_relative_eq!(movement.dx.into_inner(), 1.0);
+        assert_relative_eq!(movement.dy.into_inner(), 0.0);
     }
 }

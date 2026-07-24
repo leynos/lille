@@ -11,8 +11,9 @@ use crate::dbsp_circuit::{MovementDecision, Position};
 
 /// Applies movement decisions to base positions.
 ///
-/// Panics in debug builds if more than one movement record exists for the same
-/// entity in a single tick.
+/// Expects the movement decisions to already be deduplicated per entity (the
+/// decision stream folds duplicates before this stage). Panics in debug builds
+/// if more than one movement record still exists for the same entity in a tick.
 ///
 /// # Examples
 /// ```rust,no_run
@@ -70,12 +71,15 @@ pub fn apply_movement(
     movement: &Stream<RootCircuit, OrdZSet<MovementDecision>>,
 ) -> Stream<RootCircuit, OrdZSet<Position>> {
     let base_idx = base.map_index(|p| (p.entity, *p));
+    // The decision stream already folds duplicate decisions per entity, so index
+    // the movements directly rather than aggregating a second time here. The
+    // inspect below still flags any duplicate that slips through as a bug.
     let mv_base = movement.map_index(|m| (m.entity, (m.dx, m.dy)));
 
     let mv = mv_base.inspect(|batch| {
-        // Accumulate counts per entity to catch duplicates emitted within a
-        // single tick. Duplicates indicate a bug upstream; release builds log
-        // the issue while debug builds panic for visibility.
+        // Accumulate counts per entity to catch duplicates reaching the join.
+        // Any duplicate here indicates a bug upstream; release builds log the
+        // issue while debug builds panic for visibility.
         use std::collections::HashMap;
 
         let mut counts: HashMap<i64, i64> = HashMap::new();
@@ -102,4 +106,136 @@ pub fn apply_movement(
     let mv_entities = mv.map(|(e, _)| *e).map_index(|e| (*e, ()));
     let unmoved = base_idx.antijoin(&mv_entities).map(|(_, p)| *p);
     unmoved.plus(&moved)
+}
+
+#[cfg(test)]
+mod tests {
+    //! End-to-end tests for [`apply_movement`].
+    //!
+    //! Each test drives a minimal circuit, feeding base positions and movement
+    //! decisions, then asserts the consolidated positions the stream emits.
+
+    use super::apply_movement;
+    use crate::dbsp_circuit::{MovementDecision, Position};
+    use approx::relative_eq;
+    use dbsp::RootCircuit;
+    use ordered_float::OrderedFloat;
+
+    type ApplyCircuit = (
+        dbsp::CircuitHandle,
+        (
+            dbsp::ZSetHandle<Position>,
+            dbsp::ZSetHandle<MovementDecision>,
+            dbsp::OutputHandle<dbsp::typed_batch::OrdZSet<Position>>,
+        ),
+    );
+
+    fn build_apply_circuit() -> Result<ApplyCircuit, dbsp::Error> {
+        RootCircuit::build(|circuit| {
+            let (base_stream, base_handle) = circuit.add_input_zset::<Position>();
+            let (movement_stream, movement_handle) = circuit.add_input_zset::<MovementDecision>();
+            let output_handle = apply_movement(&base_stream, &movement_stream).output();
+            Ok((base_handle, movement_handle, output_handle))
+        })
+    }
+
+    fn position_at(entity: i64, x: f64, y: f64, z: f64) -> Position {
+        Position {
+            entity,
+            x: x.into(),
+            y: y.into(),
+            z: z.into(),
+        }
+    }
+
+    fn movement(entity: i64, dx: f64, dy: f64) -> MovementDecision {
+        MovementDecision {
+            entity,
+            dx: OrderedFloat(dx),
+            dy: OrderedFloat(dy),
+        }
+    }
+
+    fn collect_positions(
+        handle: &dbsp::OutputHandle<dbsp::typed_batch::OrdZSet<Position>>,
+    ) -> Vec<(Position, i64)> {
+        handle
+            .consolidate()
+            .iter()
+            .map(|(position, (), weight)| {
+                let position_ref: &Position = &position;
+                (*position_ref, weight)
+            })
+            .collect()
+    }
+
+    /// Extracts the sole emitted position, panicking if there is not exactly
+    /// one (which keeps the tests free of panicking slice indexing).
+    fn single_position(positions: &[(Position, i64)]) -> (Position, i64) {
+        *test_utils::expect_single(positions, "expected exactly one output position")
+    }
+
+    #[test]
+    fn applies_or_preserves_positions() {
+        struct Case {
+            name: &'static str,
+            base: Position,
+            movement: Option<MovementDecision>,
+            expected: Position,
+        }
+
+        let cases = [
+            // A targeted entity shifts by its decision's delta in x/y while its
+            // z coordinate is carried through unchanged.
+            Case {
+                name: "applies movement to targeted entity",
+                base: position_at(1, 0.0, 0.0, 2.0),
+                movement: Some(movement(1, 1.0, 0.0)),
+                expected: position_at(1, 1.0, 0.0, 2.0),
+            },
+            // Without a decision, the base position passes through unchanged.
+            Case {
+                name: "passes unmoved entity through",
+                base: position_at(2, 5.0, 5.0, 3.0),
+                movement: None,
+                expected: position_at(2, 5.0, 5.0, 3.0),
+            },
+        ];
+
+        for case in cases {
+            let (circuit, (base_in, movement_in, out)) =
+                build_apply_circuit().expect("failed to build apply circuit");
+            base_in.push(case.base, 1);
+            if let Some(decision) = case.movement {
+                movement_in.push(decision, 1);
+            }
+
+            circuit.step().expect("dbsp step");
+
+            let (actual, weight) = single_position(&collect_positions(&out));
+            assert_eq!(weight, 1, "{}: output weight", case.name);
+            assert_eq!(actual.entity, case.expected.entity, "{}: entity", case.name);
+            assert!(
+                relative_eq!(actual.x.into_inner(), case.expected.x.into_inner()),
+                "{}: x (expected {}, got {})",
+                case.name,
+                case.expected.x.into_inner(),
+                actual.x.into_inner()
+            );
+            assert!(
+                relative_eq!(actual.y.into_inner(), case.expected.y.into_inner()),
+                "{}: y (expected {}, got {})",
+                case.name,
+                case.expected.y.into_inner(),
+                actual.y.into_inner()
+            );
+            assert!(
+                relative_eq!(actual.z.into_inner(), case.expected.z.into_inner()),
+                "{}: z (expected {}, got {}) — movement must preserve z",
+                case.name,
+                case.expected.z.into_inner(),
+                actual.z.into_inner()
+            );
+        }
+    }
 }

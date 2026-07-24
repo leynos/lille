@@ -6,7 +6,7 @@ use bevy::prelude::*;
 use log::{debug, warn};
 
 use crate::components::{DdlogId, Health, VelocityComp};
-use crate::dbsp_circuit::{HealthDelta, Tick};
+use crate::dbsp_circuit::{HealthDelta, Position, Tick};
 use crate::world_handle::WorldHandle;
 
 use super::{DbspState, DbspSyncError, DbspSyncErrorContext};
@@ -23,18 +23,27 @@ type DbspWriteQuery<'w, 's> = Query<
     With<DdlogId>,
 >;
 
-macro_rules! apply_output_records {
-    ($state:expr, $query:expr, $records:expr, |$record:ident| $pattern:pat => $body:block) => {
-        for ($record, (), _) in $records.iter() {
-            let Some(&entity) = $state.id_map.get(&$record.entity) else {
-                continue;
-            };
-            let Ok($pattern) = $query.get_mut(entity) else {
-                continue;
-            };
-            $body
-        }
-    };
+/// Mutable component handles for an entity resolved through the DBSP id map.
+type WriteTarget<'q> = (
+    Mut<'q, Transform>,
+    Option<Mut<'q, VelocityComp>>,
+    Option<Mut<'q, Health>>,
+);
+
+/// Resolves a DBSP record's entity through `state.id_map` and borrows its
+/// mutable `Transform`/`VelocityComp`/`Health` components from the query.
+///
+/// Returns `None` when the id is unmapped or the entity is missing from the
+/// query, mirroring the skip behaviour of the previous macro without binding a
+/// pattern fragment.
+fn resolve_write_target<'q>(
+    state: &DbspState,
+    write_query: &'q mut DbspWriteQuery<'_, '_>,
+    entity_id: i64,
+) -> Option<WriteTarget<'q>> {
+    let &entity = state.id_map.get(&entity_id)?;
+    let (_, transform, velocity, health) = write_query.get_mut(entity).ok()?;
+    Some((transform, velocity, health))
 }
 
 #[expect(
@@ -54,117 +63,191 @@ fn f32_from_f64(value: f64) -> Option<f32> {
     Some(value as f32)
 }
 
+/// Converts a `f64` axis value to `f32` and writes it to `target`, warning and
+/// leaving `target` unchanged when the value is out of range. `field` names the
+/// axis (e.g. `"position.x"`) for the warning's entity-specific context.
+fn assign_axis(target: &mut f32, value: f64, entity: i64, field: &str) {
+    match f32_from_f64(value) {
+        Some(converted) => *target = converted,
+        None => warn!("{field} out of range for entity {entity}"),
+    }
+}
+
+/// Writes a DBSP position onto a `Transform`, warning on out-of-range axes.
+fn write_position(pos: &Position, transform: &mut Transform) {
+    assign_axis(
+        &mut transform.translation.x,
+        pos.x.into_inner(),
+        pos.entity,
+        "position.x",
+    );
+    assign_axis(
+        &mut transform.translation.y,
+        pos.y.into_inner(),
+        pos.entity,
+        "position.y",
+    );
+    assign_axis(
+        &mut transform.translation.z,
+        pos.z.into_inner(),
+        pos.entity,
+        "position.z",
+    );
+}
+
 fn apply_positions(
     state: &DbspState,
     write_query: &mut DbspWriteQuery<'_, '_>,
     world_handle: &mut WorldHandle,
 ) {
     let positions = state.circuit.new_position_out().consolidate();
-    apply_output_records!(state, write_query, positions, |pos| (_, mut transform, _, _) => {
-        if let Some(x) = f32_from_f64(pos.x.into_inner()) {
-            transform.translation.x = x;
-        } else {
-            warn!("position.x out of range for entity {}", pos.entity);
+    for (pos, (), weight) in positions.iter() {
+        // Only positive weights are live insertions; skip retractions and
+        // zero-weight records so stale positions are never applied.
+        if weight <= 0 {
+            continue;
         }
-        if let Some(y) = f32_from_f64(pos.y.into_inner()) {
-            transform.translation.y = y;
-        } else {
-            warn!("position.y out of range for entity {}", pos.entity);
-        }
-        if let Some(z) = f32_from_f64(pos.z.into_inner()) {
-            transform.translation.z = z;
-        } else {
-            warn!("position.z out of range for entity {}", pos.entity);
-        }
+        let Some((mut transform, _, _)) = resolve_write_target(state, write_query, pos.entity)
+        else {
+            continue;
+        };
+        write_position(&pos, &mut transform);
         if let Some(entry) = world_handle.entities.get_mut(&pos.entity) {
             entry.position = transform.translation;
         }
-    });
+    }
 }
 
 fn apply_velocities(state: &DbspState, write_query: &mut DbspWriteQuery<'_, '_>) {
     let velocities = state.circuit.new_velocity_out().consolidate();
-    apply_output_records!(
-        state,
-        write_query,
-        velocities,
-        |vel| (_, _, Some(mut velocity), _) => {
-            if let Some(vx) = f32_from_f64(vel.vx.into_inner()) {
-                velocity.vx = vx;
-            } else {
-                warn!("velocity.vx out of range for entity {}", vel.entity);
-            }
-            if let Some(vy) = f32_from_f64(vel.vy.into_inner()) {
-                velocity.vy = vy;
-            } else {
-                warn!("velocity.vy out of range for entity {}", vel.entity);
-            }
-            if let Some(vz) = f32_from_f64(vel.vz.into_inner()) {
-                velocity.vz = vz;
-            } else {
-                warn!("velocity.vz out of range for entity {}", vel.entity);
-            }
+    for (vel, (), weight) in velocities.iter() {
+        // Skip retractions and zero-weight records; only apply live updates.
+        if weight <= 0 {
+            continue;
         }
-    );
+        let Some((_, Some(mut velocity), _)) = resolve_write_target(state, write_query, vel.entity)
+        else {
+            continue;
+        };
+        assign_axis(
+            &mut velocity.vx,
+            vel.vx.into_inner(),
+            vel.entity,
+            "velocity.vx",
+        );
+        assign_axis(
+            &mut velocity.vy,
+            vel.vy.into_inner(),
+            vel.entity,
+            "velocity.vy",
+        );
+        assign_axis(
+            &mut velocity.vz,
+            vel.vz.into_inner(),
+            vel.entity,
+            "velocity.vz",
+        );
+    }
 }
 
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "Health delta processing requires multiple early exits for data validation."
-)]
+/// Resolves the entity key and mutable `Health` component for a health delta.
+///
+/// Returns `None` (after logging where appropriate) when the entity id cannot
+/// be mapped, the entity is missing from the query, or it carries no `Health`
+/// component. Extracting this guard keeps [`apply_health_deltas`] within the
+/// cognitive-complexity budget without suppressing the lint.
+fn resolve_health_target<'q>(
+    state: &DbspState,
+    write_query: &'q mut DbspWriteQuery<'_, '_>,
+    delta: &HealthDelta,
+) -> Option<(i64, Mut<'q, Health>)> {
+    let Ok(entity_key) = i64::try_from(delta.entity) else {
+        warn!("health delta for unmappable entity {}", delta.entity);
+        return None;
+    };
+    let Some(&entity) = state.id_map.get(&entity_key) else {
+        warn!("health delta for unknown entity id {}", delta.entity);
+        return None;
+    };
+    let Ok((_, _, _, maybe_health)) = write_query.get_mut(entity) else {
+        return None;
+    };
+    let Some(health) = maybe_health else {
+        warn!("health delta received for entity without Health component");
+        return None;
+    };
+    Some((entity_key, health))
+}
+
 fn apply_health_deltas(
     state: &mut DbspState,
     write_query: &mut DbspWriteQuery<'_, '_>,
     world_handle: &mut WorldHandle,
 ) {
     let health_deltas = state.circuit.health_delta_out().consolidate();
-    for (delta, (), _) in health_deltas.iter() {
-        let Ok(entity_key) = i64::try_from(delta.entity) else {
-            warn!("health delta for unmappable entity {}", delta.entity);
-            continue;
-        };
-        let Some(&entity) = state.id_map.get(&entity_key) else {
-            warn!("health delta for unknown entity id {}", delta.entity);
-            continue;
-        };
-        let Ok((_, _, _, maybe_health)) = write_query.get_mut(entity) else {
-            continue;
-        };
-        let Some(mut health) = maybe_health else {
-            warn!("health delta received for entity without Health component");
-            continue;
-        };
-        let key = (delta.at_tick, delta.seq);
-        if !should_apply_health_delta(state, &delta, key) {
+    for (delta, (), weight) in health_deltas.iter() {
+        // Apply only positive weights; skip retractions (negative) and
+        // zero-weight deltas so they never mutate Health or update
+        // applied_health/world_handle.
+        if weight <= 0 {
             continue;
         }
-        let current = i32::from(health.current);
-        let max = i32::from(health.max);
-        let raw = current + delta.delta;
-        let new_value = raw.clamp(0, max);
-        if raw != new_value {
-            debug!(
-                "health clamped for entity {}: raw {} -> {}",
-                delta.entity, raw, new_value
-            );
-        }
-        let Ok(new_u16) = u16::try_from(new_value) else {
-            debug_assert!(
-                false,
-                "clamped health value {new_value} exceeds u16 capacity"
-            );
-            continue;
-        };
-        health.current = new_u16;
-        state.applied_health.insert(delta.entity, key);
-        if let Some(entry) = world_handle.entities.get_mut(&entity_key) {
-            entry.health_current = health.current;
-            entry.health_max = health.max;
-        }
-        if delta.death {
-            // Future hook: notify AI about deaths if needed.
-        }
+        apply_one_health_delta(state, write_query, world_handle, &delta);
     }
+}
+
+/// Applies a single positive-weight health delta: resolves the target entity's
+/// `Health`, honours the dedup/retraction rules, clamps the new value, then
+/// updates the component, `applied_health` bookkeeping, the world handle, and
+/// the death hook. Any guard failing simply skips this delta.
+fn apply_one_health_delta(
+    state: &mut DbspState,
+    write_query: &mut DbspWriteQuery<'_, '_>,
+    world_handle: &mut WorldHandle,
+    delta: &HealthDelta,
+) {
+    let key = (delta.at_tick, delta.seq);
+    let Some((entity_key, mut health)) = resolve_health_target(state, write_query, delta) else {
+        return;
+    };
+    if !should_apply_health_delta(state, delta, key) {
+        return;
+    }
+    let Some(new_current) = clamped_health_value(delta, &health) else {
+        return;
+    };
+    health.current = new_current;
+    state.applied_health.insert(delta.entity, key);
+    if let Some(entry) = world_handle.entities.get_mut(&entity_key) {
+        entry.health_current = health.current;
+        entry.health_max = health.max;
+    }
+    if delta.death {
+        // Future hook: notify AI about deaths if needed.
+    }
+}
+
+/// Computes the clamped `Health::current` for a delta, logging when clamping
+/// occurs and returning `None` if the clamped value cannot fit in `u16`.
+fn clamped_health_value(delta: &HealthDelta, health: &Health) -> Option<u16> {
+    let current = i32::from(health.current);
+    let max = i32::from(health.max);
+    let raw = current + delta.delta;
+    let new_value = raw.clamp(0, max);
+    if raw != new_value {
+        debug!(
+            "health clamped for entity {}: raw {} -> {}",
+            delta.entity, raw, new_value
+        );
+    }
+    let Ok(value) = u16::try_from(new_value) else {
+        debug_assert!(
+            false,
+            "clamped health value {new_value} exceeds u16 capacity"
+        );
+        return None;
+    };
+    Some(value)
 }
 
 fn should_apply_health_delta(
@@ -208,6 +291,14 @@ pub fn apply_dbsp_outputs_system(
             DbspSyncErrorContext::Step,
             error.to_string(),
         ));
+        // Clear inputs even when stepping fails so the buffered records are not
+        // replayed on the next tick, then roll back the health/damage tracking
+        // that the cache system advanced this frame. Clearing the inputs alone
+        // would leave `health_snapshot`/`pending_damage_retractions` pointing at
+        // records the circuit never accepted, corrupting next frame's
+        // retractions.
+        state.circuit.clear_inputs();
+        state.rollback_frame_tracking();
         return;
     }
 
@@ -222,6 +313,9 @@ pub fn apply_dbsp_outputs_system(
 
     state.expected_health_retractions.clear();
     state.circuit.clear_inputs();
+    // The step succeeded and its inputs are now folded into the circuit; drop
+    // the pre-frame tracking backup so it cannot be rolled back later.
+    state.commit_frame_tracking();
 }
 
 #[cfg(test)]

@@ -1,10 +1,11 @@
 //! Tests for the DBSP output application systems.
 
 mod edge_cases;
+mod failure_paths;
 
 use super::*;
 use crate::components::{Block, DdlogId, Health, UnitType};
-use crate::dbsp_circuit::{DamageEvent, DamageSource, HealthState, Position, Velocity};
+use crate::dbsp_circuit::{try_step, DamageEvent, DamageSource, HealthState, Position, Velocity};
 use crate::world_handle::DdlogEntity;
 use crate::{DbspCircuit, DbspPlugin};
 use bevy::ecs::prelude::On;
@@ -58,7 +59,9 @@ fn spawn_entity(app: &mut App) -> Entity {
         .id()
 }
 
-fn prime_state(app: &mut App, entity: Entity) {
+/// Wires the entity mapping shared by every priming path — world handle entry,
+/// id/rev maps, and a block input — without pushing any position or velocity.
+fn prime_entity_mapping(app: &mut App, entity: Entity) {
     {
         let mut world_handle = app.world_mut().resource_mut::<WorldHandle>();
         world_handle.entities.insert(
@@ -85,7 +88,25 @@ fn prime_state(app: &mut App, entity: Entity) {
         },
         1,
     );
-    state.circuit.position_in().push(
+}
+
+/// Pushes a single position record with the given Z-set `weight`, so callers
+/// can prime insertions or retractions without duplicating the mapping setup.
+fn push_position_input(app: &mut App, position: Position, weight: i64) {
+    let state = app.world_mut().non_send_resource_mut::<DbspState>();
+    state.circuit.position_in().push(position, weight);
+}
+
+/// Pushes a single velocity record with the given Z-set `weight`.
+fn push_velocity_input(app: &mut App, velocity: Velocity, weight: i64) {
+    let state = app.world_mut().non_send_resource_mut::<DbspState>();
+    state.circuit.velocity_in().push(velocity, weight);
+}
+
+fn prime_state(app: &mut App, entity: Entity) {
+    prime_entity_mapping(app, entity);
+    push_position_input(
+        app,
         Position {
             entity: 1,
             x: 0.0.into(),
@@ -94,6 +115,7 @@ fn prime_state(app: &mut App, entity: Entity) {
         },
         1,
     );
+    let state = app.world_mut().non_send_resource_mut::<DbspState>();
     state.circuit.velocity_in().push(
         Velocity {
             entity: 1,
@@ -209,38 +231,36 @@ fn duplicate_health_delta_is_ignored() {
 }
 
 #[rstest]
-fn step_failure_triggers_error_event() {
-    let mut app = App::new();
-    app.add_plugins(MinimalPlugins);
-    dbsp_test_support::install_error_observer(&mut app);
-    app.add_plugins(DbspPlugin);
-    app.world_mut().flush();
-
-    // Run startup to initialise WorldHandle before priming state.
-    app.update();
-
+fn negative_weight_position_is_not_applied() {
+    let mut app = setup_app().expect("failed to set up test app");
     let entity = spawn_entity(&mut app);
-    prime_state(&mut app, entity);
+    prime_entity_mapping(&mut app, entity);
+    // Push the position as a retraction (weight -1). The consolidated output
+    // carries a negative weight and must be skipped rather than written to the
+    // Transform.
+    push_position_input(
+        &mut app,
+        Position {
+            entity: 1,
+            x: 5.0.into(),
+            y: 5.0.into(),
+            z: 1.0.into(),
+        },
+        -1,
+    );
 
-    {
-        let mut state = app.world_mut().non_send_resource_mut::<DbspState>();
-        state.set_stepper_for_testing(force_step_error);
-    }
-
-    app.update();
-
-    let step_errors = app.world().resource::<dbsp_test_support::CapturedErrors>();
-    let error = step_errors
-        .0
-        .first()
-        .expect("DBSP error event should be captured");
-    assert_eq!(error.0, format!("{:?}", DbspSyncErrorContext::Step));
-    assert!(error.1.contains("forced failure"));
+    app.world_mut()
+        .run_system_once(apply_dbsp_outputs_system)
+        .expect("applying DBSP outputs should succeed");
 
     let transform = app
         .world()
         .entity(entity)
         .get::<Transform>()
-        .expect("Transform should remain after failed step");
-    assert_eq!(transform.translation, Vec3::ZERO);
+        .expect("Transform component should remain present");
+    assert_eq!(
+        transform.translation,
+        Vec3::ZERO,
+        "a negative-weight position must not mutate the Transform"
+    );
 }

@@ -118,19 +118,48 @@ fn validate_asset_path(asset_path: &str) -> Result<(), LilleMapError> {
         });
     }
 
-    if asset_path.starts_with('/') {
+    // Reject rooted paths in any form the asset loader might resolve outside
+    // the asset root: Unix-absolute (`/...`), Windows backslash-root and UNC
+    // (`\...`, `\\server\share\...`), and drive-absolute (`C:\...`, `C:/...`).
+    if is_rooted_path(asset_path) {
         return Err(LilleMapError::InvalidPrimaryMapAssetPath {
             path: asset_path.to_owned(),
         });
     }
 
-    if asset_path.contains("..") {
+    // Reject parent-directory traversal, but only when `..` is a whole path
+    // component. A substring check would wrongly reject legitimate filenames
+    // such as `maps/primary..backup.tmx`. Split on both slash forms so a
+    // Windows-style separator (`maps\..\secret.tmx`) cannot smuggle a `..`
+    // component past this check.
+    if asset_path
+        .split(['/', '\\'])
+        .any(|component| component == "..")
+    {
         return Err(LilleMapError::InvalidPrimaryMapAssetPath {
             path: asset_path.to_owned(),
         });
     }
 
     Ok(())
+}
+
+/// Reports whether `path` is rooted (absolute) on any target platform.
+///
+/// Covers Unix-absolute (`/...`), Windows backslash-root and UNC
+/// (`\...`, `\\server\share`), and drive-letter-absolute paths (`C:\...` or
+/// `C:/...`). Asset paths must stay relative to the asset root, so any rooted
+/// form is rejected regardless of the host operating system.
+fn is_rooted_path(path: &str) -> bool {
+    if path.starts_with('/') || path.starts_with('\\') {
+        return true;
+    }
+    // Drive-absolute, e.g. `C:\maps\primary.tmx` or `C:/maps/primary.tmx`.
+    let mut chars = path.chars();
+    matches!(
+        (chars.next(), chars.next()),
+        (Some(drive), Some(':')) if drive.is_ascii_alphabetic()
+    )
 }
 
 pub(super) fn try_spawn_primary_map_on_build(app: &mut App) {
@@ -249,11 +278,11 @@ pub(super) fn monitor_primary_map_load_state(
         return;
     }
 
-    let Some(handle) = tracking.handle.clone() else {
+    let Some(asset_id) = tracking.handle.as_ref().map(bevy::prelude::Handle::id) else {
         return;
     };
 
-    match asset_server.recursive_dependency_load_state(handle.id()) {
+    match asset_server.recursive_dependency_load_state(asset_id) {
         RecursiveDependencyLoadState::Loaded => {
             tracking.has_finalised = true;
         }
@@ -269,74 +298,4 @@ pub(super) fn monitor_primary_map_load_state(
 }
 
 #[cfg(test)]
-mod tests {
-    //! Tests for the map lifecycle helpers that need no asset backend.
-    use bevy::prelude::*;
-    use rstest::rstest;
-
-    use super::*;
-
-    fn app_with_settings(should_spawn: bool, path: &str) -> App {
-        let mut app = App::new();
-        app.insert_resource(LilleMapSettings {
-            primary_map: super::super::MapAssetPath::from(path),
-            should_spawn_primary_map: should_spawn,
-        });
-        app.init_resource::<PrimaryMapAssetTracking>();
-        app
-    }
-
-    #[rstest]
-    #[case::empty_path("")]
-    #[case::absolute_path("/etc/maps/primary.tmx")]
-    #[case::parent_traversal("maps/../secrets.tmx")]
-    fn validate_asset_path_rejects_unsafe_paths(#[case] path: &str) {
-        let result = validate_asset_path(path);
-        assert!(
-            matches!(
-                result,
-                Err(LilleMapError::InvalidPrimaryMapAssetPath { path: ref p }) if p == path
-            ),
-            "expected InvalidPrimaryMapAssetPath for {path:?}, got {result:?}"
-        );
-    }
-
-    #[rstest]
-    fn validate_asset_path_accepts_relative_paths() {
-        assert!(validate_asset_path("maps/primary-isometric.tmx").is_ok());
-    }
-
-    #[rstest]
-    fn build_spawn_skips_when_disabled() {
-        let mut app = app_with_settings(false, "maps/primary-isometric.tmx");
-        try_spawn_primary_map_on_build(&mut app);
-        let tracking = app.world().resource::<PrimaryMapAssetTracking>();
-        assert!(tracking.asset_path.is_none());
-    }
-
-    #[rstest]
-    fn build_spawn_skips_when_map_already_present() {
-        let mut app = app_with_settings(true, "maps/primary-isometric.tmx");
-        app.world_mut().spawn(PrimaryTiledMap);
-        try_spawn_primary_map_on_build(&mut app);
-        let tracking = app.world().resource::<PrimaryMapAssetTracking>();
-        assert!(tracking.asset_path.is_none());
-    }
-
-    #[rstest]
-    fn build_spawn_rejects_invalid_path_without_spawning() {
-        let mut app = app_with_settings(true, "/absolute/path.tmx");
-        try_spawn_primary_map_on_build(&mut app);
-        let world = app.world_mut();
-        let mut maps = world.query_filtered::<Entity, With<PrimaryTiledMap>>();
-        assert!(maps.iter(world).next().is_none());
-    }
-
-    #[rstest]
-    fn build_spawn_skips_without_asset_server() {
-        let mut app = app_with_settings(true, "maps/primary-isometric.tmx");
-        try_spawn_primary_map_on_build(&mut app);
-        let tracking = app.world().resource::<PrimaryMapAssetTracking>();
-        assert!(tracking.asset_path.is_none());
-    }
-}
+mod tests;
