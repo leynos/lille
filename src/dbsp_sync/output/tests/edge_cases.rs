@@ -76,12 +76,17 @@ fn out_of_range_outputs_leave_components_unchanged() {
     assert!(velocity.vy.abs() < f32::EPSILON);
 }
 
+// Both cases exercise distinct early-return branches of `resolve_health_target`:
+// `u64::MAX` fails `i64::try_from` (unmappable), while `2` converts but misses
+// `DbspState::id_map` (unknown). Neither may mutate the mapped entity's Health.
 #[rstest]
-fn health_delta_for_unmappable_entity_is_skipped() {
+#[case::unmappable_entity(u64::MAX)]
+#[case::unknown_entity(2)]
+fn health_delta_for_unresolvable_entity_is_skipped(#[case] health_entity: u64) {
     let mut app = setup_app().expect("failed to set up test app");
     let entity = spawn_entity(&mut app);
     prime_state(&mut app, entity);
-    push_health_inputs_for(&mut app, u64::MAX, 90, 50);
+    push_health_inputs_for(&mut app, health_entity, 90, 50);
 
     app.world_mut()
         .run_system_once(apply_dbsp_outputs_system)
@@ -92,26 +97,10 @@ fn health_delta_for_unmappable_entity_is_skipped() {
         .entity(entity)
         .get::<Health>()
         .expect("Health component should remain after applying DBSP outputs");
-    assert_eq!(health.current, 90);
-}
-
-#[rstest]
-fn health_delta_for_unknown_entity_is_skipped() {
-    let mut app = setup_app().expect("failed to set up test app");
-    let entity = spawn_entity(&mut app);
-    prime_state(&mut app, entity);
-    push_health_inputs_for(&mut app, 2, 90, 50);
-
-    app.world_mut()
-        .run_system_once(apply_dbsp_outputs_system)
-        .expect("applying DBSP outputs should succeed");
-
-    let health = app
-        .world()
-        .entity(entity)
-        .get::<Health>()
-        .expect("Health component should remain after applying DBSP outputs");
-    assert_eq!(health.current, 90);
+    assert_eq!(
+        health.current, 90,
+        "an unresolvable health delta must not mutate the mapped entity's Health"
+    );
 }
 
 #[rstest]

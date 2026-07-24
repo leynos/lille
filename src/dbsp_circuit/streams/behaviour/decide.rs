@@ -42,7 +42,7 @@ fn should_flee(level: OrderedFloat<f64>) -> bool {
     level.into_inner() > FEAR_THRESHOLD
 }
 
-/// Threshold below which displacement is treated as zero when normalising.
+/// Threshold below which displacement is treated as zero when normalizing.
 ///
 /// The value `1e-12` avoids division by near-zero magnitudes. It suppresses
 /// floating-point noise while remaining negligible for typical movement
@@ -73,7 +73,7 @@ pub(super) fn decide_movement(level: OrderedFloat<f64>, pt: &PositionTarget) -> 
 ///
 /// Entities with a target move one unit towards it when their fear is below
 /// [`FEAR_THRESHOLD`]; otherwise, they flee one unit away. Vectors are
-/// normalised to ensure consistent speed in all directions.
+/// normalized to ensure consistent speed in all directions.
 ///
 /// # Examples
 /// ```rust,no_run
@@ -173,7 +173,7 @@ pub fn movement_decision_stream(
 ///
 /// Decisions are indexed by entity and folded through [`MovementAccumulator`],
 /// which sums each decision's `dx`/`dy` weighted by its Z-set weight and
-/// tracks the total weight. The summed vector is then normalised back to a
+/// tracks the total weight. The summed vector is then normalized back to a
 /// unit direction; entities whose total weight nets to zero are dropped
 /// entirely. This guarantees a single decision per entity downstream, so a
 /// join cannot apply a doubled delta.
@@ -202,7 +202,7 @@ fn dedupe_movement_decisions(
             },
             |acc: MovementAccumulator| acc,
         ))
-        .flat_map(|(entity, accumulator)| accumulator.clone().into_decision(*entity).into_iter())
+        .flat_map(|(entity, accumulator)| accumulator.to_decision(*entity).into_iter())
 }
 
 #[derive(
@@ -246,13 +246,13 @@ impl MovementAccumulator {
         self.total_weight += other.total_weight;
     }
 
-    fn into_decision(self, entity: i64) -> Option<MovementDecision> {
+    fn to_decision(&self, entity: i64) -> Option<MovementDecision> {
         if self.total_weight == 0 {
             return None;
         }
         if self.total_weight.abs() > 1 {
             warn!(
-                "aggregated {} movement decisions for entity {entity}, normalising to one vector",
+                "aggregated {} movement decisions for entity {entity}, normalizing to one vector",
                 self.total_weight
             );
         }
@@ -290,15 +290,75 @@ impl Semigroup<MovementAccumulator> for MovementAccumulatorSemigroup {
 
 #[cfg(test)]
 mod tests {
-    //! Unit tests for the private movement accumulator.
+    //! Unit tests for the private movement accumulator and dedupe stream.
     use super::*;
     use approx::assert_relative_eq;
+    use rstest::rstest;
 
     fn decision(dx: f64, dy: f64) -> MovementDecision {
         MovementDecision {
             entity: 1,
             dx: OrderedFloat(dx),
             dy: OrderedFloat(dy),
+        }
+    }
+
+    /// Runs a single entity's weighted decisions through
+    /// [`dedupe_movement_decisions`] and returns the emitted decisions.
+    ///
+    /// Returns the fallible `Result` (rather than unwrapping) so the circuit
+    /// construction stays outside a `no_expect_outside_tests` boundary; callers
+    /// unwrap it.
+    fn deduped_decisions(
+        weighted: &[((f64, f64), i64)],
+    ) -> Result<Vec<MovementDecision>, dbsp::Error> {
+        let (circuit, (input, output)) = RootCircuit::build(|circuit| {
+            let (stream, handle) = circuit.add_input_zset::<MovementDecision>();
+            let deduped = dedupe_movement_decisions(&stream).output();
+            Ok((handle, deduped))
+        })?;
+        for &((dx, dy), weight) in weighted {
+            input.push(decision(dx, dy), weight);
+        }
+        circuit.step()?;
+        Ok(output
+            .consolidate()
+            .iter()
+            .map(|(movement, (), _weight)| {
+                let movement_ref: &MovementDecision = &movement;
+                *movement_ref
+            })
+            .collect())
+    }
+
+    /// Bounded matrix over duplicate and cancelling weighted decisions for one
+    /// entity: a positive total weight yields exactly one normalized decision;
+    /// a net-zero total weight yields none.
+    #[rstest]
+    #[case::single_positive(&[((1.0, 0.0), 1)], Some((1.0, 0.0)))]
+    #[case::duplicate_positive(&[((2.0, 0.0), 1), ((2.0, 0.0), 1)], Some((1.0, 0.0)))]
+    #[case::weighted_positive(&[((0.0, 3.0), 2)], Some((0.0, 1.0)))]
+    #[case::cancel_to_zero(&[((1.0, 0.0), 1), ((1.0, 0.0), -1)], None)]
+    #[case::mixed_net_zero(
+        &[((1.0, 0.0), 1), ((0.0, 1.0), 1), ((1.0, 0.0), -1), ((0.0, 1.0), -1)],
+        None
+    )]
+    fn dedupe_emits_one_decision_for_positive_weight_and_none_for_zero(
+        #[case] weighted: &[((f64, f64), i64)],
+        #[case] expected: Option<(f64, f64)>,
+    ) {
+        let decisions = deduped_decisions(weighted).expect("dedupe circuit run");
+        match expected {
+            Some((expected_dx, expected_dy)) => {
+                let movement =
+                    test_utils::expect_single(&decisions, "positive weight must emit one decision");
+                assert_relative_eq!(movement.dx.into_inner(), expected_dx);
+                assert_relative_eq!(movement.dy.into_inner(), expected_dy);
+            }
+            None => assert!(
+                decisions.is_empty(),
+                "net-zero total weight must emit no decision, got {decisions:?}"
+            ),
         }
     }
 
@@ -326,7 +386,7 @@ mod tests {
         acc.apply(&decision(0.0, 1.0), 1); // north +1 restores unit weight
 
         let movement = acc
-            .into_decision(1)
+            .to_decision(1)
             .expect("net weight of one must yield a decision");
         assert_relative_eq!(movement.dx.into_inner(), 1.0);
         assert_relative_eq!(movement.dy.into_inner(), 0.0);

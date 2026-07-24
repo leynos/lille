@@ -294,55 +294,63 @@ mod tests {
         assert_eq!(state.pending_damage_retractions, vec![pending]);
     }
 
+    /// Bounded state-transition matrix over the rollback-relevant combinations:
+    /// whether the entity had a prior `applied_unsequenced` entry, whether the
+    /// undo was recorded once or twice (the second must be a no-op), and whether
+    /// the frame commits or rolls back. Rollback must restore the exact pre-frame
+    /// entry (removing entries that were absent before the frame); commit must
+    /// make a later rollback a no-op.
     #[rstest]
-    fn rollback_restores_applied_unsequenced(
+    #[case::no_prior_single_rollback(false, false, false)]
+    #[case::no_prior_repeat_rollback(false, true, false)]
+    #[case::prior_single_rollback(true, false, false)]
+    #[case::prior_repeat_rollback(true, true, false)]
+    #[case::no_prior_single_commit(false, false, true)]
+    #[case::no_prior_repeat_commit(false, true, true)]
+    #[case::prior_single_commit(true, false, true)]
+    #[case::prior_repeat_commit(true, true, true)]
+    fn applied_unsequenced_rollback_matrix(
+        #[case] had_prior: bool,
+        #[case] repeat_undo: bool,
+        #[case] commit: bool,
         #[from(state)] state_result: Result<DbspState, dbsp::Error>,
     ) {
         let mut state = state_result.expect("failed to initialise DbspState for tests");
-        let original = damage_event(7, 1);
-        state
-            .applied_unsequenced
-            .insert(7, (1, HashSet::from([original])));
+        let entity: EntityId = 7;
+        let prior = (1, HashSet::from([damage_event(entity, 1)]));
+        if had_prior {
+            state.applied_unsequenced.insert(entity, prior.clone());
+        }
 
         state.begin_frame_rollback();
-        // Entity 7 already had an entry; entity 8 is new this frame.
-        state.record_unsequenced_undo(7);
-        state.applied_unsequenced.insert(7, (2, HashSet::new()));
-        state.record_unsequenced_undo(8);
-        state.applied_unsequenced.insert(8, (2, HashSet::new()));
-        // A repeat undo record for 7 must not overwrite the captured value.
-        state.record_unsequenced_undo(7);
+        state.record_unsequenced_undo(entity);
+        if repeat_undo {
+            // A repeat record for the same entity must not overwrite the capture.
+            state.record_unsequenced_undo(entity);
+        }
+        let advanced = (2, HashSet::from([damage_event(entity, 2)]));
+        state.applied_unsequenced.insert(entity, advanced.clone());
         state.stash_frame_rollback(Vec::new(), Vec::new());
 
-        state.rollback_frame_tracking();
-
-        assert_eq!(
-            state.applied_unsequenced.get(&7),
-            Some(&(1, HashSet::from([original]))),
-            "entity 7 restored to its pre-frame bucket"
-        );
-        assert!(
-            !state.applied_unsequenced.contains_key(&8),
-            "entity 8 was absent pre-frame, so it is removed on rollback"
-        );
-    }
-
-    #[rstest]
-    fn commit_discards_rollback_log(#[from(state)] state_result: Result<DbspState, dbsp::Error>) {
-        let mut state = state_result.expect("failed to initialise DbspState for tests");
-        state.begin_frame_rollback();
-        state.record_unsequenced_undo(5);
-        state.applied_unsequenced.insert(5, (9, HashSet::new()));
-        state.stash_frame_rollback(Vec::new(), Vec::new());
-
-        state.commit_frame_tracking();
-        // A stray rollback after commit must not revert the committed state.
-        state.rollback_frame_tracking();
-
-        assert_eq!(
-            state.applied_unsequenced.get(&5).map(|(tick, _)| *tick),
-            Some(9),
-            "committed applied_unsequenced state must survive a later rollback"
-        );
+        if commit {
+            state.commit_frame_tracking();
+            // A stray rollback after commit must not revert the committed state.
+            state.rollback_frame_tracking();
+            assert_eq!(
+                state.applied_unsequenced.get(&entity),
+                Some(&advanced),
+                "committed state must survive a later rollback \
+                 (had_prior={had_prior}, repeat_undo={repeat_undo})"
+            );
+        } else {
+            state.rollback_frame_tracking();
+            let expected = had_prior.then_some(prior);
+            assert_eq!(
+                state.applied_unsequenced.get(&entity),
+                expected.as_ref(),
+                "rollback must restore the exact pre-frame applied_unsequenced \
+                 (had_prior={had_prior}, repeat_undo={repeat_undo})"
+            );
+        }
     }
 }

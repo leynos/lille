@@ -75,6 +75,11 @@ the sole authority when a step fails and avoiding partial writes to ECS state.
 > mechanics of its integration with Bevy, see:
 >
 > - `docs/declarative-world-inference-with-dbsp-and-rust.md`
+>
+> For the synchronization contract's frame lifecycle, rollback API, and
+> step-failure handling, see:
+>
+> - `docs/developers-guide.md`
 
 ## 3. Core Physics and Geometry
 
@@ -315,6 +320,49 @@ prior frame's health snapshots and damage events before ingesting new records.
 pushed `DamageEvent`s, draining both collections with negative weights at the
 start of the next tick. This keeps the circuit's view of the world aligned with
 the ECS source of truth and ensures replay detection remains deterministic.
+
+#### Frame-rollback safety net
+
+The retract/reinsert bookkeeping above assumes the circuit accepted the
+records the cache pass retracted and re-pushed. If `apply_dbsp_outputs_system`'s
+call to `step_circuit()` fails, that assumption breaks: the circuit's inputs
+are cleared without ever being stepped, so `health_snapshot`,
+`pending_damage_retractions`, and `applied_unsequenced` must be rolled back
+to their pre-frame values, or the next frame's retractions target records the
+circuit never held. `DbspState` tracks a per-frame rollback log
+(`begin_frame_rollback`, `stash_frame_rollback`, `record_unsequenced_undo`)
+without deep-cloning the tracking state every frame: the health and pending-
+damage backups reuse the `Vec<HealthState>`/`Vec<DamageEvent>` values the
+cache pass already extracts via `mem::take`, and the `applied_unsequenced`
+map is protected by a per-entity undo log that records only the entries
+actually touched that frame. On a failed step, `apply_dbsp_outputs_system`
+clears the circuit's inputs (`clear_inputs()`) and calls
+`rollback_frame_tracking()` to restore the three collections; on a
+successful step it calls `commit_frame_tracking()` to discard the backups
+instead. Unit tests in `src/dbsp_sync/state.rs`
+(`rollback_restores_health_snapshot_and_pending_damage`,
+`applied_unsequenced_rollback_matrix`) cover the rollback/commit
+transitions in isolation, and full-pipeline tests in
+`src/dbsp_sync/output/tests/failure_paths.rs`
+(`step_failure_triggers_error_event`,
+`failed_step_clears_inputs_so_they_do_not_replay`,
+`failed_step_rolls_back_health_tracking`) exercise the same behaviour through
+two real `app.update()` calls.
+
+#### Output application applies only positive-weight records
+
+`apply_positions`, `apply_velocities`, and `apply_health_deltas` consolidate
+their respective output Z-sets and skip any record whose weight is not
+strictly positive before writing it to a component. Because DBSP's
+`consolidate()` already removes entries whose net weight is zero, this guard
+never observes a genuine zero-weight record in practice; its effect is to
+skip negative-weight (retraction) records, such as a superseded health
+snapshot being withdrawn under the retract/reinsert pattern described above.
+Dedicated tests in `src/dbsp_sync/output/tests/` assert this directly:
+`negative_weight_position_is_not_applied`,
+`negative_weight_velocity_is_not_applied`, and
+`negative_weight_health_delta_is_not_applied` each push a record with weight
+`-1` and assert the corresponding component is left unchanged.
 
 The Bevy 0.13 migration reaffirmed this ownership boundary: only entities that
 carry a `DdlogId` participate in the synchronization loop. The new

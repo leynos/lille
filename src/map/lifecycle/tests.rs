@@ -112,3 +112,55 @@ fn build_spawn_skips_without_asset_server() {
     let tracking = app.world().resource::<PrimaryMapAssetTracking>();
     assert!(tracking.asset_path.is_none());
 }
+
+/// Bounded generator over representative components and both separator styles.
+/// Every rooted path or path containing a standalone `..` component must be
+/// rejected, while relative paths whose components merely contain `..` as a
+/// substring must be accepted.
+#[rstest]
+fn validate_asset_path_component_matrix() {
+    // Some components embed `..` as a substring but are not the `..` component.
+    let safe_components = ["maps", "level.tmx", "primary..backup", "a..b", "sub"];
+
+    for sep in ['/', '\\'] {
+        let sep_str = sep.to_string();
+
+        let relative = safe_components.join(&sep_str);
+        assert!(
+            validate_asset_path(&relative).is_ok(),
+            "relative path {relative:?} with only substring dots must be accepted"
+        );
+
+        // Inserting a standalone `..` component at any position must be rejected,
+        // regardless of which separator style delimits it.
+        for insert_at in 0..=safe_components.len() {
+            let mut parts = safe_components.to_vec();
+            parts.insert(insert_at, "..");
+            let traversal = parts.join(&sep_str);
+            assert!(
+                matches!(
+                    validate_asset_path(&traversal),
+                    Err(LilleMapError::InvalidPrimaryMapAssetPath { .. })
+                ),
+                "path {traversal:?} with a standalone `..` component must be rejected"
+            );
+        }
+    }
+
+    // Rooted paths in every platform form are rejected regardless of contents.
+    for path in [
+        "/maps/level.tmx",
+        "\\maps\\level.tmx",
+        "C:\\maps\\level.tmx",
+        "c:/maps/level.tmx",
+        "\\\\server\\share\\level.tmx",
+    ] {
+        assert!(
+            matches!(
+                validate_asset_path(path),
+                Err(LilleMapError::InvalidPrimaryMapAssetPath { .. })
+            ),
+            "rooted path {path:?} must be rejected"
+        );
+    }
+}
