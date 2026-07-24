@@ -47,13 +47,11 @@ impl DbspTestAppBuilder {
     }
 
     /// Build and return the configured `App`.
-    #[must_use]
     pub fn build(self) -> App {
         self.app
     }
 
     /// Build and return both the `App` and a tracked entity.
-    #[must_use]
     pub fn build_with_entity(self, entity: Entity) -> (App, Entity) {
         (self.build(), entity)
     }

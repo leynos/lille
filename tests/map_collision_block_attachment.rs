@@ -60,9 +60,8 @@ fn spawn_sloped_collidable_tile(
 }
 
 /// Triggers a `MapCreated` event in the world.
-#[expect(deprecated, reason = "bevy_ecs_tiled 0.10 uses the legacy Event API.")]
 fn trigger_map_created(world: &mut World) {
-    world.send_event(TiledEvent::new(Entity::PLACEHOLDER, MapCreated));
+    world.write_message(TiledEvent::new(Entity::PLACEHOLDER, MapCreated));
 }
 
 #[rstest]
