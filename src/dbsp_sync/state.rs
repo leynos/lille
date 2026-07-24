@@ -206,7 +206,17 @@ mod tests {
     //! Tests for the DBSP synchronisation state resource.
     use super::*;
     use bevy::prelude::Entity;
-    use rstest::rstest;
+    use rstest::{fixture, rstest};
+
+    /// Shared fresh [`DbspState`] for the frame-rollback tests below.
+    ///
+    /// Returns the fallible `Result` so construction stays outside a
+    /// `no_expect_outside_tests` boundary; each test unwraps it, mirroring the
+    /// `setup_app`/`fresh_state` helpers used elsewhere.
+    #[fixture]
+    fn state() -> Result<DbspState, dbsp::Error> {
+        DbspState::new()
+    }
 
     #[rstest]
     fn new_state_starts_empty() {
@@ -249,8 +259,10 @@ mod tests {
     }
 
     #[rstest]
-    fn rollback_restores_health_snapshot_and_pending_damage() {
-        let mut state = DbspState::new().expect("failed to initialise DbspState for tests");
+    fn rollback_restores_health_snapshot_and_pending_damage(
+        #[from(state)] state_result: Result<DbspState, dbsp::Error>,
+    ) {
+        let mut state = state_result.expect("failed to initialise DbspState for tests");
         let snapshot = HealthState {
             entity: 3,
             current: 50,
@@ -283,8 +295,10 @@ mod tests {
     }
 
     #[rstest]
-    fn rollback_restores_applied_unsequenced() {
-        let mut state = DbspState::new().expect("failed to initialise DbspState for tests");
+    fn rollback_restores_applied_unsequenced(
+        #[from(state)] state_result: Result<DbspState, dbsp::Error>,
+    ) {
+        let mut state = state_result.expect("failed to initialise DbspState for tests");
         let original = damage_event(7, 1);
         state
             .applied_unsequenced
@@ -314,8 +328,8 @@ mod tests {
     }
 
     #[rstest]
-    fn commit_discards_rollback_log() {
-        let mut state = DbspState::new().expect("failed to initialise DbspState for tests");
+    fn commit_discards_rollback_log(#[from(state)] state_result: Result<DbspState, dbsp::Error>) {
+        let mut state = state_result.expect("failed to initialise DbspState for tests");
         state.begin_frame_rollback();
         state.record_unsequenced_undo(5);
         state.applied_unsequenced.insert(5, (9, HashSet::new()));
