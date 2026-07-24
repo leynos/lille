@@ -1,4 +1,6 @@
 /target
+# Build artifacts from any standalone build of a vendored crate fork.
+third_party/*/target/
 **/*.rs.bk
 Cargo.lock
 *.ttf
