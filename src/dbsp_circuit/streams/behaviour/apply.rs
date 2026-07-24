@@ -7,13 +7,13 @@ use dbsp::{typed_batch::OrdZSet, RootCircuit, Stream};
 use log::warn;
 use ordered_float::OrderedFloat;
 
-use super::decide::dedupe_movement_decisions;
 use crate::dbsp_circuit::{MovementDecision, Position};
 
 /// Applies movement decisions to base positions.
 ///
-/// Panics in debug builds if more than one movement record exists for the same
-/// entity in a single tick.
+/// Expects the movement decisions to already be deduplicated per entity (the
+/// decision stream folds duplicates before this stage). Panics in debug builds
+/// if more than one movement record still exists for the same entity in a tick.
 ///
 /// # Examples
 /// ```rust,no_run
@@ -71,18 +71,15 @@ pub fn apply_movement(
     movement: &Stream<RootCircuit, OrdZSet<MovementDecision>>,
 ) -> Stream<RootCircuit, OrdZSet<Position>> {
     let base_idx = base.map_index(|p| (p.entity, *p));
-    // Fold duplicate decisions per entity into a single movement before the
-    // join, mirroring the decision stream's own dedupe. This keeps the join
-    // from applying a doubled delta when upstream emits more than one record
-    // for an entity in a tick. The deduped stream feeds both the duplicate
-    // validation below and the join.
-    let deduped = dedupe_movement_decisions(movement);
-    let mv_base = deduped.map_index(|m| (m.entity, (m.dx, m.dy)));
+    // The decision stream already folds duplicate decisions per entity, so index
+    // the movements directly rather than aggregating a second time here. The
+    // inspect below still flags any duplicate that slips through as a bug.
+    let mv_base = movement.map_index(|m| (m.entity, (m.dx, m.dy)));
 
     let mv = mv_base.inspect(|batch| {
-        // Accumulate counts per entity to catch duplicates surviving the
-        // dedupe above. Any duplicate here indicates a bug; release builds log
-        // the issue while debug builds panic for visibility.
+        // Accumulate counts per entity to catch duplicates reaching the join.
+        // Any duplicate here indicates a bug upstream; release builds log the
+        // issue while debug builds panic for visibility.
         use std::collections::HashMap;
 
         let mut counts: HashMap<i64, i64> = HashMap::new();
@@ -120,7 +117,7 @@ mod tests {
 
     use super::apply_movement;
     use crate::dbsp_circuit::{MovementDecision, Position};
-    use approx::{assert_relative_eq, relative_eq};
+    use approx::relative_eq;
     use dbsp::RootCircuit;
     use ordered_float::OrderedFloat;
 
@@ -149,10 +146,6 @@ mod tests {
             y: y.into(),
             z: z.into(),
         }
-    }
-
-    fn position(entity: i64, x: f64, y: f64) -> Position {
-        position_at(entity, x, y, 0.0)
     }
 
     fn movement(entity: i64, dx: f64, dy: f64) -> MovementDecision {
@@ -244,26 +237,5 @@ mod tests {
                 actual.z.into_inner()
             );
         }
-    }
-
-    #[test]
-    fn dedupes_duplicate_movement_decisions() {
-        let (circuit, (base_in, movement_in, out)) =
-            build_apply_circuit().expect("failed to build apply circuit");
-        base_in.push(position(1, 0.0, 0.0), 1);
-        // Two decisions for the same entity in one tick must collapse into one
-        // normalised movement rather than doubling the applied delta.
-        movement_in.push(movement(1, 2.0, 0.0), 1);
-        movement_in.push(movement(1, 2.0, 0.0), 1);
-
-        circuit.step().expect("dbsp step");
-
-        // Exactly one output position, emitted once (weight 1): the join must
-        // not see two decisions, and (2, 0) normalises to the unit vector (1, 0).
-        let (moved, weight) = single_position(&collect_positions(&out));
-        assert_eq!(weight, 1);
-        assert_eq!(moved.entity, 1);
-        assert_relative_eq!(moved.x.into_inner(), 1.0);
-        assert_relative_eq!(moved.y.into_inner(), 0.0);
     }
 }

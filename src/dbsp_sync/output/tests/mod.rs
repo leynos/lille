@@ -97,6 +97,12 @@ fn push_position_input(app: &mut App, position: Position, weight: i64) {
     state.circuit.position_in().push(position, weight);
 }
 
+/// Pushes a single velocity record with the given Z-set `weight`.
+fn push_velocity_input(app: &mut App, velocity: Velocity, weight: i64) {
+    let state = app.world_mut().non_send_resource_mut::<DbspState>();
+    state.circuit.velocity_in().push(velocity, weight);
+}
+
 fn prime_state(app: &mut App, entity: Entity) {
     prime_entity_mapping(app, entity);
     push_position_input(

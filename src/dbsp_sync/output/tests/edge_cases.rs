@@ -183,3 +183,94 @@ fn health_delta_for_despawned_entity_is_skipped() {
     let state = app.world().non_send_resource::<DbspState>();
     assert_eq!(state.applied_health_duplicates(), 0);
 }
+
+#[rstest]
+fn negative_weight_velocity_is_not_applied() {
+    let mut app = setup_app().expect("failed to set up test app");
+    let entity = spawn_entity(&mut app);
+    prime_entity_mapping(&mut app, entity);
+    // A base position makes the entity produce velocity output; push the
+    // velocity as a retraction (weight -1) so the consolidated velocity output
+    // carries a negative weight and must be skipped, not written.
+    push_position_input(
+        &mut app,
+        Position {
+            entity: 1,
+            x: 0.0.into(),
+            y: 0.0.into(),
+            z: 1.0.into(),
+        },
+        1,
+    );
+    push_velocity_input(
+        &mut app,
+        Velocity {
+            entity: 1,
+            vx: 1.0.into(),
+            vy: 2.0.into(),
+            vz: 3.0.into(),
+        },
+        -1,
+    );
+
+    app.world_mut()
+        .run_system_once(apply_dbsp_outputs_system)
+        .expect("applying DBSP outputs should succeed");
+
+    let velocity = app
+        .world()
+        .entity(entity)
+        .get::<VelocityComp>()
+        .expect("VelocityComp should remain present");
+    let default = VelocityComp::default();
+    assert_eq!(
+        (velocity.vx, velocity.vy, velocity.vz),
+        (default.vx, default.vy, default.vz),
+        "a negative-weight velocity must not mutate VelocityComp"
+    );
+}
+
+#[rstest]
+fn negative_weight_health_delta_is_not_applied() {
+    let mut app = setup_app().expect("failed to set up test app");
+    let entity = spawn_entity(&mut app);
+    prime_entity_mapping(&mut app, entity);
+    // Retract the health snapshot (weight -1) while damage arrives (+1): the
+    // consolidated health delta carries a negative weight (a retraction) and
+    // must be skipped rather than mutating Health.
+    {
+        let state = app.world_mut().non_send_resource_mut::<DbspState>();
+        state.circuit.health_state_in().push(
+            HealthState {
+                entity: 1,
+                current: 90,
+                max: 100,
+            },
+            -1,
+        );
+        state.circuit.damage_in().push(
+            DamageEvent {
+                entity: 1,
+                amount: 50,
+                source: DamageSource::External,
+                at_tick: 1,
+                seq: Some(1),
+            },
+            1,
+        );
+    }
+
+    app.world_mut()
+        .run_system_once(apply_dbsp_outputs_system)
+        .expect("applying DBSP outputs should succeed");
+
+    let health = app
+        .world()
+        .entity(entity)
+        .get::<Health>()
+        .expect("Health component should remain present");
+    assert_eq!(
+        health.current, 90,
+        "a negative-weight (retraction) health delta must not mutate Health"
+    );
+}

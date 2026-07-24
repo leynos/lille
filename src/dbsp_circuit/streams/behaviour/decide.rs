@@ -184,7 +184,7 @@ pub fn movement_decision_stream(
 /// let deduped = dedupe_movement_decisions(&movement);
 /// // `deduped` carries at most one `MovementDecision` per entity per tick.
 /// ```
-pub(super) fn dedupe_movement_decisions(
+fn dedupe_movement_decisions(
     movement: &Stream<RootCircuit, OrdZSet<MovementDecision>>,
 ) -> Stream<RootCircuit, OrdZSet<MovementDecision>> {
     movement
