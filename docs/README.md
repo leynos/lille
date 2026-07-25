@@ -10,7 +10,7 @@ provide further detail:
 - [Behavioural testing in Rust with RSpec](behavioural-testing-in-rust-with-rspec.md)
 - [Complexity antipatterns and refactoring strategies](
   complexity-antipatterns-and-refactoring-strategies.md)
-- [DBSP synchronization developer's guide](developers-guide.md)
+- [DBSP synchronization developer's guide](dbsp-synchronization-guide.md)
 - [Declarative world inference with DBSP and Rust](
   declarative-world-inference-with-dbsp-and-rust.md)
 - [Documentation style guide](documentation-style-guide.md)

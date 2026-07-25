@@ -1,307 +1,207 @@
-# DBSP synchronization developer's guide
+# Developer's guide
 
-This guide documents the contract between Bevy's Entity-Component-System (ECS)
-and the DBSP (Differential Dataflow Stream Processing) circuit that governs
-Lille's simulation state. It covers how the synchronization systems are
-scheduled, how per-frame state is tracked and rolled back on failure, how
-circuit outputs are applied back to components, and the local tooling used to
-lint the `dbsp_sync` module.
+This guide records the practical facts a contributor needs about Lille's active
+dependency stack. It is the source of truth for the current Bevy and
+`bevy_ecs_tiled` versions; the
+[Bevy migration plan](bevy-0-16-plus-migration-plan.md) is an archived
+historical record and must not be used to infer current versions.
 
-For the circuit's data model and dataflow construction, see [Declarative
-world inference with DBSP and Rust](
-declarative-world-inference-with-dbsp-and-rust.md). For the health and damage
-synchronization protocol in more depth, see §3.5 of [Lille physics engine
-design](lille-physics-engine-design.md). For the test-writing patterns used
-throughout `dbsp_sync`, see [Testing declarative game logic in DBSP](
-testing-declarative-game-logic-in-dbsp.md). For the `observers-v1-spike`
-feature's effect on scheduling, see [ADR-001: DBSP Observers V1 spike](
-adr-001-dbsp-observers-v1-spike.md).
+## Toolchain
 
-## 1. Frame lifecycle
+- `rust-toolchain.toml` pins `nightly-2025-09-14` (rustc 1.91.0-nightly) with
+  the `rustfmt` and `clippy` components.
+- The nightly channel is required: `src/lib.rs` uses
+  `#![cfg_attr(docsrs, feature(doc_cfg))]`, and `make lint` builds the docs with
+  `--cfg docsrs`, which needs the unstable `doc_cfg` feature.
+- **Do not bump the toolchain or Bevy to 0.19 without also satisfying the
+  constraint below.** Bevy 0.19 requires Rust 1.95.0, which this nightly cannot
+  provide. `bevy_ecs_tiled` 0.13 already tracks Bevy 0.19, so the plugin is not
+  the blocker; the toolchain is.
 
-`DbspPlugin::build` (`src/dbsp_sync/plugin.rs`) wires the synchronization
-systems into the app during plugin construction:
+## Bevy
 
-1. It registers `log_dbsp_error` as an observer of `DbspSyncError` events, so
-   failures are logged (via `error!`) even when raised before any schedule
-   runs.
-2. Under the `observers-v1-spike` feature, it also registers
-   `observers_v1::buffer_damage_ingress`.
-3. It calls `init_dbsp_system` synchronously to construct the `DbspCircuit`
-   and insert the `DbspState` non-send resource. If circuit construction
-   fails, it triggers a `DbspSyncError` with context `Init` and returns
-   *without* registering the sync chain — the plugin is otherwise inert for
-   the rest of the app's lifetime.
-4. It initializes the `DamageInbox` resource, schedules
-   `init_world_handle_system` at `Startup`, and calls `add_dbsp_sync_chain`.
+The workspace targets the **Bevy 0.18.1** release line. Keep the entire Bevy
+surface on one minor line: never mix major/minor families across type
+signatures, imports, plugins, events, or system parameters.
 
-`add_dbsp_sync_chain` chains two systems with Bevy's `.chain()` combinator,
-which guarantees `cache_state_for_dbsp_system` runs to completion before
-`apply_dbsp_outputs_system` starts within the same schedule pass:
+*Active Bevy dependency versions (workspace and direct subcrates):*
 
-```rust,ignore
-let chain = (cache_state_for_dbsp_system, apply_dbsp_outputs_system).chain();
+| Dependency       | Version | Notes                                                                                               |
+| ---------------- | ------- | --------------------------------------------------------------------------------------------------- |
+| `bevy`           | 0.18.1  | Workspace dependency, `default-features = false`, `reflect_auto_register`; Linux target adds `x11`. |
+| `bevy_app`       | 0.18.1  | Direct subcrate.                                                                                    |
+| `bevy_ecs`       | 0.18.1  | Direct subcrate.                                                                                    |
+| `bevy_math`      | 0.18.1  | Direct subcrate.                                                                                    |
+| `bevy_reflect`   | 0.18.1  | Feature `auto_register_inventory`.                                                                  |
+| `bevy_transform` | 0.18.1  | Direct subcrate.                                                                                    |
+| `bevy_log`       | 0.18.1  | Optional; enabled through the `render` feature.                                                     |
+
+The optional renderer is gated behind the `render` feature (which pulls in the
+Bevy asset, core-pipeline, render, sprite, winit, log, and PNG features); the
+`text` feature layers `bevy/bevy_text` on top.
+
+### Buffered events use the Message API
+
+Bevy 0.18 split buffered events from observer events:
+
+- **Buffered events** derive `Message` and are read/written with
+  `MessageReader<T>` / `MessageWriter<T>`; from a `World`, use
+  `World::write_message`. This is what `TiledEvent<MapCreated>` uses.
+- **Observer events** derive `Event` and are consumed via `On<T>` observers,
+  emitted with `Commands::trigger` / `World::trigger` and registered with
+  `App::add_observer`. Lille's `LilleMapError`, `UnloadPrimaryMap`,
+  `PrimaryMapUnloaded`, `DbspSyncError`, and `DbspDamageIngress` are observer
+  events.
+
+`App` is `#[must_use]` in Bevy 0.18, so do not add a bare `#[must_use]` to
+functions that return `App`; `clippy::double_must_use` will reject it.
+
+The migrated buffered-message surface is guarded two ways. The runtime map
+integration tests exercise it dynamically, and a `trybuild` compile-pass
+harness pins it statically: `tests/compile_pass.rs` compiles the fixture
+`tests/compile_pass/message_reader_migration.rs`, which uses
+`MessageReader<TiledEvent<MapCreated>>` and `World::write_message`.
+Reintroducing the legacy `EventReader` / `World::send_event` names breaks the
+fixture. Run it with:
+
+```sh
+cargo test --features test-support --test compile_pass
 ```
 
-- By default, this chain runs in the `Update` schedule.
-- Under the `observers-v1-spike` feature, it runs in `PostUpdate` instead, so
-  that `Commands::trigger` calls issued by gameplay systems during `Update`
-  (for example, `DbspDamageIngress` triggers) are flushed and delivered to
-  `buffer_damage_ingress` — populating `DamageInbox` — before the DBSP chain
-  drains it that same frame. See ADR-001 for the sequencing rationale.
+The harness is gated on `test-support` (like the other map tests), so it also
+runs as part of `make test` (which passes `--features test-support`) and the CI
+coverage step. The fixture is a standalone crate, so `bevy_ecs_tiled` is
+carried as a non-optional dev-dependency purely to make it nameable there.
 
-Within a single pass of the chain:
+## Map support: `bevy_ecs_tiled`
 
-- **`cache_state_for_dbsp_system`** (`src/dbsp_sync/input/mod.rs`) reads ECS
-  component state and pushes it into the circuit's input handles, via the
-  `cache_state_for_dbsp_impl` helper described in
-  [§2](#2-frame-rollback-api-on-dbspstate).
-- **`apply_dbsp_outputs_system`** (`src/dbsp_sync/output/mod.rs`) steps the
-  circuit and, on success, applies its outputs back onto ECS components. See
-  [§3](#3-step-failure-handling) and [§4](#4-output-weight-semantics).
+- Version **0.12.0** (optional, behind the `map` feature),
+  `default-features = false`.
+- Features: `png` and `user_properties` are always enabled with the crate;
+  `render` is added by the `render` feature and `atlas` by `test-support`.
+- 0.12 is the `bevy_ecs_tiled` line that tracks Bevy 0.18 (upstream
+  compatibility table: 0.11–0.12 target Bevy 0.18). The Bevy-0.19 line is 0.13,
+  which already supports Bevy 0.19; adopting it is blocked solely by the Rust
+  1.95.0 toolchain constraint above, not by plugin availability.
 
-## 2. Frame-rollback API on `DbspState`
+## `ordered-float` v5 and the vendored `feldera-size-of` fork
 
-`cache_state_for_dbsp_impl` mutates several `DbspState` bookkeeping
-collections before it is known whether `apply_dbsp_outputs_system` will
-successfully step the circuit this frame:
+Lille's DBSP records store floating-point values through
+`ordered_float::OrderedFloat<f64>` so that they have a total order, which DBSP
+requires for keys, joins, and aggregations. Those records also derive
+`feldera_size_of::SizeOf` for memory accounting. Reconciling the two across a
+major `ordered-float` upgrade is the reason for the arrangement described here.
 
-- `health_snapshot`: the last `HealthState` pushed per entity, drained and
-  retracted (`-1` weight) so this frame can push a fresh snapshot.
-- `pending_damage_retractions`: damage events pushed last frame, taken with
-  `mem::take` and retracted (`-1` weight) so they are not double-counted.
-- `expected_health_retractions`: cleared and repopulated as retractions are
-  issued, matching later `HealthDelta` outputs against expected retractions.
-- `applied_unsequenced`: mutated per entity as new unsequenced damage events
-  are deduplicated during `ingest_damage_events`.
+For the full decision record, see
+[ADR 002](adr-002-ordered-float-v5-vendored-feldera-size-of-fork.md). The fork
+itself is documented in
+[`third_party/README.md`](../third_party/README.md). Fork lifecycle and removal
+are tracked in
+[issue #294](https://github.com/leynos/lille/issues/294).
 
-If `state.step_circuit()` later fails, these mutations must be undone: the
-circuit's inputs are cleared without ever being accepted, so the Rust-side
-bookkeeping must be restored to match what the circuit actually holds (that
-is, nothing from this frame). `DbspState` exposes five methods to manage this
-without a per-frame deep clone of the tracking state:
+### Why `ordered-float` is pinned at v5
 
-- **`begin_frame_rollback()`** — called at the very start of
-  `cache_state_for_dbsp_impl`. Resets `health_snapshot_backup` and
-  `pending_damage_backup` to `None` and clears the `applied_unsequenced_undo`
-  log, starting a fresh rollback record for this frame.
-- **`record_unsequenced_undo(entity)`** — called from `ingest_damage_events`
-  for each *unsequenced* damage event, immediately before the entity's
-  `applied_unsequenced` entry is mutated by the deduplication check. It
-  records that entity's prior `applied_unsequenced` value once per frame
-  (repeat calls for the same entity in the same frame are no-ops), so a
-  rollback can restore exactly that value later.
-- **`stash_frame_rollback(health_snapshot, pending_damage)`** — called once,
-  at the end of `cache_state_for_dbsp_impl`, after the cache pass has
-  finished mutating the live state. It stores the `Vec<HealthState>` and
-  `Vec<DamageEvent>` that were already extracted from the live collections
-  earlier in the pass (via `collect_previous_health_snapshots` and
-  `mem::take`) as the frame's backups.
-- **`commit_frame_tracking()`** — called by `apply_dbsp_outputs_system` after
-  a successful `step_circuit()` call. Discards the backups and undo log, so a
-  later, stray call to `rollback_frame_tracking()` cannot revert this frame's
-  now-committed changes.
-- **`rollback_frame_tracking()`** — called by `apply_dbsp_outputs_system`
-  when `step_circuit()` returns `Err`. Rebuilds `health_snapshot` from the
-  backed-up `Vec<HealthState>` (keyed by `entity`), restores
-  `pending_damage_retractions` from the backed-up `Vec<DamageEvent>`, and
-  replays the `applied_unsequenced_undo` log: entities with a recorded prior
-  value have it reinserted; entities with a recorded `None` (meaning they had
-  no entry before this frame) have their entry removed.
+The workspace standardizes on `ordered-float` 5.x
+(`ordered-float = { version = "5", features = ["serde", "rkyv_64"] }` in the
+root `Cargo.toml`). This is the current major version, and Lille's own records
+are built against it. The `rkyv_64` feature still targets rkyv 0.7, matching
+Lille's `rkyv = "0.7"`, so the upgrade needs no rkyv changes.
 
-The design goal is to avoid deep-cloning the whole tracking state every
-frame. The health/damage backups reuse the same vectors the cache pass
-already extracts via `mem::take`/`drain`-style moves — no extra clone is
-taken solely for rollback purposes. The `applied_unsequenced` undo log takes
-a different approach because that collection is a map mutated key-by-key
-rather than wholesale: instead of cloning the whole map,
-`applied_unsequenced_undo` records only the prior value for each entity
-actually touched this frame, the first time it is touched.
+Note that `dbsp` 0.98 independently requires `ordered-float ^4.2.0`, so
+ordered-float 4.x and 5.x coexist in the dependency graph: dbsp resolves to v4
+for its own internals, while Lille's records use v5. This is expected and
+supported.
 
-This is exercised directly in `src/dbsp_sync/state.rs`'s unit tests:
-`rollback_restores_health_snapshot_and_pending_damage` covers the health and
-pending-damage backups, and `applied_unsequenced_rollback_matrix` is a
-parameterized test over whether the entity had a prior entry, whether the
-undo was recorded once or twice, and whether the frame commits or rolls
-back — asserting rollback restores the exact pre-frame value and commit
-makes a later rollback a no-op.
+### Why `feldera-size-of` is patched through `[patch.crates-io]`
 
-## 3. Step-failure handling
+Every published `feldera-size-of` release, up to and including 0.1.7 (and
+upstream `main`), pins its optional `ordered-float` dependency at `^3.0.0`. Its
+`SizeOf` impl for `OrderedFloat`/`NotNan` therefore applies only to
+ordered-float 3.x. Against 5.x the derive fails to compile:
 
-`apply_dbsp_outputs_system` (`src/dbsp_sync/output/mod.rs`) begins by calling
-`state.step_circuit()`, which invokes the stepper function pointer stored on
-`DbspState` (`try_step` in production; tests may override it via
-`set_stepper_for_testing`). When this returns `Err`:
-
-1. The system queues a `DbspSyncError` (context `Step`) via
-   `commands.trigger(...)`. This is a *deferred* `Commands` call: it is
-   buffered onto the command queue rather than applied immediately, so the
-   `log_dbsp_error` observer only runs once the queued command is flushed at
-   the schedule's next command-application point — not synchronously at this
-   line.
-2. Independently of when that trigger flushes, the system synchronously
-   clears every circuit input handle via `state.circuit.clear_inputs()`, so
-   the buffered records this frame's cache pass pushed (positions,
-   velocities, health state, damage events) are never replayed on a later,
-   successful frame.
-3. It then calls `state.rollback_frame_tracking()` to restore the pre-frame
-   `health_snapshot`, `pending_damage_retractions`, and `applied_unsequenced`
-   entries described in [§2](#2-frame-rollback-api-on-dbspstate). Clearing
-   the inputs alone would leave that bookkeeping pointing at records the
-   circuit never accepted, which would corrupt the retractions the *next*
-   frame's cache pass issues.
-4. The function returns early. `apply_positions`, `apply_velocities`, and
-   `apply_health_deltas` are never called on a failed step, so no ECS
-   component is mutated — the circuit remains the sole authority and no
-   partial writes occur.
-
-On success, the system applies outputs (see [§4](#4-output-weight-semantics)),
-drains any remaining circuit output via `take_from_all()` on each output
-handle so stale values cannot be reapplied next frame, clears
-`expected_health_retractions` and the circuit's inputs, and finally calls
-`state.commit_frame_tracking()` to discard the now-unneeded rollback backups.
-
-This path is exercised by `src/dbsp_sync/output/tests/failure_paths.rs`:
-`step_failure_triggers_error_event` asserts the error event is captured and
-that a failed step leaves the ECS `Transform` untouched;
-`failed_step_clears_inputs_so_they_do_not_replay` asserts a subsequent,
-successful run does not replay the cleared inputs; and
-`failed_step_rolls_back_health_tracking` runs a full pipeline (two real
-`app.update()` calls) to assert that `DbspState::health_snapshot` after a
-failed step exactly matches its value before that frame's cache pass ran.
-
-## 4. Output weight semantics
-
-`apply_positions`, `apply_velocities`, and `apply_health_deltas` (all in
-`src/dbsp_sync/output/mod.rs`) each read from a DBSP output handle
-(`new_position_out`, `new_velocity_out`, `health_delta_out` respectively),
-call `.consolidate()` on it, and iterate the resulting `(record, (), weight)`
-tuples. Each loop begins with the same guard:
-
-```rust,ignore
-if weight <= 0 {
-    continue;
-}
+```plaintext
+error[E0277]: the trait bound `ordered_float::OrderedFloat<f64>:
+feldera_size_of::SizeOf` is not satisfied
 ```
 
-DBSP's `consolidate()` merges every contribution to a Z-set by key and
-**removes entries whose net weight is zero** — a record present with equal
-positive and negative weight contributions in the same batch simply does not
-appear in the consolidated output. Consequently, the `weight <= 0` guard
-never observes a genuine zero-weight record in practice; its operative
-effect is skipping records with a strictly **negative** weight, which
-represent retractions (for example, an entity's previous position or health
-snapshot being withdrawn as part of the retract/reinsert pattern described
-in [§2](#2-frame-rollback-api-on-dbspstate)). The `<= 0` comparison, rather
-than `< 0`, is written defensively against any non-positive weight rather
-than to handle an expected zero-weight case.
+Lille cannot implement `SizeOf` for `OrderedFloat` itself, because both the
+trait and the type are foreign (the orphan rule forbids it). No upstream
+release accepts ordered-float 5.x, so there is nothing to upgrade to.
 
-This is exercised by dedicated tests asserting a negative-weight record does
-not mutate its target component:
-`negative_weight_position_is_not_applied` and
-`negative_weight_velocity_is_not_applied` (in
-`src/dbsp_sync/output/tests/mod.rs` and
-`src/dbsp_sync/output/tests/edge_cases.rs` respectively) push a position or
-velocity record with weight `-1` and assert the `Transform`/`VelocityComp`
-stays at its default value; `negative_weight_health_delta_is_not_applied`
-retracts a `HealthState` snapshot (weight `-1`) alongside a positive-weight
-damage event and asserts `Health` is unchanged.
+The workaround redirects the crate to a minimal vendored fork:
 
-## 5. Local linting/tooling workflow
-
-Run `make lint` to check the whole workspace before committing changes under
-`src/dbsp_sync`. The target runs three checks in sequence:
-
-```makefile
-lint:
-	set -euo pipefail
-	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" cargo doc --workspace --no-deps
-	cargo clippy --all-targets --all-features -- $(RUST_FLAGS)
-	$(RUST_FLAGS_ENV) $(WHITAKER) --all -- --all-targets --all-features
+```toml
+[patch.crates-io]
+feldera-size-of = { path = "third_party/feldera-size-of" }
 ```
 
-1. `cargo doc --workspace --no-deps` with `RUSTDOCFLAGS` set to `--cfg
-   docsrs -D warnings`, so broken intra-doc links or other rustdoc warnings
-   fail the build.
-2. `cargo clippy --all-targets --all-features -- -D warnings`.
-3. The Whitaker Dylint suite, invoked as `whitaker --all -- --all-targets
-   --all-features` (the `whitaker` binary is looked up on `PATH` by default;
-   override it by setting the `WHITAKER` make variable).
+The fork widens its `ordered-float` constraint to 5 and switches the `SizeOf`
+impl bound from `Float` to `FloatCore` (ordered-float 5.x bounds its `Deref`
+impls on `FloatCore`, and the impl relies on the `&OrderedFloat<T>` → `&T`
+deref coercion). That bound switch is the only source change the upgrade
+requires.
 
-CI (`.github/workflows/ci.yml`) runs the same clippy and Whitaker checks in
-its "Lint" step, but first has to ensure the `whitaker-installer` and
-`whitaker` binaries are present. The "Install the Whitaker Dylint suite"
-step:
+### Why `third_party/feldera-size-of` is excluded from the workspace
 
-- Reuses a cached `whitaker-installer` binary (restored from
-  `~/.cargo/bin/whitaker-installer` and `~/.cache/cargo-binstall` by
-  `actions/cache`) only when its reported `whitaker-installer --version`
-  output exactly matches the pinned `WHITAKER_INSTALLER_VERSION` environment
-  variable (`0.2.6` at the time of writing). A bare presence check or a
-  substring match on the version string is deliberately avoided, since
-  either could accept a stale or near-miss version.
-- Otherwise, it installs `whitaker-installer`, preferring `cargo binstall`:
-  it checks `cargo binstall --version` succeeds, then attempts to binstall
-  `whitaker-installer` pinned to `WHITAKER_INSTALLER_VERSION` with
-  `--no-confirm --locked`. If `cargo binstall` is unavailable, or that
-  install attempt fails, it falls back to a locked source build: `cargo
-  install --locked whitaker-installer --version
-  "${WHITAKER_INSTALLER_VERSION}"`.
-- Finally runs `whitaker-installer` (with no arguments) to complete
-  installation of the `whitaker` tool itself before the "Lint" step invokes
-  it.
+```toml
+[workspace]
+members = ["build_support", "test_utils"]
+exclude = ["third_party/feldera-size-of"]
+```
 
-> The exact behaviour of the bare `whitaker-installer` invocation (for
-> example, which `whitaker` binary version it installs and where) is not
-> defined in this repository's workflow; consult the `whitaker-installer`
-> tool's own documentation for details.
+The fork is a `[patch.crates-io]` target, not a first-class workspace member.
+Excluding it keeps Cargo from folding it into this workspace and keeps its
+upstream source out of the workspace-wide gates (`cargo fmt`, `cargo clippy`,
+`cargo test`, `cargo doc`). It is still built and linked, but only as a patched
+dependency of `lille`.
 
-## 6. Testing strategy for invariants
+### Ownership and scope: carried, not maintained
 
-The DBSP-sync and map lifecycle code has several small, finite invariants
-that must hold exactly — not merely "usually" — because they govern
-correctness properties such as at-most-one decision per entity or exact
-frame rollback. These invariants are covered by **bounded, near-exhaustive
-`rstest` case matrices** plus focused regression tests, using the `rstest`
-stack already in use throughout the codebase (see [Mastering test fixtures
-in Rust with `rstest`](rust-testing-with-rstest-fixtures.md)), rather than a
-property-testing framework.
+`third_party/feldera-size-of` is **carried upstream code, not adopted or
+maintained Lille code**. Except for the deliberately minimal changes listed in
+`third_party/README.md`, its source is byte-identical to `feldera-size-of`
+0.1.7, and Lille does not hold it to this repository's code-health, testing,
+documentation, or lint standards. This is why the crate carries
+`#![allow(warnings)]` and `#![cfg_attr(coverage_nightly, coverage(off))]`, and
+why `.codescene/code-health-rules.json` disables the Code Duplication rule under
+`third_party/**`.
 
-The invariant-heavy paths and their concrete test entry points are:
+Feedback about the upstream code that is outside the scope of the vendored fix
+— for example requests to test, refactor, or re-architect functionality Lille
+does not use, or to change the fork's fallible `SizeOf` traversal semantics or
+lint allowances — is out of scope for this repository. Raise such concerns
+upstream against [`feldera/size-of`](https://github.com/feldera/size-of).
 
-- **Movement-decision dedupe** — one decision per entity, none for net-zero
-  total weight, and a consolidated Z-set multiplicity of exactly `1` for the
-  emitted decision. Covered by
-  `dedupe_emits_one_decision_for_positive_weight_and_none_for_zero` and
-  `net_zero_merge_preserves_pending_direction` in
-  `src/dbsp_circuit/streams/behaviour/decide/tests.rs`, and by
-  `duplicate_targets_produce_single_decision` in
-  `src/dbsp_circuit/streams/behaviour/tests.rs`.
-- **Frame rollback** — exact pre-frame restoration of `health_snapshot`,
-  `pending_damage_retractions`, and `applied_unsequenced` on a failed
-  `step_circuit()` call, versus retention of the frame's changes on commit.
-  Covered by `applied_unsequenced_rollback_matrix` in
-  `src/dbsp_sync/state.rs` (see [§2](#2-frame-rollback-api-on-dbspstate)).
-- **Asset-path validation** — rejection of rooted paths and standalone `..`
-  traversal components (checked against both `/` and `\` separators), versus
-  acceptance of relative paths where `..` appears only as a substring.
-  Covered by `validate_asset_path_component_matrix` in
-  `src/map/lifecycle/tests.rs`.
-- **Non-positive output weights** — retractions (negative-weight records)
-  are ignored rather than applied to ECS components. Covered by the tests
-  named in [§4](#4-output-weight-semantics).
+The Lille-owned guard for this arrangement is
+`tests/ordered_float_size_of.rs`, a compile-time integration regression test
+asserting that `OrderedFloat<f64>`, `NotNan<f64>`, `Position`, and `BlockSlope`
+implement `SizeOf`. It is Lille code and is maintained normally.
 
-### Why not a property-testing framework
+### Removing the fork
 
-Property-testing frameworks such as `proptest`, Kani, or Verus are
-deliberately **not** adopted for this work. None of them are workspace
-dependencies, and adding one is a supply-chain decision that this testing
-strategy does not need to make: every invariant above concerns a small,
-finite input space (a handful of weight combinations, a handful of path
-component forms, a handful of rollback/commit orderings). A bounded,
-enumerated `rstest` case matrix over that space gives equivalent coverage to
-a property test — every relevant case is exercised, not merely a
-randomly-sampled subset — without introducing a new dependency or a
-generator/shrinker to maintain. Should an invariant's input space grow large
-enough that exhaustive enumeration becomes impractical, adopting a
-property-testing framework would be a reasonable escalation at that point.
+Once `feldera-size-of` publishes a release whose optional `ordered-float`
+dependency accepts 5.x (ideally including the `Float` → `FloatCore` bound fix):
+
+1. Bump Lille's `feldera-size-of` dependency to that upstream release.
+2. Delete `third_party/feldera-size-of/`.
+3. Drop the `[patch.crates-io]` entry and the `[workspace] exclude` line from
+   the root `Cargo.toml`.
+4. Remove the CodeScene `third_party/**` rule set from
+   `.codescene/code-health-rules.json` if nothing else needs it.
+5. Keep `tests/ordered_float_size_of.rs` as the regression guard.
+6. Regenerate `Cargo.lock` and run the standard gates.
+
+Progress against these steps is tracked in
+[issue #294](https://github.com/leynos/lille/issues/294).
+
+## Commit gates
+
+Run the deterministic gates before committing (see `AGENTS.md` and the
+`Makefile`): `make check-fmt`, `make test`, `make typecheck`, and `make lint`.
+`make test` passes `--features test-support`, so it also runs the
+buffered-message compile-pass harness
+(`cargo test --features test-support --test compile_pass`; see
+[Buffered events use the Message API](#buffered-events-use-the-message-api)).
+`make lint` runs rustdoc (`--cfg docsrs`),
+`cargo clippy --all-targets --all-features -- -D warnings`, and the Whitaker
+Dylint suite.

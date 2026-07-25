@@ -910,7 +910,6 @@ respective game systems (be it AI spawn systems or trigger systems) can
 operate. This approach reinforces Lille’s separation: the map defines *data*,
 and the logic systems use that data. The plugin is just the bridge.
 
-
 ### 5.5 Primary Map Asset Path Validation
 
 Before spawning the primary map, the plugin validates the `primary_map` path
