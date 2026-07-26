@@ -39,7 +39,7 @@ systems into the app during plugin construction:
 which guarantees `cache_state_for_dbsp_system` runs to completion before
 `apply_dbsp_outputs_system` starts within the same schedule pass:
 
-```rust,ignore
+```rust
 let chain = (cache_state_for_dbsp_system, apply_dbsp_outputs_system).chain();
 ```
 
@@ -178,7 +178,7 @@ failed step exactly matches its value before that frame's cache pass ran.
 call `.consolidate()` on it, and iterate the resulting `(record, (), weight)`
 tuples. Each loop begins with the same guard:
 
-```rust,ignore
+```rust
 if weight <= 0 {
     continue;
 }

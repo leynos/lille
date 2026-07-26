@@ -179,10 +179,24 @@ pub fn movement_decision_stream(
 /// join cannot apply a doubled delta.
 ///
 /// # Examples
+///
+/// Duplicate decisions for one entity collapse into a single normalized
+/// decision: [`MovementAccumulator`] sums the weighted vectors, then
+/// `to_decision` renormalizes the total to a unit direction.
 /// ```text
-/// let movement = movement_decision_stream(&fear, &targets, &positions);
 /// let deduped = dedupe_movement_decisions(&movement);
-/// // `deduped` carries at most one `MovementDecision` per entity per tick.
+/// // input  (entity 1): {dx: 1.0, dy: 0.0} x1, {dx: 1.0, dy: 0.0} x1
+/// // fold   -> sum (2.0, 0.0), total weight 2
+/// // output (entity 1): {dx: 1.0, dy: 0.0} x1   (one unit decision)
+/// ```
+///
+/// Opposing decisions whose weights net to zero produce no decision: the
+/// accumulator's total weight is zero, so `to_decision` returns `None`.
+/// ```text
+/// let deduped = dedupe_movement_decisions(&movement);
+/// // input  (entity 1): {dx: 1.0, dy: 0.0} x+1, {dx: 1.0, dy: 0.0} x-1
+/// // fold   -> total weight 0
+/// // output (entity 1): (no decision emitted)
 /// ```
 fn dedupe_movement_decisions(
     movement: &Stream<RootCircuit, OrdZSet<MovementDecision>>,

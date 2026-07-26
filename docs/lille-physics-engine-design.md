@@ -79,7 +79,7 @@ the sole authority when a step fails and avoiding partial writes to ECS state.
 > For the synchronization contract's frame lifecycle, rollback API, and
 > step-failure handling, see:
 >
-> - `docs/dbsp-synchronization-guide.md`
+> - [DBSP synchronization developer's guide](dbsp-synchronization-guide.md)
 
 ## 3. Core Physics and Geometry
 

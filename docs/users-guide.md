@@ -45,12 +45,12 @@ _Table 1: Accepted and rejected forms of `LilleMapSettings::primary_map`._
 
 ### What happens on rejection
 
-If the configured `primary_map` path fails validation, no primary map
-spawns. Instead, the plugin triggers a
-`LilleMapError::InvalidPrimaryMapAssetPath` event carrying the offending
-path. An observer logs this event via `error!`; it does not panic, so
-runtime and test runs fail loudly but safely.
+If the configured `primary_map` path fails validation, the plugin
+triggers and logs a `LilleMapError::InvalidPrimaryMapAssetPath` event
+(carrying the offending path) via `error!`, then skips spawning the
+primary map. The plugin does not panic and keeps running; only a test
+assertion that expects the rejection would fail if the event were not
+triggered.
 
 For the design rationale behind these rules, see §5.5 of [Integrating
-isometric Tiled maps into Lille](
-lille-isometric-tiled-maps-design.md#55-primary-map-asset-path-validation).
+isometric Tiled maps into Lille](lille-isometric-tiled-maps-design.md#55-primary-map-asset-path-validation).
