@@ -5,6 +5,7 @@
 //! step fails mid-frame.
 
 use super::*;
+use crate::dbsp_sync::DamageInbox;
 
 #[rstest]
 fn step_failure_triggers_error_event() {
@@ -148,4 +149,75 @@ fn failed_step_rolls_back_health_tracking() {
         "a failed step must roll back health_snapshot to its pre-frame value so \
          the next frame does not emit phantom health-state retractions"
     );
+}
+
+#[rstest]
+fn failed_step_rolls_back_applied_unsequenced() {
+    // Full-pipeline sibling of `failed_step_rolls_back_health_tracking`, covering
+    // `applied_unsequenced`: the cache system ingests unsequenced damage from the
+    // `DamageInbox` and advances `applied_unsequenced` before the output system
+    // steps. A failed step must roll that map back to its pre-frame value, not
+    // just the `record_unsequenced_undo` unit path.
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
+    dbsp_test_support::install_error_observer(&mut app);
+    app.add_plugins(DbspPlugin);
+    app.world_mut().flush();
+
+    app.update(); // startup
+
+    // Spawn the entity (DdlogId 1) so the frame is realistic; the Bevy entity
+    // id is unused here because `applied_unsequenced` is keyed by the damage
+    // event's own entity id, not the registered ECS entity.
+    spawn_entity(&mut app);
+
+    // Frame 1 (success): ingest an unsequenced damage event so the cache pass
+    // records a non-empty `applied_unsequenced` entry for entity 1.
+    app.world_mut()
+        .resource_mut::<DamageInbox>()
+        .push(unsequenced_damage(10));
+    app.update();
+
+    let before = app
+        .world()
+        .non_send_resource::<DbspState>()
+        .applied_unsequenced
+        .clone();
+    assert!(
+        before.contains_key(&1),
+        "the first frame should record an applied_unsequenced entry for entity 1"
+    );
+
+    // Frame 2: ingest a second unsequenced event at the same tick (so the entry's
+    // set grows rather than resetting), then force the step to fail.
+    app.world_mut()
+        .resource_mut::<DamageInbox>()
+        .push(unsequenced_damage(5));
+    {
+        let mut state = app.world_mut().non_send_resource_mut::<DbspState>();
+        state.set_stepper_for_testing(force_step_error);
+    }
+    app.update();
+
+    let after = app
+        .world()
+        .non_send_resource::<DbspState>()
+        .applied_unsequenced
+        .clone();
+    assert_eq!(
+        after, before,
+        "a failed step must roll back applied_unsequenced to its pre-frame value \
+         through the real cache-to-step failure path"
+    );
+}
+
+/// An unsequenced (`seq: None`) external damage event for entity 1 at tick 1.
+fn unsequenced_damage(amount: u16) -> DamageEvent {
+    DamageEvent {
+        entity: 1,
+        amount,
+        source: DamageSource::External,
+        at_tick: 1,
+        seq: None,
+    }
 }

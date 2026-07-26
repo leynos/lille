@@ -175,48 +175,71 @@ fn health_delta_for_despawned_entity_is_skipped() {
 
 #[rstest]
 fn negative_weight_velocity_is_not_applied() {
-    let mut app = setup_app().expect("failed to set up test app");
-    let entity = spawn_entity(&mut app);
-    prime_entity_mapping(&mut app, entity);
-    // A base position makes the entity produce velocity output; push the
-    // velocity as a retraction (weight -1) so the consolidated velocity output
-    // carries a negative weight and must be skipped, not written.
-    push_position_input(
-        &mut app,
-        Position {
-            entity: 1,
-            x: 0.0.into(),
-            y: 0.0.into(),
-            z: 1.0.into(),
-        },
-        1,
-    );
-    push_velocity_input(
-        &mut app,
-        Velocity {
-            entity: 1,
-            vx: 1.0.into(),
-            vy: 2.0.into(),
-            vz: 3.0.into(),
-        },
-        -1,
-    );
-
-    app.world_mut()
-        .run_system_once(apply_dbsp_outputs_system)
-        .expect("applying DBSP outputs should succeed");
-
-    let velocity = app
-        .world()
-        .entity(entity)
-        .get::<VelocityComp>()
-        .expect("VelocityComp should remain present");
+    // Place the entity well above the floor (block at z=0) so it is
+    // *unsupported* and the circuit integrates the velocity input into a
+    // non-default velocity output — a standing entity would ignore the input,
+    // making the gate assertion vacuous. The same velocity input drives both
+    // phases so the Z-set weight is the only variable.
+    let base = Position {
+        entity: 1,
+        x: 0.0.into(),
+        y: 0.0.into(),
+        z: 10.0.into(),
+    };
+    let velocity = Velocity {
+        entity: 1,
+        vx: 1.0.into(),
+        vy: 2.0.into(),
+        vz: 3.0.into(),
+    };
     let default = VelocityComp::default();
-    assert_eq!(
-        (velocity.vx, velocity.vy, velocity.vz),
-        (default.vx, default.vy, default.vz),
-        "a negative-weight velocity must not mutate VelocityComp"
-    );
+
+    // Phase 1: at weight +1 the velocity output IS applied, so VelocityComp
+    // changes from its default. This proves these inputs emit velocity output
+    // at all, which keeps the phase-2 skip assertion from passing vacuously.
+    {
+        let mut app = setup_app().expect("failed to set up test app");
+        let entity = spawn_entity(&mut app);
+        prime_entity_mapping(&mut app, entity);
+        push_position_input(&mut app, base, 1);
+        push_velocity_input(&mut app, velocity, 1);
+        app.world_mut()
+            .run_system_once(apply_dbsp_outputs_system)
+            .expect("applying DBSP outputs should succeed");
+        let applied = app
+            .world()
+            .entity(entity)
+            .get::<VelocityComp>()
+            .expect("VelocityComp should remain present");
+        assert_ne!(
+            (applied.vx, applied.vy, applied.vz),
+            (default.vx, default.vy, default.vz),
+            "a positive-weight velocity must be applied, else the gate test is vacuous"
+        );
+    }
+
+    // Phase 2: a freshly created entity with the same inputs at weight -1. The
+    // negative (retraction) weight must be skipped, leaving VelocityComp default.
+    {
+        let mut app = setup_app().expect("failed to set up test app");
+        let entity = spawn_entity(&mut app);
+        prime_entity_mapping(&mut app, entity);
+        push_position_input(&mut app, base, 1);
+        push_velocity_input(&mut app, velocity, -1);
+        app.world_mut()
+            .run_system_once(apply_dbsp_outputs_system)
+            .expect("applying DBSP outputs should succeed");
+        let skipped = app
+            .world()
+            .entity(entity)
+            .get::<VelocityComp>()
+            .expect("VelocityComp should remain present");
+        assert_eq!(
+            (skipped.vx, skipped.vy, skipped.vz),
+            (default.vx, default.vy, default.vz),
+            "a negative-weight velocity must not mutate VelocityComp"
+        );
+    }
 }
 
 #[rstest]

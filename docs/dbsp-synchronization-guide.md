@@ -75,11 +75,27 @@ successfully step the circuit this frame:
 - `applied_unsequenced`: mutated per entity as new unsequenced damage events
   are deduplicated during `ingest_damage_events`.
 
+Of these four, `expected_health_retractions` is **not** rolled back on a
+failed step, and deliberately so: it is transient rather than persistent
+frame-to-frame state. `cache_state_for_dbsp_impl` clears and rebuilds it from
+scratch at the very start of every pass, before any retraction is issued, and
+it is only ever read within that same frame — inside
+`should_apply_health_delta` (`src/dbsp_sync/output/mod.rs`) — to suppress
+`HealthDelta` outputs that merely echo a retraction this frame already
+issued. Because the next frame's cache pass unconditionally clears it before
+reading it, leaving it "advanced" after a failed step has no observable
+effect; there is nothing for a rollback to protect. The three collections
+that *do* persist meaningfully across frames — `health_snapshot`,
+`pending_damage_retractions`, and `applied_unsequenced` — are exactly the
+ones the rollback methods below restore.
+
 If `state.step_circuit()` later fails, these mutations must be undone: the
 circuit's inputs are cleared without ever being accepted, so the Rust-side
 bookkeeping must be restored to match what the circuit actually holds (that
-is, nothing from this frame). `DbspState` exposes five methods to manage this
-without a per-frame deep clone of the tracking state:
+is, nothing from this frame). `DbspState` exposes five methods to restore
+three of the four collections above (`health_snapshot`,
+`pending_damage_retractions`, and `applied_unsequenced`) without a per-frame
+deep clone of the tracking state:
 
 - **`begin_frame_rollback()`** — called at the very start of
   `cache_state_for_dbsp_impl`. Resets `health_snapshot_backup` and
@@ -298,10 +314,14 @@ deliberately **not** adopted for this work. None of them are workspace
 dependencies, and adding one is a supply-chain decision that this testing
 strategy does not need to make: every invariant above concerns a small,
 finite input space (a handful of weight combinations, a handful of path
-component forms, a handful of rollback/commit orderings). A bounded,
-enumerated `rstest` case matrix over that space gives equivalent coverage to
-a property test — every relevant case is exercised, not merely a
-randomly-sampled subset — without introducing a new dependency or a
-generator/shrinker to maintain. Should an invariant's input space grow large
-enough that exhaustive enumeration becomes impractical, adopting a
-property-testing framework would be a reasonable escalation at that point.
+component forms, a handful of rollback/commit orderings). Because each of
+these spaces is small and finite, a bounded, enumerated `rstest` case matrix
+covers the *entire* space — every relevant case, not a randomly-sampled
+subset of it — without introducing a new dependency or a generator/shrinker
+to maintain. This deliberate deviation from a property/proof-testing default
+is a documented, approved exception, recorded in [ADR-003: bounded `rstest`
+matrices over a property-testing framework](
+adr-003-bounded-rstest-over-property-testing.md). Should an invariant's
+input space grow large enough that exhaustive enumeration becomes
+impractical, adopting a property-testing framework would be a reasonable
+escalation at that point.

@@ -222,9 +222,6 @@ fn apply_one_health_delta(
         entry.health_current = health.current;
         entry.health_max = health.max;
     }
-    if delta.death {
-        // Future hook: notify AI about deaths if needed.
-    }
 }
 
 /// Computes the clamped `Health::current` for a delta, logging when clamping

@@ -115,8 +115,8 @@ fn prime_state(app: &mut App, entity: Entity) {
         },
         1,
     );
-    let state = app.world_mut().non_send_resource_mut::<DbspState>();
-    state.circuit.velocity_in().push(
+    push_velocity_input(
+        app,
         Velocity {
             entity: 1,
             vx: 1.0.into(),
