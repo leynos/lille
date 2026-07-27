@@ -94,9 +94,8 @@ major `ordered-float` upgrade is the reason for the arrangement described here.
 
 For the full decision record, see
 [ADR 002](adr-002-ordered-float-v5-vendored-feldera-size-of-fork.md). The fork
-itself is documented in
-[`third_party/README.md`](../third_party/README.md). Fork lifecycle and removal
-are tracked in
+itself is documented in [`third_party/README.md`](../third_party/README.md).
+Fork lifecycle and removal are tracked in
 [issue #294](https://github.com/leynos/lille/issues/294).
 
 ### Why `ordered-float` is pinned at v5
@@ -172,10 +171,10 @@ does not use, or to change the fork's fallible `SizeOf` traversal semantics or
 lint allowances — is out of scope for this repository. Raise such concerns
 upstream against [`feldera/size-of`](https://github.com/feldera/size-of).
 
-The Lille-owned guard for this arrangement is
-`tests/ordered_float_size_of.rs`, a compile-time integration regression test
-asserting that `OrderedFloat<f64>`, `NotNan<f64>`, `Position`, and `BlockSlope`
-implement `SizeOf`. It is Lille code and is maintained normally.
+The Lille-owned guard for this arrangement is `tests/ordered_float_size_of.rs`,
+a compile-time integration regression test asserting that `OrderedFloat<f64>`,
+`NotNan<f64>`, `Position`, and `BlockSlope` implement `SizeOf`. It is Lille
+code and is maintained normally.
 
 ### Removing the fork
 

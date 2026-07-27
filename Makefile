@@ -10,7 +10,6 @@ RUST_FLAGS_ENV := RUSTFLAGS="$(RUST_FLAGS)"
 WHITAKER ?= whitaker
 WORKSPACE_PACKAGES := --package lille --package build_support --package test_utils
 MARKDOWNLINT := $(shell which markdownlint-cli2)
-MDTABLEFIX := $(shell which mdtablefix)
 MD_FILES := $(shell git ls-files -co --exclude-standard '*.md')
 UV ?= uv
 UV_ENV = UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools
@@ -36,12 +35,7 @@ typecheck:
 
 fmt:
 	cargo fmt $(WORKSPACE_PACKAGES)
-	if [[ -n "$(MD_FILES)" ]]; then \
-	  if [[ -n "$(MDTABLEFIX)" ]]; then \
-	    $(MDTABLEFIX) --wrap --renumber --breaks --ellipsis --fences --headings --in-place $(MD_FILES); \
-	  fi; \
-	  if [[ -n "$(MARKDOWNLINT)" ]]; then $(MARKDOWNLINT) --fix $(MD_FILES); fi; \
-	fi
+	mdformat-all
 
 check-fmt:
 	cargo fmt $(WORKSPACE_PACKAGES) -- --check
