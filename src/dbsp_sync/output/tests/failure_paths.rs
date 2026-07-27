@@ -152,12 +152,15 @@ fn failed_step_rolls_back_health_tracking() {
 }
 
 #[rstest]
-fn failed_step_rolls_back_applied_unsequenced() {
-    // Full-pipeline sibling of `failed_step_rolls_back_health_tracking`, covering
-    // `applied_unsequenced`: the cache system ingests unsequenced damage from the
-    // `DamageInbox` and advances `applied_unsequenced` before the output system
-    // steps. A failed step must roll that map back to its pre-frame value, not
-    // just the `record_unsequenced_undo` unit path.
+fn failed_step_rolls_back_unsequenced_damage_dedupe_state() {
+    // Full-pipeline sibling of `failed_step_rolls_back_health_tracking`, driving
+    // the real cache-to-step failure path for `applied_unsequenced` (the
+    // unsequenced-damage dedupe state) rather than calling
+    // `record_unsequenced_undo` directly. The cache system ingests an
+    // unsequenced `DamageEvent` from the `DamageInbox` and advances
+    // `applied_unsequenced`; a failed step must restore it to its exact
+    // pre-frame value. This covers the absent-before-frame case: the entry the
+    // cache pass adds must be gone again after the rollback.
     let mut app = App::new();
     app.add_plugins(MinimalPlugins);
     dbsp_test_support::install_error_observer(&mut app);
@@ -165,34 +168,26 @@ fn failed_step_rolls_back_applied_unsequenced() {
     app.world_mut().flush();
 
     app.update(); // startup
+    spawn_entity(&mut app); // DdlogId(1)
+    app.update(); // register the entity in id_map (no damage yet)
 
-    // Spawn the entity (DdlogId 1) so the frame is realistic; the Bevy entity
-    // id is unused here because `applied_unsequenced` is keyed by the damage
-    // event's own entity id, not the registered ECS entity.
-    spawn_entity(&mut app);
-
-    // Frame 1 (success): ingest an unsequenced damage event so the cache pass
-    // records a non-empty `applied_unsequenced` entry for entity 1.
-    app.world_mut()
-        .resource_mut::<DamageInbox>()
-        .push(unsequenced_damage(10));
-    app.update();
-
+    // Pre-frame: entity 1 has no `applied_unsequenced` entry.
     let before = app
         .world()
         .non_send_resource::<DbspState>()
         .applied_unsequenced
         .clone();
     assert!(
-        before.contains_key(&1),
-        "the first frame should record an applied_unsequenced entry for entity 1"
+        !before.contains_key(&1),
+        "entity 1 must be absent from applied_unsequenced before the failing frame"
     );
 
-    // Frame 2: ingest a second unsequenced event at the same tick (so the entry's
-    // set grows rather than resetting), then force the step to fail.
+    // Queue one unsequenced damage event and force the step to fail. The cache
+    // pass will call `record_unsequenced_undo(1)` (capturing the absent entry)
+    // and then add entity 1 via `record_duplicate_unsequenced_damage`.
     app.world_mut()
         .resource_mut::<DamageInbox>()
-        .push(unsequenced_damage(5));
+        .push(unsequenced_damage(10));
     {
         let mut state = app.world_mut().non_send_resource_mut::<DbspState>();
         state.set_stepper_for_testing(force_step_error);
@@ -204,10 +199,17 @@ fn failed_step_rolls_back_applied_unsequenced() {
         .non_send_resource::<DbspState>()
         .applied_unsequenced
         .clone();
+    // Restored to the exact pre-frame state. If `ingest_damage_events` stopped
+    // calling `record_unsequenced_undo` before the dedupe mutation, the undo log
+    // would omit entity 1, the rollback could not remove the entry it added, and
+    // both assertions below would fail.
     assert_eq!(
         after, before,
-        "a failed step must roll back applied_unsequenced to its pre-frame value \
-         through the real cache-to-step failure path"
+        "a failed step must roll back applied_unsequenced to its exact pre-frame state"
+    );
+    assert!(
+        !after.contains_key(&1),
+        "the entry the rolled-back frame added must be absent afterwards"
     );
 }
 

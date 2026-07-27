@@ -198,8 +198,8 @@ fn apply_health_deltas(
 
 /// Applies a single positive-weight health delta: resolves the target entity's
 /// `Health`, honours the dedup/retraction rules, clamps the new value, then
-/// updates the component, `applied_health` bookkeeping, the world handle, and
-/// the death hook. Any guard failing simply skips this delta.
+/// updates the component, `applied_health` bookkeeping, and the world handle.
+/// Any guard failing simply skips this delta.
 fn apply_one_health_delta(
     state: &mut DbspState,
     write_query: &mut DbspWriteQuery<'_, '_>,

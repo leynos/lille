@@ -194,6 +194,40 @@ dependency accepts 5.x (ideally including the `Float` → `FloatCore` bound fix)
 Progress against these steps is tracked in
 [issue #294](https://github.com/leynos/lille/issues/294).
 
+## DBSP synchronization
+
+Each frame, `DbspPlugin` chains two systems so the first runs to completion
+before the second starts: `cache_state_for_dbsp_system` reads ECS component
+state into the DBSP circuit's input handles, then
+`apply_dbsp_outputs_system` steps the circuit and writes its outputs back
+onto ECS components.
+
+`DbspState` exposes frame-rollback methods that keep Rust-side bookkeeping
+in step with the circuit, called in this order:
+
+- `begin_frame_rollback` — start of the cache pass; clears the previous
+  frame's rollback log.
+- `record_unsequenced_undo` — during damage ingestion, captures an
+  `applied_unsequenced` entry's pre-frame value before it is mutated.
+- `stash_frame_rollback` — saves the pre-frame health-snapshot and
+  pending-damage values the cache pass extracted.
+- `commit_frame_tracking` — on a successful step, discards the rollback
+  log.
+- `rollback_frame_tracking` — on a failed step, restores the pre-frame
+  tracking.
+
+When `state.step_circuit()` returns `Err`, the output system clears the
+circuit inputs, restores the Rust-side tracking
+(`rollback_frame_tracking`), emits a `DbspSyncError` event, and applies no
+ECS output writes that frame.
+
+`apply_positions`, `apply_velocities`, and `apply_health_deltas` apply only
+consolidated records with a positive Z-set weight; non-positive
+(retraction) weights are skipped.
+
+For the detailed walkthrough, see
+[DBSP synchronization developer's guide](dbsp-synchronization-guide.md).
+
 ## Commit gates
 
 Run the deterministic gates before committing (see `AGENTS.md` and the
