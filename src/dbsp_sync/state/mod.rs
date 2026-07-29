@@ -178,13 +178,23 @@ impl DbspState {
     /// Stashes the pre-frame health snapshots and pending damage retractions —
     /// values the cache pass has already extracted from the live state — so a
     /// failed step can restore them without an extra clone.
+    ///
+    /// Idempotent within a frame, like
+    /// [`record_unsequenced_undo`](Self::record_unsequenced_undo): only the
+    /// first call after [`begin_frame_rollback`](Self::begin_frame_rollback)
+    /// stores anything, so a repeat call cannot overwrite the true pre-frame
+    /// values with already-advanced ones.
     pub(crate) fn stash_frame_rollback(
         &mut self,
         health_snapshot: Vec<HealthState>,
         pending_damage: Vec<DamageEvent>,
     ) {
-        self.health_snapshot_backup = Some(health_snapshot);
-        self.pending_damage_backup = Some(pending_damage);
+        if self.health_snapshot_backup.is_none() {
+            self.health_snapshot_backup = Some(health_snapshot);
+        }
+        if self.pending_damage_backup.is_none() {
+            self.pending_damage_backup = Some(pending_damage);
+        }
     }
 
     /// Records the pre-frame [`Self::applied_unsequenced`] entry for `entity`

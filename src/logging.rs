@@ -97,7 +97,7 @@ mod tests {
         );
         ensure!(
             observed_level == Some(LevelFilter::Trace),
-            "expected trace level when verbose initializes"
+            "expected trace level when verbose mode is enabled"
         );
         Ok(())
     }

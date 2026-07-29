@@ -134,7 +134,7 @@ rather than wholesale: instead of cloning the whole map,
 `applied_unsequenced_undo` records only the prior value for each entity
 actually touched this frame, the first time it is touched.
 
-This is exercised directly in `src/dbsp_sync/state.rs`'s unit tests:
+This is exercised directly in `src/dbsp_sync/state/tests.rs`'s unit tests:
 `rollback_restores_health_snapshot_and_pending_damage` covers the health and
 pending-damage backups, and `applied_unsequenced_rollback_matrix` is a
 parameterized test over whether the entity had a prior entry, whether the
@@ -297,7 +297,8 @@ The invariant-heavy paths and their concrete test entry points are:
   `pending_damage_retractions`, and `applied_unsequenced` on a failed
   `step_circuit()` call, versus retention of the frame's changes on commit.
   Covered by `applied_unsequenced_rollback_matrix` in
-  `src/dbsp_sync/state.rs` (see [§2](#2-frame-rollback-api-on-dbspstate)).
+  `src/dbsp_sync/state/tests.rs` (see
+  [§2](#2-frame-rollback-api-on-dbspstate)).
 - **Asset-path validation** — rejection of rooted paths and standalone `..`
   traversal components (checked against both `/` and `\` separators), versus
   acceptance of relative paths where `..` appears only as a substring.

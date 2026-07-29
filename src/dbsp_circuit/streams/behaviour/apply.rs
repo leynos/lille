@@ -120,6 +120,7 @@ mod tests {
     use approx::relative_eq;
     use dbsp::RootCircuit;
     use ordered_float::OrderedFloat;
+    use rstest::rstest;
 
     type ApplyCircuit = (
         dbsp::CircuitHandle,
@@ -159,14 +160,7 @@ mod tests {
     fn collect_positions(
         handle: &dbsp::OutputHandle<dbsp::typed_batch::OrdZSet<Position>>,
     ) -> Vec<(Position, i64)> {
-        handle
-            .consolidate()
-            .iter()
-            .map(|(position, (), weight)| {
-                let position_ref: &Position = &position;
-                (*position_ref, weight)
-            })
-            .collect()
+        test_utils::collect_weighted(handle)
     }
 
     /// Extracts the sole emitted position, panicking if there is not exactly
@@ -175,67 +169,54 @@ mod tests {
         *test_utils::expect_single(positions, "expected exactly one output position")
     }
 
-    #[test]
-    fn applies_or_preserves_positions() {
-        struct Case {
-            name: &'static str,
-            base: Position,
-            movement: Option<MovementDecision>,
-            expected: Position,
+    // A targeted entity shifts by its decision's delta in x/y while its z
+    // coordinate is carried through unchanged; without a decision the base
+    // position passes through untouched.
+    #[rstest]
+    #[case::applies_movement_to_targeted_entity(
+        position_at(1, 0.0, 0.0, 2.0),
+        Some(movement(1, 1.0, 0.0)),
+        position_at(1, 1.0, 0.0, 2.0)
+    )]
+    #[case::passes_unmoved_entity_through(
+        position_at(2, 5.0, 5.0, 3.0),
+        None,
+        position_at(2, 5.0, 5.0, 3.0)
+    )]
+    fn applies_or_preserves_positions(
+        #[case] base: Position,
+        #[case] movement: Option<MovementDecision>,
+        #[case] expected: Position,
+    ) {
+        let (circuit, (base_in, movement_in, out)) =
+            build_apply_circuit().expect("failed to build apply circuit");
+        base_in.push(base, 1);
+        if let Some(decision) = movement {
+            movement_in.push(decision, 1);
         }
 
-        let cases = [
-            // A targeted entity shifts by its decision's delta in x/y while its
-            // z coordinate is carried through unchanged.
-            Case {
-                name: "applies movement to targeted entity",
-                base: position_at(1, 0.0, 0.0, 2.0),
-                movement: Some(movement(1, 1.0, 0.0)),
-                expected: position_at(1, 1.0, 0.0, 2.0),
-            },
-            // Without a decision, the base position passes through unchanged.
-            Case {
-                name: "passes unmoved entity through",
-                base: position_at(2, 5.0, 5.0, 3.0),
-                movement: None,
-                expected: position_at(2, 5.0, 5.0, 3.0),
-            },
-        ];
+        circuit.step().expect("dbsp step");
 
-        for case in cases {
-            let (circuit, (base_in, movement_in, out)) =
-                build_apply_circuit().expect("failed to build apply circuit");
-            base_in.push(case.base, 1);
-            if let Some(decision) = case.movement {
-                movement_in.push(decision, 1);
-            }
-
-            circuit.step().expect("dbsp step");
-
-            let (actual, weight) = single_position(&collect_positions(&out));
-            assert_eq!(weight, 1, "{}: output weight", case.name);
-            assert_eq!(actual.entity, case.expected.entity, "{}: entity", case.name);
-            assert!(
-                relative_eq!(actual.x.into_inner(), case.expected.x.into_inner()),
-                "{}: x (expected {}, got {})",
-                case.name,
-                case.expected.x.into_inner(),
-                actual.x.into_inner()
-            );
-            assert!(
-                relative_eq!(actual.y.into_inner(), case.expected.y.into_inner()),
-                "{}: y (expected {}, got {})",
-                case.name,
-                case.expected.y.into_inner(),
-                actual.y.into_inner()
-            );
-            assert!(
-                relative_eq!(actual.z.into_inner(), case.expected.z.into_inner()),
-                "{}: z (expected {}, got {}) — movement must preserve z",
-                case.name,
-                case.expected.z.into_inner(),
-                actual.z.into_inner()
-            );
-        }
+        let (actual, weight) = single_position(&collect_positions(&out));
+        assert_eq!(weight, 1, "output weight");
+        assert_eq!(actual.entity, expected.entity, "entity");
+        assert!(
+            relative_eq!(actual.x.into_inner(), expected.x.into_inner()),
+            "x (expected {}, got {})",
+            expected.x.into_inner(),
+            actual.x.into_inner()
+        );
+        assert!(
+            relative_eq!(actual.y.into_inner(), expected.y.into_inner()),
+            "y (expected {}, got {})",
+            expected.y.into_inner(),
+            actual.y.into_inner()
+        );
+        assert!(
+            relative_eq!(actual.z.into_inner(), expected.z.into_inner()),
+            "z (expected {}, got {}) — movement must preserve z",
+            expected.z.into_inner(),
+            actual.z.into_inner()
+        );
     }
 }

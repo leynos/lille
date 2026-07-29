@@ -30,14 +30,7 @@ fn deduped_decisions(
         input.push(decision(dx, dy), weight);
     }
     circuit.step()?;
-    Ok(output
-        .consolidate()
-        .iter()
-        .map(|(movement, (), weight)| {
-            let movement_ref: &MovementDecision = &movement;
-            (*movement_ref, weight)
-        })
-        .collect())
+    Ok(test_utils::collect_weighted(&output))
 }
 
 /// Bounded matrix over duplicate and cancelling weighted decisions for one

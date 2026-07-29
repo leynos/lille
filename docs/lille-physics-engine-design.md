@@ -339,7 +339,7 @@ actually touched that frame. On a failed step, `apply_dbsp_outputs_system`
 clears the circuit's inputs (`clear_inputs()`) and calls
 `rollback_frame_tracking()` to restore the three collections; on a
 successful step it calls `commit_frame_tracking()` to discard the backups
-instead. Unit tests in `src/dbsp_sync/state.rs`
+instead. Unit tests in `src/dbsp_sync/state/tests.rs`
 (`rollback_restores_health_snapshot_and_pending_damage`,
 `applied_unsequenced_rollback_matrix`) cover the rollback/commit
 transitions in isolation, and full-pipeline tests in

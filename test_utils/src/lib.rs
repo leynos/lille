@@ -2,6 +2,10 @@
 //! Provides assertions for verifying generated code and constructors for
 //! common physics records.
 
+use dbsp::dynamic::{DynData, Erase};
+use dbsp::typed_batch::OrdZSet;
+use dbsp::{DBData, OutputHandle, ZWeight};
+
 pub mod conversions;
 pub mod dbsp_sync;
 pub mod physics;
@@ -47,6 +51,23 @@ pub fn expect_single<'a, T>(items: &'a [T], context: &str) -> &'a T {
         [] => panic!("{context}: expected one item, found none"),
         many => panic!("{context}: expected one item, found {}", many.len()),
     }
+}
+
+/// Consolidates a DBSP output handle into `(record, weight)` pairs.
+///
+/// Retaining the Z-set weight lets tests assert multiplicity — for example,
+/// that a deduplicated stream emits a record exactly once — rather than only
+/// checking the record's contents.
+#[must_use]
+pub fn collect_weighted<T>(handle: &OutputHandle<OrdZSet<T>>) -> Vec<(T, ZWeight)>
+where
+    T: DBData + Erase<DynData>,
+{
+    handle
+        .consolidate()
+        .iter()
+        .map(|(record, (), weight)| (record, weight))
+        .collect()
 }
 
 /// Assert that all strings in `keys` are present in `code`.

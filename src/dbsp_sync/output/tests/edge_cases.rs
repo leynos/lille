@@ -247,9 +247,12 @@ fn negative_weight_health_delta_is_not_applied() {
     let mut app = setup_app().expect("failed to set up test app");
     let entity = spawn_entity(&mut app);
     prime_entity_mapping(&mut app, entity);
-    // Retract the health snapshot (weight -1) while damage arrives (+1): the
-    // consolidated health delta carries a negative weight (a retraction) and
-    // must be skipped rather than mutating Health.
+    // Positive control: `applies_outputs_updates_components` primes these same
+    // inputs — health 90/100 and 50 external damage at tick 1, seq 1 — with the
+    // health snapshot at weight +1, and asserts `Health::current` moves 90 -> 40.
+    // Here the snapshot is retracted instead (weight -1), so the Z-set weight is
+    // the only variable: the consolidated health delta carries a negative
+    // (retraction) weight and must be skipped rather than mutating Health.
     {
         let state = app.world_mut().non_send_resource_mut::<DbspState>();
         state.circuit.health_state_in().push(

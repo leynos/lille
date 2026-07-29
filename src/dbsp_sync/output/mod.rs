@@ -125,8 +125,19 @@ fn apply_velocities(state: &DbspState, write_query: &mut DbspWriteQuery<'_, '_>)
         if weight <= 0 {
             continue;
         }
-        let Some((_, Some(mut velocity), _)) = resolve_write_target(state, write_query, vel.entity)
+        // Unmapped or despawned entities are skipped silently (they are already
+        // reported elsewhere), but an entity that resolves yet carries no
+        // `VelocityComp` is a mismatch worth surfacing, mirroring
+        // `resolve_health_target`'s missing-`Health` warning.
+        let Some((_, maybe_velocity, _)) = resolve_write_target(state, write_query, vel.entity)
         else {
+            continue;
+        };
+        let Some(mut velocity) = maybe_velocity else {
+            warn!(
+                "velocity update received for entity {} without VelocityComp",
+                vel.entity
+            );
             continue;
         };
         assign_axis(
@@ -237,6 +248,10 @@ fn clamped_health_value(delta: &HealthDelta, health: &Health) -> Option<u16> {
             delta.entity, raw, new_value
         );
     }
+    // `new_value` is `raw` clamped to `0..=health.max`, and `health.max` is a
+    // `u16`, so the value is always within `u16` range and this conversion
+    // cannot fail. The branch below is belt and braces against a future change
+    // to the clamp bounds.
     let Ok(value) = u16::try_from(new_value) else {
         debug_assert!(
             false,

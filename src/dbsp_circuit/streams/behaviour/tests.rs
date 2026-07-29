@@ -286,14 +286,7 @@ fn duplicate_targets_produce_single_decision() {
 
     // Retain the Z-set weight: duplicate targets must dedupe to a single
     // decision with multiplicity 1, not a single decision emitted twice.
-    let decisions: Vec<(MovementDecision, i64)> = decisions_handle
-        .consolidate()
-        .iter()
-        .map(|(decision, (), weight)| {
-            let decision_ref: &MovementDecision = &decision;
-            (*decision_ref, weight)
-        })
-        .collect();
+    let decisions = test_utils::collect_weighted(&decisions_handle);
     let (decision, weight) = test_utils::expect_single(&decisions, "movement decision result");
     assert_eq!(
         *weight, 1,

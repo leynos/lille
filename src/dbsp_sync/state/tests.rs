@@ -119,12 +119,14 @@ fn applied_unsequenced_rollback_matrix(
 
     state.begin_frame_rollback();
     state.record_unsequenced_undo(entity);
-    if repeat_undo {
-        // A repeat record for the same entity must not overwrite the capture.
-        state.record_unsequenced_undo(entity);
-    }
     let advanced = (2, HashSet::from([damage_event(entity, 2)]));
     state.applied_unsequenced.insert(entity, advanced.clone());
+    if repeat_undo {
+        // Recorded *after* the mutation: a repeat capture for the same entity
+        // must keep the original pre-frame value rather than latching the
+        // already-advanced entry.
+        state.record_unsequenced_undo(entity);
+    }
     state.stash_frame_rollback(Vec::new(), Vec::new());
 
     if commit {

@@ -232,35 +232,68 @@ fn duplicate_health_delta_is_ignored() {
 
 #[rstest]
 fn negative_weight_position_is_not_applied() {
-    let mut app = setup_app().expect("failed to set up test app");
-    let entity = spawn_entity(&mut app);
-    prime_entity_mapping(&mut app, entity);
-    // Push the position as a retraction (weight -1). The consolidated output
-    // carries a negative weight and must be skipped rather than written to the
-    // Transform.
-    push_position_input(
-        &mut app,
-        Position {
-            entity: 1,
-            x: 5.0.into(),
-            y: 5.0.into(),
-            z: 1.0.into(),
-        },
-        -1,
-    );
+    // These are `prime_state`'s inputs, which `applies_outputs_updates_components`
+    // already proves move the Transform: the entity stands on the primed block
+    // and the circuit integrates its velocity into a new position. A position
+    // input alone emits no output at all, so pushing the velocity at a fixed
+    // weight +1 keeps the position record's weight as the only variable and
+    // stops the retraction assertion from holding vacuously.
+    let position = Position {
+        entity: 1,
+        x: 0.0.into(),
+        y: 0.0.into(),
+        z: 1.0.into(),
+    };
+    let velocity = Velocity {
+        entity: 1,
+        vx: 1.0.into(),
+        vy: 0.0.into(),
+        vz: 0.0.into(),
+    };
 
-    app.world_mut()
-        .run_system_once(apply_dbsp_outputs_system)
-        .expect("applying DBSP outputs should succeed");
+    // Control phase: at weight +1 the position IS applied, so the Transform
+    // moves off the origin — proving the record reaches the write path.
+    {
+        let mut app = setup_app().expect("failed to set up test app");
+        let entity = spawn_entity(&mut app);
+        prime_entity_mapping(&mut app, entity);
+        push_velocity_input(&mut app, velocity, 1);
+        push_position_input(&mut app, position, 1);
+        app.world_mut()
+            .run_system_once(apply_dbsp_outputs_system)
+            .expect("applying DBSP outputs should succeed");
+        let transform = app
+            .world()
+            .entity(entity)
+            .get::<Transform>()
+            .expect("Transform component should remain present");
+        assert_ne!(
+            transform.translation,
+            Vec3::ZERO,
+            "a positive-weight position must be applied, else the gate test is vacuous"
+        );
+    }
 
-    let transform = app
-        .world()
-        .entity(entity)
-        .get::<Transform>()
-        .expect("Transform component should remain present");
-    assert_eq!(
-        transform.translation,
-        Vec3::ZERO,
-        "a negative-weight position must not mutate the Transform"
-    );
+    // Retraction phase: the same records with the position at weight -1 give a
+    // negative consolidated output weight, which must be skipped, not written.
+    {
+        let mut app = setup_app().expect("failed to set up test app");
+        let entity = spawn_entity(&mut app);
+        prime_entity_mapping(&mut app, entity);
+        push_velocity_input(&mut app, velocity, 1);
+        push_position_input(&mut app, position, -1);
+        app.world_mut()
+            .run_system_once(apply_dbsp_outputs_system)
+            .expect("applying DBSP outputs should succeed");
+        let transform = app
+            .world()
+            .entity(entity)
+            .get::<Transform>()
+            .expect("Transform component should remain present");
+        assert_eq!(
+            transform.translation,
+            Vec3::ZERO,
+            "a negative-weight position must not mutate the Transform"
+        );
+    }
 }

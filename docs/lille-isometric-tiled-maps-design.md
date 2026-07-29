@@ -910,7 +910,7 @@ respective game systems (be it AI spawn systems or trigger systems) can
 operate. This approach reinforces Lille’s separation: the map defines *data*,
 and the logic systems use that data. The plugin is just the bridge.
 
-### 5.5 Primary Map Asset Path Validation
+### 5.5 Primary map asset path validation
 
 Before spawning the primary map, the plugin validates the `primary_map` path
 configured on `LilleMapSettings`. The path must be a relative asset-server
@@ -1038,15 +1038,14 @@ they run after the map spawn, but using events largely decouples that ordering):
 - `spawn_player` / `spawn_enemies` – systems to spawn actual game entities at
   spawn markers.
 
-We have to be careful about system order. The map events (`MapCreated`,
-`ObjectCreated`, etc.) are emitted by the TiledPlugin likely in the
-`PostUpdate` or end of a frame when the asset finishes loading. We should
-ensure our message-reader systems run *after* that emission in the same frame.
-By default, if we put them in `Update` stage without further ordering, they
-might run before events are delivered. However, Bevy events are updated between
-stages, and since we’re adding our plugin after, it might align. To be sure, we
-could schedule some of them in `PostUpdate` or use explicit `.after(...)`
-dependencies if TiledPlugin declares a label.
+System order needs care. The map events (`MapCreated`, `ObjectCreated`, etc.)
+are emitted by the TiledPlugin likely in the `PostUpdate` or end of a frame
+when the asset finishes loading. The message-reader systems must run *after*
+that emission in the same frame. By default, placing them in the `Update`
+stage without further ordering risks running them before events are delivered.
+However, Bevy events are updated between stages, and since the plugin is added
+afterwards, it might align. To be sure, schedule some of them in `PostUpdate`
+or use explicit `.after(...)` dependencies if TiledPlugin declares a label.
 
 For simplicity, we might do all our processing in one system that runs on
 `MapCreated` event, since at that point all objects exist. That system can
