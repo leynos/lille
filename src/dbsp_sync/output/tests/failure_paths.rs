@@ -220,6 +220,45 @@ fn failed_step_rolls_back_unsequenced_damage_dedupe_state(#[from(plugin_app)] mu
     );
 }
 
+#[rstest]
+fn rolled_back_retraction_markers_do_not_suppress_a_later_delta() {
+    // A frame's cache pass records `expected_health_retractions` markers for the
+    // damage retractions it issues, and `should_apply_health_delta` consumes a
+    // matching marker to suppress the echoing delta. When the step fails those
+    // retractions are discarded with the circuit inputs, so the markers must go
+    // too — otherwise a later, legitimate delta for the same
+    // `(entity, at_tick, seq)` would be silently swallowed.
+    let mut app = setup_app().expect("failed to set up test app");
+    let entity = spawn_entity(&mut app);
+    prime_state(&mut app, entity);
+    // Emits a delta for entity 1 at tick 1, seq 1, taking health 90 -> 40 (the
+    // same inputs `applies_outputs_updates_components` asserts are applied).
+    push_health_inputs(&mut app, 90, 50);
+
+    // Stand in for a failed frame that left a marker matching that delta, then
+    // roll the frame back.
+    {
+        let mut state = app.world_mut().non_send_resource_mut::<DbspState>();
+        state.expected_health_retractions.insert((1, 1, Some(1)));
+        state.rollback_frame_tracking();
+    }
+
+    app.world_mut()
+        .run_system_once(apply_dbsp_outputs_system)
+        .expect("applying DBSP outputs should succeed");
+
+    let health = app
+        .world()
+        .entity(entity)
+        .get::<Health>()
+        .expect("Health component should remain present");
+    assert_eq!(
+        health.current, 40,
+        "a rolled-back frame's retraction markers must not suppress a later \
+         matching health delta"
+    );
+}
+
 /// An unsequenced (`seq: None`) external damage event for entity 1 at tick 1.
 fn unsequenced_damage(amount: u16) -> DamageEvent {
     DamageEvent {

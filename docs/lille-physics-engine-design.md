@@ -337,17 +337,26 @@ cache pass already extracts via `mem::take`, and the `applied_unsequenced`
 map is protected by a per-entity undo log that records only the entries
 actually touched that frame. On a failed step, `apply_dbsp_outputs_system`
 clears the circuit's inputs (`clear_inputs()`) and calls
-`rollback_frame_tracking()` to restore the three collections; on a
-successful step it calls `commit_frame_tracking()` to discard the backups
-instead. Unit tests in `src/dbsp_sync/state/tests.rs`
+`rollback_frame_tracking()` to restore those three collections and clear
+`expected_health_retractions`; on a successful step it calls
+`commit_frame_tracking()` to discard the backups instead. Clearing
+`expected_health_retractions` on rollback is defensive completeness, not a
+fix for an observed bug: the set is transient, cleared and rebuilt by every
+cache pass, so a marker left by a failed frame was always wiped before any
+later output-side read. Unit tests in `src/dbsp_sync/state/tests.rs`
 (`rollback_restores_health_snapshot_and_pending_damage`,
+`stash_frame_rollback_keeps_first_values`,
 `applied_unsequenced_rollback_matrix`) cover the rollback/commit
 transitions in isolation, and full-pipeline tests in
 `src/dbsp_sync/output/tests/failure_paths.rs`
 (`step_failure_triggers_error_event`,
 `failed_step_clears_inputs_so_they_do_not_replay`,
-`failed_step_rolls_back_health_tracking`) exercise the same behaviour through
-two real `app.update()` calls.
+`failed_step_rolls_back_health_tracking`) exercise the same behaviour
+through two real `app.update()` calls. A further test in that file,
+`rolled_back_retraction_markers_do_not_suppress_a_later_delta`, primes a
+stray retraction marker, rolls the frame back directly, and asserts a
+later, legitimate `HealthDelta` for the same key is still applied rather
+than swallowed.
 
 #### Output application applies only positive-weight records
 

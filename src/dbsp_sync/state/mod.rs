@@ -217,6 +217,13 @@ impl DbspState {
     /// circuit inputs were cleared without being applied, keeping the Rust-side
     /// bookkeeping consistent with the circuit's actual records. A no-op when no
     /// backup was taken (e.g. the output system run in isolation by a test).
+    ///
+    /// Also drops this frame's [`Self::expected_health_retractions`] markers.
+    /// The retractions they describe were discarded with the circuit inputs, so
+    /// no matching `HealthDelta` will arrive to consume them. The next cache
+    /// pass clears the set unconditionally, so this is defensive rather than a
+    /// correction — it keeps the rollback complete instead of relying on the
+    /// cache-precedes-output ordering holding forever.
     pub(crate) fn rollback_frame_tracking(&mut self) {
         if let Some(snapshots) = self.health_snapshot_backup.take() {
             self.health_snapshot = snapshots
@@ -227,6 +234,7 @@ impl DbspState {
         if let Some(pending) = self.pending_damage_backup.take() {
             self.pending_damage_retractions = pending;
         }
+        self.expected_health_retractions.clear();
         for (entity, previous) in std::mem::take(&mut self.applied_unsequenced_undo) {
             match previous {
                 Some(entry) => {

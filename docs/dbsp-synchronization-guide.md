@@ -75,27 +75,30 @@ successfully step the circuit this frame:
 - `applied_unsequenced`: mutated per entity as new unsequenced damage events
   are deduplicated during `ingest_damage_events`.
 
-Of these four, `expected_health_retractions` is **not** rolled back on a
-failed step, and deliberately so: it is transient rather than persistent
-frame-to-frame state. `cache_state_for_dbsp_impl` clears and rebuilds it from
-scratch at the very start of every pass, before any retraction is issued, and
-it is only ever read within that same frame — inside
-`should_apply_health_delta` (`src/dbsp_sync/output/mod.rs`) — to suppress
-`HealthDelta` outputs that merely echo a retraction this frame already
-issued. Because the next frame's cache pass unconditionally clears it before
-reading it, leaving it "advanced" after a failed step has no observable
-effect; there is nothing for a rollback to protect. The three collections
-that *do* persist meaningfully across frames — `health_snapshot`,
-`pending_damage_retractions`, and `applied_unsequenced` — are exactly the
-ones the rollback methods below restore.
+`health_snapshot`, `pending_damage_retractions`, and `applied_unsequenced`
+persist meaningfully frame-to-frame, so `rollback_frame_tracking()` restores
+each to its pre-frame value on a failed step. `expected_health_retractions`
+is different: it is transient rather than persistent state.
+`cache_state_for_dbsp_impl` clears and rebuilds it from scratch at the very
+start of every pass, before any retraction is issued, and it is only ever
+read within that same frame — inside `should_apply_health_delta`
+(`src/dbsp_sync/output/mod.rs`) — to suppress `HealthDelta` outputs that
+merely echo a retraction this frame already issued. Because the next
+frame's cache pass unconditionally clears it before reading it, leaving it
+"advanced" after a failed step has no observable effect under the current
+`.chain()`-ordered systems (`src/dbsp_sync/plugin.rs`).
+`rollback_frame_tracking()` clears it anyway: this is defensive
+completeness, not a fix for an observed bug — it stops correctness
+depending on that chained ordering holding forever.
 
 If `state.step_circuit()` later fails, these mutations must be undone: the
 circuit's inputs are cleared without ever being accepted, so the Rust-side
 bookkeeping must be restored to match what the circuit actually holds (that
 is, nothing from this frame). `DbspState` exposes five methods to restore
 three of the four collections above (`health_snapshot`,
-`pending_damage_retractions`, and `applied_unsequenced`) without a per-frame
-deep clone of the tracking state:
+`pending_damage_retractions`, and `applied_unsequenced`) and clear the
+fourth (`expected_health_retractions`), without a per-frame deep clone of
+the tracking state:
 
 - **`begin_frame_rollback()`** — called at the very start of
   `cache_state_for_dbsp_impl`. Resets `health_snapshot_backup` and
@@ -120,10 +123,11 @@ deep clone of the tracking state:
 - **`rollback_frame_tracking()`** — called by `apply_dbsp_outputs_system`
   when `step_circuit()` returns `Err`. Rebuilds `health_snapshot` from the
   backed-up `Vec<HealthState>` (keyed by `entity`), restores
-  `pending_damage_retractions` from the backed-up `Vec<DamageEvent>`, and
-  replays the `applied_unsequenced_undo` log: entities with a recorded prior
-  value have it reinserted; entities with a recorded `None` (meaning they had
-  no entry before this frame) have their entry removed.
+  `pending_damage_retractions` from the backed-up `Vec<DamageEvent>`, clears
+  `expected_health_retractions`, and replays the `applied_unsequenced_undo`
+  log: entities with a recorded prior value have it reinserted; entities
+  with a recorded `None` (meaning they had no entry before this frame) have
+  their entry removed.
 
 The design goal is to avoid deep-cloning the whole tracking state every
 frame. The health/damage backups reuse the same vectors the cache pass
@@ -136,11 +140,13 @@ actually touched this frame, the first time it is touched.
 
 This is exercised directly in `src/dbsp_sync/state/tests.rs`'s unit tests:
 `rollback_restores_health_snapshot_and_pending_damage` covers the health and
-pending-damage backups, and `applied_unsequenced_rollback_matrix` is a
-parameterized test over whether the entity had a prior entry, whether the
-undo was recorded once or twice, and whether the frame commits or rolls
-back — asserting rollback restores the exact pre-frame value and commit
-makes a later rollback a no-op.
+pending-damage backups; `stash_frame_rollback_keeps_first_values` asserts a
+second `stash_frame_rollback` call in the same frame cannot overwrite the
+true pre-frame values with already-advanced ones; and
+`applied_unsequenced_rollback_matrix` is a parameterized test over whether
+the entity had a prior entry, whether the undo was recorded once or twice,
+and whether the frame commits or rolls back — asserting rollback restores
+the exact pre-frame value and commit makes a later rollback a no-op.
 
 ## 3. Step-failure handling
 
@@ -162,10 +168,10 @@ makes a later rollback a no-op.
    successful frame.
 3. It then calls `state.rollback_frame_tracking()` to restore the pre-frame
    `health_snapshot`, `pending_damage_retractions`, and `applied_unsequenced`
-   entries described in [§2](#2-frame-rollback-api-on-dbspstate). Clearing
-   the inputs alone would leave that bookkeeping pointing at records the
-   circuit never accepted, which would corrupt the retractions the *next*
-   frame's cache pass issues.
+   entries, and to clear `expected_health_retractions`, as described in
+   [§2](#2-frame-rollback-api-on-dbspstate). Clearing the inputs alone would
+   leave that bookkeeping pointing at records the circuit never accepted,
+   which would corrupt the retractions the *next* frame's cache pass issues.
 4. The function returns early. `apply_positions`, `apply_velocities`, and
    `apply_health_deltas` are never called on a failed step, so no ECS
    component is mutated — the circuit remains the sole authority and no
@@ -181,10 +187,14 @@ This path is exercised by `src/dbsp_sync/output/tests/failure_paths.rs`:
 `step_failure_triggers_error_event` asserts the error event is captured and
 that a failed step leaves the ECS `Transform` untouched;
 `failed_step_clears_inputs_so_they_do_not_replay` asserts a subsequent,
-successful run does not replay the cleared inputs; and
+successful run does not replay the cleared inputs;
 `failed_step_rolls_back_health_tracking` runs a full pipeline (two real
 `app.update()` calls) to assert that `DbspState::health_snapshot` after a
-failed step exactly matches its value before that frame's cache pass ran.
+failed step exactly matches its value before that frame's cache pass ran;
+and `rolled_back_retraction_markers_do_not_suppress_a_later_delta` primes a
+stray `expected_health_retractions` marker before rolling back, then asserts
+a later, legitimate `HealthDelta` for the same `(entity, at_tick, seq)` is
+still applied rather than silently swallowed.
 
 ## 4. Output weight semantics
 

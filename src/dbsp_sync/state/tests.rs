@@ -89,6 +89,47 @@ fn rollback_restores_health_snapshot_and_pending_damage(
     assert_eq!(state.pending_damage_retractions, vec![pending]);
 }
 
+/// `stash_frame_rollback` keeps the first pre-frame values it is given and
+/// ignores later calls within the same frame, so a repeat call cannot latch
+/// already-advanced state. Removing either `is_none` guard makes the rollback
+/// below restore the second (wrong) values and fails this test.
+#[rstest]
+fn stash_frame_rollback_keeps_first_values(
+    #[from(state)] state_result: Result<DbspState, dbsp::Error>,
+) {
+    let mut state = state_result.expect("failed to initialise DbspState for tests");
+    let first_snapshot = HealthState {
+        entity: 3,
+        current: 50,
+        max: 100,
+    };
+    let first_pending = damage_event(3, 1);
+    // Distinct from the first pair, so a lost guard is observable.
+    let second_snapshot = HealthState {
+        entity: 3,
+        current: 10,
+        max: 100,
+    };
+    let second_pending = damage_event(3, 2);
+
+    state.begin_frame_rollback();
+    state.stash_frame_rollback(vec![first_snapshot], vec![first_pending]);
+    state.stash_frame_rollback(vec![second_snapshot], vec![second_pending]);
+
+    state.rollback_frame_tracking();
+
+    assert_eq!(
+        state.health_snapshot.get(&3),
+        Some(&first_snapshot),
+        "rollback must restore the health snapshot from the first stash"
+    );
+    assert_eq!(
+        state.pending_damage_retractions,
+        vec![first_pending],
+        "rollback must restore the pending damage from the first stash"
+    );
+}
+
 /// Bounded state-transition matrix over the rollback-relevant combinations:
 /// whether the entity had a prior `applied_unsequenced` entry, whether the
 /// undo was recorded once or twice (the second must be a no-op), and whether
