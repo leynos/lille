@@ -1038,20 +1038,23 @@ they run after the map spawn, but using events largely decouples that ordering):
 - `spawn_player` / `spawn_enemies` – systems to spawn actual game entities at
   spawn markers.
 
-System order needs care. The map events (`MapCreated`, `ObjectCreated`, etc.)
-are emitted by the TiledPlugin likely in the `PostUpdate` or end of a frame
-when the asset finishes loading. The message-reader systems must run *after*
-that emission in the same frame. By default, placing them in the `Update`
-stage without further ordering risks running them before events are delivered.
-However, Bevy events are updated between stages, and since the plugin is added
-afterwards, it might align. To be sure, schedule some of them in `PostUpdate`
-or use explicit `.after(...)` dependencies if TiledPlugin declares a label.
+System order is well defined. `bevy_ecs_tiled` emits `TiledEvent<MapCreated>`
+from its internal `process_loaded_maps` system, which runs in the `PreUpdate`
+schedule under the `TiledPreUpdateSystems::ProcessLoadedMaps` system
+set, after layer, tile, and object entities and their custom
+properties have been spawned. `TiledEvent<E>` is delivered both as a
+triggered entity event, observable synchronously regardless of
+schedule ordering, and as a buffered `Message`, readable via
+`MessageReader<TiledEvent<MapCreated>>`. A buffered reader placed in
+`Update` or later sees the message in the same frame, because
+emission happens earlier in `PreUpdate`. A reader that must run in
+`PreUpdate` alongside emission should be ordered
+`.after(TiledPreUpdateSystems::ProcessLoadedMaps)`.
 
-For simplicity, we might do all our processing in one system that runs on
-`MapCreated` event, since at that point all objects exist. That system can
-perform: add blocks, add slopes, spawn player, spawn NPCs. This avoids having
-to coordinate multiple small systems and is triggered only once per map load
-(which is fine).
+A single system triggered by the `MapCreated` event can perform all
+processing after all objects exist: adding blocks, adding slopes,
+spawning the player, and spawning NPCs. This avoids coordinating
+multiple small systems and runs only once per map load.
 
 Pseudo-code for a combined system using `MapCreated` event:
 

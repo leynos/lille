@@ -103,6 +103,37 @@ fn push_velocity_input(app: &mut App, velocity: Velocity, weight: i64) {
     state.circuit.velocity_in().push(velocity, weight);
 }
 
+/// Runs one phase of a two-phase weight-gate test on a fresh app: spawns and
+/// primes an entity, lets `push_inputs` push this phase's records at `weight`,
+/// applies the DBSP outputs, then reads a comparable value back out.
+///
+/// Pairing a positive-weight phase with a negative-weight one isolates the
+/// Z-set weight as the only variable, so the retraction assertion cannot hold
+/// vacuously. `read` must copy the value out of the component — returning a
+/// borrow would outlive the app. Failures propagate as `dbsp::Error` rather
+/// than panicking here, so this helper stays outside a
+/// `no_expect_outside_tests` boundary; callers unwrap the result.
+fn run_weight_gate_phase<T>(
+    weight: i64,
+    push_inputs: impl FnOnce(&mut App, i64),
+    read: impl FnOnce(&App, Entity) -> Option<T>,
+) -> Result<Option<T>, dbsp::Error> {
+    let mut app = setup_app()?;
+    let entity = spawn_entity(&mut app);
+    prime_entity_mapping(&mut app, entity);
+    push_inputs(&mut app, weight);
+    // `RunSystemError` implements neither `Display` nor `Error`, so fold it into
+    // the `dbsp::Error` this helper already returns (as `force_step_error` does).
+    app.world_mut()
+        .run_system_once(apply_dbsp_outputs_system)
+        .map_err(|error| {
+            dbsp::Error::IO(io::Error::other(format!(
+                "applying DBSP outputs failed: {error:?}"
+            )))
+        })?;
+    Ok(read(&app, entity))
+}
+
 fn prime_state(app: &mut App, entity: Entity) {
     prime_entity_mapping(app, entity);
     push_position_input(
@@ -251,49 +282,34 @@ fn negative_weight_position_is_not_applied() {
         vz: 0.0.into(),
     };
 
+    // The velocity is always pushed at +1; only the position's weight varies.
+    let push_inputs = |app: &mut App, weight: i64| {
+        push_velocity_input(app, velocity, 1);
+        push_position_input(app, position, weight);
+    };
+    let read_translation = |app: &App, entity: Entity| {
+        Some(app.world().entity(entity).get::<Transform>()?.translation)
+    };
+
     // Control phase: at weight +1 the position IS applied, so the Transform
     // moves off the origin — proving the record reaches the write path.
-    {
-        let mut app = setup_app().expect("failed to set up test app");
-        let entity = spawn_entity(&mut app);
-        prime_entity_mapping(&mut app, entity);
-        push_velocity_input(&mut app, velocity, 1);
-        push_position_input(&mut app, position, 1);
-        app.world_mut()
-            .run_system_once(apply_dbsp_outputs_system)
-            .expect("applying DBSP outputs should succeed");
-        let transform = app
-            .world()
-            .entity(entity)
-            .get::<Transform>()
-            .expect("Transform component should remain present");
-        assert_ne!(
-            transform.translation,
-            Vec3::ZERO,
-            "a positive-weight position must be applied, else the gate test is vacuous"
-        );
-    }
+    let applied = run_weight_gate_phase(1, push_inputs, read_translation)
+        .expect("running the control phase should succeed")
+        .expect("Transform component should remain present");
+    assert_ne!(
+        applied,
+        Vec3::ZERO,
+        "a positive-weight position must be applied, else the gate test is vacuous"
+    );
 
     // Retraction phase: the same records with the position at weight -1 give a
     // negative consolidated output weight, which must be skipped, not written.
-    {
-        let mut app = setup_app().expect("failed to set up test app");
-        let entity = spawn_entity(&mut app);
-        prime_entity_mapping(&mut app, entity);
-        push_velocity_input(&mut app, velocity, 1);
-        push_position_input(&mut app, position, -1);
-        app.world_mut()
-            .run_system_once(apply_dbsp_outputs_system)
-            .expect("applying DBSP outputs should succeed");
-        let transform = app
-            .world()
-            .entity(entity)
-            .get::<Transform>()
-            .expect("Transform component should remain present");
-        assert_eq!(
-            transform.translation,
-            Vec3::ZERO,
-            "a negative-weight position must not mutate the Transform"
-        );
-    }
+    let skipped = run_weight_gate_phase(-1, push_inputs, read_translation)
+        .expect("running the retraction phase should succeed")
+        .expect("Transform component should remain present");
+    assert_eq!(
+        skipped,
+        Vec3::ZERO,
+        "a negative-weight position must not mutate the Transform"
+    );
 }

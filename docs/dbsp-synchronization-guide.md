@@ -320,19 +320,23 @@ The invariant-heavy paths and their concrete test entry points are:
 
 ### Why not a property-testing framework
 
-Property-testing frameworks such as `proptest`, Kani, or Verus are
-deliberately **not** adopted for this work. None of them are workspace
-dependencies, and adding one is a supply-chain decision that this testing
-strategy does not need to make: every invariant above concerns a small,
-finite input space (a handful of weight combinations, a handful of path
-component forms, a handful of rollback/commit orderings). Because each of
-these spaces is small and finite, a bounded, enumerated `rstest` case matrix
-covers the *entire* space — every relevant case, not a randomly-sampled
-subset of it — without introducing a new dependency or a generator/shrinker
-to maintain. This deliberate deviation from a property/proof-testing default
-is a documented, approved exception, recorded in [ADR-003: bounded `rstest`
-matrices over a property-testing framework](
-adr-003-bounded-rstest-over-property-testing.md). Should an invariant's
-input space grow large enough that exhaustive enumeration becomes
-impractical, adopting a property-testing framework would be a reasonable
-escalation at that point.
+Property-based *sampling* (`proptest`) and formal *proof* tools (Kani,
+Verus) are different classes of tool, and neither is adopted for this work.
+`proptest` draws randomized samples from an input domain; Kani and Verus
+instead prove a property over a bounded or whole domain. None of the three
+is a workspace dependency, and adding any of them is a supply-chain decision
+that this testing strategy does not need to make.
+
+The bounded `rstest` matrices are exhaustive over the finite dimensions they
+enumerate — the rollback/commit orderings, and the prior-entry/repeat-undo/
+commit-vs-rollback state combinations. For the movement-decision weights
+(`i64`-valued) and asset-path strings, the domains are unbounded; the
+matrices instead enumerate representative **equivalence classes**
+(positive, negative, and net-zero weights; rooted, `..`-component, and
+substring-`..` path forms), not the entire space. This deliberate deviation
+from a property/proof-testing default is a documented, approved exception,
+recorded in [ADR-003: bounded `rstest` matrices over a property-testing
+framework](adr-003-bounded-rstest-over-property-testing.md). Should a
+domain warrant stronger assurance, adopting `proptest` (sampling) or a
+bounded model checker such as Kani (proof) would be a reasonable escalation
+at that point.

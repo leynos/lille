@@ -194,52 +194,39 @@ fn negative_weight_velocity_is_not_applied() {
     };
     let default = VelocityComp::default();
 
+    // The base position is always pushed at +1; only the velocity's weight
+    // varies. `VelocityComp` derives no `PartialEq`, so the read copies its
+    // components out as a comparable tuple.
+    let push_inputs = |app: &mut App, weight: i64| {
+        push_position_input(app, base, 1);
+        push_velocity_input(app, velocity, weight);
+    };
+    let read_velocity = |app: &App, entity: Entity| {
+        let applied = app.world().entity(entity).get::<VelocityComp>()?;
+        Some((applied.vx, applied.vy, applied.vz))
+    };
+    let baseline = (default.vx, default.vy, default.vz);
+
     // Phase 1: at weight +1 the velocity output IS applied, so VelocityComp
     // changes from its default. This proves these inputs emit velocity output
     // at all, which keeps the phase-2 skip assertion from passing vacuously.
-    {
-        let mut app = setup_app().expect("failed to set up test app");
-        let entity = spawn_entity(&mut app);
-        prime_entity_mapping(&mut app, entity);
-        push_position_input(&mut app, base, 1);
-        push_velocity_input(&mut app, velocity, 1);
-        app.world_mut()
-            .run_system_once(apply_dbsp_outputs_system)
-            .expect("applying DBSP outputs should succeed");
-        let applied = app
-            .world()
-            .entity(entity)
-            .get::<VelocityComp>()
-            .expect("VelocityComp should remain present");
-        assert_ne!(
-            (applied.vx, applied.vy, applied.vz),
-            (default.vx, default.vy, default.vz),
-            "a positive-weight velocity must be applied, else the gate test is vacuous"
-        );
-    }
+    let applied = run_weight_gate_phase(1, push_inputs, read_velocity)
+        .expect("running the control phase should succeed")
+        .expect("VelocityComp should remain present");
+    assert_ne!(
+        applied, baseline,
+        "a positive-weight velocity must be applied, else the gate test is vacuous"
+    );
 
-    // Phase 2: a freshly created entity with the same inputs at weight -1. The
-    // negative (retraction) weight must be skipped, leaving VelocityComp default.
-    {
-        let mut app = setup_app().expect("failed to set up test app");
-        let entity = spawn_entity(&mut app);
-        prime_entity_mapping(&mut app, entity);
-        push_position_input(&mut app, base, 1);
-        push_velocity_input(&mut app, velocity, -1);
-        app.world_mut()
-            .run_system_once(apply_dbsp_outputs_system)
-            .expect("applying DBSP outputs should succeed");
-        let skipped = app
-            .world()
-            .entity(entity)
-            .get::<VelocityComp>()
-            .expect("VelocityComp should remain present");
-        assert_eq!(
-            (skipped.vx, skipped.vy, skipped.vz),
-            (default.vx, default.vy, default.vz),
-            "a negative-weight velocity must not mutate VelocityComp"
-        );
-    }
+    // Phase 2: the same inputs at weight -1. The negative (retraction) weight
+    // must be skipped, leaving VelocityComp at its default.
+    let skipped = run_weight_gate_phase(-1, push_inputs, read_velocity)
+        .expect("running the retraction phase should succeed")
+        .expect("VelocityComp should remain present");
+    assert_eq!(
+        skipped, baseline,
+        "a negative-weight velocity must not mutate VelocityComp"
+    );
 }
 
 #[rstest]

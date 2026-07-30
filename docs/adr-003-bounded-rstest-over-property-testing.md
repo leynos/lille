@@ -13,10 +13,11 @@ Accepted, 2026-07-26.
 Several invariants in the DBSP-sync and map-lifecycle code must hold
 *exactly*, not merely "usually", because they govern correctness properties
 such as at-most-one decision per entity, exact frame rollback, and rejection
-of unsafe asset paths. Property-testing frameworks (`proptest`, Kani, Verus)
-are the conventional tool for this class of invariant, generating many inputs
-per run (or, for Kani/Verus, proving over the whole input domain) rather than
-relying on a handful of hand-picked cases.
+of unsafe asset paths. Two distinct classes of tool are the conventional
+choice for this class of invariant: property-based *sampling* (`proptest`),
+which generates many randomly-drawn inputs per run, and formal *proof* tools
+(Kani, Verus), which prove a property over a bounded or whole input domain,
+rather than relying on a handful of hand-picked cases.
 
 None of `proptest`, Kani, or Verus is a workspace dependency (checked against
 the workspace `Cargo.toml`). Adopting one to cover these invariants would be
@@ -24,9 +25,14 @@ a new supply-chain decision, not a reuse of existing tooling.
 
 ## Decision Drivers
 
-- The invariants concerned each have a small, **finite** input space: a
-  handful of weight combinations, a handful of path-component forms, a
-  handful of rollback/commit orderings.
+- The rollback/commit orderings and prior-entry/repeat-undo/commit-vs-
+  rollback state combinations have a small, **finite** input space that a
+  hand-written matrix can enumerate exhaustively.
+- The movement-decision weights (`i64`-valued) and asset-path strings have
+  **unbounded** domains; a hand-written matrix can only cover a handful of
+  representative equivalence classes (positive, negative, and net-zero
+  weights; rooted, `..`-component, and substring-`..` path forms), not the
+  entire domain.
 - The `rstest` stack is already used throughout the codebase's test suite
   (see [Mastering test fixtures in Rust with `rstest`](
   rust-testing-with-rstest-fixtures.md)), so a case-matrix approach reuses
@@ -42,31 +48,37 @@ a new supply-chain decision, not a reuse of existing tooling.
 Generate randomly-sampled inputs (with shrinking on failure) for the
 invariants under test.
 
-Rejected for these invariants: `proptest` samples a subset of a space rather
-than enumerating it exhaustively, and for spaces this small a hand-written
-matrix can cover every case rather than a sample. `proptest` is also not
-currently a workspace dependency.
+Rejected for these invariants: `proptest` samples a subset of a domain
+rather than enumerating it exhaustively. For the finite state/ordering
+dimensions, a hand-written matrix can cover every case rather than a
+sample; for the weight and path domains, a hand-written matrix is no more
+exhaustive than sampling, but avoids the dependency and generator/shrinker
+authoring cost. `proptest` is also not currently a workspace dependency.
 
 ### Option B: adopt Kani or Verus
 
 Use bounded model checking (Kani) or a proof assistant (Verus) to prove the
 invariant holds over its entire input domain.
 
-Rejected for now: neither is a workspace dependency, both carry a
-significantly heavier toolchain and authoring cost than a test matrix, and
-for input spaces small enough to enumerate by hand, a proof tool is more
-machinery than the problem requires.
+Rejected for now: neither is a workspace dependency, and both carry a
+significantly heavier toolchain and authoring cost than a test matrix. For
+the finite state/ordering dimensions, a proof tool is more machinery than
+the problem requires. For the weight and path domains, proving over the
+whole domain would give stronger assurance than the enumerated matrix, but
+that investment is not judged warranted at present.
 
-### Option C (chosen): bounded, exhaustive `rstest` case matrices
+### Option C (chosen): bounded `rstest` case matrices
 
-Enumerate every case in the finite input space as an explicit `rstest` case,
-using the `rstest` stack already in use throughout the codebase.
+Enumerate the finite state/ordering dimensions exhaustively, and enumerate
+representative equivalence classes for the weight and path domains, as
+explicit `rstest` cases, using the `rstest` stack already in use throughout
+the codebase.
 
 ## Decision Outcome
 
 For the DBSP-sync and map-lifecycle invariants listed below, cover the
-invariant with a bounded, exhaustive `rstest` case matrix rather than
-adopting a property-testing or proof framework:
+invariant with a bounded `rstest` case matrix rather than adopting a
+property-testing or proof framework:
 
 - **Movement-decision dedupe** — one decision per entity, none for net-zero
   total weight, and a consolidated Z-set multiplicity of exactly `1` for the
@@ -83,23 +95,32 @@ adopting a property-testing or proof framework:
   appears only as a substring. Canonical example:
   `validate_asset_path_component_matrix` in `src/map/lifecycle/tests.rs`.
 
-Because each of these input spaces is small and finite, an `rstest` matrix
-enumerating every case covers the *entire* space — every relevant
-combination, not a sampled subset of it — which is the property a
-property-testing framework would otherwise be adopted to obtain. This ADR is
-the documented, approved exception to defaulting to a property-testing or
-proof framework for exactly-correctness invariants: it applies only to the
-invariants named above and any future invariant with an equivalently small,
-finite input space.
+For the frame-rollback ordering dimensions, the matrix enumerates every
+case in a genuinely finite, small domain, so it is exhaustive there. For
+the movement-decision weights (`i64`-valued) and asset-path strings, the
+domains are unbounded; the matrix instead enumerates chosen representative
+equivalence classes (positive, negative, and net-zero weights; rooted,
+`..`-component, and substring-`..` path forms), not the entire domain. This
+is a deliberately narrower guarantee than a property-testing framework
+(sampling) or a proof tool (Kani, Verus) would give over those two domains.
+This ADR is the documented, approved exception to defaulting to a
+property-testing or proof framework for exactly-correctness invariants: it
+applies only to the invariants named above and any future invariant of an
+equivalent shape, on the understanding that coverage is exhaustive only
+where the underlying domain is finite and small enough to enumerate.
 
 ## Known Risks and Limitations
 
-- The exhaustiveness argument is only sound while the input space stays
-  small enough to enumerate by hand. If an invariant's input space grows —
-  for example, if the number of independent weight/ordering dimensions
-  increases — a hand-written matrix risks silently becoming a sample rather
-  than remaining exhaustive, without an obvious signal that this has
-  happened.
+- For the movement-decision weight and asset-path invariants, the matrix is
+  already not exhaustive: it covers hand-chosen equivalence classes over an
+  unbounded domain, and a bug specific to a value outside those classes
+  would not be caught. This is a genuine, present coverage gap, not a
+  future risk.
+- For the frame-rollback ordering invariant, the exhaustiveness argument is
+  sound only while the state/ordering space stays small enough to enumerate
+  by hand. If the number of independent dimensions grows, a hand-written
+  matrix risks silently becoming a sample rather than remaining exhaustive,
+  without an obvious signal that this has happened.
 - No random generators or shrinkers are introduced, so this approach does
   not surface unanticipated edge cases the way property-based sampling can;
   it only verifies the cases the matrix's author enumerated.
@@ -107,10 +128,15 @@ finite input space.
 ## Removal Criteria
 
 This decision should be revisited, and a property-testing or proof framework
-adopted for the affected invariant, once either:
+adopted for the affected invariant, once any of:
 
-1. An invariant's input space grows large enough that exhaustive enumeration
-   by hand becomes impractical or error-prone to maintain, or
-2. `proptest`, Kani, or Verus becomes a workspace dependency for an
+1. The movement-decision weight or asset-path invariants show evidence — a
+   bug report, an incident, or a review finding — that the enumerated
+   equivalence classes miss a value class that matters, indicating stronger
+   assurance over those domains is warranted.
+2. The frame-rollback state/ordering invariant's input space grows large
+   enough that exhaustive enumeration by hand becomes impractical or
+   error-prone to maintain, or
+3. `proptest`, Kani, or Verus becomes a workspace dependency for an
    unrelated reason, at which point re-using it here may cost less than
    maintaining a bespoke matrix.
