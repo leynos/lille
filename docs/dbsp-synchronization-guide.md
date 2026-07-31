@@ -263,7 +263,7 @@ step:
   `~/.cargo/bin/whitaker-installer` and `~/.cache/cargo-binstall` by
   `actions/cache`) only when its reported `whitaker-installer --version`
   output exactly matches the pinned `WHITAKER_INSTALLER_VERSION` environment
-  variable (`0.2.6` at the time of writing). A bare presence check or a
+  variable defined in `.github/workflows/ci.yml`. A bare presence check or a
   substring match on the version string is deliberately avoided, since
   either could accept a stale or near-miss version.
 - Otherwise, it installs `whitaker-installer`, preferring `cargo binstall`:
@@ -330,8 +330,9 @@ that this testing strategy does not need to make.
 The bounded `rstest` matrices are exhaustive over the finite dimensions they
 enumerate — the rollback/commit orderings, and the prior-entry/repeat-undo/
 commit-vs-rollback state combinations. For the movement-decision weights
-(`i64`-valued) and asset-path strings, the domains are unbounded; the
-matrices instead enumerate representative **equivalence classes**
+(`i64`-valued), the domain is large but finite; for asset-path strings, the
+domain is genuinely unbounded. In both cases the matrices instead enumerate
+representative **equivalence classes**
 (positive, negative, and net-zero weights; rooted, `..`-component, and
 substring-`..` path forms), not the entire space. This deliberate deviation
 from a property/proof-testing default is a documented, approved exception,

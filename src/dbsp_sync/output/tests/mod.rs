@@ -113,6 +113,23 @@ fn push_velocity_input(app: &mut App, velocity: Velocity, weight: i64) {
 /// borrow would outlive the app. Failures propagate as `dbsp::Error` rather
 /// than panicking here, so this helper stays outside a
 /// `no_expect_outside_tests` boundary; callers unwrap the result.
+///
+/// One phase — pushing a position at the phase weight alongside a fixed
+/// weight-`+1` velocity, and reading the resulting translation back:
+///
+/// ```rust,ignore
+/// let translation = run_weight_gate_phase(
+///     -1,
+///     |app, weight| {
+///         push_velocity_input(app, velocity, 1);
+///         push_position_input(app, position, weight);
+///     },
+///     |app, entity| Some(app.world().entity(entity).get::<Transform>()?.translation),
+/// )?
+/// .expect("Transform component should remain present");
+/// // The negative weight is skipped, so the translation is still the origin.
+/// assert_eq!(translation, Vec3::ZERO);
+/// ```
 fn run_weight_gate_phase<T>(
     weight: i64,
     push_inputs: impl FnOnce(&mut App, i64),

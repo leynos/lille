@@ -1,4 +1,4 @@
-# Architectural decision record (ADR) 003: bounded `rstest` matrices over a property-testing framework
+# Architectural decision record (ADR) 003: bounded case matrices over a property-testing framework
 
 ## Status
 
@@ -15,7 +15,7 @@ Several invariants in the DBSP-sync and map-lifecycle code must hold
 such as at-most-one decision per entity, exact frame rollback, and rejection
 of unsafe asset paths. Two distinct classes of tool are the conventional
 choice for this class of invariant: property-based *sampling* (`proptest`),
-which generates many randomly-drawn inputs per run, and formal *proof* tools
+which generates many randomly drawn inputs per run, and formal *proof* tools
 (Kani, Verus), which prove a property over a bounded or whole input domain,
 rather than relying on a handful of hand-picked cases.
 
@@ -28,8 +28,9 @@ a new supply-chain decision, not a reuse of existing tooling.
 - The rollback/commit orderings and prior-entry/repeat-undo/commit-vs-
   rollback state combinations have a small, **finite** input space that a
   hand-written matrix can enumerate exhaustively.
-- The movement-decision weights (`i64`-valued) and asset-path strings have
-  **unbounded** domains; a hand-written matrix can only cover a handful of
+- The movement-decision weights (`i64`-valued) have a **large but finite**
+  domain, and asset-path strings have a genuinely **unbounded** domain (no
+  fixed maximum length); a hand-written matrix can only cover a handful of
   representative equivalence classes (positive, negative, and net-zero
   weights; rooted, `..`-component, and substring-`..` path forms), not the
   entire domain.
@@ -57,17 +58,20 @@ authoring cost. `proptest` is also not currently a workspace dependency.
 
 ### Option B: adopt Kani or Verus
 
-Use bounded model checking (Kani) or a proof assistant (Verus) to prove the
-invariant holds over its entire input domain.
+Use bounded model checking (Kani), which proves the invariant holds within
+the harness's configured bounds (loop unwind limits, size bounds) rather
+than over the whole input domain, or a proof assistant (Verus), which
+deductively proves the invariant holds over its entire input domain.
 
 Rejected for now: neither is a workspace dependency, and both carry a
 significantly heavier toolchain and authoring cost than a test matrix. For
 the finite state/ordering dimensions, a proof tool is more machinery than
-the problem requires. For the weight and path domains, proving over the
-whole domain would give stronger assurance than the enumerated matrix, but
-that investment is not judged warranted at present.
+the problem requires. For the weight and path domains, Kani's bounded
+guarantee and Verus's whole-domain proof would each give stronger assurance
+than the enumerated matrix, but that investment is not judged warranted at
+present.
 
-### Option C (chosen): bounded `rstest` case matrices
+### Option C (chosen): bounded case matrices
 
 Enumerate the finite state/ordering dimensions exhaustively, and enumerate
 representative equivalence classes for the weight and path domains, as
@@ -77,7 +81,7 @@ the codebase.
 ## Decision Outcome
 
 For the DBSP-sync and map-lifecycle invariants listed below, cover the
-invariant with a bounded `rstest` case matrix rather than adopting a
+invariant with a bounded case matrix rather than adopting a
 property-testing or proof framework:
 
 - **Movement-decision dedupe** — one decision per entity, none for net-zero
@@ -89,7 +93,7 @@ property-testing or proof framework:
   `pending_damage_retractions`, and `applied_unsequenced` on a failed
   `step_circuit()` call, versus retention of the frame's changes on commit.
   Canonical example: `applied_unsequenced_rollback_matrix` in
-  `src/dbsp_sync/state.rs`.
+  `src/dbsp_sync/state/tests.rs`.
 - **Asset-path validation** — rejection of rooted paths and standalone `..`
   traversal components, versus acceptance of relative paths where `..`
   appears only as a substring. Canonical example:
@@ -97,11 +101,12 @@ property-testing or proof framework:
 
 For the frame-rollback ordering dimensions, the matrix enumerates every
 case in a genuinely finite, small domain, so it is exhaustive there. For
-the movement-decision weights (`i64`-valued) and asset-path strings, the
-domains are unbounded; the matrix instead enumerates chosen representative
-equivalence classes (positive, negative, and net-zero weights; rooted,
-`..`-component, and substring-`..` path forms), not the entire domain. This
-is a deliberately narrower guarantee than a property-testing framework
+the movement-decision weights (`i64`-valued), the domain is large but
+finite; for asset-path strings, the domain is genuinely unbounded. In both
+cases the matrix instead enumerates chosen representative equivalence
+classes (positive, negative, and net-zero weights; rooted, `..`-component,
+and substring-`..` path forms), not the entire domain. This is a
+deliberately narrower guarantee than a property-testing framework
 (sampling) or a proof tool (Kani, Verus) would give over those two domains.
 This ADR is the documented, approved exception to defaulting to a
 property-testing or proof framework for exactly-correctness invariants: it
@@ -112,10 +117,10 @@ where the underlying domain is finite and small enough to enumerate.
 ## Known Risks and Limitations
 
 - For the movement-decision weight and asset-path invariants, the matrix is
-  already not exhaustive: it covers hand-chosen equivalence classes over an
-  unbounded domain, and a bug specific to a value outside those classes
-  would not be caught. This is a genuine, present coverage gap, not a
-  future risk.
+  already not exhaustive: it covers hand-chosen equivalence classes over a
+  large-but-finite (weights) or unbounded (paths) domain, and a bug
+  specific to a value outside those classes would not be caught. This is a
+  genuine, present coverage gap, not a future risk.
 - For the frame-rollback ordering invariant, the exhaustiveness argument is
   sound only while the state/ordering space stays small enough to enumerate
   by hand. If the number of independent dimensions grows, a hand-written
