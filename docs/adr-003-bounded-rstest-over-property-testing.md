@@ -27,10 +27,10 @@ a new supply-chain decision, not a reuse of existing tooling.
 
 - The rollback/commit orderings and prior-entry/repeat-undo/commit-vs-
   rollback state combinations have a small, **finite** input space that a
-  hand-written matrix can enumerate exhaustively.
+  handwritten matrix can enumerate exhaustively.
 - The movement-decision weights (`i64`-valued) have a **large but finite**
   domain, and asset-path strings have a genuinely **unbounded** domain (no
-  fixed maximum length); a hand-written matrix can only cover a handful of
+  fixed maximum length); a handwritten matrix can only cover a handful of
   representative equivalence classes (positive, negative, and net-zero
   weights; rooted, `..`-component, and substring-`..` path forms), not the
   entire domain.
@@ -51,8 +51,8 @@ invariants under test.
 
 Rejected for these invariants: `proptest` samples a subset of a domain
 rather than enumerating it exhaustively. For the finite state/ordering
-dimensions, a hand-written matrix can cover every case rather than a
-sample; for the weight and path domains, a hand-written matrix is no more
+dimensions, a handwritten matrix can cover every case rather than a
+sample; for the weight and path domains, a handwritten matrix is no more
 exhaustive than sampling, but avoids the dependency and generator/shrinker
 authoring cost. `proptest` is also not currently a workspace dependency.
 
@@ -123,7 +123,7 @@ where the underlying domain is finite and small enough to enumerate.
   genuine, present coverage gap, not a future risk.
 - For the frame-rollback ordering invariant, the exhaustiveness argument is
   sound only while the state/ordering space stays small enough to enumerate
-  by hand. If the number of independent dimensions grows, a hand-written
+  by hand. If the number of independent dimensions grows, a handwritten
   matrix risks silently becoming a sample rather than remaining exhaustive,
   without an obvious signal that this has happened.
 - No random generators or shrinkers are introduced, so this approach does

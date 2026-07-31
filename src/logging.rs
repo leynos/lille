@@ -27,7 +27,7 @@ where
     Ok(())
 }
 
-/// Initializes the global logger once for the entire process.
+/// Initialises the global logger once for the entire process.
 ///
 /// When `verbose` is `true`, all debug messages are printed. Otherwise only
 /// info level and above are shown.
@@ -55,7 +55,7 @@ pub fn init(verbose: bool) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    //! Tests for logging initialization.
+    //! Tests for logging initialisation.
     use super::*;
     use anyhow::ensure;
     use std::fmt;
