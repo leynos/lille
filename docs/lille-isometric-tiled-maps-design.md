@@ -1062,10 +1062,15 @@ populated map because the event is emitted only after every object
 exists.
 
 Once-per-map-load behaviour comes from two gates rather than from
-single-system scheduling. The `MessageReader` gate means a system does
-its work only on the frame that delivers the message, since each reader
-consumes it once. Marker components then make the work idempotent for
-the entities involved: `spawn_actors_at_spawn_points` queries
+single-system scheduling. The `MessageReader` gate means each reader
+independently tracks the messages it has not yet read and consumes each
+message exactly once, so no reader acts on the same `MapCreated` twice.
+Handling happens on the delivery frame because `MapCreated` is emitted
+during `PreUpdate`, before the `Update` consumers run; a reader
+scheduled so that it does not run that frame still observes the
+retained message later rather than missing it. Marker components then
+make the work idempotent for the entities involved:
+`spawn_actors_at_spawn_points` queries
 `Without<PlayerSpawnConsumed>` and `Without<SpawnPointConsumed>` and
 inserts those markers as it consumes each spawn point, so a spawn
 marker is never processed twice, and `attach_collision_blocks` skips
