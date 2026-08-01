@@ -230,6 +230,62 @@ fn negative_weight_velocity_is_not_applied() {
 }
 
 #[rstest]
+fn velocity_output_without_velocity_component_is_skipped() {
+    // `apply_velocities` resolves the entity through `id_map` but then finds no
+    // `VelocityComp`, taking the mismatch branch: it warns and continues rather
+    // than inserting or mutating a component. These are exactly the inputs
+    // `negative_weight_velocity_is_not_applied`'s phase-1 control proves emit a
+    // positive-weight velocity output — an unsupported entity at z=10 whose
+    // velocity input the circuit integrates — so the record really does reach
+    // the write path and the assertion below cannot hold vacuously. The
+    // resulting warning is not asserted on: the repository has no log-capture
+    // helper.
+    let mut app = setup_app().expect("failed to set up test app");
+    let entity = app
+        .world_mut()
+        .spawn((
+            DdlogId(1),
+            Transform::default(),
+            Health {
+                current: 90,
+                max: 100,
+            },
+        ))
+        .id();
+    prime_entity_mapping(&mut app, entity);
+    push_position_input(
+        &mut app,
+        Position {
+            entity: 1,
+            x: 0.0.into(),
+            y: 0.0.into(),
+            z: 10.0.into(),
+        },
+        1,
+    );
+    push_velocity_input(
+        &mut app,
+        Velocity {
+            entity: 1,
+            vx: 1.0.into(),
+            vy: 2.0.into(),
+            vz: 3.0.into(),
+        },
+        1,
+    );
+
+    app.world_mut()
+        .run_system_once(apply_dbsp_outputs_system)
+        .expect("applying DBSP outputs should succeed");
+
+    assert!(
+        app.world().entity(entity).get::<VelocityComp>().is_none(),
+        "a velocity output for an entity without VelocityComp must be skipped, \
+         not inserted"
+    );
+}
+
+#[rstest]
 fn negative_weight_health_delta_is_not_applied() {
     let mut app = setup_app().expect("failed to set up test app");
     let entity = spawn_entity(&mut app);
