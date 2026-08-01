@@ -47,6 +47,13 @@ pub struct DbspState {
     /// Running count of duplicate health/damage events filtered.
     /// Used for diagnostics and monitoring deduplication effectiveness.
     pub(crate) health_duplicate_count: u64,
+    /// Running count of frames whose `step_circuit()` call failed and whose
+    /// tracking was therefore rolled back. Bounded (a single counter, no
+    /// per-entity labels) so it is safe to sample every frame.
+    pub(crate) step_failure_count: u64,
+    /// Running count of consolidated output records skipped because their Z-set
+    /// weight was not positive (retractions and zero-weight records).
+    pub(crate) skipped_output_count: u64,
 }
 
 /// Convenience wrapper exposing queries required to track `DdlogId` changes.
@@ -81,6 +88,8 @@ impl DbspState {
             pending_damage_backup: None,
             applied_unsequenced_undo: HashMap::new(),
             health_duplicate_count: 0,
+            step_failure_count: 0,
+            skipped_output_count: 0,
         })
     }
 
@@ -110,6 +119,38 @@ impl DbspState {
     #[must_use]
     pub const fn applied_health_duplicates(&self) -> u64 {
         self.health_duplicate_count
+    }
+
+    /// Returns the number of circuit steps that failed and were rolled back.
+    ///
+    /// Together with [`Self::skipped_outputs`] this gives a bounded,
+    /// label-free view of DBSP reliability suitable for periodic sampling.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use lille::dbsp_sync::DbspState;
+    /// let state = DbspState::new().expect("failed to initialise DbspState");
+    /// assert_eq!(state.step_failures(), 0);
+    /// ```
+    #[must_use]
+    pub const fn step_failures(&self) -> u64 {
+        self.step_failure_count
+    }
+
+    /// Returns the number of consolidated output records skipped for having a
+    /// non-positive Z-set weight (retractions and zero-weight records).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use lille::dbsp_sync::DbspState;
+    /// let state = DbspState::new().expect("failed to initialise DbspState");
+    /// assert_eq!(state.skipped_outputs(), 0);
+    /// ```
+    #[must_use]
+    pub const fn skipped_outputs(&self) -> u64 {
+        self.skipped_output_count
     }
 
     /// Invokes the configured circuit stepper.

@@ -54,3 +54,49 @@ triggered.
 
 For the design rationale behind these rules, see §5.5 of [Integrating
 isometric Tiled maps into Lille](lille-isometric-tiled-maps-design.md#55-primary-map-asset-path-validation).
+
+## 2. DBSP circuit contracts
+
+These contracts matter to anyone composing Lille's DBSP stream helpers
+directly, or reading the state the sync systems maintain.
+
+### `apply_movement` expects deduplicated decisions
+
+`apply_movement` applies at most one movement decision per entity per tick.
+It does **not** deduplicate its input: `movement_decision_stream` already
+folds duplicate decisions for an entity into a single normalized vector, and
+`apply_movement` consumes that result. Feeding it a stream that still
+contains two decisions for one entity is a contract violation — release
+builds log a warning and debug builds panic on the `debug_assert!`.
+
+When wiring the helpers by hand, put `movement_decision_stream` (or an
+equivalent per-entity fold) ahead of `apply_movement`, as
+`DbspCircuit::new` does.
+
+### Only positive-weight output records are applied
+
+The output systems iterate the _consolidated_ Z-set for positions,
+velocities, and health deltas, and apply only records whose weight is
+positive. Retractions (negative weight) are skipped and never mutate ECS
+components or the world handle. Consolidation removes net-zero records
+before the loops see them, so in practice the guard's effect is to ignore
+retractions.
+
+Downstream code should therefore not rely on observing a retraction as an
+ECS mutation; a retracted record simply leaves the previous component value
+in place.
+
+### Reliability counters
+
+`DbspState` exposes three bounded counters, with no per-entity labels, for
+sampling circuit health:
+
+- `applied_health_duplicates()` — duplicate health or damage events filtered.
+- `step_failures()` — circuit steps that failed and were rolled back.
+- `skipped_outputs()` — output records skipped for a non-positive weight.
+
+A failed step also logs a warning naming the operation and error, and rolls
+the frame's Rust-side tracking back so the next frame starts consistent.
+
+For the full frame lifecycle and rollback API, see the [DBSP
+synchronization developer's guide](dbsp-synchronization-guide.md).

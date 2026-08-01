@@ -95,16 +95,19 @@ fn write_position(pos: &Position, transform: &mut Transform) {
     );
 }
 
+/// Returns the number of records skipped for a non-positive Z-set weight.
 fn apply_positions(
     state: &DbspState,
     write_query: &mut DbspWriteQuery<'_, '_>,
     world_handle: &mut WorldHandle,
-) {
+) -> u64 {
+    let mut skipped = 0;
     let positions = state.circuit.new_position_out().consolidate();
     for (pos, (), weight) in positions.iter() {
         // Only positive weights are live insertions; skip retractions and
         // zero-weight records so stale positions are never applied.
         if weight <= 0 {
+            skipped += 1;
             continue;
         }
         let Some((mut transform, _, _)) = resolve_write_target(state, write_query, pos.entity)
@@ -116,13 +119,17 @@ fn apply_positions(
             entry.position = transform.translation;
         }
     }
+    skipped
 }
 
-fn apply_velocities(state: &DbspState, write_query: &mut DbspWriteQuery<'_, '_>) {
+/// Returns the number of records skipped for a non-positive Z-set weight.
+fn apply_velocities(state: &DbspState, write_query: &mut DbspWriteQuery<'_, '_>) -> u64 {
+    let mut skipped = 0;
     let velocities = state.circuit.new_velocity_out().consolidate();
     for (vel, (), weight) in velocities.iter() {
         // Skip retractions and zero-weight records; only apply live updates.
         if weight <= 0 {
+            skipped += 1;
             continue;
         }
         // Unmapped or despawned entities are skipped silently (they are already
@@ -159,6 +166,7 @@ fn apply_velocities(state: &DbspState, write_query: &mut DbspWriteQuery<'_, '_>)
             "velocity.vz",
         );
     }
+    skipped
 }
 
 /// Resolves the entity key and mutable `Health` component for a health delta.
@@ -190,21 +198,25 @@ fn resolve_health_target<'q>(
     Some((entity_key, health))
 }
 
+/// Returns the number of deltas skipped for a non-positive Z-set weight.
 fn apply_health_deltas(
     state: &mut DbspState,
     write_query: &mut DbspWriteQuery<'_, '_>,
     world_handle: &mut WorldHandle,
-) {
+) -> u64 {
+    let mut skipped = 0;
     let health_deltas = state.circuit.health_delta_out().consolidate();
     for (delta, (), weight) in health_deltas.iter() {
         // Apply only positive weights; skip retractions (negative) and
         // zero-weight deltas so they never mutate Health or update
         // applied_health/world_handle.
         if weight <= 0 {
+            skipped += 1;
             continue;
         }
         apply_one_health_delta(state, write_query, world_handle, &delta);
     }
+    skipped
 }
 
 /// Applies a single positive-weight health delta: resolves the target entity's
@@ -311,12 +323,29 @@ pub fn apply_dbsp_outputs_system(
         // retractions.
         state.circuit.clear_inputs();
         state.rollback_frame_tracking();
+        state.step_failure_count += 1;
+        warn!(
+            "dbsp step failed; rolled back frame tracking and cleared inputs \
+             (context: {:?}, failures so far: {}): {error}",
+            DbspSyncErrorContext::Step,
+            state.step_failure_count
+        );
         return;
     }
 
-    apply_positions(&state, &mut write_query, &mut world_handle);
-    apply_velocities(&state, &mut write_query);
-    apply_health_deltas(&mut state, &mut write_query, &mut world_handle);
+    // Tally the records the weight gates discarded. A single bounded counter,
+    // with no per-entity labels, so it stays cheap to sample every frame.
+    let mut skipped = apply_positions(&state, &mut write_query, &mut world_handle);
+    skipped += apply_velocities(&state, &mut write_query);
+    skipped += apply_health_deltas(&mut state, &mut write_query, &mut world_handle);
+    if skipped > 0 {
+        state.skipped_output_count += skipped;
+        debug!(
+            "skipped {skipped} non-positive-weight output record(s) this frame \
+             ({} total)",
+            state.skipped_output_count
+        );
+    }
     let _ = state.circuit.health_delta_out().take_from_all();
 
     // Drain any remaining output so stale values are not reused.

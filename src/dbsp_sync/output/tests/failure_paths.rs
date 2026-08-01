@@ -259,6 +259,75 @@ fn rolled_back_retraction_markers_do_not_suppress_a_later_delta() {
     );
 }
 
+#[rstest]
+fn step_failures_and_skipped_outputs_are_counted() {
+    // The bounded reliability counters must actually move: a forced step
+    // failure increments `step_failures`, and a retracted (negative-weight)
+    // output record increments `skipped_outputs`. Each phase gets its own
+    // scope so the two setups do not shadow one another.
+    {
+        let mut app = setup_app().expect("failed to set up test app");
+        let entity = spawn_entity(&mut app);
+        prime_entity_mapping(&mut app, entity);
+        assert_eq!(
+            app.world().non_send_resource::<DbspState>().step_failures(),
+            0,
+            "a fresh state reports no step failures"
+        );
+
+        // A failed step is counted once.
+        force_step_failure(&mut app);
+        app.world_mut()
+            .run_system_once(apply_dbsp_outputs_system)
+            .expect("system should run even when the step fails");
+        assert_eq!(
+            app.world().non_send_resource::<DbspState>().step_failures(),
+            1,
+            "a failed step must be counted"
+        );
+    }
+
+    // A retracted position produces a non-positive-weight output record, which
+    // the weight gate skips and counts. This needs a fresh app: the failed step
+    // above cleared the circuit inputs, including the primed block, so the same
+    // app would emit no output at all to skip. These are
+    // `negative_weight_position_is_not_applied`'s inputs — a velocity at weight
+    // +1 so output is produced, and the position retracted at weight -1.
+    let mut app = setup_app().expect("failed to set up test app");
+    let entity = spawn_entity(&mut app);
+    prime_entity_mapping(&mut app, entity);
+    push_velocity_input(
+        &mut app,
+        Velocity {
+            entity: 1,
+            vx: 1.0.into(),
+            vy: 0.0.into(),
+            vz: 0.0.into(),
+        },
+        1,
+    );
+    push_position_input(
+        &mut app,
+        Position {
+            entity: 1,
+            x: 0.0.into(),
+            y: 0.0.into(),
+            z: 1.0.into(),
+        },
+        -1,
+    );
+    app.world_mut()
+        .run_system_once(apply_dbsp_outputs_system)
+        .expect("applying DBSP outputs should succeed");
+    assert!(
+        app.world()
+            .non_send_resource::<DbspState>()
+            .skipped_outputs()
+            > 0,
+        "a negative-weight output record must be counted as skipped"
+    );
+}
+
 /// An unsequenced (`seq: None`) external damage event for entity 1 at tick 1.
 fn unsequenced_damage(amount: u16) -> DamageEvent {
     DamageEvent {
