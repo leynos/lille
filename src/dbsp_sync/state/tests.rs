@@ -339,7 +339,14 @@ mod properties {
                             "rollback must restore the exact frame-start tracking"
                         );
                     }
-                    _ => {}
+                    // These mutate the tracking but assert nothing on their
+                    // own; their effect is checked at the next Commit or
+                    // Rollback. Listed explicitly rather than caught by `_` so
+                    // a new Action variant fails to compile until the model
+                    // makes a deliberate decision about it.
+                    Action::RecordUndo(_)
+                    | Action::ApplyUnsequenced(_, _)
+                    | Action::Stash(_) => {}
                 }
             }
         }

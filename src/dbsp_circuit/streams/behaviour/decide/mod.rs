@@ -289,7 +289,7 @@ impl MovementAccumulator {
         let dy = movement.dy.into_inner();
         #[expect(
             clippy::cast_precision_loss,
-            reason = "Movement counts remain tiny so converting to f64 is exact"
+            reason = "The weight only scales this contribution to a sum that `to_decision` renormalizes, so lost precision cannot change the emitted direction"
         )]
         let scaled = weight as f64;
         self.sum_dx = OrderedFloat(self.sum_dx.into_inner() + dx * scaled);
@@ -324,7 +324,7 @@ impl MovementAccumulator {
         });
         #[expect(
             clippy::cast_precision_loss,
-            reason = "Movement counts remain tiny so converting to f64 is exact"
+            reason = "The total only scales the averaged vector, which is renormalized immediately below, so lost precision cannot change the emitted direction"
         )]
         let weight = self.total_weight as f64;
         let avg_x = self.sum_dx.into_inner() / weight;

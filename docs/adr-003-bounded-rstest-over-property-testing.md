@@ -79,7 +79,7 @@ guarantee and Verus's whole-domain proof would each give stronger assurance
 than the enumerated matrix, but that investment is not judged warranted at
 present.
 
-### Option C (chosen): bounded case matrices, since supplemented by `proptest`
+### Option C (chosen): bounded case matrices, supplemented by `proptest`
 
 Enumerate the finite state/ordering dimensions exhaustively, and enumerate
 representative equivalence classes for the weight and path domains, as
@@ -149,11 +149,11 @@ submodule of each test module:
   `src/dbsp_sync/state/tests.rs`.
 
 Two things surfaced from generating extreme values, both now fixed in
-production code rather than hidden by narrowing a generator:
+production code rather than hidden by narrowing a generator.
 `MovementAccumulator` accumulates its weight total with `saturating_add`,
-since a plain `+=` panicked on an overflowing total; and the aggregation
-check tests `total_weight` against `-1..=1` rather than calling `abs()`,
-which overflows on `i64::MIN`. The weight oracle folds in `i128` and clamps
+since a plain `+=` panicked on an overflowing total. The aggregation check
+tests `total_weight` against `-1..=1` rather than calling `abs()`, which
+overflows on `i64::MIN`. The weight oracle folds in `i128` and clamps
 per step, so it never overflows and matches the saturating accumulator
 exactly.
 
@@ -186,11 +186,11 @@ Kani and Verus remain unadopted; the reasoning in Option B is unchanged.
 
 ## Removal criteria
 
-Criteria 1 and 3 have been met for `proptest`, which is why the amendment
-above adopted it. The decision should be revisited again, and a *proof* tool
-(Kani or Verus) adopted for the affected invariant, once any of:
+The coverage gap documented above motivated the 2026-08-01 `proptest`
+amendment. The decision should be revisited, and a *proof* tool (Kani or
+Verus) adopted for the affected invariant, once any of:
 
-1. A sampled property proves insufficient — a bug report, an incident, or a
+1. Sampling proves insufficient — a bug report, an incident, or a
    review finding showing that a counter-example exists which sampling is
    unlikely to draw, indicating that a bounded or whole-domain proof is
    warranted.

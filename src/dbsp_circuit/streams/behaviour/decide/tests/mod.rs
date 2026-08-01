@@ -3,12 +3,25 @@ use super::*;
 use approx::assert_relative_eq;
 use rstest::rstest;
 
-fn decision(dx: f64, dy: f64) -> MovementDecision {
+fn decision(entity: i64, dx: f64, dy: f64) -> MovementDecision {
     MovementDecision {
-        entity: 1,
+        entity,
         dx: OrderedFloat(dx),
         dy: OrderedFloat(dy),
     }
+}
+
+/// One weighted input decision: which entity it targets, its direction, and
+/// its Z-set weight.
+type WeightedDecision = (i64, (f64, f64), i64);
+
+/// Tags single-entity fixtures with entity 1, so tests that do not care about
+/// the entity key stay readable.
+fn for_entity_one(weighted: &[((f64, f64), i64)]) -> Vec<WeightedDecision> {
+    weighted
+        .iter()
+        .map(|&(direction, weight)| (1, direction, weight))
+        .collect()
 }
 
 /// Both streams [`dedupe_movement_decisions`] produces, each record paired
@@ -24,14 +37,14 @@ struct DedupeOutputs {
 /// Returns the fallible `Result` (rather than unwrapping) so the circuit
 /// construction stays outside a `no_expect_outside_tests` boundary; callers
 /// unwrap it.
-fn deduped_outputs(weighted: &[((f64, f64), i64)]) -> Result<DedupeOutputs, dbsp::Error> {
+fn deduped_outputs(weighted: &[WeightedDecision]) -> Result<DedupeOutputs, dbsp::Error> {
     let (circuit, (input, decisions_out, aggregations_out)) = RootCircuit::build(|circuit| {
         let (stream, handle) = circuit.add_input_zset::<MovementDecision>();
         let (deduped, aggregations) = dedupe_movement_decisions(&stream);
         Ok((handle, deduped.output(), aggregations.output()))
     })?;
-    for &((dx, dy), weight) in weighted {
-        input.push(decision(dx, dy), weight);
+    for &(entity, (dx, dy), weight) in weighted {
+        input.push(decision(entity, dx, dy), weight);
     }
     circuit.step()?;
     Ok(DedupeOutputs {
@@ -44,7 +57,7 @@ fn deduped_outputs(weighted: &[((f64, f64), i64)]) -> Result<DedupeOutputs, dbsp
 fn deduped_decisions(
     weighted: &[((f64, f64), i64)],
 ) -> Result<Vec<(MovementDecision, i64)>, dbsp::Error> {
-    Ok(deduped_outputs(weighted)?.decisions)
+    Ok(deduped_outputs(&for_entity_one(weighted))?.decisions)
 }
 
 /// Bounded matrix over duplicate and cancelling weighted decisions for one
@@ -92,10 +105,10 @@ fn dedupe_emits_one_decision_for_positive_weight_and_none_for_zero(
 fn net_zero_merge_preserves_pending_direction() {
     // Axes: east = (+1, 0), north = (0, +1).
     let mut acc = MovementAccumulator::default();
-    acc.apply(&decision(1.0, 0.0), 1); // east +1
+    acc.apply(&decision(1, 1.0, 0.0), 1); // east +1
 
     let mut north_retraction = MovementAccumulator::default();
-    north_retraction.apply(&decision(0.0, 1.0), -1); // north -1
+    north_retraction.apply(&decision(1, 0.0, 1.0), -1); // north -1
 
     acc.merge(&north_retraction);
     assert_eq!(
@@ -103,7 +116,7 @@ fn net_zero_merge_preserves_pending_direction() {
         "east +1 and north -1 net to zero weight"
     );
 
-    acc.apply(&decision(0.0, 1.0), 1); // north +1 restores unit weight
+    acc.apply(&decision(1, 0.0, 1.0), 1); // north +1 restores unit weight
 
     let movement = acc
         .to_decision(1)
@@ -136,7 +149,7 @@ fn to_decision_reports_movement_and_aggregation(
 ) {
     let mut acc = MovementAccumulator::default();
     for &((dx, dy), weight) in weighted {
-        acc.apply(&decision(dx, dy), weight);
+        acc.apply(&decision(1, dx, dy), weight);
     }
     let outcome = acc.to_decision(1);
 
@@ -211,7 +224,7 @@ fn dedupe_emits_aggregation_diagnostics(
     #[case] weighted: &[((f64, f64), i64)],
     #[case] expected_total_weight: Option<i64>,
 ) {
-    let outputs = deduped_outputs(weighted).expect("dedupe circuit run");
+    let outputs = deduped_outputs(&for_entity_one(weighted)).expect("dedupe circuit run");
     match expected_total_weight {
         Some(total_weight) => {
             let (aggregation, weight) = test_utils::expect_single(
@@ -230,146 +243,46 @@ fn dedupe_emits_aggregation_diagnostics(
     }
 }
 
-mod properties {
-    //! Property-based coverage supplementing the bounded matrices above.
-    //!
-    //! The matrices pin a handful of representative shapes exactly; these
-    //! properties sample the broader domain of weighted decision sets, including
-    //! extreme `i64` weights, and check the invariants that must hold across all
-    //! of it. See `docs/adr-003-bounded-rstest-over-property-testing.md`.
+mod properties;
 
-    use super::*;
-    use proptest::prelude::*;
+/// Deduplication is per entity, not global. Entity 1's two decisions collapse
+/// into one; entity 2's single decision passes through untouched. Both
+/// decisions must survive, and only entity 1 — the one actually collapsed —
+/// may produce an aggregation diagnostic.
+#[rstest]
+fn dedupe_separates_entities() {
+    // Entity 1 points east twice; entity 2 points north once.
+    let outputs = deduped_outputs(&[(1, (1.0, 0.0), 1), (1, (1.0, 0.0), 1), (2, (0.0, 1.0), 1)])
+        .expect("dedupe circuit run");
 
-    /// Unit-ish directions plus the zero vector: the domain
-    /// `decide_movement` actually produces. Generating unbounded floats would
-    /// only exercise `f64` overflow, which is not what deduplication is
-    /// responsible for.
-    fn direction_strategy() -> impl Strategy<Value = (f64, f64)> {
-        prop_oneof![
-            2 => (0.0f64..std::f64::consts::TAU).prop_map(|angle| (angle.cos(), angle.sin())),
-            1 => Just((0.0, 0.0)),
-        ]
-    }
+    let mut decisions = outputs.decisions.clone();
+    decisions.sort_by_key(|(movement, _)| movement.entity);
+    let [(first, first_weight), (second, second_weight)] = decisions.as_slice() else {
+        panic!("both entities must emit a decision, got {decisions:?}");
+    };
 
-    /// Z-set weights spanning the ordinary range and both `i64` extremes. The
-    /// extremes are included deliberately: `i64::MIN` is the value whose
-    /// `abs()` overflows, and summing extremes is what forced the accumulator's
-    /// `saturating_add`.
-    fn extreme_weight_strategy() -> impl Strategy<Value = i64> {
-        prop_oneof![
-            8 => -4i64..=4,
-            1 => Just(i64::MIN),
-            1 => Just(i64::MAX),
-        ]
-    }
+    assert_eq!(first.entity, 1);
+    assert_eq!(
+        *first_weight, 1,
+        "the collapsed decision keeps multiplicity 1"
+    );
+    assert_relative_eq!(first.dx.into_inner(), 1.0);
+    assert_relative_eq!(first.dy.into_inner(), 0.0);
 
-    /// Weights for the circuit-level property. Bounded, because DBSP's own
-    /// `ZWeight` arithmetic panics with `attempt to add with overflow` on
-    /// extreme weights before any of this crate's code runs: those values are
-    /// outside what the circuit can process at all, so a property asserting
-    /// deduplication behaviour cannot use them. The accumulator's own handling
-    /// of the extremes is covered by the pure property above, which does not go
-    /// through DBSP.
-    fn zset_weight_strategy() -> impl Strategy<Value = i64> {
-        -4i64..=4
-    }
+    assert_eq!(second.entity, 2);
+    assert_eq!(*second_weight, 1);
+    assert_relative_eq!(second.dx.into_inner(), 0.0);
+    assert_relative_eq!(second.dy.into_inner(), 1.0);
 
-    /// Overflow-safe oracle for the accumulated total.
-    ///
-    /// Folds in `i128` and clamps after each addition, mirroring the
-    /// accumulator's per-step `saturating_add`. Summing first and clamping once
-    /// would not match: saturation is order-dependent, so `[MAX, MAX, MIN]`
-    /// saturates to `-1` step by step but sums to `MAX - 1`.
-    /// Returned as `i128` so the oracle never needs a fallible narrowing
-    /// conversion; callers widen the accumulator's `i64` total to compare.
-    fn expected_total_weight(weighted: &[((f64, f64), i64)]) -> i128 {
-        let (min, max) = (i128::from(i64::MIN), i128::from(i64::MAX));
-        weighted.iter().fold(0i128, |total, &(_, weight)| {
-            (total + i128::from(weight)).clamp(min, max)
-        })
-    }
-
-    fn weighted_decisions_strategy() -> impl Strategy<Value = Vec<((f64, f64), i64)>> {
-        prop::collection::vec((direction_strategy(), extreme_weight_strategy()), 1..8)
-    }
-
-    /// As [`weighted_decisions_strategy`], with weights DBSP can actually
-    /// process.
-    fn zset_decisions_strategy() -> impl Strategy<Value = Vec<((f64, f64), i64)>> {
-        prop::collection::vec((direction_strategy(), zset_weight_strategy()), 1..8)
-    }
-
-    proptest! {
-        #![proptest_config(ProptestConfig::with_cases(256))]
-
-        /// `to_decision` never panics, and its decision is present exactly when
-        /// the overflow-safe total is non-zero. The emitted direction is always
-        /// finite, and is either a unit vector or the defined zero vector when
-        /// the averaged magnitude falls below `MIN_DIRECTION_MAGNITUDE`.
-        #[test]
-        fn to_decision_matches_the_overflow_safe_weight_oracle(
-            weighted in weighted_decisions_strategy(),
-        ) {
-            let mut acc = MovementAccumulator::default();
-            for &((dx, dy), weight) in &weighted {
-                acc.apply(&decision(dx, dy), weight);
-            }
-            let expected_total = expected_total_weight(&weighted);
-            prop_assert_eq!(i128::from(acc.total_weight), expected_total);
-
-            let outcome = acc.to_decision(1);
-            prop_assert_eq!(outcome.decision.is_some(), expected_total != 0);
-
-            if let Some(movement) = outcome.decision {
-                let dx = movement.dx.into_inner();
-                let dy = movement.dy.into_inner();
-                prop_assert!(dx.is_finite() && dy.is_finite(), "direction must be finite");
-                let magnitude = dx.hypot(dy);
-                prop_assert!(
-                    (magnitude - 1.0).abs() < 1e-9 || (dx == 0.0 && dy == 0.0),
-                    "direction must be normalised or the zero vector, got ({dx}, {dy})"
-                );
-            }
-
-            // The diagnostic is reported exactly when more than one decision
-            // folded in, tested against the same overflow-safe total.
-            prop_assert_eq!(
-                outcome.aggregation.is_some(),
-                !(-1i128..=1).contains(&expected_total)
-            );
-        }
-    }
-
-    proptest! {
-        // Each case builds and steps a circuit, so this runs fewer cases than
-        // the pure property above.
-        #![proptest_config(ProptestConfig::with_cases(48))]
-
-        /// End to end through `dedupe_movement_decisions`: a net-zero total
-        /// emits nothing, and any non-zero total emits exactly one consolidated
-        /// decision with Z-set multiplicity 1.
-        #[test]
-        fn dedupe_emits_at_most_one_decision_of_multiplicity_one(
-            weighted in zset_decisions_strategy(),
-        ) {
-            let outputs = deduped_outputs(&weighted)
-                .map_err(|error| TestCaseError::fail(format!("circuit run failed: {error}")))?;
-            let expected_total = expected_total_weight(&weighted);
-
-            if expected_total == 0 {
-                prop_assert!(
-                    outputs.decisions.is_empty(),
-                    "a net-zero total must emit no decision, got {:?}",
-                    outputs.decisions
-                );
-            } else {
-                let (_, weight) = test_utils::expect_single(
-                    &outputs.decisions,
-                    "a non-zero total must emit exactly one decision",
-                );
-                prop_assert_eq!(*weight, 1, "the deduplicated decision must have multiplicity 1");
-            }
-        }
-    }
+    // Only entity 1 aggregated, so entity 2 must not appear in the diagnostics.
+    let (aggregation, weight) = test_utils::expect_single(
+        &outputs.aggregations,
+        "only the collapsed entity may emit a diagnostic",
+    );
+    assert_eq!(*weight, 1);
+    assert_eq!(
+        aggregation.entity, 1,
+        "the diagnostic must name the entity whose decisions collapsed"
+    );
+    assert_eq!(aggregation.total_weight, 2);
 }

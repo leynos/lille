@@ -322,8 +322,8 @@ The invariant-heavy paths and their concrete test entry points are:
   `properties::validate_asset_path_agrees_with_the_documented_contract` in
   the same module.
 - **Non-positive output weights** — retractions (negative-weight records)
-  are ignored rather than applied to ECS components. Covered by the tests
-  named in [§4](#4-output-weight-semantics).
+  are ignored rather than applied to ECS components, as are zero-weight
+  records. Covered by the tests named in [§4](#4-output-weight-semantics).
 
 ### Why both matrices and properties
 
@@ -351,7 +351,7 @@ sampling**: arbitrary path strings, weighted decision sets drawn from the
 full `i64` weight range, and generated sequences of frame-rollback lifecycle
 actions, each checked against a small independent oracle or reference model.
 Sampling is not a proof — a passing run is not evidence that no
-counter-example exists — but it reaches value classes no hand-written matrix
+counter-example exists — but it reaches value classes no handwritten matrix
 enumerates.
 
 The rationale for keeping the deterministic matrices, and the record of when

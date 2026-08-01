@@ -36,7 +36,7 @@ struct ClampCase {
     max: u16,
     delta: i32,
     expected_value: u16,
-    expected_clamped_from: Option<i32>,
+    expected_clamped_from: Option<i64>,
 }
 
 #[rstest]
@@ -57,6 +57,17 @@ struct ClampCase {
 })]
 #[case::overheal_clamps_to_max(ClampCase {
     current: 90, max: 100, delta: 50, expected_value: 100, expected_clamped_from: Some(140),
+})]
+// Regression: `current + delta` exceeds `i32::MAX`, so computing the raw total
+// in `i32` panicked in debug builds and wrapped to a negative value in release
+// builds — which the clamp then silently accepted as 0. The raw total is
+// computed in `i64`, and `clamped_from` reports it in full.
+#[case::delta_overflows_i32(ClampCase {
+    current: 90,
+    max: 100,
+    delta: i32::MAX,
+    expected_value: 100,
+    expected_clamped_from: Some(90 + i64::from(i32::MAX)),
 })]
 fn clamped_health_value_reports_value_and_clamping(#[case] case: ClampCase) {
     let health = Health {

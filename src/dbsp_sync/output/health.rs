@@ -116,7 +116,10 @@ pub(super) struct ClampedHealth {
     pub(super) value: u16,
     /// `Some(raw)` when the uncapped total fell outside the valid range and
     /// was clamped; `None` when no clamping was needed.
-    pub(super) clamped_from: Option<i32>,
+    ///
+    /// Widened to `i64` because the raw total does not fit in `i32`: a
+    /// `u16` current health plus an `i32::MAX` delta exceeds `i32::MAX`.
+    pub(super) clamped_from: Option<i64>,
 }
 
 /// Computes the clamped `Health::current` for a delta, returning `None` if the
@@ -124,10 +127,16 @@ pub(super) struct ClampedHealth {
 ///
 /// Pure: it neither logs nor mutates. The caller reports any clamping using the
 /// returned [`ClampedHealth::clamped_from`].
+///
+/// The raw total is computed in `i64`. `Health::current` is a `u16` and
+/// `HealthDelta::delta` is a full-range `i32`, so their sum can exceed
+/// `i32::MAX` — computing it in `i32` panics in debug builds and wraps to a
+/// bogus (possibly negative) value in release builds, which the clamp would
+/// then silently accept. `i64` cannot overflow for any input of those types.
 pub(super) fn clamped_health_value(delta: &HealthDelta, health: &Health) -> Option<ClampedHealth> {
-    let current = i32::from(health.current);
-    let max = i32::from(health.max);
-    let raw = current + delta.delta;
+    let current = i64::from(health.current);
+    let max = i64::from(health.max);
+    let raw = current + i64::from(delta.delta);
     let new_value = raw.clamp(0, max);
     let clamped_from = (raw != new_value).then_some(raw);
     // `new_value` is `raw` clamped to `0..=health.max`, and `health.max` is a
