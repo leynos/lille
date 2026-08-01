@@ -1,20 +1,10 @@
 //! Edge-case tests for the DBSP output application systems.
 //!
-//! Covers conversion bounds and the guard paths that skip records for
-//! unmappable, unknown, despawned, or component-less entities.
+//! Covers the guard paths that skip records for unmappable, unknown,
+//! despawned, or component-less entities, and the Z-set weight gates. Direct
+//! unit tests for the pure helpers live in [`super::pure_helpers`].
 
 use super::*;
-
-#[rstest]
-#[case::nan(f64::NAN, None)]
-#[case::positive_infinity(f64::INFINITY, None)]
-#[case::negative_infinity(f64::NEG_INFINITY, None)]
-#[case::above_f32_range(1e300, None)]
-#[case::below_f32_range(-1e300, None)]
-#[case::in_range(1.5, Some(1.5))]
-fn f32_from_f64_bounds(#[case] value: f64, #[case] expected: Option<f32>) {
-    assert_eq!(f32_from_f64(value), expected);
-}
 
 #[rstest]
 fn out_of_range_outputs_leave_components_unchanged() {

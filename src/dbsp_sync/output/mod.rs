@@ -1,15 +1,17 @@
 //! Output application systems bridging DBSP updates back into Bevy ECS.
 
-use std::convert::TryFrom;
-
 use bevy::prelude::*;
 use log::{debug, warn};
 
 use crate::components::{DdlogId, Health, VelocityComp};
-use crate::dbsp_circuit::{HealthDelta, Position, Tick};
+use crate::dbsp_circuit::Position;
 use crate::world_handle::WorldHandle;
 
 use super::{DbspState, DbspSyncError, DbspSyncErrorContext};
+
+mod health;
+
+use health::apply_health_deltas;
 
 type DbspWriteQuery<'w, 's> = Query<
     'w,
@@ -169,131 +171,24 @@ fn apply_velocities(state: &DbspState, write_query: &mut DbspWriteQuery<'_, '_>)
     skipped
 }
 
-/// Resolves the entity key and mutable `Health` component for a health delta.
+/// Warns for each entity whose movement decisions the circuit collapsed.
 ///
-/// Returns `None` (after logging where appropriate) when the entity id cannot
-/// be mapped, the entity is missing from the query, or it carries no `Health`
-/// component. Extracting this guard keeps [`apply_health_deltas`] within the
-/// cognitive-complexity budget without suppressing the lint.
-fn resolve_health_target<'q>(
-    state: &DbspState,
-    write_query: &'q mut DbspWriteQuery<'_, '_>,
-    delta: &HealthDelta,
-) -> Option<(i64, Mut<'q, Health>)> {
-    let Ok(entity_key) = i64::try_from(delta.entity) else {
-        warn!("health delta for unmappable entity {}", delta.entity);
-        return None;
-    };
-    let Some(&entity) = state.id_map.get(&entity_key) else {
-        warn!("health delta for unknown entity id {}", delta.entity);
-        return None;
-    };
-    let Ok((_, _, _, maybe_health)) = write_query.get_mut(entity) else {
-        return None;
-    };
-    let Some(health) = maybe_health else {
-        warn!("health delta received for entity without Health component");
-        return None;
-    };
-    Some((entity_key, health))
-}
-
-/// Returns the number of deltas skipped for a non-positive Z-set weight.
-fn apply_health_deltas(
-    state: &mut DbspState,
-    write_query: &mut DbspWriteQuery<'_, '_>,
-    world_handle: &mut WorldHandle,
-) -> u64 {
-    let mut skipped = 0;
-    let health_deltas = state.circuit.health_delta_out().consolidate();
-    for (delta, (), weight) in health_deltas.iter() {
-        // Apply only positive weights; skip retractions (negative) and
-        // zero-weight deltas so they never mutate Health or update
-        // applied_health/world_handle.
+/// `MovementAccumulator::to_decision` is pure, so the aggregation fact travels
+/// out of the circuit as a [`MovementAggregation`] record on its own output
+/// handle. Reporting it is a command-layer concern, and this is where it
+/// happens. Only positive-weight records are reported, matching the weight
+/// gates the component writers apply.
+fn report_movement_aggregations(state: &DbspState) {
+    let aggregations = state.circuit.movement_aggregation_out().consolidate();
+    for (aggregation, (), weight) in aggregations.iter() {
         if weight <= 0 {
-            skipped += 1;
             continue;
         }
-        apply_one_health_delta(state, write_query, world_handle, &delta);
-    }
-    skipped
-}
-
-/// Applies a single positive-weight health delta: resolves the target entity's
-/// `Health`, honours the dedup/retraction rules, clamps the new value, then
-/// updates the component, `applied_health` bookkeeping, and the world handle.
-/// Any guard failing simply skips this delta.
-fn apply_one_health_delta(
-    state: &mut DbspState,
-    write_query: &mut DbspWriteQuery<'_, '_>,
-    world_handle: &mut WorldHandle,
-    delta: &HealthDelta,
-) {
-    let key = (delta.at_tick, delta.seq);
-    let Some((entity_key, mut health)) = resolve_health_target(state, write_query, delta) else {
-        return;
-    };
-    if !should_apply_health_delta(state, delta, key) {
-        return;
-    }
-    let Some(new_current) = clamped_health_value(delta, &health) else {
-        return;
-    };
-    health.current = new_current;
-    state.applied_health.insert(delta.entity, key);
-    if let Some(entry) = world_handle.entities.get_mut(&entity_key) {
-        entry.health_current = health.current;
-        entry.health_max = health.max;
-    }
-}
-
-/// Computes the clamped `Health::current` for a delta, logging when clamping
-/// occurs and returning `None` if the clamped value cannot fit in `u16`.
-fn clamped_health_value(delta: &HealthDelta, health: &Health) -> Option<u16> {
-    let current = i32::from(health.current);
-    let max = i32::from(health.max);
-    let raw = current + delta.delta;
-    let new_value = raw.clamp(0, max);
-    if raw != new_value {
-        debug!(
-            "health clamped for entity {}: raw {} -> {}",
-            delta.entity, raw, new_value
+        warn!(
+            "aggregated {} movement decisions for entity {}, normalizing to one vector",
+            aggregation.total_weight, aggregation.entity
         );
     }
-    // `new_value` is `raw` clamped to `0..=health.max`, and `health.max` is a
-    // `u16`, so the value is always within `u16` range and this conversion
-    // cannot fail. The branch below is belt and braces against a future change
-    // to the clamp bounds.
-    let Ok(value) = u16::try_from(new_value) else {
-        debug_assert!(
-            false,
-            "clamped health value {new_value} exceeds u16 capacity"
-        );
-        return None;
-    };
-    Some(value)
-}
-
-fn should_apply_health_delta(
-    state: &mut DbspState,
-    delta: &HealthDelta,
-    key: (Tick, Option<u32>),
-) -> bool {
-    if state
-        .expected_health_retractions
-        .remove(&(delta.entity, delta.at_tick, delta.seq))
-    {
-        return false;
-    }
-    if state.applied_health.get(&delta.entity) == Some(&key) {
-        debug!(
-            "duplicate health delta ignored for entity {} at tick {} seq {:?}",
-            delta.entity, delta.at_tick, delta.seq
-        );
-        state.health_duplicate_count += 1;
-        return false;
-    }
-    true
 }
 
 /// Applies DBSP outputs back to ECS components.
@@ -346,11 +241,13 @@ pub fn apply_dbsp_outputs_system(
             state.skipped_output_count
         );
     }
+    report_movement_aggregations(&state);
     let _ = state.circuit.health_delta_out().take_from_all();
 
     // Drain any remaining output so stale values are not reused.
     let _ = state.circuit.new_position_out().take_from_all();
     let _ = state.circuit.new_velocity_out().take_from_all();
+    let _ = state.circuit.movement_aggregation_out().take_from_all();
 
     state.expected_health_retractions.clear();
     state.circuit.clear_inputs();

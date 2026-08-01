@@ -2,10 +2,14 @@
 
 mod edge_cases;
 mod failure_paths;
+mod pure_helpers;
 
+use super::health::{clamped_health_value, ClampedHealth};
 use super::*;
 use crate::components::{Block, DdlogId, Health, UnitType};
-use crate::dbsp_circuit::{try_step, DamageEvent, DamageSource, HealthState, Position, Velocity};
+use crate::dbsp_circuit::{
+    try_step, DamageEvent, DamageSource, HealthDelta, HealthState, Position, Velocity,
+};
 use crate::world_handle::DdlogEntity;
 use crate::{DbspCircuit, DbspPlugin};
 use bevy::ecs::prelude::On;

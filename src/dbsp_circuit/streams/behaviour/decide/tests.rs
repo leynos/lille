@@ -11,26 +11,40 @@ fn decision(dx: f64, dy: f64) -> MovementDecision {
     }
 }
 
-/// Runs a single entity's weighted decisions through
-/// [`dedupe_movement_decisions`] and returns each emitted decision paired
+/// Both streams [`dedupe_movement_decisions`] produces, each record paired
 /// with its consolidated Z-set weight (multiplicity).
+struct DedupeOutputs {
+    decisions: Vec<(MovementDecision, i64)>,
+    aggregations: Vec<(MovementAggregation, i64)>,
+}
+
+/// Runs a single entity's weighted decisions through
+/// [`dedupe_movement_decisions`] and returns both output streams.
 ///
 /// Returns the fallible `Result` (rather than unwrapping) so the circuit
 /// construction stays outside a `no_expect_outside_tests` boundary; callers
 /// unwrap it.
-fn deduped_decisions(
-    weighted: &[((f64, f64), i64)],
-) -> Result<Vec<(MovementDecision, i64)>, dbsp::Error> {
-    let (circuit, (input, output)) = RootCircuit::build(|circuit| {
+fn deduped_outputs(weighted: &[((f64, f64), i64)]) -> Result<DedupeOutputs, dbsp::Error> {
+    let (circuit, (input, decisions_out, aggregations_out)) = RootCircuit::build(|circuit| {
         let (stream, handle) = circuit.add_input_zset::<MovementDecision>();
-        let deduped = dedupe_movement_decisions(&stream).output();
-        Ok((handle, deduped))
+        let (deduped, aggregations) = dedupe_movement_decisions(&stream);
+        Ok((handle, deduped.output(), aggregations.output()))
     })?;
     for &((dx, dy), weight) in weighted {
         input.push(decision(dx, dy), weight);
     }
     circuit.step()?;
-    Ok(test_utils::collect_weighted(&output))
+    Ok(DedupeOutputs {
+        decisions: test_utils::collect_weighted(&decisions_out),
+        aggregations: test_utils::collect_weighted(&aggregations_out),
+    })
+}
+
+/// Convenience wrapper for the tests that only assert on the decision stream.
+fn deduped_decisions(
+    weighted: &[((f64, f64), i64)],
+) -> Result<Vec<(MovementDecision, i64)>, dbsp::Error> {
+    Ok(deduped_outputs(weighted)?.decisions)
 }
 
 /// Bounded matrix over duplicate and cancelling weighted decisions for one
@@ -93,7 +107,125 @@ fn net_zero_merge_preserves_pending_direction() {
 
     let movement = acc
         .to_decision(1)
+        .decision
         .expect("net weight of one must yield a decision");
     assert_relative_eq!(movement.dx.into_inner(), 1.0);
     assert_relative_eq!(movement.dy.into_inner(), 0.0);
+}
+
+/// `to_decision` is pure, so it can be exercised directly. This matrix pins
+/// both halves of its result: the normalized decision and the aggregation
+/// diagnostic that replaced the helper's former `warn!` call. The diagnostic
+/// appears only when more than one decision was folded in, which is exactly
+/// the condition the old log fired on.
+#[rstest]
+#[case::net_zero_yields_nothing(&[((1.0, 0.0), 1), ((1.0, 0.0), -1)], None, None)]
+#[case::single_decision_is_not_aggregated(&[((3.0, 0.0), 1)], Some((1.0, 0.0)), None)]
+#[case::duplicate_is_aggregated(&[((1.0, 0.0), 1), ((1.0, 0.0), 1)], Some((1.0, 0.0)), Some(2))]
+#[case::weight_two_is_aggregated(&[((0.0, 2.0), 2)], Some((0.0, 1.0)), Some(2))]
+#[case::net_negative_is_aggregated(&[((1.0, 0.0), -2)], Some((1.0, 0.0)), Some(-2))]
+#[case::opposed_sum_below_threshold(
+    &[((1.0, 0.0), 1), ((-1.0, 0.0), 1)],
+    Some((0.0, 0.0)),
+    Some(2)
+)]
+fn to_decision_reports_movement_and_aggregation(
+    #[case] weighted: &[((f64, f64), i64)],
+    #[case] expected_direction: Option<(f64, f64)>,
+    #[case] expected_total_weight: Option<i64>,
+) {
+    let mut acc = MovementAccumulator::default();
+    for &((dx, dy), weight) in weighted {
+        acc.apply(&decision(dx, dy), weight);
+    }
+    let outcome = acc.to_decision(1);
+
+    match expected_direction {
+        Some((dx, dy)) => {
+            let movement = outcome
+                .decision
+                .expect("a non-zero total weight must yield a decision");
+            assert_eq!(movement.entity, 1);
+            assert_relative_eq!(movement.dx.into_inner(), dx);
+            assert_relative_eq!(movement.dy.into_inner(), dy);
+        }
+        None => assert!(
+            outcome.decision.is_none(),
+            "a net-zero total weight must yield no decision, got {:?}",
+            outcome.decision
+        ),
+    }
+
+    match expected_total_weight {
+        Some(total_weight) => {
+            let aggregation = outcome
+                .aggregation
+                .expect("folding several decisions must report an aggregation");
+            assert_eq!(aggregation.entity, 1);
+            assert_eq!(aggregation.total_weight, total_weight);
+        }
+        None => assert!(
+            outcome.aggregation.is_none(),
+            "a single decision must not report an aggregation, got {:?}",
+            outcome.aggregation
+        ),
+    }
+}
+
+/// `to_decision` must not panic on the extremes of `i64`. `i64::MIN.abs()`
+/// overflows, so the aggregation check compares against the bounds instead of
+/// negating; these are the cases that would trip a naive `abs()`.
+#[rstest]
+#[case::min(i64::MIN)]
+#[case::max(i64::MAX)]
+#[case::minus_one(-1)]
+#[case::one(1)]
+fn to_decision_handles_extreme_total_weights(#[case] total_weight: i64) {
+    let acc = MovementAccumulator {
+        sum_dx: OrderedFloat(1.0),
+        sum_dy: OrderedFloat(0.0),
+        total_weight,
+    };
+    let outcome = acc.to_decision(1);
+    assert!(
+        outcome.decision.is_some(),
+        "a non-zero total weight must yield a decision"
+    );
+    let expects_aggregation = !(-1..=1).contains(&total_weight);
+    assert_eq!(
+        outcome.aggregation.is_some(),
+        expects_aggregation,
+        "aggregation must be reported exactly when more than one decision folded in"
+    );
+}
+
+/// The diagnostic reaches the circuit's own output stream, which is what
+/// `apply_dbsp_outputs_system` reads to log aggregation. Asserting on the
+/// stream (rather than on log text, for which the repository has no capture
+/// helper) pins the command-side diagnostic path end to end.
+#[rstest]
+#[case::single_decision_emits_no_diagnostic(&[((1.0, 0.0), 1)], None)]
+#[case::duplicate_emits_diagnostic(&[((1.0, 0.0), 1), ((1.0, 0.0), 1)], Some(2))]
+#[case::net_zero_emits_no_diagnostic(&[((1.0, 0.0), 1), ((1.0, 0.0), -1)], None)]
+fn dedupe_emits_aggregation_diagnostics(
+    #[case] weighted: &[((f64, f64), i64)],
+    #[case] expected_total_weight: Option<i64>,
+) {
+    let outputs = deduped_outputs(weighted).expect("dedupe circuit run");
+    match expected_total_weight {
+        Some(total_weight) => {
+            let (aggregation, weight) = test_utils::expect_single(
+                &outputs.aggregations,
+                "a collapsed entity must emit one diagnostic",
+            );
+            assert_eq!(*weight, 1, "the diagnostic must have multiplicity 1");
+            assert_eq!(aggregation.entity, 1);
+            assert_eq!(aggregation.total_weight, total_weight);
+        }
+        None => assert!(
+            outputs.aggregations.is_empty(),
+            "no aggregation occurred, so no diagnostic must be emitted, got {:?}",
+            outputs.aggregations
+        ),
+    }
 }

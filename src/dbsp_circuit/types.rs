@@ -277,6 +277,38 @@ crate::dbsp_copy_record! {
 }
 
 crate::dbsp_copy_record! {
+    /// Diagnostic record reporting that several movement decisions for one
+    /// entity were collapsed into a single normalized vector.
+    ///
+    /// The circuit's decision output carries at most one `MovementDecision` per
+    /// entity, so the fact that aggregation happened is not observable from
+    /// that output alone. This record transports it to the command layer,
+    /// which logs it; the dedupe helper itself stays pure.
+    ///
+    /// Semantics:
+    /// - Emitted only when aggregation actually occurred, that is when the
+    ///   accumulated `total_weight` has an absolute value greater than one. An
+    ///   entity with a single decision produces no record.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use lille::dbsp_circuit::MovementAggregation;
+    ///
+    /// let aggregation = MovementAggregation {
+    ///     entity: 1,
+    ///     total_weight: 2,
+    /// };
+    /// assert_eq!(aggregation.total_weight, 2);
+    /// ```
+    pub struct MovementAggregation {
+        /// Entity whose decisions were collapsed.
+        pub entity: i64,
+        /// Net Z-set weight of the decisions folded into one vector.
+        pub total_weight: i64,
+    }
+}
+
+crate::dbsp_copy_record! {
     /// Player spawn location for the DBSP circuit.
     ///
     /// Contains world-space coordinates of the spawn point derived from the
