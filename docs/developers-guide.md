@@ -228,6 +228,36 @@ consolidated records with a positive Z-set weight; non-positive
 For the detailed walkthrough, see
 [DBSP synchronization developer's guide](dbsp-synchronization-guide.md).
 
+### Asserting Z-set weights with `collect_weighted`
+
+Because those weight gates are part of the contract, tests need to see the
+weights, not just the records. `test_utils::collect_weighted` consolidates a
+`dbsp::OutputHandle<OrdZSet<T>>` and returns `Vec<(T, ZWeight)>`, retaining
+each consolidated Z-set weight rather than discarding it.
+
+That retained weight is what lets a test assert multiplicity and retractions.
+A record pushed twice consolidates into one record with weight `2`, so a
+deduplicated output can be asserted to have multiplicity `1` — which
+distinguishes "emitted once" from "emitted twice and collapsed only when
+read".
+
+```rust
+use dbsp::RootCircuit;
+use test_utils::collect_weighted;
+
+let (circuit, (input, output)) = RootCircuit::build(|circuit| {
+    let (stream, handle) = circuit.add_input_zset::<i64>();
+    Ok((handle, stream.output()))
+})?;
+
+// Pushing the same record twice consolidates to one record of weight 2.
+input.push(7, 1);
+input.push(7, 1);
+circuit.step()?;
+
+assert_eq!(collect_weighted(&output), vec![(7, 2)]);
+```
+
 ## Commit gates
 
 Run the deterministic gates before committing (see `AGENTS.md` and the
