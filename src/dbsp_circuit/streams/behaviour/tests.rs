@@ -297,35 +297,37 @@ fn duplicate_targets_produce_single_decision() {
     assert_relative_eq!(decision.dy.into_inner(), -3.0 / magnitude);
 }
 
+/// Input and output handles for the decision-and-apply test circuit.
+///
+/// Naming the bundle keeps the builder's signature readable without an
+/// untracked `clippy::type_complexity` suppression.
+struct DecisionApplyHandles {
+    fear: dbsp::ZSetHandle<FearLevel>,
+    targets: dbsp::ZSetHandle<Target>,
+    positions: dbsp::ZSetHandle<Position>,
+    moved: dbsp::OutputHandle<dbsp::typed_batch::OrdZSet<Position>>,
+}
+
 /// Builds the decision stream *and* applies it, mirroring the production
 /// wiring in `circuit.rs` (`movement_decision_stream` feeding `apply_movement`).
 ///
 /// The raw position input doubles as `apply_movement`'s base, so the test does
 /// not need the physics pipeline that derives `base_pos` in production.
-#[expect(
-    clippy::type_complexity,
-    reason = "DBSP handle tuples are verbose by nature"
-)]
-fn build_decision_and_apply_circuit() -> Result<
-    (
-        dbsp::CircuitHandle,
-        (
-            dbsp::ZSetHandle<FearLevel>,
-            dbsp::ZSetHandle<Target>,
-            dbsp::ZSetHandle<Position>,
-            dbsp::OutputHandle<dbsp::typed_batch::OrdZSet<Position>>,
-        ),
-    ),
-    dbsp::Error,
-> {
+fn build_decision_and_apply_circuit(
+) -> Result<(dbsp::CircuitHandle, DecisionApplyHandles), dbsp::Error> {
     RootCircuit::build(|circuit| {
-        let (fear_input, fear_handle) = circuit.add_input_zset::<FearLevel>();
-        let (target_stream, target_handle) = circuit.add_input_zset::<Target>();
-        let (position_stream, position_handle) = circuit.add_input_zset::<Position>();
+        let (fear_input, fear) = circuit.add_input_zset::<FearLevel>();
+        let (target_stream, targets) = circuit.add_input_zset::<Target>();
+        let (position_stream, positions) = circuit.add_input_zset::<Position>();
         let fear_stream = fear_level_stream(&position_stream, &fear_input);
         let decisions = movement_decision_stream(&fear_stream, &target_stream, &position_stream);
-        let moved = apply_movement(&position_stream, &decisions);
-        Ok((fear_handle, target_handle, position_handle, moved.output()))
+        let moved = apply_movement(&position_stream, &decisions).output();
+        Ok(DecisionApplyHandles {
+            fear,
+            targets,
+            positions,
+            moved,
+        })
     })
 }
 
@@ -335,10 +337,10 @@ fn build_decision_and_apply_circuit() -> Result<
 /// emitted position would fail here.
 #[test]
 fn duplicate_targets_shift_position_once() {
-    let (circuit, (fear_in, target_in, pos_in, moved_handle)) =
+    let (circuit, handles) =
         build_decision_and_apply_circuit().expect("failed to build decision-and-apply circuit");
 
-    fear_in.push(
+    handles.fear.push(
         FearLevel {
             entity: 1,
             level: 0.0.into(),
@@ -350,9 +352,9 @@ fn duplicate_targets_shift_position_once() {
         x: 5.0.into(),
         y: (-3.0).into(),
     };
-    target_in.push(target, 1);
-    target_in.push(target, 1);
-    pos_in.push(
+    handles.targets.push(target, 1);
+    handles.targets.push(target, 1);
+    handles.positions.push(
         Position {
             entity: 1,
             x: 0.0.into(),
@@ -364,7 +366,7 @@ fn duplicate_targets_shift_position_once() {
 
     circuit.step().expect("dbsp step");
 
-    let moved = test_utils::collect_weighted(&moved_handle);
+    let moved = test_utils::collect_weighted(&handles.moved);
     let (position, weight) = test_utils::expect_single(&moved, "moved position result");
     assert_eq!(
         *weight, 1,

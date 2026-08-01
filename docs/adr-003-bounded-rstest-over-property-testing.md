@@ -8,7 +8,7 @@ Accepted, 2026-07-26.
 
 2026-07-26.
 
-## Context and Problem Statement
+## Context and problem statement
 
 Several invariants in the DBSP-sync and map-lifecycle code must hold
 *exactly*, not merely "usually", because they govern correctness properties
@@ -23,7 +23,7 @@ None of `proptest`, Kani, or Verus is a workspace dependency (checked against
 the workspace `Cargo.toml`). Adopting one to cover these invariants would be
 a new supply-chain decision, not a reuse of existing tooling.
 
-## Decision Drivers
+## Decision drivers
 
 - The rollback/commit orderings and prior-entry/repeat-undo/commit-vs-
   rollback state combinations have a small, **finite** input space that a
@@ -42,7 +42,7 @@ a new supply-chain decision, not a reuse of existing tooling.
   new tool to install and maintain) that this testing strategy does not need
   to pay if exhaustive enumeration is achievable by hand.
 
-## Options Considered
+## Options considered
 
 ### Option A: adopt `proptest`
 
@@ -78,7 +78,7 @@ representative equivalence classes for the weight and path domains, as
 explicit `rstest` cases, using the `rstest` stack already in use throughout
 the codebase.
 
-## Decision Outcome
+## Decision outcome
 
 For the DBSP-sync and map-lifecycle invariants listed below, cover the
 invariant with a bounded case matrix rather than adopting a
@@ -109,12 +109,13 @@ and substring-`..` path forms), not the entire domain. This is a
 deliberately narrower guarantee than a property-testing framework
 (sampling) or a proof tool (Kani, Verus) would give over those two domains.
 This ADR is the documented, approved exception to defaulting to a
-property-testing or proof framework for exactly-correctness invariants: it
-applies only to the invariants named above and any future invariant of an
-equivalent shape, on the understanding that coverage is exhaustive only
-where the underlying domain is finite and small enough to enumerate.
+property-testing or proof framework for invariants that require exact
+correctness: it applies only to the invariants named above and any future
+invariant of an equivalent shape, on the understanding that coverage is
+exhaustive only where the underlying domain is finite and small enough to
+enumerate.
 
-## Known Risks and Limitations
+## Known risks and limitations
 
 - For the movement-decision weight and asset-path invariants, the matrix is
   already not exhaustive: it covers hand-chosen equivalence classes over a
@@ -130,7 +131,7 @@ where the underlying domain is finite and small enough to enumerate.
   not surface unanticipated edge cases the way property-based sampling can;
   it only verifies the cases the matrix's author enumerated.
 
-## Removal Criteria
+## Removal criteria
 
 This decision should be revisited, and a property-testing or proof framework
 adopted for the affected invariant, once any of:

@@ -1051,12 +1051,29 @@ emission happens earlier in `PreUpdate`. A reader that must run in
 `PreUpdate` alongside emission should be ordered
 `.after(TiledPreUpdateSystems::ProcessLoadedMaps)`.
 
-A single system triggered by the `MapCreated` event can perform all
-processing after all objects exist: adding blocks, adding slopes,
-spawning the player, and spawning NPCs. This avoids coordinating
-multiple small systems and runs only once per map load.
+`LilleMapPlugin` registers the post-processing as separate `Update`
+systems rather than one combined system: `attach_collision_blocks`
+(adding blocks and slopes) and `spawn_actors_at_spawn_points` (spawning
+the player and NPCs) each hold their own
+`MessageReader<TiledEvent<MapCreated>>`, alongside
+`monitor_primary_map_load_state`. Each system therefore waits
+independently for the same message, and all of them observe a fully
+populated map because the event is emitted only after every object
+exists.
 
-Pseudo-code for a combined system using `MapCreated` event:
+Once-per-map-load behaviour comes from two gates rather than from
+single-system scheduling. The `MessageReader` gate means a system does
+its work only on the frame that delivers the message, since each reader
+consumes it once. Marker components then make the work idempotent for
+the entities involved: `spawn_actors_at_spawn_points` queries
+`Without<PlayerSpawnConsumed>` and `Without<SpawnPointConsumed>` and
+inserts those markers as it consumes each spawn point, so a spawn
+marker is never processed twice, and `attach_collision_blocks` skips
+tiles that already carry a `Block`.
+
+The pseudo-code below shows the whole of that work in one system, to keep
+the sequence readable in a single listing; the shipped code splits it
+across the systems described above:
 
 ```rust
 fn on_map_loaded(
