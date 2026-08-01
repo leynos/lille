@@ -164,3 +164,78 @@ fn validate_asset_path_component_matrix() {
         );
     }
 }
+
+mod properties {
+    //! Property-based coverage supplementing the deterministic matrices above.
+    //!
+    //! [`validate_asset_path_component_matrix`] enumerates a fixed set of
+    //! components and both separator styles exhaustively; this samples arbitrary
+    //! strings instead, including the separator and prefix shapes an attacker
+    //! would reach for. See `docs/adr-003-bounded-rstest-over-property-testing.md`.
+
+    use super::*;
+    use proptest::prelude::*;
+
+    /// The documented contract, restated independently of the implementation:
+    /// an asset path is rejected when it is empty, when it is rooted in any
+    /// platform form, or when any whole path component is `..`. Everything else
+    /// is accepted, including components that merely contain `..` as a
+    /// substring and paths with repeated separators (an empty component is not
+    /// itself a rejection reason).
+    fn contract_rejects(path: &str) -> bool {
+        if path.is_empty() {
+            return true;
+        }
+        let rooted = path.starts_with('/')
+            || path.starts_with('\\')
+            || matches!(
+                path.as_bytes(),
+                [drive, b':', ..] if drive.is_ascii_alphabetic()
+            );
+        rooted || path.split(['/', '\\']).any(|component| component == "..")
+    }
+
+    /// Fragments assembled into candidate paths: separators in both styles,
+    /// empty components, dot runs, drive and UNC prefixes, and ordinary names.
+    fn fragment_strategy() -> impl Strategy<Value = String> {
+        prop_oneof![
+            Just("/".to_owned()),
+            Just("\\".to_owned()),
+            Just("//".to_owned()),
+            Just("..".to_owned()),
+            Just(".".to_owned()),
+            Just("...".to_owned()),
+            Just(String::new()),
+            Just("C:".to_owned()),
+            Just("\\\\server".to_owned()),
+            Just("maps".to_owned()),
+            Just("primary..backup".to_owned()),
+            Just("level.tmx".to_owned()),
+            "[a-zA-Z0-9._\\\\/:-]{0,6}",
+        ]
+    }
+
+    fn path_strategy() -> impl Strategy<Value = String> {
+        prop::collection::vec(fragment_strategy(), 0..6).prop_map(|parts| parts.concat())
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(512))]
+
+        /// `validate_asset_path` agrees with the documented contract on
+        /// arbitrary strings.
+        #[test]
+        fn validate_asset_path_agrees_with_the_documented_contract(path in path_strategy()) {
+            let rejected = matches!(
+                validate_asset_path(&path),
+                Err(LilleMapError::InvalidPrimaryMapAssetPath { .. })
+            );
+            prop_assert_eq!(
+                rejected,
+                contract_rejects(&path),
+                "validate_asset_path disagreed with the contract for {:?}",
+                path
+            );
+        }
+    }
+}

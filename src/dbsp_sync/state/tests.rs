@@ -191,3 +191,157 @@ fn applied_unsequenced_rollback_matrix(
         );
     }
 }
+
+mod properties {
+    //! Property-based coverage supplementing the exhaustive matrix above.
+    //!
+    //! [`applied_unsequenced_rollback_matrix`] enumerates the finite
+    //! present/absent × mutate/leave space exactly; this samples *sequences* of
+    //! lifecycle calls instead, where the interesting failures are ordering ones —
+    //! a repeated stash overwriting the true pre-frame values, or a commit failing
+    //! to disarm a later rollback. See
+    //! `docs/adr-003-bounded-rstest-over-property-testing.md`.
+
+    use super::*;
+    use proptest::prelude::*;
+    use std::collections::HashSet;
+
+    /// One call in the frame-rollback protocol.
+    #[derive(Clone, Copy, Debug)]
+    enum Action {
+        /// `begin_frame_rollback` — a new cache pass starts.
+        Begin,
+        /// A bare `record_unsequenced_undo` with no following mutation.
+        /// Repeats must be no-ops.
+        RecordUndo(u8),
+        /// The production pattern: record the undo, then mutate the entry.
+        ApplyUnsequenced(u8, u8),
+        /// Advance the health/pending tracking and stash the pre-values, as the
+        /// cache pass does. Repeats within a frame must not overwrite the
+        /// stashed values with already-advanced ones.
+        Stash(u8),
+        /// `commit_frame_tracking` — the step succeeded.
+        Commit,
+        /// `rollback_frame_tracking` — the step failed.
+        Rollback,
+    }
+
+    fn action_strategy() -> impl Strategy<Value = Action> {
+        prop_oneof![
+            2 => Just(Action::Begin),
+            2 => (0u8..3).prop_map(Action::RecordUndo),
+            4 => (0u8..3, 0u8..4).prop_map(|(e, v)| Action::ApplyUnsequenced(e, v)),
+            4 => (0u8..4).prop_map(Action::Stash),
+            2 => Just(Action::Commit),
+            2 => Just(Action::Rollback),
+        ]
+    }
+
+    /// The tracking fields the frame-rollback protocol governs, copied out
+    /// eagerly for comparison. The production state keeps these lazily, which is
+    /// exactly what the property is checking.
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    struct Tracking {
+        applied_unsequenced: HashMap<EntityId, (Tick, HashSet<DamageEvent>)>,
+        health_snapshot: HashMap<EntityId, HealthState>,
+        pending_damage_retractions: Vec<DamageEvent>,
+    }
+
+    impl Tracking {
+        fn of(state: &DbspState) -> Self {
+            Self {
+                applied_unsequenced: state.applied_unsequenced.clone(),
+                health_snapshot: state.health_snapshot.clone(),
+                pending_damage_retractions: state.pending_damage_retractions.clone(),
+            }
+        }
+    }
+
+    fn unsequenced_entry(value: u8) -> (Tick, HashSet<DamageEvent>) {
+        let mut events = HashSet::new();
+        events.insert(damage_event(EntityId::from(value), Tick::from(value)));
+        (Tick::from(value), events)
+    }
+
+    /// Applies one action to the state, driving it exactly as the cache and
+    /// output passes do.
+    fn apply_action(state: &mut DbspState, action: Action) {
+        match action {
+            Action::Begin => state.begin_frame_rollback(),
+            Action::RecordUndo(entity) => state.record_unsequenced_undo(EntityId::from(entity)),
+            Action::ApplyUnsequenced(entity, value) => {
+                let entity_id = EntityId::from(entity);
+                state.record_unsequenced_undo(entity_id);
+                state
+                    .applied_unsequenced
+                    .insert(entity_id, unsequenced_entry(value));
+            }
+            Action::Stash(value) => {
+                // The cache pass extracts the live values, then advances them.
+                let previous_snapshots: Vec<_> = state.health_snapshot.values().copied().collect();
+                let previous_pending = std::mem::take(&mut state.pending_damage_retractions);
+                state.health_snapshot.insert(
+                    EntityId::from(value),
+                    HealthState {
+                        entity: EntityId::from(value),
+                        current: u16::from(value),
+                        max: 100,
+                    },
+                );
+                state
+                    .pending_damage_retractions
+                    .push(damage_event(EntityId::from(value), Tick::from(value)));
+                state.stash_frame_rollback(previous_snapshots, previous_pending);
+            }
+            Action::Commit => state.commit_frame_tracking(),
+            Action::Rollback => state.rollback_frame_tracking(),
+        }
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(256))]
+
+        /// Reference model: as long as every mutation follows the protocol
+        /// (record the undo, stash before advancing), the tracking at any
+        /// rollback equals the tracking as it stood at the last `Begin` or
+        /// `Commit`, and a commit leaves the advanced tracking in place.
+        #[test]
+        fn rollback_restores_the_frame_start_tracking(
+            actions in prop::collection::vec(action_strategy(), 1..24),
+        ) {
+            let mut state = DbspState::new()
+                .map_err(|error| TestCaseError::fail(format!("DbspState::new failed: {error}")))?;
+            // The model: what the tracking looked like when this frame began.
+            let mut frame_start = Tracking::of(&state);
+
+            for action in actions {
+                let before = Tracking::of(&state);
+                apply_action(&mut state, action);
+
+                match action {
+                    // A new frame re-bases the model on the current tracking.
+                    Action::Begin => frame_start = Tracking::of(&state),
+                    // Commit must preserve the advanced tracking, and re-base
+                    // the model so a later rollback restores nothing.
+                    Action::Commit => {
+                        prop_assert_eq!(
+                            Tracking::of(&state),
+                            before,
+                            "commit must leave the advanced tracking untouched"
+                        );
+                        frame_start = Tracking::of(&state);
+                    }
+                    // Rollback must restore the exact frame-start tracking.
+                    Action::Rollback => {
+                        prop_assert_eq!(
+                            Tracking::of(&state),
+                            frame_start.clone(),
+                            "rollback must restore the exact frame-start tracking"
+                        );
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+}

@@ -287,11 +287,12 @@ step:
 The DBSP-sync and map lifecycle code has several small, finite invariants
 that must hold exactly — not merely "usually" — because they govern
 correctness properties such as at-most-one decision per entity or exact
-frame rollback. These invariants are covered by **bounded, near-exhaustive
+frame rollback. These invariants are covered in two layers: **bounded, near-exhaustive
 `rstest` case matrices** plus focused regression tests, using the `rstest`
 stack already in use throughout the codebase (see [Mastering test fixtures
-in Rust with `rstest`](rust-testing-with-rstest-fixtures.md)), rather than a
-property-testing framework.
+in Rust with `rstest`](rust-testing-with-rstest-fixtures.md)); and **sampled
+`proptest` properties** that supplement those matrices over the domains a
+matrix can only sample from.
 
 The invariant-heavy paths and their concrete test entry points are:
 
@@ -300,44 +301,62 @@ The invariant-heavy paths and their concrete test entry points are:
   emitted decision. Covered by
   `dedupe_emits_one_decision_for_positive_weight_and_none_for_zero` and
   `net_zero_merge_preserves_pending_direction` in
-  `src/dbsp_circuit/streams/behaviour/decide/tests.rs`, and by
+  `src/dbsp_circuit/streams/behaviour/decide/tests.rs`, by
   `duplicate_targets_produce_single_decision` in
-  `src/dbsp_circuit/streams/behaviour/tests.rs`.
+  `src/dbsp_circuit/streams/behaviour/tests.rs`, and over generated weighted
+  decision sets by `properties::to_decision_matches_the_overflow_safe_weight_oracle`
+  and `properties::dedupe_emits_at_most_one_decision_of_multiplicity_one`.
 - **Frame rollback** — exact pre-frame restoration of `health_snapshot`,
   `pending_damage_retractions`, and `applied_unsequenced` on a failed
   `step_circuit()` call, versus retention of the frame's changes on commit.
   Covered by `applied_unsequenced_rollback_matrix` in
   `src/dbsp_sync/state/tests.rs` (see
-  [§2](#2-frame-rollback-api-on-dbspstate)).
+  [§2](#2-frame-rollback-api-on-dbspstate)), and over generated sequences of
+  lifecycle calls by `properties::rollback_restores_the_frame_start_tracking`
+  in the same module.
 - **Asset-path validation** — rejection of rooted paths and standalone `..`
   traversal components (checked against both `/` and `\` separators), versus
   acceptance of relative paths where `..` appears only as a substring.
   Covered by `validate_asset_path_component_matrix` in
-  `src/map/lifecycle/tests.rs`.
+  `src/map/lifecycle/tests.rs`, and over arbitrary strings by
+  `properties::validate_asset_path_agrees_with_the_documented_contract` in
+  the same module.
 - **Non-positive output weights** — retractions (negative-weight records)
   are ignored rather than applied to ECS components. Covered by the tests
   named in [§4](#4-output-weight-semantics).
 
-### Why not a property-testing framework
+### Why both matrices and properties
 
 Property-based *sampling* (`proptest`) and formal *proof* tools (Kani,
-Verus) are different classes of tool, and neither is adopted for this work.
-`proptest` draws randomized samples from an input domain; Kani and Verus
-instead prove a property over a bounded or whole domain. None of the three
-is a workspace dependency, and adding any of them is a supply-chain decision
-that this testing strategy does not need to make.
+Verus) are different classes of tool. `proptest` draws randomized samples
+from an input domain; Kani and Verus instead prove a property over a bounded
+or whole domain. `proptest` is a development-only workspace dependency and
+is used here; Kani and Verus are not adopted.
 
-The bounded `rstest` matrices are exhaustive over the finite dimensions they
-enumerate — the rollback/commit orderings, and the prior-entry/repeat-undo/
-commit-vs-rollback state combinations. For the movement-decision weights
-(`i64`-valued), the domain is large but finite; for asset-path strings, the
-domain is genuinely unbounded. In both cases the matrices instead enumerate
-representative **equivalence classes**
-(positive, negative, and net-zero weights; rooted, `..`-component, and
-substring-`..` path forms), not the entire space. This deliberate deviation
-from a property/proof-testing default is a documented, approved exception,
-recorded in [ADR-003: bounded `rstest` matrices over a property-testing
-framework](adr-003-bounded-rstest-over-property-testing.md). Should a
-domain warrant stronger assurance, adopting `proptest` (sampling) or a
-bounded model checker such as Kani (proof) would be a reasonable escalation
-at that point.
+The two layers answer different questions, which is why neither replaces the
+other.
+
+The bounded `rstest` matrices are **exhaustive over the finite dimensions
+they enumerate** — the rollback/commit orderings, and the
+prior-entry/repeat-undo/commit-vs-rollback state combinations. Sampling
+cannot improve on a complete enumeration, so the matrices stay the canonical
+statement of those invariants.
+
+For the movement-decision weights (`i64`-valued) the domain is large but
+finite, and for asset-path strings it is genuinely unbounded. There a matrix
+can only enumerate representative **equivalence classes** (positive,
+negative, and net-zero weights; rooted, `..`-component, and substring-`..`
+path forms). The `proptest` properties cover those **broader domains by
+sampling**: arbitrary path strings, weighted decision sets drawn from the
+full `i64` weight range, and generated sequences of frame-rollback lifecycle
+actions, each checked against a small independent oracle or reference model.
+Sampling is not a proof — a passing run is not evidence that no
+counter-example exists — but it reaches value classes no hand-written matrix
+enumerates.
+
+The rationale for keeping the deterministic matrices, and the record of when
+`proptest` was adopted alongside them, is in [ADR-003: bounded `rstest`
+matrices over a property-testing
+framework](adr-003-bounded-rstest-over-property-testing.md). Should a domain
+warrant assurance stronger than sampling, a bounded model checker such as
+Kani would be the next escalation.

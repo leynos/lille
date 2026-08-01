@@ -78,6 +78,10 @@ exclude = ["third_party/feldera-size-of"]
 anyhow = "1"
 glam = "0.33"
 ordered-float = { version = "5", features = ["serde", "rkyv_64"] }
+# Development-only. Supplements the bounded `rstest` matrices with sampled
+# properties over broader domains; see docs/adr-003-bounded-rstest-over-property-testing.md.
+proptest = "1"
+
 bevy = { version = "0.18.1", default-features = false, features = ["reflect_auto_register"] }
 
 # `feldera-size-of` 0.1.x pins its optional `ordered-float` dependency at
@@ -96,6 +100,7 @@ rstest = "0.18.0"
 regex = "1"
 approx = "0.5"
 ordered-float = { workspace = true }
+proptest = { workspace = true }
 serial_test = "3.2"
 mockall = "0.13.1"
 static_assertions = "^1"

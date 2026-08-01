@@ -277,6 +277,13 @@ struct MovementAccumulator {
 }
 
 impl MovementAccumulator {
+    /// Folds one weighted decision in.
+    ///
+    /// The weight total uses `saturating_add`. Real Z-set weights are tiny, so
+    /// saturation is unreachable in practice, but a plain `+=` would panic in
+    /// debug builds on an overflowing total; making the bound explicit means
+    /// extreme weights degrade to a clamped total instead of aborting the
+    /// circuit mid-step.
     fn apply(&mut self, movement: &MovementDecision, weight: i64) {
         let dx = movement.dx.into_inner();
         let dy = movement.dy.into_inner();
@@ -287,13 +294,15 @@ impl MovementAccumulator {
         let scaled = weight as f64;
         self.sum_dx = OrderedFloat(self.sum_dx.into_inner() + dx * scaled);
         self.sum_dy = OrderedFloat(self.sum_dy.into_inner() + dy * scaled);
-        self.total_weight += weight;
+        self.total_weight = self.total_weight.saturating_add(weight);
     }
 
+    /// Combines two partial accumulators. The weight total saturates for the
+    /// same reason as in [`Self::apply`].
     fn merge(&mut self, other: &Self) {
         self.sum_dx = OrderedFloat(self.sum_dx.into_inner() + other.sum_dx.into_inner());
         self.sum_dy = OrderedFloat(self.sum_dy.into_inner() + other.sum_dy.into_inner());
-        self.total_weight += other.total_weight;
+        self.total_weight = self.total_weight.saturating_add(other.total_weight);
     }
 
     /// Collapses the accumulated decisions for `entity` into a normalized
