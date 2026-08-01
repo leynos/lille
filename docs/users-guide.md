@@ -98,5 +98,36 @@ sampling circuit health:
 A failed step also logs a warning naming the operation and error, and rolls
 the frame's Rust-side tracking back so the next frame starts consistent.
 
+### Movement-aggregation diagnostics
+
+`movement_decision_stream` folds an entity's decisions into a single
+normalized vector, but that fold is a pure map and cannot log from inside
+the circuit. `movement_decision_streams` exposes the same fold alongside a
+diagnostic stream, so the caller can report what happened:
+
+```rust
+let (decisions, aggregations) =
+    movement_decision_streams(fear, targets, positions);
+```
+
+The returned `decisions` stream is identical to the one
+`movement_decision_stream` alone would produce; the second stream adds
+information without changing movement behaviour. Each `MovementAggregation`
+record is `{ entity: i64, total_weight: i64 }`. A record is emitted only
+when deduplication actually collapsed something — an entity with a single
+decision emits no record, and an entity whose weights net to zero emits
+neither a decision nor an aggregation record.
+
+`DbspCircuit::movement_aggregation_out()` exposes the corresponding
+`OutputHandle<OrdZSet<MovementAggregation>>`. Aggregation records carry
+Z-set weights like every other circuit output, so consumers must apply the
+same rule as [Only positive-weight output records are
+applied](#only-positive-weight-output-records-are-applied): consolidate the
+handle, skip any record whose weight is `<= 0`, then act on the rest.
+Lille's own `apply_dbsp_outputs_system` does this, emitting one `warn!` per
+positive-weight record naming the entity and total weight. A consumer
+driving its own circuit must likewise drain the handle every frame — with
+`take_from_all()` or equivalent — or records accumulate.
+
 For the full frame lifecycle and rollback API, see the [DBSP
 synchronization developer's guide](dbsp-synchronization-guide.md).

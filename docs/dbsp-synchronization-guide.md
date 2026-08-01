@@ -198,10 +198,11 @@ still applied rather than silently swallowed.
 
 ## 4. Output weight semantics
 
-`apply_positions`, `apply_velocities`, and `apply_health_deltas` (all in
-`src/dbsp_sync/output/mod.rs`) each read from a DBSP output handle
-(`new_position_out`, `new_velocity_out`, `health_delta_out` respectively),
-call `.consolidate()` on it, and iterate the resulting `(record, (), weight)`
+`apply_positions`, `apply_velocities`, `apply_health_deltas`, and
+`report_movement_aggregations` (all in `src/dbsp_sync/output/mod.rs`) each
+read from a DBSP output handle (`new_position_out`, `new_velocity_out`,
+`health_delta_out`, and `movement_aggregation_out` respectively), call
+`.consolidate()` on it, and iterate the resulting `(record, (), weight)`
 tuples. Each loop begins with the same guard:
 
 ```rust
@@ -209,6 +210,11 @@ if weight <= 0 {
     continue;
 }
 ```
+
+Unlike the other three, `report_movement_aggregations` does not write a
+surviving record to an ECS component; it logs a `warn!` diagnostic naming
+the entity and its total weight, reporting that the circuit collapsed
+several movement decisions for that entity.
 
 DBSP's `consolidate()` merges every contribution to a Z-set by key and
 **removes entries whose net weight is zero** — a record present with equal
