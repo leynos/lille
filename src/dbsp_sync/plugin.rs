@@ -17,7 +17,7 @@ use super::observers_v1;
 /// Context carried by [`DbspSyncError`] events.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DbspSyncErrorContext {
-    /// Failure surfaced while initialising the plugin.
+    /// Failure surfaced while initializing the plugin.
     Init,
     /// Failure surfaced while advancing the DBSP circuit.
     Step,

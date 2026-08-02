@@ -19,13 +19,14 @@ pub use circuit::DbspCircuit;
 pub use step::{step, step_named, try_step};
 pub use streams::{
     apply_movement, fall_damage_stream, fear_level_stream, floor_height_stream,
-    health_delta_stream, highest_block_pair, movement_decision_stream, new_position_stream,
-    new_velocity_stream, position_floor_stream, standing_motion_stream, PositionFloor,
+    health_delta_stream, highest_block_pair, movement_decision_stream, movement_decision_streams,
+    new_position_stream, new_velocity_stream, position_floor_stream, standing_motion_stream,
+    PositionFloor,
 };
 pub use types::{
     DamageEvent, DamageSource, EntityId, FearLevel, FloorHeightAt, Force, HealthDelta, HealthState,
-    HighestBlockAt, MovementDecision, NewPosition, NewVelocity, PlayerSpawnLocation, Position,
-    SpawnPointRecord, Target, Tick, Velocity,
+    HighestBlockAt, MovementAggregation, MovementDecision, NewPosition, NewVelocity,
+    PlayerSpawnLocation, Position, SpawnPointRecord, Target, Tick, Velocity,
 };
 
 #[cfg(test)]

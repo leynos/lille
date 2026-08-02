@@ -1,10 +1,16 @@
 //! Tests for the DBSP output application systems.
 
+mod counters;
 mod edge_cases;
+mod failure_paths;
+mod pure_helpers;
 
+use super::health::{clamped_health_value, ClampedHealth};
 use super::*;
 use crate::components::{Block, DdlogId, Health, UnitType};
-use crate::dbsp_circuit::{DamageEvent, DamageSource, HealthState, Position, Velocity};
+use crate::dbsp_circuit::{
+    try_step, DamageEvent, DamageSource, HealthDelta, HealthState, Position, Velocity,
+};
 use crate::world_handle::DdlogEntity;
 use crate::{DbspCircuit, DbspPlugin};
 use bevy::ecs::prelude::On;
@@ -58,7 +64,9 @@ fn spawn_entity(app: &mut App) -> Entity {
         .id()
 }
 
-fn prime_state(app: &mut App, entity: Entity) {
+/// Wires the entity mapping shared by every priming path — world handle entry,
+/// id/rev maps, and a block input — without pushing any position or velocity.
+fn prime_entity_mapping(app: &mut App, entity: Entity) {
     {
         let mut world_handle = app.world_mut().resource_mut::<WorldHandle>();
         world_handle.entities.insert(
@@ -85,7 +93,73 @@ fn prime_state(app: &mut App, entity: Entity) {
         },
         1,
     );
-    state.circuit.position_in().push(
+}
+
+/// Pushes a single position record with the given Z-set `weight`, so callers
+/// can prime insertions or retractions without duplicating the mapping setup.
+fn push_position_input(app: &mut App, position: Position, weight: i64) {
+    let state = app.world_mut().non_send_resource_mut::<DbspState>();
+    state.circuit.position_in().push(position, weight);
+}
+
+/// Pushes a single velocity record with the given Z-set `weight`.
+fn push_velocity_input(app: &mut App, velocity: Velocity, weight: i64) {
+    let state = app.world_mut().non_send_resource_mut::<DbspState>();
+    state.circuit.velocity_in().push(velocity, weight);
+}
+
+/// Runs one phase of a two-phase weight-gate test on a fresh app: spawns and
+/// primes an entity, lets `push_inputs` push this phase's records at `weight`,
+/// applies the DBSP outputs, then reads a comparable value back out.
+///
+/// Pairing a positive-weight phase with a negative-weight one isolates the
+/// Z-set weight as the only variable, so the retraction assertion cannot hold
+/// vacuously. `read` must copy the value out of the component — returning a
+/// borrow would outlive the app. Failures propagate as `dbsp::Error` rather
+/// than panicking here, so this helper stays outside a
+/// `no_expect_outside_tests` boundary; callers unwrap the result.
+///
+/// One phase — pushing a position at the phase weight alongside a fixed
+/// weight-`+1` velocity, and reading the resulting translation back:
+///
+/// ```rust,ignore
+/// let translation = run_weight_gate_phase(
+///     -1,
+///     |app, weight| {
+///         push_velocity_input(app, velocity, 1);
+///         push_position_input(app, position, weight);
+///     },
+///     |app, entity| Some(app.world().entity(entity).get::<Transform>()?.translation),
+/// )?
+/// .expect("Transform component should remain present");
+/// // The negative weight is skipped, so the translation is still the origin.
+/// assert_eq!(translation, Vec3::ZERO);
+/// ```
+fn run_weight_gate_phase<T>(
+    weight: i64,
+    push_inputs: impl FnOnce(&mut App, i64),
+    read: impl FnOnce(&App, Entity) -> Option<T>,
+) -> Result<Option<T>, dbsp::Error> {
+    let mut app = setup_app()?;
+    let entity = spawn_entity(&mut app);
+    prime_entity_mapping(&mut app, entity);
+    push_inputs(&mut app, weight);
+    // `RunSystemError` implements neither `Display` nor `Error`, so fold it into
+    // the `dbsp::Error` this helper already returns (as `force_step_error` does).
+    app.world_mut()
+        .run_system_once(apply_dbsp_outputs_system)
+        .map_err(|error| {
+            dbsp::Error::IO(io::Error::other(format!(
+                "applying DBSP outputs failed: {error:?}"
+            )))
+        })?;
+    Ok(read(&app, entity))
+}
+
+fn prime_state(app: &mut App, entity: Entity) {
+    prime_entity_mapping(app, entity);
+    push_position_input(
+        app,
         Position {
             entity: 1,
             x: 0.0.into(),
@@ -94,7 +168,8 @@ fn prime_state(app: &mut App, entity: Entity) {
         },
         1,
     );
-    state.circuit.velocity_in().push(
+    push_velocity_input(
+        app,
         Velocity {
             entity: 1,
             vx: 1.0.into(),
@@ -209,38 +284,54 @@ fn duplicate_health_delta_is_ignored() {
 }
 
 #[rstest]
-fn step_failure_triggers_error_event() {
-    let mut app = App::new();
-    app.add_plugins(MinimalPlugins);
-    dbsp_test_support::install_error_observer(&mut app);
-    app.add_plugins(DbspPlugin);
-    app.world_mut().flush();
+fn negative_weight_position_is_not_applied() {
+    // These are `prime_state`'s inputs, which `applies_outputs_updates_components`
+    // already proves move the Transform: the entity stands on the primed block
+    // and the circuit integrates its velocity into a new position. A position
+    // input alone emits no output at all, so pushing the velocity at a fixed
+    // weight +1 keeps the position record's weight as the only variable and
+    // stops the retraction assertion from holding vacuously.
+    let position = Position {
+        entity: 1,
+        x: 0.0.into(),
+        y: 0.0.into(),
+        z: 1.0.into(),
+    };
+    let velocity = Velocity {
+        entity: 1,
+        vx: 1.0.into(),
+        vy: 0.0.into(),
+        vz: 0.0.into(),
+    };
 
-    // Run startup to initialise WorldHandle before priming state.
-    app.update();
+    // The velocity is always pushed at +1; only the position's weight varies.
+    let push_inputs = |app: &mut App, weight: i64| {
+        push_velocity_input(app, velocity, 1);
+        push_position_input(app, position, weight);
+    };
+    let read_translation = |app: &App, entity: Entity| {
+        Some(app.world().entity(entity).get::<Transform>()?.translation)
+    };
 
-    let entity = spawn_entity(&mut app);
-    prime_state(&mut app, entity);
+    // Control phase: at weight +1 the position IS applied, so the Transform
+    // moves off the origin — proving the record reaches the write path.
+    let applied = run_weight_gate_phase(1, push_inputs, read_translation)
+        .expect("running the control phase should succeed")
+        .expect("Transform component should remain present");
+    assert_ne!(
+        applied,
+        Vec3::ZERO,
+        "a positive-weight position must be applied, else the gate test is vacuous"
+    );
 
-    {
-        let mut state = app.world_mut().non_send_resource_mut::<DbspState>();
-        state.set_stepper_for_testing(force_step_error);
-    }
-
-    app.update();
-
-    let step_errors = app.world().resource::<dbsp_test_support::CapturedErrors>();
-    let error = step_errors
-        .0
-        .first()
-        .expect("DBSP error event should be captured");
-    assert_eq!(error.0, format!("{:?}", DbspSyncErrorContext::Step));
-    assert!(error.1.contains("forced failure"));
-
-    let transform = app
-        .world()
-        .entity(entity)
-        .get::<Transform>()
-        .expect("Transform should remain after failed step");
-    assert_eq!(transform.translation, Vec3::ZERO);
+    // Retraction phase: the same records with the position at weight -1 give a
+    // negative consolidated output weight, which must be skipped, not written.
+    let skipped = run_weight_gate_phase(-1, push_inputs, read_translation)
+        .expect("running the retraction phase should succeed")
+        .expect("Transform component should remain present");
+    assert_eq!(
+        skipped,
+        Vec3::ZERO,
+        "a negative-weight position must not mutate the Transform"
+    );
 }

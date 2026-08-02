@@ -10,5 +10,5 @@ mod fear;
 mod tests;
 
 pub use apply::apply_movement;
-pub use decide::movement_decision_stream;
+pub use decide::{movement_decision_stream, movement_decision_streams};
 pub use fear::fear_level_stream;

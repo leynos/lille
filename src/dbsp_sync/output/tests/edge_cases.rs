@@ -1,20 +1,10 @@
 //! Edge-case tests for the DBSP output application systems.
 //!
-//! Covers conversion bounds and the guard paths that skip records for
-//! unmappable, unknown, despawned, or component-less entities.
+//! Covers the guard paths that skip records for unmappable, unknown,
+//! despawned, or component-less entities, and the Z-set weight gates. Direct
+//! unit tests for the pure helpers live in [`super::pure_helpers`].
 
 use super::*;
-
-#[rstest]
-#[case::nan(f64::NAN, None)]
-#[case::positive_infinity(f64::INFINITY, None)]
-#[case::negative_infinity(f64::NEG_INFINITY, None)]
-#[case::above_f32_range(1e300, None)]
-#[case::below_f32_range(-1e300, None)]
-#[case::in_range(1.5, Some(1.5))]
-fn f32_from_f64_bounds(#[case] value: f64, #[case] expected: Option<f32>) {
-    assert_eq!(f32_from_f64(value), expected);
-}
 
 #[rstest]
 fn out_of_range_outputs_leave_components_unchanged() {
@@ -76,12 +66,17 @@ fn out_of_range_outputs_leave_components_unchanged() {
     assert!(velocity.vy.abs() < f32::EPSILON);
 }
 
+// Both cases exercise distinct early-return branches of `resolve_health_target`:
+// `u64::MAX` fails `i64::try_from` (unmappable), while `2` converts but misses
+// `DbspState::id_map` (unknown). Neither may mutate the mapped entity's Health.
 #[rstest]
-fn health_delta_for_unmappable_entity_is_skipped() {
+#[case::unmappable_entity(u64::MAX)]
+#[case::unknown_entity(2)]
+fn health_delta_for_unresolvable_entity_is_skipped(#[case] health_entity: u64) {
     let mut app = setup_app().expect("failed to set up test app");
     let entity = spawn_entity(&mut app);
     prime_state(&mut app, entity);
-    push_health_inputs_for(&mut app, u64::MAX, 90, 50);
+    push_health_inputs_for(&mut app, health_entity, 90, 50);
 
     app.world_mut()
         .run_system_once(apply_dbsp_outputs_system)
@@ -92,26 +87,10 @@ fn health_delta_for_unmappable_entity_is_skipped() {
         .entity(entity)
         .get::<Health>()
         .expect("Health component should remain after applying DBSP outputs");
-    assert_eq!(health.current, 90);
-}
-
-#[rstest]
-fn health_delta_for_unknown_entity_is_skipped() {
-    let mut app = setup_app().expect("failed to set up test app");
-    let entity = spawn_entity(&mut app);
-    prime_state(&mut app, entity);
-    push_health_inputs_for(&mut app, 2, 90, 50);
-
-    app.world_mut()
-        .run_system_once(apply_dbsp_outputs_system)
-        .expect("applying DBSP outputs should succeed");
-
-    let health = app
-        .world()
-        .entity(entity)
-        .get::<Health>()
-        .expect("Health component should remain after applying DBSP outputs");
-    assert_eq!(health.current, 90);
+    assert_eq!(
+        health.current, 90,
+        "an unresolvable health delta must not mutate the mapped entity's Health"
+    );
 }
 
 #[rstest]
@@ -182,4 +161,164 @@ fn health_delta_for_despawned_entity_is_skipped() {
 
     let state = app.world().non_send_resource::<DbspState>();
     assert_eq!(state.applied_health_duplicates(), 0);
+}
+
+#[rstest]
+fn negative_weight_velocity_is_not_applied() {
+    // Place the entity well above the floor (block at z=0) so it is
+    // *unsupported* and the circuit integrates the velocity input into a
+    // non-default velocity output — a standing entity would ignore the input,
+    // making the gate assertion vacuous. The same velocity input drives both
+    // phases so the Z-set weight is the only variable.
+    let base = Position {
+        entity: 1,
+        x: 0.0.into(),
+        y: 0.0.into(),
+        z: 10.0.into(),
+    };
+    let velocity = Velocity {
+        entity: 1,
+        vx: 1.0.into(),
+        vy: 2.0.into(),
+        vz: 3.0.into(),
+    };
+    let default = VelocityComp::default();
+
+    // The base position is always pushed at +1; only the velocity's weight
+    // varies. `VelocityComp` derives no `PartialEq`, so the read copies its
+    // components out as a comparable tuple.
+    let push_inputs = |app: &mut App, weight: i64| {
+        push_position_input(app, base, 1);
+        push_velocity_input(app, velocity, weight);
+    };
+    let read_velocity = |app: &App, entity: Entity| {
+        let applied = app.world().entity(entity).get::<VelocityComp>()?;
+        Some((applied.vx, applied.vy, applied.vz))
+    };
+    let baseline = (default.vx, default.vy, default.vz);
+
+    // Phase 1: at weight +1 the velocity output IS applied, so VelocityComp
+    // changes from its default. This proves these inputs emit velocity output
+    // at all, which keeps the phase-2 skip assertion from passing vacuously.
+    let applied = run_weight_gate_phase(1, push_inputs, read_velocity)
+        .expect("running the control phase should succeed")
+        .expect("VelocityComp should remain present");
+    assert_ne!(
+        applied, baseline,
+        "a positive-weight velocity must be applied, else the gate test is vacuous"
+    );
+
+    // Phase 2: the same inputs at weight -1. The negative (retraction) weight
+    // must be skipped, leaving VelocityComp at its default.
+    let skipped = run_weight_gate_phase(-1, push_inputs, read_velocity)
+        .expect("running the retraction phase should succeed")
+        .expect("VelocityComp should remain present");
+    assert_eq!(
+        skipped, baseline,
+        "a negative-weight velocity must not mutate VelocityComp"
+    );
+}
+
+#[rstest]
+fn velocity_output_without_velocity_component_is_skipped() {
+    // `apply_velocities` resolves the entity through `id_map` but then finds no
+    // `VelocityComp`, taking the mismatch branch: it warns and continues rather
+    // than inserting or mutating a component. These are exactly the inputs
+    // `negative_weight_velocity_is_not_applied`'s phase-1 control proves emit a
+    // positive-weight velocity output — an unsupported entity at z=10 whose
+    // velocity input the circuit integrates — so the record really does reach
+    // the write path and the assertion below cannot hold vacuously. The
+    // resulting warning is not asserted on: the repository has no log-capture
+    // helper.
+    let mut app = setup_app().expect("failed to set up test app");
+    let entity = app
+        .world_mut()
+        .spawn((
+            DdlogId(1),
+            Transform::default(),
+            Health {
+                current: 90,
+                max: 100,
+            },
+        ))
+        .id();
+    prime_entity_mapping(&mut app, entity);
+    push_position_input(
+        &mut app,
+        Position {
+            entity: 1,
+            x: 0.0.into(),
+            y: 0.0.into(),
+            z: 10.0.into(),
+        },
+        1,
+    );
+    push_velocity_input(
+        &mut app,
+        Velocity {
+            entity: 1,
+            vx: 1.0.into(),
+            vy: 2.0.into(),
+            vz: 3.0.into(),
+        },
+        1,
+    );
+
+    app.world_mut()
+        .run_system_once(apply_dbsp_outputs_system)
+        .expect("applying DBSP outputs should succeed");
+
+    assert!(
+        app.world().entity(entity).get::<VelocityComp>().is_none(),
+        "a velocity output for an entity without VelocityComp must be skipped, \
+         not inserted"
+    );
+}
+
+#[rstest]
+fn negative_weight_health_delta_is_not_applied() {
+    let mut app = setup_app().expect("failed to set up test app");
+    let entity = spawn_entity(&mut app);
+    prime_entity_mapping(&mut app, entity);
+    // Positive control: `applies_outputs_updates_components` primes these same
+    // inputs — health 90/100 and 50 external damage at tick 1, seq 1 — with the
+    // health snapshot at weight +1, and asserts `Health::current` moves 90 -> 40.
+    // Here the snapshot is retracted instead (weight -1), so the Z-set weight is
+    // the only variable: the consolidated health delta carries a negative
+    // (retraction) weight and must be skipped rather than mutating Health.
+    {
+        let state = app.world_mut().non_send_resource_mut::<DbspState>();
+        state.circuit.health_state_in().push(
+            HealthState {
+                entity: 1,
+                current: 90,
+                max: 100,
+            },
+            -1,
+        );
+        state.circuit.damage_in().push(
+            DamageEvent {
+                entity: 1,
+                amount: 50,
+                source: DamageSource::External,
+                at_tick: 1,
+                seq: Some(1),
+            },
+            1,
+        );
+    }
+
+    app.world_mut()
+        .run_system_once(apply_dbsp_outputs_system)
+        .expect("applying DBSP outputs should succeed");
+
+    let health = app
+        .world()
+        .entity(entity)
+        .get::<Health>()
+        .expect("Health component should remain present");
+    assert_eq!(
+        health.current, 90,
+        "a negative-weight (retraction) health delta must not mutate Health"
+    );
 }

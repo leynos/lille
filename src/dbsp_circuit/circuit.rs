@@ -26,13 +26,13 @@ use crate::components::{Block, BlockSlope};
 use super::helpers::{advance_tick, within_grace};
 use super::streams::{
     apply_movement, fall_damage_stream, fear_level_stream, floor_height_stream,
-    health_delta_stream, highest_block_pair, movement_decision_stream, new_position_stream,
+    health_delta_stream, highest_block_pair, movement_decision_streams, new_position_stream,
     new_velocity_stream, position_floor_stream, standing_motion_stream, PositionFloor,
 };
 use super::types::{
     DamageEvent, FearLevel, FloorHeightAt, Force, HealthDelta, HealthState, HighestBlockAt,
-    NewPosition, NewVelocity, PlayerSpawnLocation, Position, SpawnPointRecord, Target, Tick,
-    Velocity,
+    MovementAggregation, NewPosition, NewVelocity, PlayerSpawnLocation, Position, SpawnPointRecord,
+    Target, Tick, Velocity,
 };
 
 /// Authoritative DBSP dataflow for Lille's world simulation.
@@ -87,6 +87,7 @@ pub struct DbspCircuit {
     floor_height_out: OutputHandle<OrdZSet<FloorHeightAt>>,
     position_floor_out: OutputHandle<OrdZSet<PositionFloor>>,
     health_delta_out: OutputHandle<OrdZSet<HealthDelta>>,
+    movement_aggregation_out: OutputHandle<OrdZSet<MovementAggregation>>,
 }
 
 struct BuildHandles {
@@ -107,6 +108,7 @@ struct BuildHandles {
     floor_height_out: OutputHandle<OrdZSet<FloorHeightAt>>,
     position_floor_out: OutputHandle<OrdZSet<PositionFloor>>,
     health_delta_out: OutputHandle<OrdZSet<HealthDelta>>,
+    movement_aggregation_out: OutputHandle<OrdZSet<MovementAggregation>>,
 }
 
 impl DbspCircuit {
@@ -154,6 +156,7 @@ impl DbspCircuit {
             floor_height_out: handles.floor_height_out,
             position_floor_out: handles.position_floor_out,
             health_delta_out: handles.health_delta_out,
+            movement_aggregation_out: handles.movement_aggregation_out,
         })
     }
 
@@ -237,7 +240,8 @@ impl DbspCircuit {
         let new_vel = unsupported_velocities.plus(&new_vel_standing);
 
         let fear = fear_level_stream(&positions, &fears);
-        let decisions = movement_decision_stream(&fear, &targets, &positions);
+        let (decisions, movement_aggregations) =
+            movement_decision_streams(&fear, &targets, &positions);
 
         let moved_pos = apply_movement(&base_pos, &decisions);
 
@@ -261,6 +265,7 @@ impl DbspCircuit {
             floor_height_out: floor_height.output(),
             position_floor_out: pos_floor.output(),
             health_delta_out: health_deltas.output(),
+            movement_aggregation_out: movement_aggregations.output(),
         })
     }
 
@@ -347,6 +352,16 @@ impl DbspCircuit {
     /// Returns a reference to the health delta output handle.
     pub const fn health_delta_out(&self) -> &OutputHandle<OrdZSet<HealthDelta>> {
         &self.health_delta_out
+    }
+
+    /// Returns a reference to the movement-aggregation diagnostic output.
+    ///
+    /// Carries one [`MovementAggregation`] per entity whose movement decisions
+    /// the circuit collapsed this tick. The deduplication helper is pure, so
+    /// this handle is how the fact reaches the command layer, which logs it and
+    /// drains the handle alongside the other outputs.
+    pub const fn movement_aggregation_out(&self) -> &OutputHandle<OrdZSet<MovementAggregation>> {
+        &self.movement_aggregation_out
     }
 
     /// Clears all input collections to remove accumulated records.

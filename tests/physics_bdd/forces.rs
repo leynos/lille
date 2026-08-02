@@ -1,3 +1,11 @@
+//! Tests covering external force application: acceleration from a force, mass
+//! scaling of the resulting motion, and rejection of invalid masses.
+//!
+//! Each scenario is built with the shared helpers in [`super::support`]
+//! (`physics_scenario`, `run_physics_scenario`, and the `world` fixture), so
+//! these tests exercise force handling through the same DBSP-backed harness as
+//! the other physics behaviour tests.
+
 use bevy::prelude::*;
 use crate::support::{physics_scenario, run_physics_scenario, world, PhysicsScenario, TestWorld};
 use lille::components::{Block, ForceComp};
@@ -90,4 +98,3 @@ fn setup_invalid_mass(world: &mut TestWorld) {
 fn force_scenarios(world: TestWorld, #[case] scenario: PhysicsScenario) {
     run_physics_scenario(world, scenario);
 }
-//! Tests for acceleration, Z-axis force application with mass, and invalid-mass handling.

@@ -1,7 +1,7 @@
 //! Tests for the behavioural movement streams.
 
 use super::decide::{decide_movement, PositionTarget};
-use super::{fear_level_stream, movement_decision_stream};
+use super::{apply_movement, fear_level_stream, movement_decision_stream};
 use crate::dbsp_circuit::{FearLevel, MovementDecision, Position, Target};
 use crate::FEAR_THRESHOLD;
 use approx::assert_relative_eq;
@@ -62,15 +62,8 @@ fn movement_decision_join(
     #[case] expected_dx: f64,
     #[case] expected_dy: f64,
 ) {
-    let (circuit, (fear_in, target_in, pos_in, decisions_handle)) = RootCircuit::build(|c| {
-        let (fear_input, fi) = c.add_input_zset::<FearLevel>();
-        let (targets, ti) = c.add_input_zset::<Target>();
-        let (pos_s, pi) = c.add_input_zset::<Position>();
-        let fear_stream = fear_level_stream(&pos_s, &fear_input);
-        let output_handle = movement_decision_stream(&fear_stream, &targets, &pos_s).output();
-        Ok((fi, ti, pi, output_handle))
-    })
-    .expect("failed to build circuit for movement_decision_join");
+    let (circuit, (fear_in, target_in, pos_in, decisions_handle)) =
+        build_decision_circuit().expect("failed to build circuit for movement_decision_join");
 
     if let Some(level) = fear {
         fear_in.push(
@@ -116,19 +109,10 @@ fn movement_decision_join(
 
 #[test]
 fn no_decision_without_target() {
-    #[expect(
-        unused_mut,
-        reason = "Mutable binding retained for compatibility with API expectations"
-    )]
-    let (mut circuit, (fear_in, pos_in, decisions_handle)) = RootCircuit::build(|c| {
-        let (fear_input, fi) = c.add_input_zset::<FearLevel>();
-        let (pos_s, pi) = c.add_input_zset::<Position>();
-        let targets = c.add_input_zset::<Target>().0;
-        let fear_stream = fear_level_stream(&pos_s, &fear_input);
-        let output_handle = movement_decision_stream(&fear_stream, &targets, &pos_s).output();
-        Ok((fi, pi, output_handle))
-    })
-    .expect("failed to build circuit for no_decision_without_target");
+    // The target handle is intentionally left unused: this test pushes no
+    // target, so no movement decision should be produced.
+    let (circuit, (fear_in, _target_in, pos_in, decisions_handle)) =
+        build_decision_circuit().expect("failed to build circuit for no_decision_without_target");
 
     fear_in.push(
         FearLevel {
@@ -269,16 +253,8 @@ fn conflicting_targets_normalise_to_one_decision(
 
 #[test]
 fn duplicate_targets_produce_single_decision() {
-    let (circuit, (fear_in, target_in, pos_in, decisions_handle)) = RootCircuit::build(|circuit| {
-        let (fear_input, fear_handle) = circuit.add_input_zset::<FearLevel>();
-        let (target_stream, target_handle) = circuit.add_input_zset::<Target>();
-        let (position_stream, position_handle) = circuit.add_input_zset::<Position>();
-        let fear_stream = fear_level_stream(&position_stream, &fear_input);
-        let output_handle =
-            movement_decision_stream(&fear_stream, &target_stream, &position_stream).output();
-        Ok((fear_handle, target_handle, position_handle, output_handle))
-    })
-    .expect("failed to build circuit for duplicate target test");
+    let (circuit, (fear_in, target_in, pos_in, decisions_handle)) =
+        build_decision_circuit().expect("failed to build circuit for duplicate target test");
 
     fear_in.push(
         FearLevel {
@@ -308,16 +284,99 @@ fn duplicate_targets_produce_single_decision() {
 
     circuit.step().expect("dbsp step");
 
-    let decisions: Vec<MovementDecision> = decisions_handle
-        .consolidate()
-        .iter()
-        .map(|(decision, (), _timestamp)| {
-            let decision_ref: &MovementDecision = &decision;
-            *decision_ref
-        })
-        .collect();
-    let decision = test_utils::expect_single(&decisions, "movement decision result");
+    // Retain the Z-set weight: duplicate targets must dedupe to a single
+    // decision with multiplicity 1, not a single decision emitted twice.
+    let decisions = test_utils::collect_weighted(&decisions_handle);
+    let (decision, weight) = test_utils::expect_single(&decisions, "movement decision result");
+    assert_eq!(
+        *weight, 1,
+        "duplicate targets must dedupe to multiplicity 1, not {weight}"
+    );
     let magnitude = (5_f64.powi(2) + (-3_f64).powi(2)).sqrt();
     assert_relative_eq!(decision.dx.into_inner(), 5.0 / magnitude);
     assert_relative_eq!(decision.dy.into_inner(), -3.0 / magnitude);
+}
+
+/// Input and output handles for the decision-and-apply test circuit.
+///
+/// Naming the bundle keeps the builder's signature readable without an
+/// untracked `clippy::type_complexity` suppression.
+struct DecisionApplyHandles {
+    fear: dbsp::ZSetHandle<FearLevel>,
+    targets: dbsp::ZSetHandle<Target>,
+    positions: dbsp::ZSetHandle<Position>,
+    moved: dbsp::OutputHandle<dbsp::typed_batch::OrdZSet<Position>>,
+}
+
+/// Builds the decision stream *and* applies it, mirroring the production
+/// wiring in `circuit.rs` (`movement_decision_stream` feeding `apply_movement`).
+///
+/// The raw position input doubles as `apply_movement`'s base, so the test does
+/// not need the physics pipeline that derives `base_pos` in production.
+fn build_decision_and_apply_circuit(
+) -> Result<(dbsp::CircuitHandle, DecisionApplyHandles), dbsp::Error> {
+    RootCircuit::build(|circuit| {
+        let (fear_input, fear) = circuit.add_input_zset::<FearLevel>();
+        let (target_stream, targets) = circuit.add_input_zset::<Target>();
+        let (position_stream, positions) = circuit.add_input_zset::<Position>();
+        let fear_stream = fear_level_stream(&position_stream, &fear_input);
+        let decisions = movement_decision_stream(&fear_stream, &target_stream, &position_stream);
+        let moved = apply_movement(&position_stream, &decisions).output();
+        Ok(DecisionApplyHandles {
+            fear,
+            targets,
+            positions,
+            moved,
+        })
+    })
+}
+
+/// End-to-end companion to `duplicate_targets_produce_single_decision`, which
+/// stops at the decision stream. Duplicate targets must dedupe upstream and
+/// then shift the entity's position exactly once — a doubled delta or a second
+/// emitted position would fail here.
+#[test]
+fn duplicate_targets_shift_position_once() {
+    let (circuit, handles) =
+        build_decision_and_apply_circuit().expect("failed to build decision-and-apply circuit");
+
+    handles.fear.push(
+        FearLevel {
+            entity: 1,
+            level: 0.0.into(),
+        },
+        1,
+    );
+    let target = Target {
+        entity: 1,
+        x: 5.0.into(),
+        y: (-3.0).into(),
+    };
+    handles.targets.push(target, 1);
+    handles.targets.push(target, 1);
+    handles.positions.push(
+        Position {
+            entity: 1,
+            x: 0.0.into(),
+            y: 0.0.into(),
+            z: 0.0.into(),
+        },
+        1,
+    );
+
+    circuit.step().expect("dbsp step");
+
+    let moved = test_utils::collect_weighted(&handles.moved);
+    let (position, weight) = test_utils::expect_single(&moved, "moved position result");
+    assert_eq!(
+        *weight, 1,
+        "duplicate targets must yield one moved position, not {weight}"
+    );
+    // The deduped decision is the unit vector towards (5, -3); the base position
+    // is the origin, so the moved position is that vector, with z carried over.
+    let magnitude = (5_f64.powi(2) + (-3_f64).powi(2)).sqrt();
+    assert_eq!(position.entity, 1);
+    assert_relative_eq!(position.x.into_inner(), 5.0 / magnitude);
+    assert_relative_eq!(position.y.into_inner(), -3.0 / magnitude);
+    assert_relative_eq!(position.z.into_inner(), 0.0);
 }

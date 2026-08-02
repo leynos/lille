@@ -5,14 +5,13 @@
 
 use dbsp::{algebra::Semigroup, operator::Fold, typed_batch::OrdZSet, RootCircuit, Stream};
 use glam::DVec2;
-use log::warn;
 use ordered_float::OrderedFloat;
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 use size_of::SizeOf;
 
 use crate::FEAR_THRESHOLD;
 
-use crate::dbsp_circuit::{FearLevel, MovementDecision, Position, Target};
+use crate::dbsp_circuit::{FearLevel, MovementAggregation, MovementDecision, Position, Target};
 
 #[derive(
     Archive,
@@ -42,7 +41,7 @@ fn should_flee(level: OrderedFloat<f64>) -> bool {
     level.into_inner() > FEAR_THRESHOLD
 }
 
-/// Threshold below which displacement is treated as zero when normalising.
+/// Threshold below which displacement is treated as zero when normalizing.
 ///
 /// The value `1e-12` avoids division by near-zero magnitudes. It suppresses
 /// floating-point noise while remaining negligible for typical movement
@@ -73,7 +72,7 @@ pub(super) fn decide_movement(level: OrderedFloat<f64>, pt: &PositionTarget) -> 
 ///
 /// Entities with a target move one unit towards it when their fear is below
 /// [`FEAR_THRESHOLD`]; otherwise, they flee one unit away. Vectors are
-/// normalised to ensure consistent speed in all directions.
+/// normalized to ensure consistent speed in all directions.
 ///
 /// # Examples
 /// ```rust,no_run
@@ -148,6 +147,27 @@ pub fn movement_decision_stream(
     targets: &Stream<RootCircuit, OrdZSet<Target>>,
     positions: &Stream<RootCircuit, OrdZSet<Position>>,
 ) -> Stream<RootCircuit, OrdZSet<MovementDecision>> {
+    movement_decision_streams(fear, targets, positions).0
+}
+
+/// As [`movement_decision_stream`], but also returning the aggregation
+/// diagnostics the deduplication step produced.
+///
+/// The decision stream is identical to the one [`movement_decision_stream`]
+/// returns; the second stream carries a [`MovementAggregation`] for each entity
+/// whose decisions were collapsed. Callers that want to report aggregation —
+/// `apply_dbsp_outputs_system` does — build the circuit with this function and
+/// expose the diagnostics through their own output handle, which keeps the
+/// logging in the command layer rather than in the circuit's map closures.
+#[must_use]
+pub fn movement_decision_streams(
+    fear: &Stream<RootCircuit, OrdZSet<FearLevel>>,
+    targets: &Stream<RootCircuit, OrdZSet<Target>>,
+    positions: &Stream<RootCircuit, OrdZSet<Position>>,
+) -> (
+    Stream<RootCircuit, OrdZSet<MovementDecision>>,
+    Stream<RootCircuit, OrdZSet<MovementAggregation>>,
+) {
     let pos_target = positions
         .map_index(|p| (p.entity, *p))
         .join(&targets.map_index(|t| (t.entity, *t)), |_entity, p, t| {
@@ -169,25 +189,70 @@ pub fn movement_decision_stream(
     dedupe_movement_decisions(&raw)
 }
 
+/// Collapses per-tick movement decisions so each entity has at most one.
+///
+/// Decisions are indexed by entity and folded through [`MovementAccumulator`],
+/// which sums each decision's `dx`/`dy` weighted by its Z-set weight and
+/// tracks the total weight. The summed vector is then normalized back to a
+/// unit direction; entities whose total weight nets to zero are dropped
+/// entirely. This guarantees a single decision per entity downstream, so a
+/// join cannot apply a doubled delta.
+///
+/// Returns the deduplicated decisions alongside a [`MovementAggregation`]
+/// stream carrying one record per entity whose decisions were actually
+/// collapsed. The fold and its output closure stay pure — reporting the
+/// aggregation is the command layer's job — so nothing here logs.
+///
+/// # Examples
+///
+/// Duplicate decisions for one entity collapse into a single normalized
+/// decision: [`MovementAccumulator`] sums the weighted vectors, then
+/// `to_decision` renormalizes the total to a unit direction.
+/// ```text
+/// let deduped = dedupe_movement_decisions(&movement);
+/// // input  (entity 1): {dx: 1.0, dy: 0.0} x1, {dx: 1.0, dy: 0.0} x1
+/// // fold   -> sum (2.0, 0.0), total weight 2
+/// // output (entity 1): {dx: 1.0, dy: 0.0} x1   (one unit decision)
+/// ```
+///
+/// Opposing decisions whose weights net to zero produce no decision: the
+/// accumulator's total weight is zero, so `to_decision` returns `None`.
+/// ```text
+/// let deduped = dedupe_movement_decisions(&movement);
+/// // input  (entity 1): {dx: 1.0, dy: 0.0} x+1, {dx: 1.0, dy: 0.0} x-1
+/// // fold   -> total weight 0
+/// // output (entity 1): (no decision emitted)
+/// ```
 fn dedupe_movement_decisions(
     movement: &Stream<RootCircuit, OrdZSet<MovementDecision>>,
-) -> Stream<RootCircuit, OrdZSet<MovementDecision>> {
-    movement
+) -> (
+    Stream<RootCircuit, OrdZSet<MovementDecision>>,
+    Stream<RootCircuit, OrdZSet<MovementAggregation>>,
+) {
+    let accumulated = movement
         .map_index(|decision| (decision.entity, *decision))
         .aggregate(Fold::<
-            MovementDecision,
-            MovementAccumulator,
-            MovementAccumulatorSemigroup,
-            _,
-            _,
-        >::with_output(
-            MovementAccumulator::default(),
-            |acc: &mut MovementAccumulator, decision: &MovementDecision, weight: i64| {
-                acc.apply(decision, weight);
-            },
-            |acc: MovementAccumulator| acc,
-        ))
-        .flat_map(|(entity, accumulator)| accumulator.clone().into_decision(*entity).into_iter())
+        MovementDecision,
+        MovementAccumulator,
+        MovementAccumulatorSemigroup,
+        _,
+        _,
+    >::with_output(
+        MovementAccumulator::default(),
+        |acc: &mut MovementAccumulator, decision: &MovementDecision, weight: i64| {
+            acc.apply(decision, weight);
+        },
+        |acc: MovementAccumulator| acc,
+    ));
+
+    // `to_decision` is pure, so evaluating it once per output stream is safe;
+    // splitting this way keeps the diagnostic out of the decision stream and so
+    // leaves the production movement output byte-for-byte what it was.
+    let decisions = accumulated
+        .flat_map(|(entity, accumulator)| accumulator.to_decision(*entity).decision.into_iter());
+    let aggregations = accumulated
+        .flat_map(|(entity, accumulator)| accumulator.to_decision(*entity).aggregation.into_iter());
+    (decisions, aggregations)
 }
 
 #[derive(
@@ -212,46 +277,54 @@ struct MovementAccumulator {
 }
 
 impl MovementAccumulator {
+    /// Folds one weighted decision in.
+    ///
+    /// The weight total uses `saturating_add`. Real Z-set weights are tiny, so
+    /// saturation is unreachable in practice, but a plain `+=` would panic in
+    /// debug builds on an overflowing total; making the bound explicit means
+    /// extreme weights degrade to a clamped total instead of aborting the
+    /// circuit mid-step.
     fn apply(&mut self, movement: &MovementDecision, weight: i64) {
         let dx = movement.dx.into_inner();
         let dy = movement.dy.into_inner();
         #[expect(
             clippy::cast_precision_loss,
-            reason = "Movement counts remain tiny so converting to f64 is exact"
+            reason = "The weight only scales this contribution to a sum that `to_decision` renormalizes, so lost precision cannot change the emitted direction"
         )]
         let scaled = weight as f64;
         self.sum_dx = OrderedFloat(self.sum_dx.into_inner() + dx * scaled);
         self.sum_dy = OrderedFloat(self.sum_dy.into_inner() + dy * scaled);
-        self.total_weight += weight;
-        if self.total_weight == 0 {
-            self.sum_dx = OrderedFloat(0.0);
-            self.sum_dy = OrderedFloat(0.0);
-        }
+        self.total_weight = self.total_weight.saturating_add(weight);
     }
 
+    /// Combines two partial accumulators. The weight total saturates for the
+    /// same reason as in [`Self::apply`].
     fn merge(&mut self, other: &Self) {
         self.sum_dx = OrderedFloat(self.sum_dx.into_inner() + other.sum_dx.into_inner());
         self.sum_dy = OrderedFloat(self.sum_dy.into_inner() + other.sum_dy.into_inner());
-        self.total_weight += other.total_weight;
-        if self.total_weight == 0 {
-            self.sum_dx = OrderedFloat(0.0);
-            self.sum_dy = OrderedFloat(0.0);
-        }
+        self.total_weight = self.total_weight.saturating_add(other.total_weight);
     }
 
-    fn into_decision(self, entity: i64) -> Option<MovementDecision> {
+    /// Collapses the accumulated decisions for `entity` into a normalized
+    /// vector, alongside the diagnostic describing whether aggregation
+    /// occurred.
+    ///
+    /// This helper is pure: it performs no logging and has no other side
+    /// effects, so it can run inside a DBSP map closure. The command layer
+    /// consumes [`MovementOutcome::aggregation`] and does the warning.
+    fn to_decision(&self, entity: i64) -> MovementOutcome {
         if self.total_weight == 0 {
-            return None;
+            return MovementOutcome::EMPTY;
         }
-        if self.total_weight.abs() > 1 {
-            warn!(
-                "aggregated {} movement decisions for entity {entity}, normalising to one vector",
-                self.total_weight
-            );
-        }
+        // `i64::MIN.abs()` would overflow, so test the range rather than
+        // negating. Any weight outside it folded in more than one decision.
+        let aggregation = (!(-1..=1).contains(&self.total_weight)).then_some(MovementAggregation {
+            entity,
+            total_weight: self.total_weight,
+        });
         #[expect(
             clippy::cast_precision_loss,
-            reason = "Movement counts remain tiny so converting to f64 is exact"
+            reason = "The total only scales the averaged vector, which is renormalized immediately below, so lost precision cannot change the emitted direction"
         )]
         let weight = self.total_weight as f64;
         let avg_x = self.sum_dx.into_inner() / weight;
@@ -262,12 +335,36 @@ impl MovementAccumulator {
         } else {
             (0.0, 0.0)
         };
-        Some(MovementDecision {
-            entity,
-            dx: OrderedFloat(dx),
-            dy: OrderedFloat(dy),
-        })
+        MovementOutcome {
+            decision: Some(MovementDecision {
+                entity,
+                dx: OrderedFloat(dx),
+                dy: OrderedFloat(dy),
+            }),
+            aggregation,
+        }
     }
+}
+
+/// Pure result of [`MovementAccumulator::to_decision`].
+///
+/// Separating the decision from the diagnostic keeps the fold closure free of
+/// side effects while still telling the command layer that aggregation
+/// happened, which is not otherwise observable from the deduplicated output.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct MovementOutcome {
+    /// The collapsed decision, or `None` when the weights net to zero.
+    decision: Option<MovementDecision>,
+    /// `Some` only when more than one decision was folded together.
+    aggregation: Option<MovementAggregation>,
+}
+
+impl MovementOutcome {
+    /// The outcome for an entity whose decisions cancelled out entirely.
+    const EMPTY: Self = Self {
+        decision: None,
+        aggregation: None,
+    };
 }
 
 #[derive(Clone)]
@@ -280,3 +377,6 @@ impl Semigroup<MovementAccumulator> for MovementAccumulatorSemigroup {
         combined
     }
 }
+
+#[cfg(test)]
+mod tests;

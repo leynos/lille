@@ -193,6 +193,105 @@ dependency accepts 5.x (ideally including the `Float` → `FloatCore` bound fix)
 Progress against these steps is tracked in
 [issue #294](https://github.com/leynos/lille/issues/294).
 
+## DBSP synchronization
+
+Each frame, `DbspPlugin` chains two systems so the first runs to completion
+before the second starts: `cache_state_for_dbsp_system` reads ECS component
+state into the DBSP circuit's input handles, then
+`apply_dbsp_outputs_system` steps the circuit and writes its outputs back
+onto ECS components.
+
+`DbspState` exposes frame-rollback methods that keep Rust-side bookkeeping
+in step with the circuit, called in this order:
+
+- `begin_frame_rollback` — start of the cache pass; clears the previous
+  frame's rollback log.
+- `record_unsequenced_undo` — during damage ingestion, captures an
+  `applied_unsequenced` entry's pre-frame value before it is mutated.
+- `stash_frame_rollback` — saves the pre-frame health-snapshot and
+  pending-damage values the cache pass extracted.
+- `commit_frame_tracking` — on a successful step, discards the rollback
+  log.
+- `rollback_frame_tracking` — on a failed step, restores the pre-frame
+  tracking.
+
+When `state.step_circuit()` returns `Err`, the output system clears the
+circuit inputs, restores the Rust-side tracking
+(`rollback_frame_tracking`), emits a `DbspSyncError` event, and applies no
+ECS output writes that frame.
+
+`apply_positions`, `apply_velocities`, and `apply_health_deltas` apply only
+consolidated records with a positive Z-set weight; non-positive
+(retraction) weights are skipped.
+
+For the detailed walkthrough, see
+[DBSP synchronization developer's guide](dbsp-synchronization-guide.md).
+
+### Movement-aggregation diagnostics
+
+`movement_decision_streams` returns the same deduplicated `MovementDecision`
+stream as `movement_decision_stream`, plus a diagnostic
+`Stream<RootCircuit, OrdZSet<MovementAggregation>>`. The deduplication
+boundary still guarantees at most one emitted movement decision per entity,
+and a net-zero total weight still emits no decision; the diagnostic stream
+adds visibility without changing that behaviour.
+
+```rust
+let (decisions, aggregations) =
+    movement_decision_streams(fear, targets, positions);
+```
+
+`MovementAggregation { entity, total_weight }` reports that the circuit
+collapsed movement decisions for one entity into one normalized vector. The
+circuit emits an aggregation record only when the accumulated
+`total_weight` falls outside `-1..=1`: a single decision emits no
+diagnostic, and a net-zero total emits neither a movement decision nor an
+aggregation record.
+
+`DbspCircuit::movement_aggregation_out()` exposes the diagnostic stream as
+`OutputHandle<OrdZSet<MovementAggregation>>`. As with every other circuit
+output, consumers must consolidate the handle, process only records with a
+positive Z-set weight, and drain the handle every frame — otherwise
+diagnostics can accumulate and be reported again.
+
+`apply_dbsp_outputs_system` performs that lifecycle:
+`report_movement_aggregations` emits the warning in the command layer, then
+the system calls `take_from_all()` on `movement_aggregation_out()`. Keep
+the distinction explicit: the DBSP fold stays pure and does not log; the
+output system owns logging. See [Movement-aggregation
+diagnostics](users-guide.md#movement-aggregation-diagnostics) in the user's
+guide for the consumer-facing contract.
+
+### Asserting Z-set weights with `collect_weighted`
+
+Because those weight gates are part of the contract, tests need to see the
+weights, not just the records. `test_utils::collect_weighted` consolidates a
+`dbsp::OutputHandle<OrdZSet<T>>` and returns `Vec<(T, ZWeight)>`, retaining
+each consolidated Z-set weight rather than discarding it.
+
+That retained weight is what lets a test assert multiplicity and retractions.
+A record pushed twice consolidates into one record with weight `2`, so a
+deduplicated output can be asserted to have multiplicity `1` — which
+distinguishes "emitted once" from "emitted twice and collapsed only when
+read".
+
+```rust
+use dbsp::RootCircuit;
+use test_utils::collect_weighted;
+
+let (circuit, (input, output)) = RootCircuit::build(|circuit| {
+    let (stream, handle) = circuit.add_input_zset::<i64>();
+    Ok((handle, stream.output()))
+})?;
+
+// Pushing the same record twice consolidates to one record of weight 2.
+input.push(7, 1);
+input.push(7, 1);
+circuit.step()?;
+
+assert_eq!(collect_weighted(&output), vec![(7, 2)]);
+```
+
 ## Commit gates
 
 Run the deterministic gates before committing (see `AGENTS.md` and the

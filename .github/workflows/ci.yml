@@ -40,13 +40,32 @@ jobs:
           key: whitaker-installer-${{ runner.os }}-${{ runner.arch }}-${{ env.WHITAKER_INSTALLER_VERSION }}
       - name: Install the Whitaker Dylint suite
         run: |
-          if ! command -v whitaker-installer >/dev/null 2>&1; then
-            if cargo binstall --version >/dev/null 2>&1; then
-              cargo binstall --no-confirm --locked "whitaker-installer@${WHITAKER_INSTALLER_VERSION}"
-            else
-              echo "cargo-binstall unavailable; building whitaker-installer from crates.io"
-              cargo install --locked whitaker-installer --version "${WHITAKER_INSTALLER_VERSION}"
+          install_whitaker() {
+            # Prefer cargo-binstall, but fall back to a locked cargo install
+            # when binstall is unavailable OR its install attempt fails (e.g.
+            # no prebuilt binary for this version/target). Running the install
+            # inside the `if` condition keeps a binstall failure from aborting
+            # the step under `set -e`.
+            if cargo binstall --version >/dev/null 2>&1 \
+              && cargo binstall --no-confirm --locked \
+                "whitaker-installer@${WHITAKER_INSTALLER_VERSION}"; then
+              return 0
             fi
+            echo "cargo binstall unavailable or failed; building whitaker-installer from crates.io"
+            cargo install --locked whitaker-installer --version "${WHITAKER_INSTALLER_VERSION}"
+          }
+          # Reuse a cached installer only when its reported version is exactly
+          # the pinned version. A bare `command -v` check would keep a stale
+          # binary, and a substring/word match could accept a near-miss version.
+          installed_version=""
+          if command -v whitaker-installer >/dev/null 2>&1; then
+            installed_version="$(whitaker-installer --version 2>/dev/null | awk 'NF{print $NF}')" \
+              || installed_version=""
+          fi
+          if [ "${installed_version}" = "${WHITAKER_INSTALLER_VERSION}" ]; then
+            echo "whitaker-installer ${WHITAKER_INSTALLER_VERSION} already present; skipping install"
+          else
+            install_whitaker
           fi
           whitaker-installer
       - name: Lint
