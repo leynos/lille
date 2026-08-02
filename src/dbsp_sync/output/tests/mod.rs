@@ -1,5 +1,6 @@
 //! Tests for the DBSP output application systems.
 
+mod counters;
 mod edge_cases;
 mod failure_paths;
 mod pure_helpers;

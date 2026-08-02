@@ -150,6 +150,11 @@ fn validate_asset_path(asset_path: &str) -> Result<(), LilleMapError> {
 /// (`\...`, `\\server\share`), and drive-letter-absolute paths (`C:\...` or
 /// `C:/...`). Asset paths must stay relative to the asset root, so any rooted
 /// form is rejected regardless of the host operating system.
+///
+/// A drive letter alone does not make a path rooted: `C:` and `C:maps/x.tmx`
+/// are drive-*relative* on Windows, resolving against that drive's current
+/// directory rather than its root. Only a drive letter followed by a separator
+/// (`C:\...` or `C:/...`) is drive-absolute.
 fn is_rooted_path(path: &str) -> bool {
     if path.starts_with('/') || path.starts_with('\\') {
         return true;
@@ -157,8 +162,8 @@ fn is_rooted_path(path: &str) -> bool {
     // Drive-absolute, e.g. `C:\maps\primary.tmx` or `C:/maps/primary.tmx`.
     let mut chars = path.chars();
     matches!(
-        (chars.next(), chars.next()),
-        (Some(drive), Some(':')) if drive.is_ascii_alphabetic()
+        (chars.next(), chars.next(), chars.next()),
+        (Some(drive), Some(':'), Some('/' | '\\')) if drive.is_ascii_alphabetic()
     )
 }
 

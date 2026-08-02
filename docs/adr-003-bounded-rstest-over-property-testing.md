@@ -115,27 +115,32 @@ the movement-decision weights (`i64`-valued), the domain is large but
 finite; for asset-path strings, the domain is genuinely unbounded. In both
 cases the matrix instead enumerates chosen representative equivalence
 classes (positive, negative, and net-zero weights; rooted, `..`-component,
-and substring-`..` path forms), not the entire domain. Taken alone that is a
+and substring-`..` path forms), not the entire domain. Taken alone, that is a
 deliberately narrower guarantee than sampling or a proof tool would give
 over those two domains, which is precisely the gap the 2026-08-01 amendment
-closes with `proptest`. The matrices remain the exhaustive layer wherever
+narrows with `proptest`. The matrices remain the exhaustive layer wherever
 the underlying domain is finite and small enough to enumerate; a proof tool
 (Kani, Verus) is still not used for any of these invariants.
 
 ## Amendment, 2026-08-01: `proptest` supplements the matrices
 
-The coverage gap this ADR recorded as "a genuine, present coverage gap, not
-a future risk" was acted on: `proptest` is now a development-only workspace
-dependency, and sampled properties cover the broader domains alongside the
-matrices. The two layers are distinct and both are kept:
+This amendment addresses the coverage gap this ADR recorded as "a genuine,
+present coverage gap, not a future risk". `proptest` is now a
+development-only workspace dependency, and sampled properties cover the
+broader domains alongside the matrices. The two layers are distinct and both
+are kept:
 
 - **Exhaustive finite matrices** — the `rstest` cases enumerate small,
   genuinely finite domains completely. Sampling cannot improve on them
   there, and they remain the canonical statement of those invariants.
 - **Sampled broader-domain properties** — `proptest` covers the domains a
-  matrix can only sample from: arbitrary asset-path strings, weighted
-  decision sets over the full `i64` weight range, and generated sequences of
-  frame-rollback lifecycle actions.
+  matrix can only sample from: asset paths sampled from bounded path
+  fragments (the generator concatenates zero to five fragments, drawn from
+  fixed separator, prefix, and path-name fragments plus one generated
+  fragment of up to six characters); weighted decision sets, with the pure
+  movement-accumulator property sampling weights from `-4..=4` plus
+  `i64::MIN` and `i64::MAX`, and the DBSP circuit property sampling only
+  `-4..=4`; and generated sequences of frame-rollback lifecycle actions.
 
 The properties live beside the matrices they supplement, in a `properties`
 submodule of each test module:

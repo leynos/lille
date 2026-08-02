@@ -47,6 +47,10 @@ fn validate_asset_path_rejects_unsafe_paths(#[case] path: &str) {
 #[case::nested("levels/act1/room.tmx")]
 // `..` embedded in a directory name is not a standalone component.
 #[case::dots_in_dir("map..data/level.tmx")]
+// A drive letter without a following separator is drive-relative, not
+// drive-absolute, so it is not a rooted path.
+#[case::bare_drive_letter("C:")]
+#[case::drive_relative("C:maps/primary.tmx")]
 fn validate_asset_path_accepts_relative_paths(#[case] path: &str) {
     assert!(
         validate_asset_path(path).is_ok(),
@@ -182,6 +186,10 @@ mod properties {
     /// is accepted, including components that merely contain `..` as a
     /// substring and paths with repeated separators (an empty component is not
     /// itself a rejection reason).
+    ///
+    /// A drive letter counts as rooted only when a separator follows it:
+    /// `C:/x` and `C:\x` are drive-absolute, while `C:` and `C:x` are
+    /// drive-relative and therefore accepted.
     fn contract_rejects(path: &str) -> bool {
         if path.is_empty() {
             return true;
@@ -190,7 +198,8 @@ mod properties {
             || path.starts_with('\\')
             || matches!(
                 path.as_bytes(),
-                [drive, b':', ..] if drive.is_ascii_alphabetic()
+                [drive, b':', separator, ..]
+                    if drive.is_ascii_alphabetic() && matches!(separator, b'/' | b'\\')
             );
         rooted || path.split(['/', '\\']).any(|component| component == "..")
     }

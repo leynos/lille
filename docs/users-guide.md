@@ -96,7 +96,8 @@ sampling circuit health:
 - `skipped_outputs()` — output records skipped for a non-positive weight.
 
 A failed step also logs a warning naming the operation and error, and rolls
-the frame's Rust-side tracking back so the next frame starts consistent.
+the frame's Rust-side tracking back, so the next frame starts in a consistent
+state.
 
 ### Movement-aggregation diagnostics
 

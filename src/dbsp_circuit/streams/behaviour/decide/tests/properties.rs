@@ -97,7 +97,7 @@ proptest! {
             let magnitude = dx.hypot(dy);
             prop_assert!(
                 (magnitude - 1.0).abs() < 1e-9 || (dx == 0.0 && dy == 0.0),
-                "direction must be normalised or the zero vector, got ({dx}, {dy})"
+                "direction must be normalized or the zero vector, got ({dx}, {dy})"
             );
         }
 

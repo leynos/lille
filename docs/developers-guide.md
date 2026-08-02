@@ -228,6 +228,41 @@ consolidated records with a positive Z-set weight; non-positive
 For the detailed walkthrough, see
 [DBSP synchronization developer's guide](dbsp-synchronization-guide.md).
 
+### Movement-aggregation diagnostics
+
+`movement_decision_streams` returns the same deduplicated `MovementDecision`
+stream as `movement_decision_stream`, plus a diagnostic
+`Stream<RootCircuit, OrdZSet<MovementAggregation>>`. The deduplication
+boundary still guarantees at most one emitted movement decision per entity,
+and a net-zero total weight still emits no decision; the diagnostic stream
+adds visibility without changing that behaviour.
+
+```rust
+let (decisions, aggregations) =
+    movement_decision_streams(fear, targets, positions);
+```
+
+`MovementAggregation { entity, total_weight }` reports that the circuit
+collapsed movement decisions for one entity into one normalized vector. The
+circuit emits an aggregation record only when the accumulated
+`total_weight` falls outside `-1..=1`: a single decision emits no
+diagnostic, and a net-zero total emits neither a movement decision nor an
+aggregation record.
+
+`DbspCircuit::movement_aggregation_out()` exposes the diagnostic stream as
+`OutputHandle<OrdZSet<MovementAggregation>>`. As with every other circuit
+output, consumers must consolidate the handle, process only records with a
+positive Z-set weight, and drain the handle every frame — otherwise
+diagnostics can accumulate and be reported again.
+
+`apply_dbsp_outputs_system` performs that lifecycle:
+`report_movement_aggregations` emits the warning in the command layer, then
+the system calls `take_from_all()` on `movement_aggregation_out()`. Keep
+the distinction explicit: the DBSP fold stays pure and does not log; the
+output system owns logging. See [Movement-aggregation
+diagnostics](users-guide.md#movement-aggregation-diagnostics) in the user's
+guide for the consumer-facing contract.
+
 ### Asserting Z-set weights with `collect_weighted`
 
 Because those weight gates are part of the contract, tests need to see the
