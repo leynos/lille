@@ -6,7 +6,7 @@ publish = false
 
 [dependencies]
 syn = { version = "3.0.3", features = ["full"] }
-dbsp = "0.98"
+dbsp = "0.324"
 lille = { path = ".." }
 ordered-float = { workspace = true }
 bevy = { workspace = true, default-features = false }
