@@ -1,6 +1,6 @@
 # Lille Physics and World Engine Roadmap
 
-## Vision and Strategy
+## Vision and strategy
 
 This document outlines the development roadmap for Lille's physics and
 world-interaction engine. The strategy is to build a highly performant,
@@ -39,7 +39,7 @@ behaviours.
 - [ ] Phase 4 — Upgrade Bevy crates from 0.15 to 0.16.
 - [ ] Phase 5 — Upgrade Bevy crates from 0.16 to 0.17.3.
 
-## 1. Foundational Migration to DBSP
+## 1. Foundational migration to DBSP
 
 **Goal**: To completely remove the DDlog dependency and establish a working,
 pure-Rust build where the core physics logic is handled by a minimal DBSP
@@ -98,7 +98,7 @@ parity.
 - Core BDD and unit tests pass, establishing the testing pattern for subsequent
   phases.
 
-## 2. Achieving Physics Parity
+## 2. Achieving physics parity
 
 **Goal**: To re-implement the full set of existing physics and geometry rules
 within the DBSP circuit, achieving parity with the capabilities of the final
@@ -150,7 +150,7 @@ DDlog-based version.
 - The project is considered stable and feature-complete with respect to its
   original design.
 
-## 3. Expanding Physics and Agent Dynamics
+## 3. Expanding physics and agent dynamics
 
 **Goal**: To move beyond the original feature set and introduce more dynamic
 physical properties and agent behaviours.
@@ -300,7 +300,7 @@ lasts for 6,000 milliseconds before another fall-damage event may trigger.
 
 - A basic health and damage system is operational.
 
-## 4. Advanced Features and Polish
+## 4. Advanced features and polish
 
 **Goal**: To investigate and implement more complex features and ensure the
 long-term stability and performance of the engine.
