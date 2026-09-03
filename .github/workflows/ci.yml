@@ -7,12 +7,14 @@ on:
 jobs:
   build-test:
     runs-on: ubicloud-standard-8
+    # Ubicloud jobs bill by the minute, so a hung step must not run to the
+    # 6-hour platform default. The 2026-09-03 baseline median was 1656 s.
+    timeout-minutes: 90
     permissions:
       contents: read
     env:
       CARGO_TERM_COLOR: always
       BUILD_PROFILE: debug
-      WHITAKER_INSTALLER_VERSION: '0.2.7'
       # Bevy's render features make the coverage build heavy; lift the
       # shared-action cargo wall-clock cap (default 600 s) accordingly.
       RUN_RUST_CARGO_WAIT_TIMEOUT: '1800'
@@ -24,67 +26,64 @@ jobs:
           # the pull request's merge base.
           fetch-depth: 0
       - name: Setup Rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@794e4801babcf68065c660fdf4781ad62be5d061
-      - name: Spelling
-        run: make spelling
-      - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-      - name: Check format
-        run: make check-fmt
-      - name: Cache Whitaker installer
+        uses: leynos/shared-actions/.github/actions/setup-rust@7d46a399558914f5a05074e55a560fec0269fd0d
+        with:
+          # Sole owner of ~/.cargo/registry and ~/.cargo/git for this job. It
+          # runs before the first cargo invocation so the lint step reads a
+          # warm registry.
+          cache-provider: github
+          # No RUSTC_WRAPPER is configured anywhere in this repository, so an
+          # sccache install would download a binary that never serves a
+          # compilation and would have no cache owner. Adopting sccache is a
+          # separate, measured change.
+          use-sccache: 'false'
+      - name: Cache uv tool layers
+        # `make spelling` drives uv with repository-local UV_CACHE_DIR and
+        # UV_TOOL_DIR, so these two directories are the whole uv surface. This
+        # job is the only one in the repository that installs uv tools, so it
+        # is necessarily both the reader and the single writer; there is no
+        # trunk job to designate as the writer instead.
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
-            ~/.cargo/bin/whitaker-installer
-            ~/.cache/cargo-binstall
-          key: whitaker-installer-${{ runner.os }}-${{ runner.arch }}-${{ env.WHITAKER_INSTALLER_VERSION }}
+            .uv-cache
+            .uv-tools
+          key: uv-tools-v1-${{ runner.os }}-${{ runner.arch }}-${{ runner.environment }}-${{ hashFiles('Makefile', 'scripts/*.py') }}
+          restore-keys: |
+            uv-tools-v1-${{ runner.os }}-${{ runner.arch }}-${{ runner.environment }}-
+      - name: Spelling
+        run: make spelling
+      - name: Check format
+        run: make check-fmt
       - name: Install the Whitaker Dylint suite
-        run: |
-          install_whitaker() {
-            # Prefer cargo-binstall, but fall back to a locked cargo install
-            # when binstall is unavailable OR its install attempt fails (e.g.
-            # no prebuilt binary for this version/target). Running the install
-            # inside the `if` condition keeps a binstall failure from aborting
-            # the step under `set -e`.
-            if cargo binstall --version >/dev/null 2>&1 \
-              && cargo binstall --no-confirm --locked \
-                "whitaker-installer@${WHITAKER_INSTALLER_VERSION}"; then
-              return 0
-            fi
-            echo "cargo binstall unavailable or failed; building whitaker-installer from crates.io"
-            cargo install --locked whitaker-installer --version "${WHITAKER_INSTALLER_VERSION}"
-          }
-          # Reuse a cached installer only when its reported version is exactly
-          # the pinned version. A bare `command -v` check would keep a stale
-          # binary, and a substring/word match could accept a near-miss version.
-          installed_version=""
-          if command -v whitaker-installer >/dev/null 2>&1; then
-            installed_version="$(whitaker-installer --version 2>/dev/null | awk 'NF{print $NF}')" \
-              || installed_version=""
-          fi
-          if [ "${installed_version}" = "${WHITAKER_INSTALLER_VERSION}" ]; then
-            echo "whitaker-installer ${WHITAKER_INSTALLER_VERSION} already present; skipping install"
-          else
-            install_whitaker
-          fi
-          whitaker-installer
+        # Downloads the pinned prebuilt installer and verifies it against a
+        # digest pinned in the action. The action owns the cache for the
+        # installer binary, its version marker, and ~/.local/share/whitaker.
+        uses: leynos/shared-actions/.github/actions/install-whitaker@7d46a399558914f5a05074e55a560fec0269fd0d
+        with:
+          installer-version: '0.2.7'
+          cache-provider: github
       - name: Lint
         run: |
           cargo clippy --all-targets --all-features -- -D warnings
           RUSTFLAGS="-D warnings" whitaker --all -- --all-targets --all-features
-      - name: Test
-        run: cargo test
-      # Coverage is generated with the shared action (replacing the bespoke
-      # cargo-llvm-cov steps) so the whole estate shares one recipe. The
-      # ratchet compares against the baseline written by coverage-main.yml.
+      # The instrumented run is this workflow's only test execution on Linux:
+      # a separate uninstrumented `cargo test` repeated the suite for no extra
+      # evidence and doubled the billed compile. `all-features` names exactly
+      # the set the explicit feature list used to name.
       - name: Generate coverage
-        uses: leynos/shared-actions/.github/actions/generate-coverage@794e4801babcf68065c660fdf4781ad62be5d061
+        uses: leynos/shared-actions/.github/actions/generate-coverage@7d46a399558914f5a05074e55a560fec0269fd0d
         with:
-          features: render map text test-support observers-v1-spike
+          all-features: 'true'
+          all-targets: 'true'
+          doctests: 'true'
           output-path: lcov.info
           format: lcov
           use-cargo-nextest: 'false'
           with-ratchet: 'true'
+          # `setup-rust` above already owns ~/.cargo/registry and ~/.cargo/git;
+          # this keeps the action from becoming a second owner of them.
+          cache-provider: external
       # The CodeScene changed-line gate: diffs the PR against its merge
       # base and evaluates changed-line coverage. Guarded so secret-less
       # runs (forks, repos not yet onboarded) skip rather than fail.
@@ -93,7 +92,7 @@ jobs:
         env:
           CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN }}
         if: env.CS_ACCESS_TOKEN != '' && github.event_name == 'pull_request'
-        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@794e4801babcf68065c660fdf4781ad62be5d061
+        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@7d46a399558914f5a05074e55a560fec0269fd0d
         with:
           format: lcov
           mode: check

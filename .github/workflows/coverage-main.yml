@@ -15,6 +15,9 @@ on:
 jobs:
   coverage-upload:
     runs-on: ubicloud-standard-8
+    # Ubicloud jobs bill by the minute, so a hung step must not run to the
+    # 6-hour platform default. The 2026-09-03 baseline median was 561 s.
+    timeout-minutes: 60
     permissions:
       contents: read
     env:
@@ -26,22 +29,31 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Setup Rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@794e4801babcf68065c660fdf4781ad62be5d061
-      - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-      - name: Generate coverage
-        uses: leynos/shared-actions/.github/actions/generate-coverage@794e4801babcf68065c660fdf4781ad62be5d061
+        uses: leynos/shared-actions/.github/actions/setup-rust@7d46a399558914f5a05074e55a560fec0269fd0d
         with:
-          features: render map text test-support observers-v1-spike
+          # Sole owner of ~/.cargo/registry and ~/.cargo/git for this job, and
+          # the trunk writer whose entry every pull-request run restores.
+          cache-provider: github
+          # See ci.yml: nothing sets RUSTC_WRAPPER, so the sccache install
+          # would download a binary that serves no compilation.
+          use-sccache: 'false'
+      - name: Generate coverage
+        uses: leynos/shared-actions/.github/actions/generate-coverage@7d46a399558914f5a05074e55a560fec0269fd0d
+        with:
+          all-features: 'true'
+          all-targets: 'true'
+          doctests: 'true'
           output-path: lcov.info
           format: lcov
           use-cargo-nextest: 'false'
           with-ratchet: 'true'
+          # `setup-rust` above already owns ~/.cargo/registry and ~/.cargo/git.
+          cache-provider: external
       - name: Upload coverage data to CodeScene
         env:
           CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN }}
         if: env.CS_ACCESS_TOKEN != ''
-        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@794e4801babcf68065c660fdf4781ad62be5d061
+        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@7d46a399558914f5a05074e55a560fec0269fd0d
         with:
           format: lcov
           access-token: ${{ env.CS_ACCESS_TOKEN }}
