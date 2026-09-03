@@ -13,15 +13,20 @@
 
 #[path = "support/workflow_cache_owners.rs"]
 mod workflow_cache_owners;
+#[path = "support/workflow_loader.rs"]
+mod workflow_loader;
 #[path = "support/workflow_model.rs"]
 mod workflow_model;
 
 use camino::Utf8Path;
 use rstest::{fixture, rstest};
 
+use workflow_loader::{
+    all_steps, load_workflows, load_workflows_in, parse_workflow, read_repository_file,
+};
 use workflow_model::{
-    all_steps, load_workflows, load_workflows_in, parse_workflow, read_repository_file, Job, Step,
-    Workflow, BUILD_JOB_IDS, CACHE_ACTION_SHA, SHARED_ACTIONS_SHA, UBICLOUD_LABEL,
+    Job, Step, Workflow, WorkflowSource, BUILD_JOB_IDS, CACHE_ACTION_SHA, SHARED_ACTIONS_SHA,
+    UBICLOUD_LABEL,
 };
 
 /// Fragments that mark a step as building a tool from source.
@@ -346,7 +351,7 @@ fn the_uv_cache_names_its_layers_and_keys_them_by_runner(workflows: Vec<Workflow
     "jobs:\n  a:\n    runs-on: x\n    steps:\n      - uses: u\n        with:\n          k: [1]\n"
 )]
 fn a_malformed_workflow_is_an_error_not_a_default(#[case] file: &str, #[case] text: &str) {
-    let outcome = parse_workflow(file, text);
+    let outcome = parse_workflow(WorkflowSource { file, text });
     assert!(
         outcome.is_err(),
         "a workflow of unexpected shape must be rejected, not silently defaulted"

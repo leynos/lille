@@ -412,7 +412,7 @@ two. A workflow contract in `tests/workflow_contracts.rs` fails if a second
 
 ### Workflow contracts
 
-`tests/workflow_contracts.rs` parses the workflow files and asserts the rules
+`tests/workflow_contracts.rs` asserts the rules
 above: pinned cache and shared-action references, no source-built tools, one
 owner per cached path, GitHub-hosted placement for non-build jobs, registered
 runner labels, an installer before the first use of what it installs, and a
@@ -422,10 +422,12 @@ its substance: `cache-provider`, `use-sccache`, the Whitaker installer
 version, the coverage flags, the uv cache paths and key, and a bounded
 `timeout-minutes` for each build job.
 
-Parsing is strict. A workflow field that is present but of the wrong type is
-an error rather than a silent default, because a contract that read an empty
-string for a mistyped `runs-on` would pass a workflow it should reject. The
-files are read through a `cap_std` directory capability rooted at
+`tests/support/workflow_model.rs` holds the types and the queries the
+contracts ask of them, and `tests/support/workflow_loader.rs` turns files into
+those values. Parsing is strict: a workflow field that is present but of the
+wrong type is an error rather than a silent default, because a contract that
+read an empty string for a mistyped `runs-on` would pass a workflow it should
+reject. The files are read through a `cap_std` directory capability rooted at
 `.github/workflows`.
 
 Two assurance methods are used together, following
