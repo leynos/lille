@@ -116,6 +116,10 @@ mockall = "0.13.1"
 static_assertions = "^1"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 rspec = "1.0"
+# Parses the workflow estate for the structural CI contracts in
+# tests/workflow_contracts.rs. A maintained fork of the unmaintained
+# serde_yaml, so serde derives and Value keep working.
+serde_norway = "0.9"
 test_utils = { path = "test_utils" }
 trybuild = "1.0"
 # Non-optional in dev builds so the `trybuild` compile-pass fixture, which is a
