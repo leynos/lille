@@ -378,11 +378,16 @@ every miss is explainable from the rendered key.
 | `.uv-cache`, `.uv-tools`                                                         | the `Cache uv tool layers` step in `ci.yml`   | `runner.os`, `runner.arch`, `runner.environment`, `Makefile` and `scripts/*.py` hash |
 | coverage ratchet baseline files                                                  | `generate-coverage`'s split restore and save  | `runner.os`, run id                                                                  |
 
+*Table 1: Cache ownership and cache-key inputs.*
+
 `generate-coverage` is called with `cache-provider: external` in both jobs
 because `setup-rust` already owns the Cargo registry and Git index; without
 that input the action would become a second owner of the same two paths. For
-the same reason no step archives a `target` tree, and `actions/cache` is pinned
-to `55cc8345863c7cc4c66a329aec7e433d2d1c52a9` (v6.1.0) everywhere.
+the same reason no step archives a `target` tree. Every `actions/cache`
+reference written in these workflow files pins
+`55cc8345863c7cc4c66a329aec7e433d2d1c52a9` (v6.1.0). That claim covers the
+workflow files only. A shared action may reach an `actions/cache` reference of
+its own, and `upload-codescene-coverage` does; the next paragraph records it.
 
 `use-sccache: 'false'` is passed to `setup-rust` because nothing in this
 repository sets `RUSTC_WRAPPER`. Installing sccache would download a binary
@@ -395,7 +400,6 @@ is pinned, and its cache step uses an unpinned `actions/cache@v4` that this
 repository cannot pin from here. The uv tool layers are cached by the
 pull-request job that installs them, which is also the only job that installs
 them; there is no trunk job to designate as the sole writer instead.
-
 
 ### One test execution per pull request
 

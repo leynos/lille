@@ -120,6 +120,11 @@ rspec = "1.0"
 # tests/workflow_contracts.rs. A maintained fork of the unmaintained
 # serde_yaml, so serde derives and Value keep working.
 serde_norway = "0.9"
+# Capability-scoped filesystem access for the workflow-contract loader, so it
+# reads through a directory handle rooted at .github/workflows rather than
+# ambient std::fs paths.
+cap-std = { version = "4", features = ["fs_utf8"] }
+camino = "1"
 test_utils = { path = "test_utils" }
 trybuild = "1.0"
 # Non-optional in dev builds so the `trybuild` compile-pass fixture, which is a

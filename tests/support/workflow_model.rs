@@ -4,6 +4,10 @@
 //! ownership rules over this model rather than over raw YAML text, so a
 //! reordered key or a reflowed block scalar cannot silently defeat a rule.
 //!
+//! Files are read through a `cap_std` directory capability rooted at
+//! `.github/workflows`, so the loader cannot reach outside the workflow
+//! directory even if a future contract passes it a name it should not.
+//!
 //! # Examples
 //!
 //! ```no_run
@@ -12,11 +16,10 @@
 //! # Ok::<(), workflow_model::WorkflowError>(())
 //! ```
 
-use std::{
-    fmt, fs,
-    path::{Path, PathBuf},
-};
+use std::fmt;
 
+use camino::{Utf8Path, Utf8PathBuf};
+use cap_std::{ambient_authority, fs_utf8::Dir};
 use serde_norway::Value;
 
 /// Directory holding the repository's workflow definitions.
@@ -37,20 +40,20 @@ pub const BUILD_JOB_IDS: [&str; 2] = ["build-test", "coverage-upload"];
 /// Failure encountered while reading or parsing the workflow estate.
 #[derive(Debug)]
 pub enum WorkflowError {
-    /// A workflow file could not be read.
-    Read(PathBuf, std::io::Error),
+    /// A workflow file or the workflow directory could not be read.
+    Read(String, std::io::Error),
     /// A workflow file was not valid YAML.
-    Parse(PathBuf, serde_norway::Error),
+    Parse(String, serde_norway::Error),
     /// A workflow file was structurally unusable.
-    Shape(PathBuf, String),
+    Shape(String, String),
 }
 
 impl fmt::Display for WorkflowError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Read(path, err) => write!(f, "cannot read {}: {err}", path.display()),
-            Self::Parse(path, err) => write!(f, "cannot parse {}: {err}", path.display()),
-            Self::Shape(path, msg) => write!(f, "unexpected shape in {}: {msg}", path.display()),
+            Self::Read(name, err) => write!(f, "cannot read {name}: {err}"),
+            Self::Parse(name, err) => write!(f, "cannot parse {name}: {err}"),
+            Self::Shape(name, msg) => write!(f, "unexpected shape in {name}: {msg}"),
         }
     }
 }
@@ -125,10 +128,6 @@ pub struct Workflow {
     pub jobs: Vec<Job>,
 }
 
-fn workflow_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(WORKFLOW_DIR)
-}
-
 fn scalar(value: &Value, key: &str) -> String {
     value
         .get(key)
@@ -161,55 +160,59 @@ fn parse_job(id: &str, raw: &Value) -> Job {
     }
 }
 
-fn parse_workflow(path: &Path, text: &str) -> Result<Workflow, WorkflowError> {
-    let document: Value = serde_norway::from_str(text)
-        .map_err(|err| WorkflowError::Parse(path.to_path_buf(), err))?;
-    let jobs = document
+fn parse_workflow(file: &str, text: &str) -> Result<Workflow, WorkflowError> {
+    let document: Value =
+        serde_norway::from_str(text).map_err(|err| WorkflowError::Parse(file.to_owned(), err))?;
+    let raw_jobs = document
         .get("jobs")
         .and_then(Value::as_mapping)
         .ok_or_else(|| {
-            WorkflowError::Shape(path.to_path_buf(), "missing a `jobs` mapping".to_owned())
+            WorkflowError::Shape(file.to_owned(), "missing a `jobs` mapping".to_owned())
         })?;
-    let file = path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or_default()
-        .to_owned();
-    let parsed = jobs
+    let jobs = raw_jobs
         .iter()
         .map(|(id, raw)| parse_job(id.as_str().unwrap_or_default(), raw))
         .collect();
-    Ok(Workflow { file, jobs: parsed })
+    Ok(Workflow {
+        file: file.to_owned(),
+        jobs,
+    })
+}
+
+fn workflow_names(dir: &Dir) -> Result<Vec<String>, WorkflowError> {
+    let read = |err| WorkflowError::Read(WORKFLOW_DIR.to_owned(), err);
+    let mut names: Vec<String> = Vec::new();
+    for entry in dir.entries().map_err(read)? {
+        let name = entry.map_err(read)?.file_name().map_err(read)?;
+        let extension = Utf8Path::new(&name).extension().unwrap_or_default();
+        if matches!(extension, "yml" | "yaml") {
+            names.push(name);
+        }
+    }
+    names.sort();
+    Ok(names)
 }
 
 /// Loads and parses every workflow in `.github/workflows`.
 ///
 /// # Errors
 ///
-/// Returns an error when the directory cannot be listed, a file cannot be
-/// read, or a file is not a YAML document containing a `jobs` mapping.
+/// Returns an error when the workflow directory cannot be opened or listed, a
+/// file cannot be read, or a file is not a YAML document containing a `jobs`
+/// mapping.
 pub fn load_workflows() -> Result<Vec<Workflow>, WorkflowError> {
-    let dir = workflow_dir();
-    let listing = fs::read_dir(&dir).map_err(|err| WorkflowError::Read(dir.clone(), err))?;
-    let mut paths: Vec<PathBuf> = Vec::new();
-    for entry in listing {
-        let path = entry
-            .map_err(|err| WorkflowError::Read(dir.clone(), err))?
-            .path();
-        if path
-            .extension()
-            .is_some_and(|ext| ext == "yml" || ext == "yaml")
-        {
-            paths.push(path);
-        }
-    }
-    paths.sort();
-    paths
+    let root = Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(WORKFLOW_DIR);
+    // The one ambient step: everything below reads through this capability,
+    // which cannot escape the workflow directory.
+    let dir = Dir::open_ambient_dir(&root, ambient_authority())
+        .map_err(|err| WorkflowError::Read(root.to_string(), err))?;
+    workflow_names(&dir)?
         .iter()
-        .map(|path| {
-            let text =
-                fs::read_to_string(path).map_err(|err| WorkflowError::Read(path.clone(), err))?;
-            parse_workflow(path.as_path(), &text)
+        .map(|name| {
+            let text = dir
+                .read_to_string(name)
+                .map_err(|err| WorkflowError::Read(name.clone(), err))?;
+            parse_workflow(name, &text)
         })
         .collect()
 }

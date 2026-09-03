@@ -6,6 +6,12 @@
 //! the path. This module reduces both kinds to the same `(path, owner)` list
 //! so one contract can compare them.
 //!
+//! Owner identity is the step's position in its job, never its display name:
+//! two steps may legitimately share a name, and collapsing them would hide a
+//! duplicate owner. The one deliberate exception is a split cache, where an
+//! `actions/cache/restore` step and an `actions/cache/save` step that share a
+//! key are the two halves of a single owner.
+//!
 //! # Examples
 //!
 //! ```no_run
@@ -22,7 +28,7 @@ use crate::workflow_model::{Job, Step};
 pub struct CacheOwner {
     /// Cached path, as written in the workflow or the shared action.
     pub path: String,
-    /// Step that claims the path, named for a readable assertion message.
+    /// Identity of the claiming owner, unique per step or per split-cache key.
     pub owner: String,
 }
 
@@ -55,30 +61,39 @@ const SHARED_ACTION_CACHES: [(&str, &[&str]); 3] = [
 ];
 
 fn shared_action_name(uses: &str) -> Option<&str> {
-    let path = uses.split('@').next()?;
-    let name = path.strip_prefix("leynos/shared-actions/.github/actions/")?;
-    Some(name)
-}
-
-fn is_cache_action(uses: &str) -> bool {
     uses.split('@')
-        .next()
-        .is_some_and(|path| path == "actions/cache" || path.starts_with("actions/cache/"))
+        .next()?
+        .strip_prefix("leynos/shared-actions/.github/actions/")
 }
 
-fn step_label(step: &Step) -> String {
-    if step.name.is_empty() {
-        step.uses.clone()
+fn action_path(uses: &str) -> &str {
+    uses.split('@').next().unwrap_or_default()
+}
+
+/// Identity of the owner making a claim.
+///
+/// A whole-cache or shared-action claim is owned by its step alone. A split
+/// cache is owned jointly by the restore and save steps that share its key,
+/// so both halves report the same identity and are not counted twice.
+fn owner_identity(step: &Step, index: usize) -> String {
+    let label = if step.name.is_empty() {
+        step.uses.as_str()
     } else {
-        step.name.clone()
+        step.name.as_str()
+    };
+    match action_path(&step.uses) {
+        "actions/cache/restore" | "actions/cache/save" => {
+            format!("split cache with key `{}`", step.input("key"))
+        }
+        _ => format!("step {index} (`{label}`)"),
     }
 }
 
-fn direct_owners(step: &Step) -> Vec<CacheOwner> {
-    if !is_cache_action(&step.uses) {
+fn direct_owners(step: &Step, index: usize) -> Vec<CacheOwner> {
+    if !action_path(&step.uses).starts_with("actions/cache") {
         return Vec::new();
     }
-    let owner = step_label(step);
+    let owner = owner_identity(step, index);
     step.cache_paths()
         .into_iter()
         .map(|path| CacheOwner {
@@ -88,7 +103,7 @@ fn direct_owners(step: &Step) -> Vec<CacheOwner> {
         .collect()
 }
 
-fn shared_owners(step: &Step) -> Vec<CacheOwner> {
+fn shared_owners(step: &Step, index: usize) -> Vec<CacheOwner> {
     let Some(name) = shared_action_name(&step.uses) else {
         return Vec::new();
     };
@@ -98,7 +113,7 @@ fn shared_owners(step: &Step) -> Vec<CacheOwner> {
     if !provider.is_empty() && provider != "github" {
         return Vec::new();
     }
-    let owner = step_label(step);
+    let owner = owner_identity(step, index);
     SHARED_ACTION_CACHES
         .iter()
         .filter(|(action, _)| *action == name)
@@ -111,17 +126,14 @@ fn shared_owners(step: &Step) -> Vec<CacheOwner> {
 }
 
 /// Returns every cache claim made by a job, in step order.
-///
-/// `actions/cache/restore` and `actions/cache/save` halves of one split cache
-/// share a step name prefix in practice; they are reported separately and the
-/// caller decides whether the pair is a duplicate.
 #[must_use]
 pub fn owners_for(job: &Job) -> Vec<CacheOwner> {
     job.steps
         .iter()
-        .flat_map(|step| {
-            let mut claims = direct_owners(step);
-            claims.extend(shared_owners(step));
+        .enumerate()
+        .flat_map(|(index, step)| {
+            let mut claims = direct_owners(step, index);
+            claims.extend(shared_owners(step, index));
             claims
         })
         .collect()
