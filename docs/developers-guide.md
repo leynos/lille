@@ -415,5 +415,26 @@ two. A workflow contract in `tests/workflow_contracts.rs` fails if a second
 `tests/workflow_contracts.rs` parses the workflow files and asserts the rules
 above: pinned cache and shared-action references, no source-built tools, one
 owner per cached path, GitHub-hosted placement for non-build jobs, registered
-runner labels, and an installer before the first use of what it installs. Run
-them with `make test`, and run `actionlint` after editing any workflow.
+runner labels, an installer before the first use of what it installs, and a
+single test execution per build job. It also pins the inputs that make those
+rules true, so a workflow cannot keep the shape of the policy while dropping
+its substance: `cache-provider`, `use-sccache`, the Whitaker installer
+version, the coverage flags, the uv cache paths and key, and a bounded
+`timeout-minutes` for each build job.
+
+Parsing is strict. A workflow field that is present but of the wrong type is
+an error rather than a silent default, because a contract that read an empty
+string for a mistyped `runs-on` would pass a workflow it should reject. The
+files are read through a `cap_std` directory capability rooted at
+`.github/workflows`.
+
+Two assurance methods are used together, following
+[ADR 003](adr-003-bounded-rstest-over-property-testing.md).
+`tests/workflow_contracts.rs` holds bounded `rstest` cases over the workflow
+files as they stand, and `tests/workflow_model_properties.rs` samples the
+wider domain with `proptest`: arbitrary step orderings, repeated display
+names, interleaved unrelated steps, and split caches whose halves agree or
+disagree on a key. The properties check cache-owner uniqueness and
+installer-ordering against small oracles written independently of the
+implementation. Run both with `make test`, and run `actionlint` after editing
+any workflow.

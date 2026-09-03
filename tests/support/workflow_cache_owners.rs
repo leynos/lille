@@ -60,6 +60,7 @@ const SHARED_ACTION_CACHES: [(&str, &[&str]); 3] = [
     ),
 ];
 
+/// Returns the shared-action name a `uses` reference names, if any.
 fn shared_action_name(uses: &str) -> Option<&str> {
     uses.split('@')
         .next()?
@@ -89,6 +90,7 @@ fn owner_identity(step: &Step, index: usize) -> String {
     }
 }
 
+/// Returns the claims an `actions/cache` step makes on its own `path` input.
 fn direct_owners(step: &Step, index: usize) -> Vec<CacheOwner> {
     if !action_path(&step.uses).starts_with("actions/cache") {
         return Vec::new();
@@ -103,6 +105,7 @@ fn direct_owners(step: &Step, index: usize) -> Vec<CacheOwner> {
         .collect()
 }
 
+/// Returns the claims a shared composite action makes on the caller's behalf.
 fn shared_owners(step: &Step, index: usize) -> Vec<CacheOwner> {
     let Some(name) = shared_action_name(&step.uses) else {
         return Vec::new();

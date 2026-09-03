@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc eda260dbf3c89826f7936ca408a99a86ed1493f61547e8cc4a9a11da51c2abff # shrinks to external = true, filler = [Step { name: "Cache", uses: "actions/cache@sha", run: "", with: {"path": "~/.cargo/registry"} }]
+cc 993efbb5ed20e4bd09be1cce19290b1d88ccac2146b5d2bb8326d595e4dc6239 # shrinks to path = 2, same_key = true, filler = [Step { name: "Cache", uses: "actions/cache@sha", run: "", with: {"path": ".uv-cache"} }]
