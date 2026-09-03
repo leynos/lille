@@ -339,3 +339,77 @@ buffered-message compile-pass harness
 `make lint` runs rustdoc (`--cfg docsrs`),
 `cargo clippy --all-targets --all-features -- -D warnings`, and the Whitaker
 Dylint suite.
+
+
+## Continuous integration
+
+Two workflows do the developer-blocking work. `ci.yml`'s `build-test` job runs
+on every pull request, and `coverage-main.yml`'s `coverage-upload` job runs on
+every push to `main`. Both use the `ubicloud-standard-8` runner label, which is
+registered in `.github/actionlint.yaml`, and both declare `timeout-minutes` so
+a hung step cannot bill to the platform's six-hour default.
+
+Every other job stays on GitHub-hosted `ubuntu-latest`. That placement is a
+rule, not an accident: delayed comments, metadata lookups, label handling, and
+release orchestration are API-bound, so paid runner capacity buys them nothing
+and their queue time is already short. `dependabot-automerge.yml` calls a
+reusable workflow, which chooses its own runner.
+
+
+### Tool installation
+
+No tool is compiled from source. `whitaker-installer` is installed by
+`leynos/shared-actions/.github/actions/install-whitaker`, which downloads the
+pinned prebuilt release archive and verifies it against a digest pinned inside
+the action, then runs the installer to place the Whitaker Dylint suite. Every
+`leynos/shared-actions` reference pins commit
+`7d46a399558914f5a05074e55a560fec0269fd0d`.
+
+
+### Cache ownership
+
+Each mutable path has exactly one owner, so no two steps race to write it and
+every miss is explainable from the rendered key.
+
+| Path                                                                             | Owner                                         | Key inputs                                                                           |
+| -------------------------------------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `~/.cargo/registry`, `~/.cargo/git`                                              | `setup-rust` (`cache-provider: github`)       | `runner.os`, `rust-toolchain.toml` and `Cargo.lock` hash                             |
+| `~/.cargo/bin/whitaker-installer`, its version marker, `~/.local/share/whitaker` | `install-whitaker` (`cache-provider: github`) | `runner.os`, `runner.arch`, installer version, `dylint.toml` hash                    |
+| `.uv-cache`, `.uv-tools`                                                         | the `Cache uv tool layers` step in `ci.yml`   | `runner.os`, `runner.arch`, `runner.environment`, `Makefile` and `scripts/*.py` hash |
+| coverage ratchet baseline files                                                  | `generate-coverage`'s split restore and save  | `runner.os`, run id                                                                  |
+
+`generate-coverage` is called with `cache-provider: external` in both jobs
+because `setup-rust` already owns the Cargo registry and Git index; without
+that input the action would become a second owner of the same two paths. For
+the same reason no step archives a `target` tree, and `actions/cache` is pinned
+to `55cc8345863c7cc4c66a329aec7e433d2d1c52a9` (v6.1.0) everywhere.
+
+`use-sccache: 'false'` is passed to `setup-rust` because nothing in this
+repository sets `RUSTC_WRAPPER`. Installing sccache would download a binary
+that serves no compilation and has no cache owner. Adopting a compiler cache is
+a separate, measured change.
+
+Two downloads remain deliberately uncached. The `cs-coverage` CLI is fetched on
+every run because `upload-codescene-coverage` only caches it when `cli-version`
+is pinned, and its cache step uses an unpinned `actions/cache@v4` that this
+repository cannot pin from here. The uv tool layers are cached by the
+pull-request job that installs them, which is also the only job that installs
+them; there is no trunk job to designate as the sole writer instead.
+
+
+### One test execution per pull request
+
+The instrumented coverage run is the only test execution on Linux. It uses
+`all-features`, `all-targets`, and `doctests`, so it covers everything the
+former separate `cargo test` step covered and more, for one compile rather than
+two. A workflow contract in `tests/workflow_contracts.rs` fails if a second
+`cargo test` or `cargo nextest` step reappears in either job.
+
+
+### Workflow contracts
+
+`tests/workflow_contracts.rs` parses the workflow files and asserts the rules
+above: pinned cache and shared-action references, no source-built tools, one
+owner per cached path, GitHub-hosted placement for non-build jobs, registered
+runner labels, and an installer before the first use of what it installs. Run
+them with `make test`, and run `actionlint` after editing any workflow.
