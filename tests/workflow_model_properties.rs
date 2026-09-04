@@ -14,12 +14,14 @@
 #[path = "support/workflow_cache_owners.rs"]
 mod workflow_cache_owners;
 #[path = "support/workflow_model.rs"]
-// The model is shared with tests/workflow_contracts.rs, which exercises the
-// loading and contract-facing half. These properties need only the job and
-// step types, so the rest is unused in this binary alone.
+// `workflow_estate.rs` now holds the loading types and estate constants, so
+// this binary no longer pulls them in. What remains unused here are the model
+// queries only the contracts ask: placement, job-level environment, and action
+// lookup. They are part of the same two types these properties construct, so
+// they cannot be split out without splitting `Job` itself.
 #[expect(
     dead_code,
-    reason = "shared support module; the contracts binary uses the rest"
+    reason = "shared model; the contracts binary asks the placement and lookup queries"
 )]
 mod workflow_model;
 
@@ -28,7 +30,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use proptest::prelude::*;
 
 use workflow_cache_owners::duplicated_paths;
-use workflow_model::{Job, Step};
+use workflow_model::{Job, RunnerSelection, Step};
 
 /// Cache paths the generators draw from, kept small so collisions are common.
 const PATHS: [&str; 4] = ["~/.cargo/registry", "~/.cargo/git", ".uv-cache", "target-x"];
@@ -75,7 +77,7 @@ fn run_step(script: &str) -> Step {
 fn job_of(steps: Vec<Step>) -> Job {
     Job {
         id: "j".to_owned(),
-        runs_on: "ubuntu-latest".to_owned(),
+        runs_on: RunnerSelection::Labels(vec!["ubuntu-latest".to_owned()]),
         steps,
         ..Job::default()
     }
@@ -154,6 +156,37 @@ proptest! {
             rotated.rotate_left(rotation % count);
         }
         prop_assert_eq!(reported(&job), reported(&job_of(rotated)));
+    }
+
+    /// Two restores sharing a key are two owners, not one half of a pair.
+    ///
+    /// The split-cache exception exists for one restore and one save. Applying
+    /// it to any step whose key matched would let a genuine duplicate hide
+    /// behind it.
+    #[test]
+    fn two_restores_sharing_a_key_are_two_owners(
+        path in prop::sample::select(PATHS.to_vec()),
+        filler in prop::collection::vec(any_step(), 0..4),
+    ) {
+        let mut steps = vec![split_step("restore", path, "k1")];
+        steps.extend(without_claims_on(filler, path));
+        steps.push(split_step("restore", path, "k1"));
+        prop_assert!(reported(&job_of(steps)).contains(path));
+    }
+
+    /// A third step on a paired key breaks the pair rather than joining it.
+    #[test]
+    fn an_extra_restore_beside_a_matching_pair_is_a_duplicate(
+        path in prop::sample::select(PATHS.to_vec()),
+        filler in prop::collection::vec(any_step(), 0..4),
+    ) {
+        let mut steps = vec![
+            split_step("restore", path, "k1"),
+            split_step("save", path, "k1"),
+        ];
+        steps.extend(without_claims_on(filler, path));
+        steps.push(split_step("restore", path, "k1"));
+        prop_assert!(reported(&job_of(steps)).contains(path));
     }
 
     /// A restore and a save sharing a key are one owner; differing keys are two.

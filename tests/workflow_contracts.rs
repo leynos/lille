@@ -1,33 +1,39 @@
 //! Structural contracts over the repository's GitHub Actions workflows.
 //!
-//! These tests encode the Ubicloud adoption rules that a reviewer would
-//! otherwise have to re-check by hand on every workflow edit: no tool is built
-//! from source, every cached path has exactly one owner, cache and shared
-//! action references are pinned, API-bound jobs stay GitHub-hosted, and an
-//! installer always precedes the first use of what it installs. They also pin
-//! the inputs that make those rules true, so a workflow cannot keep the shape
-//! of the policy while dropping its substance.
-//!
-//! They read the workflow files directly, so they fail on the change that
-//! introduces a violation rather than on the CI run that suffers from it.
+//! These encode the Ubicloud adoption rules a reviewer would otherwise re-check
+//! by hand on every workflow edit: no tool is built from source, every cached
+//! path has one owner, references are pinned, API-bound jobs stay
+//! GitHub-hosted, and an installer precedes the first use of what it installs.
+//! They also pin the inputs that make those rules true, so a workflow cannot
+//! keep the shape of the policy while dropping its substance. They read the
+//! files directly, so they fail on the change that introduces a violation
+//! rather than on the CI run that suffers from it.
 
+#[path = "support/workflow_assertions.rs"]
+mod workflow_assertions;
 #[path = "support/workflow_cache_owners.rs"]
 mod workflow_cache_owners;
+#[path = "support/workflow_estate.rs"]
+mod workflow_estate;
 #[path = "support/workflow_loader.rs"]
 mod workflow_loader;
 #[path = "support/workflow_model.rs"]
 mod workflow_model;
 
 use camino::Utf8Path;
-use rstest::{fixture, rstest};
+use rstest::rstest;
 
-use workflow_loader::{
-    all_steps, load_workflows, load_workflows_in, parse_workflow, read_repository_file,
+use workflow_assertions::{assert_input, job_named, jobs, step_using, workflows};
+use workflow_estate::{
+    Workflow, WorkflowSource, BUILD_JOB_IDS, CACHE_ACTION_SHA, SHARED_ACTIONS_OWNER,
+    SHARED_ACTIONS_SHA, UBICLOUD_LABEL,
 };
-use workflow_model::{
-    Job, Step, Workflow, WorkflowSource, BUILD_JOB_IDS, CACHE_ACTION_SHA, SHARED_ACTIONS_SHA,
-    UBICLOUD_LABEL,
-};
+use workflow_loader::{all_steps, load_workflows_in, parse_workflow, read_repository_file};
+
+/// Full coordinate of a shared composite action this repository calls.
+fn shared_action(name: &str) -> String {
+    format!("{SHARED_ACTIONS_OWNER}/.github/actions/{name}")
+}
 
 /// Fragments that mark a step as building a tool from source.
 ///
@@ -39,6 +45,19 @@ const SOURCE_BUILD_FRAGMENTS: [&str; 3] = ["cargo install", "cargo-binstall ", "
 /// Commands that would run the test suite a second time in a build job.
 const REPEAT_TEST_COMMANDS: [&str; 4] = ["cargo test", "cargo nextest", "make test", "make all"];
 
+/// Commit that every `actions/github-script` reference must pin (v8).
+const GITHUB_SCRIPT_SHA: &str = "ed597411d8f924073f98dfc5c65a23a2325f34cd";
+
+/// Pinned prebuilt sccache the build jobs install.
+const SCCACHE_TOOL: &str = "sccache@0.16.0";
+
+/// Variables sccache's GitHub Actions backend needs re-exported on Ubicloud.
+const PROXY_VARIABLES: [&str; 3] = [
+    "ACTIONS_CACHE_URL",
+    "ACTIONS_RUNTIME_TOKEN",
+    "ACTIONS_CACHE_SERVICE_V2",
+];
+
 /// Expression fragments the uv tool-layer cache key must carry.
 const UV_CACHE_KEY_FRAGMENTS: [&str; 4] = [
     "runner.os",
@@ -46,50 +65,6 @@ const UV_CACHE_KEY_FRAGMENTS: [&str; 4] = [
     "runner.environment",
     "hashFiles(",
 ];
-
-/// Every workflow in `.github/workflows`, parsed once per test.
-#[fixture]
-fn workflows() -> Vec<Workflow> {
-    load_workflows().unwrap_or_else(|err| panic!("workflow estate must parse: {err}"))
-}
-
-/// Returns every job in the estate, tagged with its workflow file.
-fn jobs(workflows: &[Workflow]) -> Vec<(String, Job)> {
-    workflows
-        .iter()
-        .flat_map(|workflow| {
-            workflow
-                .jobs
-                .iter()
-                .map(move |job| (workflow.file.clone(), job.clone()))
-        })
-        .collect()
-}
-
-/// Returns the job with the given id, or panics naming the missing job.
-fn job_named<'a>(workflows: &'a [Workflow], id: &str) -> &'a Job {
-    workflows
-        .iter()
-        .flat_map(|workflow| workflow.jobs.iter())
-        .find(|job| job.id == id)
-        .unwrap_or_else(|| panic!("workflow estate must define the `{id}` job"))
-}
-
-/// Returns a job's step that uses `action`, or panics naming both.
-fn step_using<'a>(job: &'a Job, action: &str) -> &'a Step {
-    job.step_using(action)
-        .unwrap_or_else(|| panic!("`{}` must use the `{action}` action", job.id))
-}
-
-/// Asserts that a step supplies the expected value for one input.
-fn assert_input(job_id: &str, step: &Step, key: &str, expected: &str) {
-    assert_eq!(
-        step.input(key),
-        expected,
-        "`{job_id}` step `{}` must set `{key}: {expected}`",
-        step.label()
-    );
-}
 
 #[rstest]
 fn every_cache_reference_is_pinned_to_v6_1_0(workflows: Vec<Workflow>) {
@@ -190,7 +165,7 @@ fn each_cached_path_has_exactly_one_owner(workflows: Vec<Workflow>) {
 fn non_build_jobs_stay_on_github_hosted_runners(workflows: Vec<Workflow>) {
     let misplaced: Vec<String> = jobs(&workflows)
         .into_iter()
-        .filter(|(_, job)| !job.runs_on.is_empty())
+        .filter(|(_, job)| job.runs_on.names_a_runner())
         .filter(|(_, job)| !BUILD_JOB_IDS.contains(&job.id.as_str()))
         .filter(|(_, job)| !job.is_github_hosted())
         .map(|(file, job)| format!("{file}:{}: {}", job.id, job.runs_on))
@@ -216,7 +191,8 @@ fn build_jobs_keep_their_label_and_a_bounded_timeout(
 ) {
     let job = job_named(&workflows, id);
     assert_eq!(
-        job.runs_on, UBICLOUD_LABEL,
+        job.runs_on.labels(),
+        [UBICLOUD_LABEL],
         "`{id}` must keep its measured runner label"
     );
     let timeout = job
@@ -228,14 +204,34 @@ fn build_jobs_keep_their_label_and_a_bounded_timeout(
     );
 }
 
+/// A warm run has to be triggerable without pushing a commit, so the runner
+/// and cache changes can be measured on an unchanged tree.
+#[rstest]
+fn the_pull_request_workflow_accepts_a_warm_run_dispatch(workflows: Vec<Workflow>) {
+    let Some(ci) = workflows.iter().find(|workflow| workflow.file == "ci.yml") else {
+        panic!("the estate must define ci.yml")
+    };
+    assert!(
+        ci.has_trigger("workflow_dispatch"),
+        "ci.yml must accept `workflow_dispatch` so a warm run can be measured \
+         on demand; it declares {:?}",
+        ci.triggers
+    );
+}
+
 #[rstest]
 fn every_runner_label_is_registered_with_actionlint(workflows: Vec<Workflow>) {
     let text = read_repository_file(".github/actionlint.yaml")
         .unwrap_or_else(|err| panic!("actionlint configuration must be readable: {err}"));
     let unregistered: Vec<String> = jobs(&workflows)
         .into_iter()
-        .filter(|(_, job)| !job.runs_on.is_empty() && !job.is_github_hosted())
-        .filter(|(_, job)| !text.contains(job.runs_on.as_str()))
+        .filter(|(_, job)| job.runs_on.names_a_runner() && !job.is_github_hosted())
+        .filter(|(_, job)| {
+            !job.runs_on
+                .labels()
+                .iter()
+                .all(|label| text.contains(label.as_str()))
+        })
         .map(|(file, job)| format!("{file}:{}: {}", job.id, job.runs_on))
         .collect();
     assert!(
@@ -286,12 +282,148 @@ fn coverage_is_the_only_test_execution(workflows: Vec<Workflow>) {
 }
 
 #[rstest]
-fn setup_rust_owns_the_cargo_registry_and_installs_no_compiler_cache(workflows: Vec<Workflow>) {
+fn setup_rust_owns_the_registry_but_not_the_compiler_cache(workflows: Vec<Workflow>) {
     for id in BUILD_JOB_IDS {
         let job = job_named(&workflows, id);
-        let step = step_using(job, "setup-rust");
+        let step = step_using(job, &shared_action("setup-rust"));
         assert_input(id, step, "cache-provider", "github");
+        // The action would start the sccache server inside an action step,
+        // where the Ubicloud runner re-injects its own cache variables and the
+        // server binds GitHub's v2 service instead of the local proxy. The job
+        // installs and starts sccache itself instead.
         assert_input(id, step, "use-sccache", "false");
+    }
+}
+
+/// The two variables that make the wrapper more than overhead.
+///
+/// `RUSTC_WRAPPER` engages sccache; `SCCACHE_GHA_ENABLED` selects the Actions
+/// backend. Without the second, sccache writes to a local directory nothing
+/// persists between runs, and every compilation misses.
+#[rstest]
+#[case::wrapper("RUSTC_WRAPPER", "sccache")]
+#[case::backend("SCCACHE_GHA_ENABLED", "true")]
+#[case::no_incremental("CARGO_INCREMENTAL", "0")]
+fn the_compiler_cache_is_engaged_at_job_level(
+    workflows: Vec<Workflow>,
+    #[case] variable: &str,
+    #[case] expected: &str,
+) {
+    for id in BUILD_JOB_IDS {
+        let job = job_named(&workflows, id);
+        assert_eq!(
+            job.env(variable),
+            expected,
+            "`{id}` must export `{variable}: {expected}` at job level"
+        );
+    }
+}
+
+#[rstest]
+fn sccache_is_installed_from_a_pinned_prebuilt_release(workflows: Vec<Workflow>) {
+    for id in BUILD_JOB_IDS {
+        let job = job_named(&workflows, id);
+        let step = step_using(job, "taiki-e/install-action");
+        assert_input(id, step, "tool", SCCACHE_TOOL);
+        assert_input(id, step, "fallback", "none");
+    }
+}
+
+/// The sccache server binds its backend once, when it starts, so the order of
+/// these steps is the contract. Started before the export it binds GitHub's v2
+/// service instead of Ubicloud's proxy; started after the toolchain is in
+/// place it can miss the first compilation; reported before the build it
+/// measures nothing.
+#[rstest]
+fn the_compiler_cache_is_wired_in_the_only_order_that_works(workflows: Vec<Workflow>) {
+    for id in BUILD_JOB_IDS {
+        let job = job_named(&workflows, id);
+        let stage = |needle: &str, what: &str| {
+            job.first_step_containing(needle)
+                .unwrap_or_else(|| panic!("`{id}` must {what}"))
+        };
+        let export = stage("actions/github-script", "export the Ubicloud cache proxy");
+        let install = stage("taiki-e/install-action", "install a pinned sccache");
+        let start = stage("sccache --zero-stats", "start the compiler cache");
+        // `setup-rust` stands for the first step that could compile: it puts
+        // the toolchain in place, and nothing before it runs cargo.
+        let toolchain = stage("setup-rust", "set up Rust before anything compiles");
+        let coverage = stage("generate-coverage", "build the workspace under coverage");
+        let report = stage("sccache --show-stats", "report compiler-cache statistics");
+        let order = [
+            ("export the cache proxy", export),
+            ("install sccache", install),
+            ("start sccache", start),
+            ("set up the toolchain", toolchain),
+            ("build", coverage),
+            ("report the statistics", report),
+        ];
+        for ((earlier, before), (later, after)) in order.iter().zip(order.iter().skip(1)) {
+            assert!(
+                before < after,
+                "`{id}` must {earlier} (step {before}) before it can {later} (step {after})"
+            );
+        }
+    }
+}
+
+#[rstest]
+fn the_cache_proxy_export_is_pinned_and_names_every_variable(workflows: Vec<Workflow>) {
+    for id in BUILD_JOB_IDS {
+        let job = job_named(&workflows, id);
+        let (export_at, export) = job
+            .first_step_with("actions/github-script")
+            .unwrap_or_else(|| panic!("`{id}` must export the Ubicloud cache proxy"));
+        assert!(
+            export.uses.ends_with(GITHUB_SCRIPT_SHA),
+            "`{id}` must pin actions/github-script to {GITHUB_SCRIPT_SHA}"
+        );
+        let checkout_at = job
+            .first_step_containing("actions/checkout")
+            .unwrap_or_else(|| panic!("`{id}` must check out the repository"));
+        assert!(
+            checkout_at < export_at,
+            "`{id}` must export the proxy after checkout"
+        );
+        let script = export.input("script");
+        for variable in PROXY_VARIABLES {
+            assert!(
+                script.contains(variable),
+                "`{id}` must export `{variable}` for sccache's backend"
+            );
+        }
+        assert!(
+            !script.contains("ACTIONS_RESULTS_URL"),
+            "`{id}` must not export ACTIONS_RESULTS_URL; it does not route \
+             through Ubicloud's cache proxy"
+        );
+    }
+}
+
+#[rstest]
+fn compiler_cache_effectiveness_is_measured_around_the_build(workflows: Vec<Workflow>) {
+    for id in BUILD_JOB_IDS {
+        let job = job_named(&workflows, id);
+        let zero_at = job
+            .first_step_containing("sccache --zero-stats")
+            .unwrap_or_else(|| panic!("`{id}` must reset the compiler-cache counters"));
+        let (show_at, report) = job
+            .first_step_with("sccache --show-stats")
+            .unwrap_or_else(|| panic!("`{id}` must report compiler-cache statistics"));
+        assert!(
+            zero_at < show_at,
+            "`{id}` must reset the counters before it reports them"
+        );
+        assert!(
+            report.run.contains("GITHUB_STEP_SUMMARY"),
+            "`{id}` must put the compiler-cache statistics in the job summary"
+        );
+        // The summary is not readable through the REST API, so a run whose
+        // statistics went only there cannot be audited afterwards.
+        assert!(
+            report.run.contains("printf '%s\\n' \"$stats\""),
+            "`{id}` must also print the compiler-cache statistics to the log"
+        );
     }
 }
 
@@ -299,7 +431,7 @@ fn setup_rust_owns_the_cargo_registry_and_installs_no_compiler_cache(workflows: 
 fn coverage_runs_the_whole_suite_once_and_owns_no_cargo_cache(workflows: Vec<Workflow>) {
     for id in BUILD_JOB_IDS {
         let job = job_named(&workflows, id);
-        let step = step_using(job, "generate-coverage");
+        let step = step_using(job, &shared_action("generate-coverage"));
         for flag in ["all-features", "all-targets", "doctests"] {
             assert_input(id, step, flag, "true");
         }
@@ -310,7 +442,7 @@ fn coverage_runs_the_whole_suite_once_and_owns_no_cargo_cache(workflows: Vec<Wor
 #[rstest]
 fn whitaker_is_installed_from_a_pinned_prebuilt_release(workflows: Vec<Workflow>) {
     let job = job_named(&workflows, "build-test");
-    let step = step_using(job, "install-whitaker");
+    let step = step_using(job, &shared_action("install-whitaker"));
     assert_input("build-test", step, "installer-version", "0.2.7");
     assert_input("build-test", step, "cache-provider", "github");
 }
@@ -318,11 +450,13 @@ fn whitaker_is_installed_from_a_pinned_prebuilt_release(workflows: Vec<Workflow>
 #[rstest]
 fn the_uv_cache_names_its_layers_and_keys_them_by_runner(workflows: Vec<Workflow>) {
     let job = job_named(&workflows, "build-test");
-    let step = job
+    let cache = job
         .steps
         .iter()
-        .find(|step| step.cache_paths().iter().any(|path| path == ".uv-cache"))
-        .unwrap_or_else(|| panic!("`build-test` must cache the uv download layer"));
+        .find(|step| step.cache_paths().iter().any(|path| path == ".uv-cache"));
+    let Some(step) = cache else {
+        panic!("`build-test` must cache the uv download layer")
+    };
     assert_eq!(
         step.cache_paths(),
         vec![".uv-cache".to_owned(), ".uv-tools".to_owned()],
@@ -339,7 +473,9 @@ fn the_uv_cache_names_its_layers_and_keys_them_by_runner(workflows: Vec<Workflow
 
 #[rstest]
 #[case::not_a_workflow("scratch.yml", "steps: []")]
-#[case::mistyped_runner("scratch.yml", "jobs:\n  a:\n    runs-on: [a, b]\n")]
+#[case::mistyped_runner("scratch.yml", "jobs:\n  a:\n    runs-on: {group: [g]}\n")]
+#[case::mistyped_runner_label("scratch.yml", "jobs:\n  a:\n    runs-on: [a, [b]]\n")]
+#[case::groupless_runner_mapping("scratch.yml", "jobs:\n  a:\n    runs-on: {labels: [a]}\n")]
 #[case::placeless_job("scratch.yml", "jobs:\n  a:\n    steps: []\n")]
 #[case::mistyped_steps("scratch.yml", "jobs:\n  a:\n    runs-on: x\n    steps: nope\n")]
 #[case::empty_step(
@@ -350,11 +486,45 @@ fn the_uv_cache_names_its_layers_and_keys_them_by_runner(workflows: Vec<Workflow
     "scratch.yml",
     "jobs:\n  a:\n    runs-on: x\n    steps:\n      - uses: u\n        with:\n          k: [1]\n"
 )]
+// GitHub Actions runs a step either as an action or as a script, never both.
+#[case::dual_mode_step(
+    "scratch.yml",
+    "jobs:\n  a:\n    runs-on: x\n    steps:\n      - uses: u\n        run: echo hi\n"
+)]
 fn a_malformed_workflow_is_an_error_not_a_default(#[case] file: &str, #[case] text: &str) {
     let outcome = parse_workflow(WorkflowSource { file, text });
     assert!(
         outcome.is_err(),
         "a workflow of unexpected shape must be rejected, not silently defaulted"
+    );
+}
+
+/// Every `runs-on` shape GitHub Actions accepts must parse, not just the
+/// scalar one: rejecting a label list or a runner group would fail a valid
+/// workflow rather than the workflow a contract is meant to catch.
+#[rstest]
+#[case::single_label("runs-on: ubuntu-latest\n", &["ubuntu-latest"])]
+#[case::label_list("runs-on: [self-hosted, linux]\n", &["self-hosted", "linux"])]
+#[case::group_only("runs-on:\n      group: ubuntu-runners\n", &[])]
+#[case::group_and_labels(
+    "runs-on:\n      group: ubuntu-runners\n      labels: [ubuntu-20.04-16core]\n",
+    &["ubuntu-20.04-16core"]
+)]
+fn every_valid_runs_on_shape_parses(#[case] runs_on: &str, #[case] expected: &[&str]) {
+    let text = format!("on: push\njobs:\n  a:\n    {runs_on}    steps: []\n");
+    let workflow = parse_workflow(WorkflowSource {
+        file: "scratch.yml",
+        text: &text,
+    })
+    .unwrap_or_else(|err| panic!("`{runs_on}` must parse: {err}"));
+    let job = workflow
+        .jobs
+        .first()
+        .unwrap_or_else(|| panic!("`{runs_on}` must yield a job"));
+    assert_eq!(job.runs_on.labels(), expected);
+    assert!(
+        job.runs_on.names_a_runner(),
+        "`{runs_on}` names a runner and must say so"
     );
 }
 

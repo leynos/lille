@@ -340,7 +340,6 @@ buffered-message compile-pass harness
 `cargo clippy --all-targets --all-features -- -D warnings`, and the Whitaker
 Dylint suite.
 
-
 ## Continuous integration
 
 Two workflows do the developer-blocking work. `ci.yml`'s `build-test` job runs
@@ -355,7 +354,6 @@ release orchestration are API-bound, so paid runner capacity buys them nothing
 and their queue time is already short. `dependabot-automerge.yml` calls a
 reusable workflow, which chooses its own runner.
 
-
 ### Tool installation
 
 No tool is compiled from source. `whitaker-installer` is installed by
@@ -363,8 +361,12 @@ No tool is compiled from source. `whitaker-installer` is installed by
 pinned prebuilt release archive and verifies it against a digest pinned inside
 the action, then runs the installer to place the Whitaker Dylint suite. Every
 `leynos/shared-actions` reference pins commit
-`7d46a399558914f5a05074e55a560fec0269fd0d`.
+`c6125f19593668cbfefd65a59c08cb7aefe90d93`.
 
+sccache is installed the same way, by `taiki-e/install-action` with
+`tool: sccache@0.16.0` and `fallback: none`. The fallback matters: without it
+the action would compile sccache from source when no prebuilt binary matched,
+which is the outcome the rule exists to prevent.
 
 ### Cache ownership
 
@@ -377,6 +379,7 @@ every miss is explainable from the rendered key.
 | `~/.cargo/bin/whitaker-installer`, its version marker, `~/.local/share/whitaker` | `install-whitaker` (`cache-provider: github`) | `runner.os`, `runner.arch`, installer version, `dylint.toml` hash                    |
 | `.uv-cache`, `.uv-tools`                                                         | the `Cache uv tool layers` step in `ci.yml`   | `runner.os`, `runner.arch`, `runner.environment`, `Makefile` and `scripts/*.py` hash |
 | coverage ratchet baseline files                                                  | `generate-coverage`'s split restore and save  | `runner.os`, run id                                                                  |
+| compiler output                                                                  | `sccache`, through its GitHub Actions backend | compiler flags and toolchain, hashed by sccache itself                               |
 
 *Table 1: Cache ownership and cache-key inputs.*
 
@@ -389,17 +392,71 @@ reference written in these workflow files pins
 workflow files only. A shared action may reach an `actions/cache` reference of
 its own, and `upload-codescene-coverage` does; the next paragraph records it.
 
-`use-sccache: 'false'` is passed to `setup-rust` because nothing in this
-repository sets `RUSTC_WRAPPER`. Installing sccache would download a binary
-that serves no compilation and has no cache owner. Adopting a compiler cache is
-a separate, measured change.
+### The compiler cache
 
-Two downloads remain deliberately uncached. The `cs-coverage` CLI is fetched on
+sccache owns compiler output, and nothing archives a `target` tree. Both build
+jobs wire it up as four steps in a fixed order, and the order is the whole
+point: get it wrong and the cache is silently a no-op.
+
+The job sets `RUSTC_WRAPPER: sccache` and `SCCACHE_GHA_ENABLED: 'true'` at job
+level. The first engages the wrapper; the second is what selects the GitHub
+Actions backend. Without the second, sccache falls back to
+`Local disk: ~/.cache/sccache`, which nothing persists between runs, so the
+wrapper becomes pure overhead. `CARGO_INCREMENTAL: '0'` accompanies them
+because sccache cannot cache an incremental compilation.
+
+**Export.** A pinned `actions/github-script` step, after checkout, re-exports
+`ACTIONS_CACHE_URL` and `ACTIONS_RUNTIME_TOKEN` into `GITHUB_ENV` and clears
+`ACTIONS_CACHE_SERVICE_V2`. The runner gives those two variables to action code
+but not to later shell steps, and sccache's backend reads them from the
+environment. On Ubicloud `ACTIONS_CACHE_URL` names the runner's local cache
+proxy, so re-exporting it is what puts the compiler cache in Ubicloud's store
+rather than GitHub's. The v2 cache service bypasses that proxy, so it is
+cleared; exporting `ACTIONS_RESULTS_URL` does not route through the proxy
+either. The step also logs whether an endpoint and a token were present, and
+warns when either is missing, so a misconfigured backend is diagnosable from
+the log rather than from an unexplained slow build. It never prints the token.
+
+**Install.** `taiki-e/install-action` places the pinned sccache binary. An
+action step is safe here because installing a binary does not start the sccache
+server.
+
+**Start.** A `run:` step runs `sccache --zero-stats`, which starts the server.
+This must be a `run:` step and it must follow the export. The Ubicloud runner
+re-injects `ACTIONS_CACHE_SERVICE_V2=on` and `ACTIONS_RESULTS_URL` into every
+action step, overriding what the export wrote to `GITHUB_ENV`. A server started
+inside an action step, which is what `setup-rust` with `use-sccache: 'true'`
+would do, therefore binds GitHub's v2 service; its writes then fail and nothing
+reaches Ubicloud's store. The server binds its backend once, at start, so a
+later change to the environment is invisible to it. That is why `setup-rust` is
+called with `use-sccache: 'false'` in both jobs.
+
+**Report.** `sccache --show-stats` runs after the build, printing the counters
+to the log as well as to the job summary. The log copy is the one that matters:
+the summary cannot be read through the REST API, so it cannot be checked after
+the fact. Read `Cache location` on every run. It must name the GitHub Actions
+backend; `Local disk: ~/.cache/sccache` means the backend was never selected
+and nothing is being cached. A warm build reporting zero hits is a broken
+contract, not a slow one.
+
+Each job also deletes `target/llvm-cov-target` once coverage has been
+generated, printing `df -h` either side. The instrumented tree has no later
+consumer, and on smaller runner shapes a full disk has killed a job silently,
+with no error text.
+
+`ci.yml` accepts `workflow_dispatch` so a warm run can be measured on demand.
+A dispatch restores what a pull request restores and writes nothing:
+`coverage-main.yml` is the only job that saves on this repository.
+
+One download remains deliberately uncached. The `cs-coverage` CLI is fetched on
 every run because `upload-codescene-coverage` only caches it when `cli-version`
 is pinned, and its cache step uses an unpinned `actions/cache@v4` that this
-repository cannot pin from here. The uv tool layers are cached by the
-pull-request job that installs them, which is also the only job that installs
-them; there is no trunk job to designate as the sole writer instead.
+repository cannot pin from here.
+
+The uv tool layers are an exception to the trunk-writer rule rather than to the
+ownership rule. They are cached by the pull-request job that installs them,
+which is also the only job that installs them, so there is no trunk job to
+designate as the sole writer instead.
 
 ### One test execution per pull request
 
@@ -408,7 +465,6 @@ The instrumented coverage run is the only test execution on Linux. It uses
 former separate `cargo test` step covered and more, for one compile rather than
 two. A workflow contract in `tests/workflow_contracts.rs` fails if a second
 `cargo test` or `cargo nextest` step reappears in either job.
-
 
 ### Workflow contracts
 
@@ -419,16 +475,32 @@ runner labels, an installer before the first use of what it installs, and a
 single test execution per build job. It also pins the inputs that make those
 rules true, so a workflow cannot keep the shape of the policy while dropping
 its substance: `cache-provider`, `use-sccache`, the Whitaker installer
-version, the coverage flags, the uv cache paths and key, and a bounded
-`timeout-minutes` for each build job.
+version, the coverage flags, the uv cache paths and key, a bounded
+`timeout-minutes` for each build job, and the compiler-cache wiring: the two
+job-level variables, and the export, install, start, build, report order that
+the sccache server's one-shot backend binding depends on.
 
-`tests/support/workflow_model.rs` holds the types and the queries the
-contracts ask of them, and `tests/support/workflow_loader.rs` turns files into
-those values. Parsing is strict: a workflow field that is present but of the
-wrong type is an error rather than a silent default, because a contract that
-read an empty string for a mistyped `runs-on` would pass a workflow it should
-reject. The files are read through a `cap_std` directory capability rooted at
-`.github/workflows`.
+`tests/support/workflow_model.rs` holds the job, step, and runner-selection
+types the properties and the contracts share;
+`tests/support/workflow_estate.rs` holds the pinned commits, the whole-file
+`Workflow` type, and the errors parsing reports, which only the contracts need.
+`tests/support/workflow_loader.rs` turns files into those values.
+
+Parsing is strict about shape and permissive about spelling. A field that is
+present but of the wrong type is an error rather than a silent default, because
+a contract that read an empty string for a mistyped `runs-on` would pass a
+workflow it should reject. A step that sets both `uses` and `run` is rejected
+too: GitHub Actions runs a step one way or the other, never both. Against that,
+every form the platform genuinely accepts must parse. `runs-on` may be a label,
+a list of labels, or a mapping naming a runner group, and `on` may be an event,
+a list, or a mapping, read under the bare key that YAML 1.1 turns into the
+boolean true. The files are read through a `cap_std` directory capability
+rooted at `.github/workflows`.
+
+Action references are matched on the whole coordinate before the `@`, publisher
+included. A suffix match would let `untrusted/setup-rust` satisfy a rule
+written about the shared `setup-rust`, which is the opposite of what a pinning
+rule is for.
 
 Two assurance methods are used together, following
 [ADR 003](adr-003-bounded-rstest-over-property-testing.md).
@@ -436,7 +508,12 @@ Two assurance methods are used together, following
 files as they stand, and `tests/workflow_model_properties.rs` samples the
 wider domain with `proptest`: arbitrary step orderings, repeated display
 names, interleaved unrelated steps, and split caches whose halves agree or
-disagree on a key. The properties check cache-owner uniqueness and
-installer-ordering against small oracles written independently of the
-implementation. Run both with `make test`, and run `actionlint` after editing
-any workflow.
+disagree on a key, or where a third step claims a paired key. The properties
+check cache-owner uniqueness and installer-ordering against small oracles
+written independently of the implementation. Run both with `make test`, and run
+`actionlint` after editing any workflow.
+
+Only one restore and one save sharing a key count as a single owner. Two
+restores on the same key are two owners, and so are a matching pair plus a
+third step, because otherwise a genuine duplicate could hide behind the
+split-cache exception.

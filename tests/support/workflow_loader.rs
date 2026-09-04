@@ -14,7 +14,7 @@
 //! ```no_run
 //! let workflows = workflow_loader::load_workflows()?;
 //! assert!(workflows.iter().any(|w| w.file == "ci.yml"));
-//! # Ok::<(), workflow_model::WorkflowError>(())
+//! # Ok::<(), workflow_estate::WorkflowError>(())
 //! ```
 
 use std::collections::BTreeMap;
@@ -23,9 +23,8 @@ use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::{ambient_authority, fs_utf8::Dir};
 use serde_norway::Value;
 
-use crate::workflow_model::{
-    Job, Location, Step, Workflow, WorkflowError, WorkflowSource, WORKFLOW_DIR,
-};
+use crate::workflow_estate::{Location, Workflow, WorkflowError, WorkflowSource, WORKFLOW_DIR};
+use crate::workflow_model::{Job, RunnerSelection, Step};
 
 /// Renders a YAML scalar as the string a workflow expression would see.
 ///
@@ -70,18 +69,32 @@ fn optional_u64(raw: &Value, key: &str, at: &Location) -> Result<Option<u64>, Wo
 
 /// Returns an error when `with` is not a mapping or an input is not a scalar.
 fn parse_inputs(raw: &Value, at: &Location) -> Result<BTreeMap<String, String>, WorkflowError> {
-    let Some(value) = raw.get("with") else {
+    parse_scalar_mapping(raw, "with", at)
+}
+
+/// Parses an optional mapping of scalars, such as `with` or `env`.
+///
+/// # Errors
+///
+/// Returns an error when the field is not a mapping or a value is not a
+/// scalar.
+fn parse_scalar_mapping(
+    raw: &Value,
+    field: &str,
+    at: &Location,
+) -> Result<BTreeMap<String, String>, WorkflowError> {
+    let Some(value) = raw.get(field) else {
         return Ok(BTreeMap::new());
     };
     let mapping = value
         .as_mapping()
-        .ok_or_else(|| at.shape("`with` must be a mapping"))?;
+        .ok_or_else(|| at.shape(&format!("`{field}` must be a mapping")))?;
     mapping
         .iter()
         .map(|(key, item)| {
             let name = key
                 .as_str()
-                .ok_or_else(|| at.shape("every `with` key must be a string"))?;
+                .ok_or_else(|| at.shape(&format!("every `{field}` key must be a string")))?;
             let rendered = render_scalar(item)
                 .ok_or_else(|| at.shape(&format!("input `{name}` must be a scalar")))?;
             Ok((name.to_owned(), rendered))
@@ -105,10 +118,58 @@ fn parse_step(raw: &Value, at: &Location) -> Result<Step, WorkflowError> {
         run: optional_string(raw, "run", at)?,
         with: parse_inputs(raw, at)?,
     };
-    if step.uses.is_empty() && step.run.is_empty() {
-        return Err(at.shape("every step must set `uses` or `run`"));
+    match (step.uses.is_empty(), step.run.is_empty()) {
+        (true, true) => Err(at.shape("every step must set `uses` or `run`")),
+        // GitHub Actions rejects a step that both calls an action and runs a
+        // script, so accepting one here would let the contracts reason about a
+        // step shape the runner would never execute.
+        (false, false) => Err(at.shape("a step must not set both `uses` and `run`")),
+        _ => Ok(step),
     }
-    Ok(step)
+}
+
+/// Reads a sequence of label strings from a `runs-on` value.
+///
+/// # Errors
+///
+/// Returns an error when an entry is not a scalar.
+fn parse_labels(value: &Value, at: &Location) -> Result<Vec<String>, WorkflowError> {
+    match value {
+        Value::Sequence(items) => items
+            .iter()
+            .map(|item| {
+                render_scalar(item)
+                    .ok_or_else(|| at.shape("every `runs-on` label must be a scalar"))
+            })
+            .collect(),
+        _ => render_scalar(value)
+            .map(|label| vec![label])
+            .ok_or_else(|| at.shape("`runs-on` must be a label, a list of labels, or a mapping")),
+    }
+}
+
+/// Parses a job's `runs-on` in any of the three shapes GitHub Actions accepts.
+///
+/// # Errors
+///
+/// Returns an error when the value is a mapping without a `group`, or when a
+/// label is not a scalar.
+fn parse_runs_on(raw: &Value, at: &Location) -> Result<RunnerSelection, WorkflowError> {
+    let Some(value) = raw.get("runs-on") else {
+        return Ok(RunnerSelection::Delegated);
+    };
+    if value.as_mapping().is_none() {
+        return Ok(RunnerSelection::Labels(parse_labels(value, at)?));
+    }
+    let group = value
+        .get("group")
+        .and_then(render_scalar)
+        .ok_or_else(|| at.shape("a mapping `runs-on` must name a `group`"))?;
+    let labels = match value.get("labels") {
+        None => Vec::new(),
+        Some(labels) => parse_labels(labels, at)?,
+    };
+    Ok(RunnerSelection::Group { group, labels })
 }
 
 /// Parses one job of a workflow.
@@ -130,15 +191,54 @@ fn parse_job(id: &str, raw: &Value, file: &Location) -> Result<Job, WorkflowErro
     };
     let job = Job {
         id: id.to_owned(),
-        runs_on: optional_string(raw, "runs-on", &at)?,
+        runs_on: parse_runs_on(raw, &at)?,
         uses: optional_string(raw, "uses", &at)?,
         timeout_minutes: optional_u64(raw, "timeout-minutes", &at)?,
+        env: parse_scalar_mapping(raw, "env", &at)?,
         steps,
     };
-    if job.runs_on.is_empty() && job.uses.is_empty() {
+    if !job.runs_on.names_a_runner() && job.uses.is_empty() {
         return Err(at.shape("a job must set `runs-on` or `uses`"));
     }
     Ok(job)
+}
+
+/// Reads the event names a workflow declares under `on`.
+///
+/// YAML 1.1 reads a bare `on` key as the boolean true, and GitHub Actions
+/// workflows are written with the bare key, so both spellings are accepted.
+/// The shorthand forms are accepted too: `on: push` and `on: [push, ...]`
+/// mean the same as the mapping.
+///
+/// # Errors
+///
+/// Returns an error when `on` is absent or is not one of those shapes.
+fn parse_triggers(document: &Value, at: &Location) -> Result<Vec<String>, WorkflowError> {
+    let raw = document
+        .get("on")
+        .or_else(|| document.get(Value::Bool(true)))
+        .ok_or_else(|| at.shape("missing an `on` trigger"))?;
+    if let Some(mapping) = raw.as_mapping() {
+        return mapping
+            .keys()
+            .map(|key| {
+                key.as_str()
+                    .map(ToOwned::to_owned)
+                    .ok_or_else(|| at.shape("every `on` key must be a string"))
+            })
+            .collect();
+    }
+    if let Some(items) = raw.as_sequence() {
+        return items
+            .iter()
+            .map(|item| {
+                render_scalar(item).ok_or_else(|| at.shape("every `on` entry must be a scalar"))
+            })
+            .collect();
+    }
+    render_scalar(raw)
+        .map(|event| vec![event])
+        .ok_or_else(|| at.shape("`on` must be an event, a list of events, or a mapping"))
 }
 
 /// Parses one workflow document.
@@ -166,6 +266,7 @@ pub fn parse_workflow(source: WorkflowSource<'_>) -> Result<Workflow, WorkflowEr
         .collect::<Result<Vec<Job>, WorkflowError>>()?;
     Ok(Workflow {
         file: source.file.to_owned(),
+        triggers: parse_triggers(&document, &at)?,
         jobs,
     })
 }

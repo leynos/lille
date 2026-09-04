@@ -26,19 +26,58 @@ jobs:
       # Bevy's render features make the coverage build heavy; lift the
       # shared-action cargo wall-clock cap (default 600 s) accordingly.
       RUN_RUST_CARGO_WAIT_TIMEOUT: '1800'
+      # See ci.yml. This job is the trunk writer, so it is the run that
+      # populates the compiler cache every pull request then reads.
+      RUSTC_WRAPPER: sccache
+      SCCACHE_GHA_ENABLED: 'true'
+      CARGO_INCREMENTAL: '0'
     steps:
       - uses: actions/checkout@v7
+      - name: Route the compiler cache into Ubicloud's store
+        # See ci.yml for why each variable is exported, and why this must
+        # precede the step that starts the sccache server.
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            const cacheUrl = process.env.ACTIONS_CACHE_URL ?? '';
+            const runtimeToken = process.env.ACTIONS_RUNTIME_TOKEN ?? '';
+            core.info(`sccache cache endpoint present: ${Boolean(cacheUrl)}`);
+            core.info(`sccache runtime token present: ${Boolean(runtimeToken)}`);
+            if (!cacheUrl || !runtimeToken) {
+              core.warning(
+                'sccache has no Actions cache endpoint; every compilation ' +
+                  'will miss and the wrapper will only add overhead',
+              );
+            }
+            if (runtimeToken) {
+              core.setSecret(runtimeToken);
+            }
+            core.exportVariable('ACTIONS_CACHE_URL', cacheUrl);
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', runtimeToken);
+            core.exportVariable('ACTIONS_CACHE_SERVICE_V2', '');
+      - name: Install sccache
+        uses: taiki-e/install-action@c7eb1735f09259a5035e8e5d44b1406b1cddc0fb # v2.83.0
+        with:
+          tool: sccache@0.16.0
+          fallback: none
+      - name: Reset compiler-cache counters
+        # A `run:` step, for the reason given in ci.yml: a server started
+        # inside an action step binds GitHub's v2 service instead of the
+        # Ubicloud proxy.
+        run: |
+          set -euo pipefail
+          sccache --version
+          sccache --zero-stats
       - name: Setup Rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@7d46a399558914f5a05074e55a560fec0269fd0d
+        uses: leynos/shared-actions/.github/actions/setup-rust@c6125f19593668cbfefd65a59c08cb7aefe90d93
         with:
           # Sole owner of ~/.cargo/registry and ~/.cargo/git for this job, and
           # the trunk writer whose entry every pull-request run restores.
           cache-provider: github
-          # See ci.yml: nothing sets RUSTC_WRAPPER, so the sccache install
-          # would download a binary that serves no compilation.
+          # The job installs and starts sccache itself, above.
           use-sccache: 'false'
       - name: Generate coverage
-        uses: leynos/shared-actions/.github/actions/generate-coverage@7d46a399558914f5a05074e55a560fec0269fd0d
+        uses: leynos/shared-actions/.github/actions/generate-coverage@c6125f19593668cbfefd65a59c08cb7aefe90d93
         with:
           all-features: 'true'
           all-targets: 'true'
@@ -49,11 +88,35 @@ jobs:
           with-ratchet: 'true'
           # `setup-rust` above already owns ~/.cargo/registry and ~/.cargo/git.
           cache-provider: external
+      - name: Reclaim the coverage scratch tree
+        # See ci.yml. This job saves the trunk cache entries, so the scratch
+        # tree must be gone before the saves rather than after them.
+        if: always()
+        run: |
+          set -euo pipefail
+          df -h .
+          rm -rf -- target/llvm-cov-target
+          df -h .
+      - name: Record compiler-cache effectiveness
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          # To the log as well as the summary: the summary is not readable
+          # through the REST API.
+          stats="$(sccache --show-stats)"
+          printf '%s\n' "$stats"
+          {
+            printf '### sccache statistics (%s)\n\n' "${GITHUB_JOB}"
+            printf '```text\n'
+            printf '%s\n' "$stats"
+            printf '```\n'
+          } >> "${GITHUB_STEP_SUMMARY}"
       - name: Upload coverage data to CodeScene
         env:
           CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN }}
         if: env.CS_ACCESS_TOKEN != ''
-        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@7d46a399558914f5a05074e55a560fec0269fd0d
+        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@c6125f19593668cbfefd65a59c08cb7aefe90d93
         with:
           format: lcov
           access-token: ${{ env.CS_ACCESS_TOKEN }}

@@ -1,91 +1,72 @@
-//! Types describing the repository's GitHub Actions workflow estate.
+//! The workflow shapes the property tests and the contracts both reason about.
 //!
-//! The workflow-contract tests assert placement, tool-install, and cache
-//! ownership rules over these types rather than over raw YAML text, so a
-//! reordered key or a reflowed block scalar cannot silently defeat a rule.
-//! `workflow_loader` turns files into these values; this module holds only
-//! the shapes and the queries the contracts ask of them.
+//! A job, its steps, and how it selects a runner. Everything needed to load
+//! workflows from disk, and everything only the contracts ask for, lives in
+//! `workflow_estate.rs` instead, so a test binary that needs only these types
+//! does not pull in a module of items it never names.
 //!
 //! # Examples
 //!
 //! ```no_run
 //! let job = workflow_model::Job::default();
 //! assert!(!job.is_github_hosted());
+//! assert!(!job.runs_on.names_a_runner());
 //! ```
 
 use std::{collections::BTreeMap, fmt};
 
-/// Directory holding the repository's workflow definitions.
-pub const WORKFLOW_DIR: &str = ".github/workflows";
-
-/// Commit that every `actions/cache` reference must pin (v6.1.0).
-pub const CACHE_ACTION_SHA: &str = "55cc8345863c7cc4c66a329aec7e433d2d1c52a9";
-
-/// Commit that every `leynos/shared-actions` reference must pin.
-pub const SHARED_ACTIONS_SHA: &str = "7d46a399558914f5a05074e55a560fec0269fd0d";
-
-/// Runner label used by this repository's Ubicloud build and test jobs.
-pub const UBICLOUD_LABEL: &str = "ubicloud-standard-8";
-
-/// Jobs that build or test the crate and therefore keep an Ubicloud label.
-pub const BUILD_JOB_IDS: [&str; 2] = ["build-test", "coverage-upload"];
-
-/// Failure encountered while reading or parsing the workflow estate.
-#[derive(Debug)]
-pub enum WorkflowError {
-    /// A workflow file or the workflow directory could not be read.
-    Read(String, std::io::Error),
-    /// A workflow file was not valid YAML.
-    Parse(String, serde_norway::Error),
-    /// A workflow file was structurally unusable.
-    Shape(String, String),
+/// How a job selects the runner it executes on.
+///
+/// GitHub Actions accepts three shapes for `runs-on`: a single label, a
+/// sequence of labels a runner must carry all of, and a mapping naming a
+/// runner group with optional labels. Modelling only the scalar would make the
+/// other two shapes parse errors, so a perfectly valid workflow would fail the
+/// contracts instead of the workflow that deserves to.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum RunnerSelection {
+    /// The job names no runner because it calls a reusable workflow.
+    #[default]
+    Delegated,
+    /// Labels a runner must carry, from a scalar or a sequence.
+    Labels(Vec<String>),
+    /// A runner group, with the labels required within that group.
+    Group {
+        /// Name of the runner group.
+        group: String,
+        /// Labels required within the group, possibly empty.
+        labels: Vec<String>,
+    },
 }
 
-impl fmt::Display for WorkflowError {
-    /// Renders the failure with the workflow name that produced it.
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl RunnerSelection {
+    /// Returns the labels the selection requires, empty when it names none.
+    #[must_use]
+    pub fn labels(&self) -> &[String] {
         match self {
-            Self::Read(name, err) => write!(f, "cannot read {name}: {err}"),
-            Self::Parse(name, err) => write!(f, "cannot parse {name}: {err}"),
-            Self::Shape(name, msg) => write!(f, "unexpected shape in {name}: {msg}"),
+            Self::Delegated => &[],
+            Self::Labels(labels) | Self::Group { labels, .. } => labels,
         }
     }
-}
 
-impl std::error::Error for WorkflowError {}
-
-/// Where in the estate a value was read, carried instead of a bare string so
-/// the parsing helpers take one string argument rather than several.
-#[derive(Debug, Clone)]
-pub struct Location(String);
-
-impl Location {
-    /// Locates a whole workflow file.
+    /// Reports whether the job names a runner of its own.
     #[must_use]
-    pub fn file(name: &str) -> Self {
-        Self(name.to_owned())
-    }
-
-    /// Locates one job within this file.
-    #[must_use]
-    pub fn job(&self, id: &str) -> Self {
-        Self(format!("{}: job `{id}`", self.0))
-    }
-
-    /// Builds a shape error reported at this location.
-    #[must_use]
-    pub fn shape(&self, message: &str) -> WorkflowError {
-        WorkflowError::Shape(self.0.clone(), message.to_owned())
+    pub const fn names_a_runner(&self) -> bool {
+        !matches!(self, Self::Delegated)
     }
 }
 
-/// A workflow document paired with the file name it came from.
-#[derive(Debug, Clone, Copy)]
-pub struct WorkflowSource<'a> {
-    /// File name within [`WORKFLOW_DIR`].
-    pub file: &'a str,
-    /// The document's YAML text.
-    pub text: &'a str,
+impl fmt::Display for RunnerSelection {
+    /// Renders the selection the way a failure message should quote it.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Delegated => write!(f, "(reusable workflow)"),
+            Self::Labels(labels) => write!(f, "{}", labels.join(", ")),
+            Self::Group { group, labels } if labels.is_empty() => write!(f, "group {group}"),
+            Self::Group { group, labels } => {
+                write!(f, "group {group} ({})", labels.join(", "))
+            }
+        }
+    }
 }
 
 /// One step of a workflow job, reduced to the fields the contracts inspect.
@@ -138,21 +119,38 @@ impl Step {
 pub struct Job {
     /// Key under the workflow's `jobs` mapping.
     pub id: String,
-    /// Runner label, or an empty string when the job calls a reusable workflow.
-    pub runs_on: String,
+    /// How the job selects its runner.
+    pub runs_on: RunnerSelection,
     /// Reusable workflow reference, or an empty string for a normal job.
     pub uses: String,
     /// Declared `timeout-minutes`, when present.
     pub timeout_minutes: Option<u64>,
+    /// Job-level environment, rendered as GitHub would export it.
+    pub env: BTreeMap<String, String>,
     /// Steps in declaration order.
     pub steps: Vec<Step>,
 }
 
 impl Job {
+    /// Returns a job-level environment value, or an empty string when unset.
+    #[must_use]
+    pub fn env(&self, key: &str) -> &str {
+        self.env.get(key).map_or("", String::as_str)
+    }
+
     /// Reports whether the job runs on a GitHub-hosted Ubuntu runner.
+    ///
+    /// A runner group is never GitHub-hosted, and a label set is only when
+    /// every label in it is one of GitHub's Ubuntu images: a job that also
+    /// requires a self-hosted label runs somewhere else.
     #[must_use]
     pub fn is_github_hosted(&self) -> bool {
-        self.runs_on.starts_with("ubuntu-")
+        match &self.runs_on {
+            RunnerSelection::Labels(labels) => {
+                !labels.is_empty() && labels.iter().all(|label| label.starts_with("ubuntu-"))
+            }
+            RunnerSelection::Delegated | RunnerSelection::Group { .. } => false,
+        }
     }
 
     /// Returns the first step whose `run` or `uses` text contains `needle`.
@@ -163,23 +161,25 @@ impl Job {
             .position(|step| step.run.contains(needle) || step.uses.contains(needle))
     }
 
-    /// Returns the first step whose `uses` names `action`, ignoring its pin.
+    /// Returns the first step matching `needle`, with its index.
     #[must_use]
-    pub fn step_using(&self, action: &str) -> Option<&Step> {
-        self.steps.iter().find(|step| {
-            step.uses
-                .split('@')
-                .next()
-                .is_some_and(|path| path.ends_with(action))
-        })
+    pub fn first_step_with(&self, needle: &str) -> Option<(usize, &Step)> {
+        self.steps
+            .iter()
+            .enumerate()
+            .find(|(_, step)| step.run.contains(needle) || step.uses.contains(needle))
     }
-}
 
-/// One workflow file.
-#[derive(Debug, Clone)]
-pub struct Workflow {
-    /// File name within [`WORKFLOW_DIR`].
-    pub file: String,
-    /// Jobs in declaration order.
-    pub jobs: Vec<Job>,
+    /// Returns the first step whose `uses` is `coordinate`, ignoring its pin.
+    ///
+    /// `coordinate` is the whole reference before the `@`, publisher included.
+    /// A suffix match would accept `untrusted/setup-rust@<sha>` wherever the
+    /// contracts ask for the shared `setup-rust`, so an action from the wrong
+    /// publisher could satisfy a policy check written to exclude it.
+    #[must_use]
+    pub fn step_using(&self, coordinate: &str) -> Option<&Step> {
+        self.steps
+            .iter()
+            .find(|step| step.uses.split('@').next() == Some(coordinate))
+    }
 }
