@@ -479,24 +479,48 @@ all.
 
 `ubicloud-standard-8` was inherited rather than chosen: it predated this work
 and no evidence on this repository argued for it. These are the samples that
-replaced the assumption, all on the eight-vCPU shape:
+replaced the assumption:
 
-| Measure | build-test cold | build-test warm | coverage-upload cold |
-| --- | --- | --- | --- |
-| Peak used memory | 8,812 MiB | 7,907 MiB | 6,442 MiB |
-| Peak used disk | 95,609 MiB | 95,418 MiB | 90,998 MiB |
-| Least free disk | 101,691 MiB | 101,882 MiB | 106,302 MiB |
+| Measure | 8 vCPU, build-test cold | 8 vCPU, build-test warm | 8 vCPU, coverage-upload cold | 4 vCPU, build-test warm |
+| --- | --- | --- | --- | --- |
+| Peak used memory | 8,812 MiB | 7,907 MiB | 6,442 MiB | 3,889 MiB |
+| Peak used disk | 95,609 MiB | 95,418 MiB | 90,998 MiB | 94,537 MiB |
+| Least free disk | 101,691 MiB | 101,882 MiB | 106,302 MiB | 53,166 MiB |
+| Wall | 39m14s | 24m38s | 29m17s | 16m47s |
 
-Memory is the binding constraint, not disk: free disk never fell below 99 GiB
+Memory is the binding constraint, not disk: free disk never fell below 52 GiB
 on any run.
 
-**The cold writer sets the memory floor, not the warm run.** A warm run has
-peaked as low as 6,815 MiB, which would fit `ubicloud-standard-2` at 8 GB, and
-reading only that number would be a mistake: the cold writer reached 8,812 MiB
-and the cold writer is the run that has to succeed. Size the runner for the run
-that populates the cache, not the run that reads it. That rules out standard-2
-and makes `ubicloud-standard-4` at 16 GB the safe shrink, which is the shape
-these workflows now use.
+**Peak memory is a property of the shape, not only of the workload.** This is
+the part that is easy to get wrong. Cargo scales its parallelism with the
+processor count, so fewer processors means fewer concurrent `rustc` processes
+and a lower peak: the same job that peaked at 7,907 MiB on eight vCPUs peaked
+at 3,889 MiB on four. A memory peak measured on one shape cannot be carried
+across to another as though it were fixed. Measure the target shape.
+
+**The cold writer sets the floor, not the warm run**, because it is the run
+that has to succeed. Taking the two rules together, the eight-vCPU cold peak of
+8,812 MiB is what ruled out `ubicloud-standard-2` at 8 GB while the estate was
+still on eight vCPUs; on four, the headroom is far wider than that comparison
+suggests.
+
+**The cold limb on four vCPUs is inferred, not measured.** Every four-vCPU run
+so far has been warm, because the shape change did not alter any sccache key,
+so the run intended as the cold writer found the store already populated and
+returned a 100 % hit rate. Every four-vCPU peak observed lies between 3,889 and
+4,637 MiB, and reduced parallelism means a genuinely cold run should stay below
+its eight-vCPU counterpart of 8,812 MiB, so the 12 GB bound looks safe by a
+wide margin. That is inference. The next dependency bump or cache eviction will
+produce a real cold run and settle it; until then, treat the cold figure as
+unconfirmed rather than as evidence.
+
+Two things bound the four-vCPU shape rather than memory. `RUN_RUST_CARGO_WAIT_TIMEOUT`
+caps a single cargo command rather than the job, and had to rise from 1,800 s
+before the shape could shrink: the eight-vCPU cold writer already ran 1,757 s,
+so a slower shape would have had cargo killed before either job timeout
+noticed, and the casualty would have been the cold writer on `main`. And free
+disk fell to 52 GiB against 99 GiB on the larger shape, which is still ample
+but is the first measure to move materially.
 
 Keep the samplers. The shape is only defensible while it is measured, and the
 next person to question it needs the same evidence this change rested on.
