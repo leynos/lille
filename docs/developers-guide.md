@@ -299,18 +299,25 @@ machine and every CI run. A broken release of a transitive dependency
 therefore reaches the build the day it is published, and the only lever is a
 direct requirement in `Cargo.toml`.
 
-`tinyvec = "~1.12"` is such a lever, not a dependency. No code here names the
-crate; it arrives through Bevy's text and font stack. Version 1.13.0, published
-on 2026-09-03, imports `alloc::vec` as a module and then invokes the `vec!`
-macro, which the pinned nightly rejects with ``cannot find macro `vec` in this
-scope``. Every `--all-features` build and `make lint` fail on it. The
-requirement is a tilde rather than a caret because it must hold at 1.12 until
-the breakage is fixed; `AGENTS.md` permits that for a documented lock to
-patch-level updates.
+`tinyvec = "~1.12"` is such a lever. It is a direct Cargo dependency, but no
+source file in this repository names the crate: it arrives through Bevy's text
+and font stack, and the requirement exists only to bound what Cargo resolves.
 
-`tests/dependency_resolution.rs` fails if 1.13 or later is ever selected, and
-says which version was chosen. Without it the only symptom is a macro error
-inside a crate nothing here mentions.
+Version 1.13.0, published on 2026-09-03, imports `alloc::vec` as a module and
+then invokes the `vec!` macro, which the pinned nightly rejects with
+``cannot find macro `vec` in this scope``. Every `--all-features` build and
+`make lint` fail on it. The requirement is a tilde rather than a caret because
+it must hold at 1.12 until the breakage is fixed; `AGENTS.md` permits that for
+a documented lock to patch-level updates.
+
+`tests/dependency_resolution.rs` reads what Cargo resolved and fails if 1.13 or
+later was selected, naming the version. It is a post-resolution check, not a
+pre-build gate: Cargo compiles the graph before an integration test runs, so a
+selected 1.13.0 fails the build first with the macro error above. What the test
+catches directly is the case that would otherwise pass silently, a widened
+requirement whose resolved version still compiles but sits outside the range
+this workspace has verified. Diagnose a build that fails this way with
+`cargo tree --invert tinyvec`.
 
 Remove the requirement and the test together once upstream ships a fixed
 release or yanks 1.13.0, tracked in

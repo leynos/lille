@@ -2,10 +2,17 @@
 //!
 //! `tinyvec` reaches the build transitively through Bevy's text and font
 //! stack, and no `Cargo.lock` is committed, so resolution is decided afresh on
-//! every machine. When 1.13.0 is selected the build fails deep inside the
-//! crate with `cannot find macro `vec` in this scope`, which says nothing
-//! about why. This test fails first, and says exactly which version was
-//! selected and what to do about it.
+//! every machine. This test reads what Cargo resolved and names the version it
+//! chose.
+//!
+//! It is a post-resolution check, not a pre-build gate. Cargo compiles the
+//! dependency graph before an integration test runs, so when a broken release
+//! is selected the build fails first, deep inside the crate, with
+//! ``cannot find macro `vec` in this scope``. This test then reports the
+//! selected version on the next run, once the constraint is back. What it
+//! catches directly is the case that would otherwise pass silently: a widened
+//! requirement whose resolved version still compiles but is outside the range
+//! this workspace has verified.
 //!
 //! Remove it with the constraint itself, per
 //! <https://github.com/leynos/lille/issues/340>.
@@ -17,14 +24,48 @@ use rstest::rstest;
 /// Crate whose resolved version this workspace constrains.
 const CONSTRAINED_CRATE: &str = "tinyvec";
 
-/// First minor release of that crate which does not build here.
-const FIRST_BROKEN_MINOR: u64 = 13;
+/// First release of that crate which does not build here, as major and minor.
+const FIRST_BROKEN_RELEASE: (u64, u64) = (1, 13);
 
-/// Returns the minor version numbers `cargo metadata` resolved for a crate.
+/// A resolved semantic version, kept whole so failures can name it.
+#[derive(Debug, Clone)]
+struct ResolvedVersion {
+    /// Version exactly as Cargo reported it.
+    text: String,
+    /// Major and minor components, for ordering against a known-bad release.
+    series: (u64, u64),
+}
+
+impl ResolvedVersion {
+    /// Parses a Cargo version string, keeping the original text.
+    fn parse(text: &str) -> Result<Self, String> {
+        let mut parts = text.split(['.', '-', '+']);
+        let mut component = |name: &str| -> Result<u64, String> {
+            parts
+                .next()
+                .and_then(|part| part.parse::<u64>().ok())
+                .ok_or_else(|| format!("cannot read the {name} version from `{text}`"))
+        };
+        let major = component("major")?;
+        let minor = component("minor")?;
+        Ok(Self {
+            text: text.to_owned(),
+            series: (major, minor),
+        })
+    }
+
+    /// Reports whether this release is the broken one or anything later.
+    const fn is_broken_or_later(&self) -> bool {
+        self.series.0 > FIRST_BROKEN_RELEASE.0
+            || (self.series.0 == FIRST_BROKEN_RELEASE.0 && self.series.1 >= FIRST_BROKEN_RELEASE.1)
+    }
+}
+
+/// Returns every version of a crate that `cargo metadata` resolved.
 ///
 /// Returns an error rather than panicking so the test reports a resolution
 /// failure and a parse failure differently.
-fn resolved_minor_versions(name: &str) -> Result<Vec<u64>, String> {
+fn resolved_versions(name: &str) -> Result<Vec<ResolvedVersion>, String> {
     let output = Command::new(env!("CARGO"))
         .args(["metadata", "--format-version", "1"])
         .current_dir(env!("CARGO_MANIFEST_DIR"))
@@ -48,32 +89,30 @@ fn resolved_minor_versions(name: &str) -> Result<Vec<u64>, String> {
                 .get("version")
                 .and_then(serde_json::Value::as_str)
                 .ok_or_else(|| format!("`{name}` has no version string"))?;
-            version
-                .split('.')
-                .nth(1)
-                .and_then(|minor| minor.parse::<u64>().ok())
-                .ok_or_else(|| format!("cannot read a minor version from `{version}`"))
+            ResolvedVersion::parse(version)
         })
         .collect()
 }
 
 #[rstest]
 fn the_constrained_crate_resolves_below_its_broken_release() {
-    let minors = resolved_minor_versions(CONSTRAINED_CRATE)
+    let resolved = resolved_versions(CONSTRAINED_CRATE)
         .unwrap_or_else(|err| panic!("dependency resolution must be readable: {err}"));
     assert!(
-        !minors.is_empty(),
+        !resolved.is_empty(),
         "`{CONSTRAINED_CRATE}` must still be in the dependency graph; if it has gone, drop its \
          constraint from Cargo.toml and delete this test"
     );
-    let broken: Vec<u64> = minors
+    let broken: Vec<&str> = resolved
         .iter()
-        .copied()
-        .filter(|minor| *minor >= FIRST_BROKEN_MINOR)
+        .filter(|version| version.is_broken_or_later())
+        .map(|version| version.text.as_str())
         .collect();
+    let (major, minor) = FIRST_BROKEN_RELEASE;
     assert!(
         broken.is_empty(),
-        "`{CONSTRAINED_CRATE}` resolved to 1.{broken:?}, which does not build on the pinned \
-         nightly; keep the `~1.12` requirement in Cargo.toml until leynos/lille#340 is closed"
+        "`{CONSTRAINED_CRATE}` resolved to {broken:?}, at or beyond {major}.{minor}, which does \
+         not build on the pinned nightly; keep the `~1.12` requirement in Cargo.toml until \
+         leynos/lille#340 is closed"
     );
 }
