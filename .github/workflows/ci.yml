@@ -40,6 +40,32 @@ jobs:
           # (`upload-codescene-coverage` with `mode: check`) can reach
           # the pull request's merge base.
           fetch-depth: 0
+      # Ubicloud's `standard-8` label is inherited here, never measured. Sample
+      # memory and disk every 15 s so the next shape decision rests on evidence
+      # rather than on what a previous change happened to pick. Disk, not
+      # memory, is what has killed jobs elsewhere in this rollout, and it did so
+      # silently, so both are recorded.
+      - name: Start the resource sampler
+        shell: bash
+        env:
+          RESOURCE_SAMPLES: ${{ runner.temp }}/resource-samples.txt
+        run: |
+          set -euo pipefail
+          : > "$RESOURCE_SAMPLES"
+          sampler="$RUNNER_TEMP/sample-resources.sh"
+          cat > "$sampler" <<'SAMPLER'
+          #!/usr/bin/env bash
+          set -uo pipefail
+          while :; do
+            mem_used="$(free -m | awk '/^Mem:/ { print $3 }')"
+            disk="$(df -m --output=used,avail / | tail -1)"
+            printf '%s %s\n' "$mem_used" "$disk" >> "$1"
+            sleep 15
+          done
+          SAMPLER
+          chmod +x "$sampler"
+          nohup "$sampler" "$RESOURCE_SAMPLES" >/dev/null 2>&1 &
+          printf 'RESOURCE_SAMPLES=%s\n' "$RESOURCE_SAMPLES" >> "$GITHUB_ENV"
       - name: Route the compiler cache into Ubicloud's store
         # sccache's GitHub Actions backend reads these from the environment,
         # but the runner exposes them to action code rather than to later
@@ -92,7 +118,7 @@ jobs:
           sccache --version
           sccache --zero-stats
       - name: Setup Rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@c6125f19593668cbfefd65a59c08cb7aefe90d93
+        uses: leynos/shared-actions/.github/actions/setup-rust@3a2f2d5f17932657ddf50490a09ea5e7400ae35c
         with:
           # Sole owner of ~/.cargo/registry and ~/.cargo/git for this job. It
           # runs before the first cargo invocation so the lint step reads a
@@ -124,7 +150,7 @@ jobs:
         # Downloads the pinned prebuilt installer and verifies it against a
         # digest pinned in the action. The action owns the cache for the
         # installer binary, its version marker, and ~/.local/share/whitaker.
-        uses: leynos/shared-actions/.github/actions/install-whitaker@c6125f19593668cbfefd65a59c08cb7aefe90d93
+        uses: leynos/shared-actions/.github/actions/install-whitaker@3a2f2d5f17932657ddf50490a09ea5e7400ae35c
         with:
           installer-version: '0.2.7'
           cache-provider: github
@@ -137,7 +163,7 @@ jobs:
       # evidence and doubled the billed compile. `all-features` names exactly
       # the set the explicit feature list used to name.
       - name: Generate coverage
-        uses: leynos/shared-actions/.github/actions/generate-coverage@c6125f19593668cbfefd65a59c08cb7aefe90d93
+        uses: leynos/shared-actions/.github/actions/generate-coverage@3a2f2d5f17932657ddf50490a09ea5e7400ae35c
         with:
           all-features: 'true'
           all-targets: 'true'
@@ -160,6 +186,31 @@ jobs:
           df -h .
           rm -rf -- target/llvm-cov-target
           df -h .
+      - name: Report peak resource use
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          samples="${RESOURCE_SAMPLES:-}"
+          if [[ -z "$samples" || ! -s "$samples" ]]; then
+            echo 'No resource samples were recorded.'
+            exit 0
+          fi
+          peak_memory="$(awk '{ print $1 }' "$samples" | sort -n | tail -1)"
+          peak_disk="$(awk '{ print $2 }' "$samples" | sort -n | tail -1)"
+          least_free="$(awk '{ print $3 }' "$samples" | sort -n | head -1)"
+          count="$(wc -l < "$samples")"
+          printf 'peak used memory: %s MiB\n' "$peak_memory"
+          printf 'peak used disk: %s MiB\n' "$peak_disk"
+          printf 'least free disk: %s MiB\n' "$least_free"
+          printf 'samples: %s at 15 second intervals\n' "$count"
+          {
+            printf '### Resources (%s)\n\n' "${GITHUB_JOB}"
+            printf -- '- peak used memory: %s MiB\n' "$peak_memory"
+            printf -- '- peak used disk: %s MiB\n' "$peak_disk"
+            printf -- '- least free disk: %s MiB\n' "$least_free"
+            printf -- '- samples: %s at 15 second intervals\n' "$count"
+          } >> "${GITHUB_STEP_SUMMARY}"
       - name: Record compiler-cache effectiveness
         if: always()
         shell: bash
@@ -185,7 +236,7 @@ jobs:
         env:
           CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN }}
         if: env.CS_ACCESS_TOKEN != '' && github.event_name == 'pull_request'
-        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@c6125f19593668cbfefd65a59c08cb7aefe90d93
+        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@3a2f2d5f17932657ddf50490a09ea5e7400ae35c
         with:
           format: lcov
           mode: check

@@ -427,6 +427,36 @@ fn compiler_cache_effectiveness_is_measured_around_the_build(workflows: Vec<Work
     }
 }
 
+/// The `ubicloud-standard-8` shape is inherited here, not measured. Sampling
+/// memory and disk is what turns the next shape decision into evidence, and
+/// disk is the one that has killed jobs silently elsewhere in this rollout.
+#[rstest]
+fn both_build_jobs_sample_and_report_their_resource_use(workflows: Vec<Workflow>) {
+    for id in BUILD_JOB_IDS {
+        let job = job_named(&workflows, id);
+        let start = job
+            .first_step_containing("sample-resources.sh")
+            .unwrap_or_else(|| panic!("`{id}` must start a resource sampler"));
+        let (report_at, report) = job
+            .first_step_with("least free disk")
+            .unwrap_or_else(|| panic!("`{id}` must report its peak resource use"));
+        assert!(
+            start < report_at,
+            "`{id}` must start the sampler before it reports the peaks"
+        );
+        for measure in ["free -m", "df -m"] {
+            assert!(
+                job.steps.iter().any(|step| step.run.contains(measure)),
+                "`{id}` must sample `{measure}`; disk and memory are both needed"
+            );
+        }
+        assert!(
+            report.run.contains("peak used disk"),
+            "`{id}` must report peak disk, not memory alone"
+        );
+    }
+}
+
 #[rstest]
 fn coverage_runs_the_whole_suite_once_and_owns_no_cargo_cache(workflows: Vec<Workflow>) {
     for id in BUILD_JOB_IDS {

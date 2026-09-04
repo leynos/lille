@@ -361,7 +361,7 @@ No tool is compiled from source. `whitaker-installer` is installed by
 pinned prebuilt release archive and verifies it against a digest pinned inside
 the action, then runs the installer to place the Whitaker Dylint suite. Every
 `leynos/shared-actions` reference pins commit
-`c6125f19593668cbfefd65a59c08cb7aefe90d93`.
+`3a2f2d5f17932657ddf50490a09ea5e7400ae35c`.
 
 sccache is installed the same way, by `taiki-e/install-action` with
 `tool: sccache@0.16.0` and `fallback: none`. The fallback matters: without it
@@ -444,6 +444,16 @@ generated, printing `df -h` either side. The instrumented tree has no later
 consumer, and on smaller runner shapes a full disk has killed a job silently,
 with no error text.
 
+### Resource sampling
+
+Both build jobs start a background sampler after checkout that records used
+memory and used and free disk every 15 seconds, and report the peaks at the
+end of the job. The `ubicloud-standard-8` label was inherited rather than
+measured, so the samples are what a future decision to keep or shrink the shape
+will rest on. Disk is sampled alongside memory because disk, not memory, is
+what has exhausted runners in this estate, and it did so with no error text at
+all.
+
 `ci.yml` accepts `workflow_dispatch` so a warm run can be measured on demand.
 A dispatch restores what a pull request restores and writes nothing:
 `coverage-main.yml` is the only job that saves on this repository.
@@ -476,9 +486,10 @@ single test execution per build job. It also pins the inputs that make those
 rules true, so a workflow cannot keep the shape of the policy while dropping
 its substance: `cache-provider`, `use-sccache`, the Whitaker installer
 version, the coverage flags, the uv cache paths and key, a bounded
-`timeout-minutes` for each build job, and the compiler-cache wiring: the two
-job-level variables, and the export, install, start, build, report order that
-the sccache server's one-shot backend binding depends on.
+`timeout-minutes` for each build job, the resource sampler and its report, and
+the compiler-cache wiring: the two job-level variables, and the export,
+install, start, build, report order that the sccache server's one-shot backend
+binding depends on.
 
 `tests/support/workflow_model.rs` holds the job, step, and runner-selection
 types the properties and the contracts share;

@@ -23,7 +23,7 @@ pub const WORKFLOW_DIR: &str = ".github/workflows";
 pub const CACHE_ACTION_SHA: &str = "55cc8345863c7cc4c66a329aec7e433d2d1c52a9";
 
 /// Commit that every `leynos/shared-actions` reference must pin.
-pub const SHARED_ACTIONS_SHA: &str = "c6125f19593668cbfefd65a59c08cb7aefe90d93";
+pub const SHARED_ACTIONS_SHA: &str = "3a2f2d5f17932657ddf50490a09ea5e7400ae35c";
 
 /// Runner label used by this repository's Ubicloud build and test jobs.
 pub const UBICLOUD_LABEL: &str = "ubicloud-standard-8";
