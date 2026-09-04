@@ -339,3 +339,272 @@ buffered-message compile-pass harness
 `make lint` runs rustdoc (`--cfg docsrs`),
 `cargo clippy --all-targets --all-features -- -D warnings`, and the Whitaker
 Dylint suite.
+
+## Continuous integration
+
+Two workflows do the developer-blocking work. `ci.yml`'s `build-test` job runs
+on every pull request, and `coverage-main.yml`'s `coverage-upload` job runs on
+every push to `main`. Both use the `ubicloud-standard-8` runner label, which is
+registered in `.github/actionlint.yaml`, and both declare `timeout-minutes` so
+a hung step cannot bill to the platform's six-hour default.
+
+Every other job stays on GitHub-hosted `ubuntu-latest`. That placement is a
+rule, not an accident: delayed comments, metadata lookups, label handling, and
+release orchestration are API-bound, so paid runner capacity buys them nothing
+and their queue time is already short. `dependabot-automerge.yml` calls a
+reusable workflow, which chooses its own runner.
+
+### Tool installation
+
+No tool is compiled from source. `whitaker-installer` is installed by
+`leynos/shared-actions/.github/actions/install-whitaker`, which downloads the
+pinned prebuilt release archive and verifies it against a digest pinned inside
+the action, then runs the installer to place the Whitaker Dylint suite. Every
+`leynos/shared-actions` reference pins commit
+`3a2f2d5f17932657ddf50490a09ea5e7400ae35c`.
+
+sccache is installed the same way, by `taiki-e/install-action` with
+`tool: sccache@0.16.0` and `fallback: none`. The fallback matters: without it
+the action would compile sccache from source when no prebuilt binary matched,
+which is the outcome the rule exists to prevent.
+
+### Cache ownership
+
+Each mutable path has exactly one owner, so no two steps race to write it and
+every miss is explainable from the rendered key.
+
+| Path                                                                             | Owner                                         | Key inputs                                                                           |
+| -------------------------------------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `~/.cargo/registry`, `~/.cargo/git`                                              | `setup-rust` (`cache-provider: github`)       | `runner.os`, `rust-toolchain.toml` and `Cargo.lock` hash                             |
+| `~/.cargo/bin/whitaker-installer`, its version marker, `~/.local/share/whitaker` | `install-whitaker` (`cache-provider: github`) | `runner.os`, `runner.arch`, installer version, `dylint.toml` hash                    |
+| `.uv-cache`, `.uv-tools`                                                         | the `Cache uv tool layers` step in `ci.yml`   | `runner.os`, `runner.arch`, `runner.environment`, `Makefile` and `scripts/*.py` hash |
+| coverage ratchet baseline files                                                  | `generate-coverage`'s split restore and save  | `runner.os`, run id                                                                  |
+| compiler output                                                                  | `sccache`, through its GitHub Actions backend | compiler flags and toolchain, hashed by sccache itself                               |
+
+*Table 1: Cache ownership and cache-key inputs.*
+
+`generate-coverage` is called with `cache-provider: external` in both jobs
+because `setup-rust` already owns the Cargo registry and Git index; without
+that input the action would become a second owner of the same two paths. For
+the same reason no step archives a `target` tree. Every `actions/cache`
+reference written in these workflow files pins
+`55cc8345863c7cc4c66a329aec7e433d2d1c52a9` (v6.1.0). That claim covers the
+workflow files only. A shared action may reach an `actions/cache` reference of
+its own, and `upload-codescene-coverage` does; the next paragraph records it.
+
+### The compiler cache
+
+sccache owns compiler output, and nothing archives a `target` tree. Both build
+jobs wire it up as four steps in a fixed order, and the order is the whole
+point: get it wrong and the cache is silently a no-op.
+
+The job sets `RUSTC_WRAPPER: sccache` and `SCCACHE_GHA_ENABLED: 'true'` at job
+level. The first engages the wrapper; the second is what selects the GitHub
+Actions backend. Without the second, sccache falls back to
+`Local disk: ~/.cache/sccache`, which nothing persists between runs, so the
+wrapper becomes pure overhead. `CARGO_INCREMENTAL: '0'` accompanies them
+because sccache cannot cache an incremental compilation.
+
+**Export.** A pinned `actions/github-script` step, after checkout, re-exports
+`ACTIONS_CACHE_URL` and `ACTIONS_RUNTIME_TOKEN` into `GITHUB_ENV` and clears
+`ACTIONS_CACHE_SERVICE_V2`. The runner gives those two variables to action code
+but not to later shell steps, and sccache's backend reads them from the
+environment. On Ubicloud `ACTIONS_CACHE_URL` names the runner's local cache
+proxy, so re-exporting it is what puts the compiler cache in Ubicloud's store
+rather than GitHub's. The v2 cache service bypasses that proxy, so it is
+cleared; exporting `ACTIONS_RESULTS_URL` does not route through the proxy
+either. The step also logs whether an endpoint and a token were present, and
+warns when either is missing, so a misconfigured backend is diagnosable from
+the log rather than from an unexplained slow build. It never prints the token.
+
+**Install.** `taiki-e/install-action` places the pinned sccache binary. An
+action step is safe here because installing a binary does not start the sccache
+server.
+
+**Start.** A `run:` step runs `sccache --zero-stats`, which starts the server.
+It must follow the export, and it must not be `setup-rust`'s job. The reason is
+narrower than it first looks, and the obvious guess is wrong: `run:` steps do
+see what the export wrote, measured on `ubicloud-standard-2`, so the export is
+not being hidden from them. What happens is that `setup-rust` with
+`use-sccache: 'true'` runs the mozilla sccache-action, and that action's last
+act writes `ACTIONS_CACHE_SERVICE_V2=on`, GitHub's results URL and GitHub's
+token back to `GITHUB_ENV`. Every step after it therefore sees GitHub's v2
+cache service instead of Ubicloud's proxy, and a server started under those
+values writes where nothing is reading. The server binds its backend once, at
+start, so starting it before that clobbering happens is what makes it stick.
+Hence `use-sccache: 'false'` in both jobs.
+
+The failure is silent and total, which is why it is worth this much text.
+Three runs of `build-test` on the same shape, differing only in the
+shared-actions pin and in whether the store had been populated, show both the
+failure and what the cache is worth:
+
+| Measure | Before the fix | After, cold | After, warm |
+| --- | --- | --- | --- |
+| Cache location | ghac | ghac | ghac |
+| Hit rate | 0.00 % | 33.45 % | 99.79 % |
+| Rust hit rate | 0.00 % | 0.19 % | 99.60 % |
+| Read errors | 0 | 0 | 0 |
+| Write errors | 8170 | 5 | 0 |
+| Wall | 25m44s | 39m14s | 16m31s |
+
+The first run had a correct backend, an endpoint and a token both present, and
+every one of its 8,170 writes failed, so nothing reached the store and nothing
+in the log said so except the write counter. The second populated the store,
+which is why it is the slowest. The third reads what the second wrote. The
+cache is worth about nine minutes a run on this workspace, 16m31s warm against
+25m44s for the run that cached nothing at all.
+
+**Report.** `sccache --show-stats` runs after the build, printing the counters
+to the log as well as to the job summary. The log copy is the one that matters:
+the summary cannot be read through the REST API, so it cannot be checked after
+the fact. Read `Cache location` on every run. It must name the GitHub Actions
+backend; `Local disk: ~/.cache/sccache` means the backend was never selected
+and nothing is being cached. A warm build reporting zero hits is a broken
+contract, not a slow one.
+
+Each job also deletes `target/llvm-cov-target` once coverage has been
+generated, printing `df -h` either side. The instrumented tree has no later
+consumer, and on smaller runner shapes a full disk has killed a job silently,
+with no error text.
+
+### Resource sampling
+
+Both build jobs start a background sampler after checkout that records used
+memory and used and free disk every 15 seconds, and report peak memory, peak
+disk and least free disk at the end of the job, to the log as well as the job
+summary. Disk is sampled alongside memory because disk, not memory, is what has
+exhausted runners elsewhere in this estate, and it did so with no error text at
+all.
+
+The `ubicloud-standard-8` label is inherited, not measured. It predates this
+work and no evidence on this repository argued for it. The first samples, from
+`build-test`:
+
+| Measure | Cold writer | Warm |
+| --- | --- | --- |
+| Peak used memory | 8,812 MiB | 6,815 MiB |
+| Peak used disk | 95,609 MiB | 94,521 MiB |
+| Least free disk | 101,691 MiB | 102,779 MiB |
+| Samples | 156 | 65 |
+
+Memory is the binding constraint, not disk: free disk never fell below 99 GiB
+on either run.
+
+**The cold writer sets the memory floor, not the warm run.** The warm peak of
+6,815 MiB would fit `ubicloud-standard-2` at 8 GB, and reading only that number
+would be a mistake, because the cold writer peaked at 8,812 MiB and the cold
+writer is the run that has to succeed. Size the runner for the run that
+populates the cache, not the run that reads it. On that rule standard-2 is out
+and `ubicloud-standard-4` at 16 GB is the safe shrink.
+
+The shape is unchanged here on purpose: halving the vCPU count trades wall time
+against the lower rate, and a Bevy workspace is where that trade bites, so it
+belongs in its own pull request with its own measurement rather than folded
+into this one. The sequence is: this merge push is the cold writer on `main`,
+then two sequential runs of `ci.yml` against `main` for warm evidence, then a
+follow-up moving both jobs to `ubicloud-standard-4` with the samplers kept.
+Accept that follow-up only if its own warm `build-test` stays under 25 minutes
+and its cold writer's memory peak stays under 12 GB.
+
+`ci.yml` accepts `workflow_dispatch` so a warm run can be measured on demand.
+A dispatch restores what a pull request restores and writes nothing:
+`coverage-main.yml` is the only job that saves on this repository.
+
+One download remains deliberately uncached. The `cs-coverage` CLI is fetched on
+every run because `upload-codescene-coverage` only caches it when `cli-version`
+is pinned, and its cache step uses an unpinned `actions/cache@v4` that this
+repository cannot pin from here.
+
+The uv tool layers are an exception to the trunk-writer rule rather than to the
+ownership rule. They are cached by the pull-request job that installs them,
+which is also the only job that installs them, so there is no trunk job to
+designate as the sole writer instead.
+
+### One test execution per pull request
+
+The instrumented coverage run is the only test execution on Linux. It uses
+`all-features`, `all-targets`, and `doctests`, so it covers everything the
+former separate `cargo test` step covered and more, for one compile rather than
+two. A workflow contract in `tests/workflow_contracts.rs` fails if a second
+`cargo test` or `cargo nextest` step reappears in either job.
+
+### Workflow contracts
+
+`tests/workflow_contracts.rs` asserts the rules above. It is a harness rather
+than a test file: the rules live in four modules under `tests/contracts/`,
+split by the question each asks.
+
+| Module | Asks |
+| --- | --- |
+| `supply_chain.rs` | What will the estate execute? Pinned cache and shared-action references, no source-built tools, prebuilt Whitaker and sccache. |
+| `placement.rs` | What does it cost, and who owns each cache? Runner placement and labels, bounded timeouts, one owner per cached path, an installer before the first use of what it installs, a single test execution per build job, the uv cache key. |
+| `compiler_cache.rs` | Is sccache actually working? The two job-level variables, the export, install, start, build, report order, the proxy export, and the resource sampler with its report. |
+| `parsing.rs` | Does the loader read workflows correctly? Its subject is the loader, not any workflow in this repository. |
+
+Each module also pins the inputs that make its rules true, so a workflow cannot
+keep the shape of the policy while dropping its substance: `cache-provider`,
+`use-sccache`, the Whitaker installer version, the coverage flags, and the uv
+cache paths and key.
+
+The split is not only about the 400-line limit. `parsing.rs` reads a different
+subject from the other three, and separating it makes that visible: a failure
+there means the loader is wrong, not that a workflow is.
+
+`tests/support/workflow_model.rs` holds the job, step, and runner-selection
+types the properties and the contracts share;
+`tests/support/workflow_estate.rs` holds the pinned commits, the whole-file
+`Workflow` type, and the errors parsing reports, which only the contracts need.
+`tests/support/workflow_loader.rs` turns workflow files into those values, and
+`tests/support/workflow_config.rs` reads the other repository files a contract
+needs, currently `actionlint`'s runner registration. They are separate because
+the subject differs: a failure in one is a workflow that would not parse, in
+the other a configuration file that could not be read.
+
+Parsing is strict about shape and permissive about spelling. A field that is
+present but of the wrong type is an error rather than a silent default, because
+a contract that read an empty string for a mistyped `runs-on` would pass a
+workflow it should reject. The exclusive shapes GitHub Actions enforces are
+enforced here too: a step sets `uses` or `run`, never both, and a job either
+calls a reusable workflow or names a runner and runs its own steps, never both.
+Accepting a mixture would let the contracts reason about a job the runner would
+never schedule.
+
+Against that, every form the platform genuinely accepts must parse. `runs-on`
+may be a label, a list of labels, or a mapping naming a runner group, and `on`
+may be an event, a list, or a mapping, read under the bare key that YAML 1.1
+turns into the boolean true. The files are read through a `cap_std` directory
+capability rooted at `.github/workflows`.
+
+Three matching rules exist because a loose match quietly defeats the rule it is
+part of.
+
+- Action references are compared on the whole coordinate before the `@`,
+  publisher included. A suffix match would let `untrusted/setup-rust` satisfy a
+  rule written about the shared `setup-rust`.
+- A step owns a cache only when its `uses` names `actions/cache`,
+  `actions/cache/restore`, or `actions/cache/save` exactly.
+  `actions/cache-audit` shares the prefix, caches nothing, and would otherwise
+  contribute an invented claim on whatever `path` input it carried.
+- Runner labels are compared against the parsed
+  `self-hosted-runner.labels` list in `.github/actionlint.yaml`, by equality.
+  Searching the file as text would accept `standard-8` because
+  `ubicloud-standard-8` contains it, and would accept a label that appears only
+  in a comment.
+
+Two assurance methods are used together, following
+[ADR 003](adr-003-bounded-rstest-over-property-testing.md).
+The contract modules hold bounded `rstest` cases over the workflow files as
+they stand, and `tests/workflow_model_properties.rs` samples the wider domain
+with `proptest`: arbitrary step orderings, repeated display names, interleaved
+unrelated steps, actions that merely share the `actions/cache` prefix, and
+split caches whose halves agree or disagree on a key, or where a third step
+claims a paired key. The properties
+check cache-owner uniqueness and installer-ordering against small oracles
+written independently of the implementation. Run both with `make test`, and run
+`actionlint` after editing any workflow.
+
+Only one restore and one save sharing a key count as a single owner. Two
+restores on the same key are two owners, and so are a matching pair plus a
+third step, because otherwise a genuine duplicate could hide behind the
+split-cache exception.

@@ -15,6 +15,9 @@ on:
 jobs:
   coverage-upload:
     runs-on: ubicloud-standard-8
+    # Ubicloud jobs bill by the minute, so a hung step must not run to the
+    # 6-hour platform default. The 2026-09-03 baseline median was 561 s.
+    timeout-minutes: 60
     permissions:
       contents: read
     env:
@@ -23,25 +26,155 @@ jobs:
       # Bevy's render features make the coverage build heavy; lift the
       # shared-action cargo wall-clock cap (default 600 s) accordingly.
       RUN_RUST_CARGO_WAIT_TIMEOUT: '1800'
+      # See ci.yml. This job is the trunk writer, so it is the run that
+      # populates the compiler cache every pull request then reads.
+      RUSTC_WRAPPER: sccache
+      SCCACHE_GHA_ENABLED: 'true'
+      CARGO_INCREMENTAL: '0'
     steps:
       - uses: actions/checkout@v7
-      - name: Setup Rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@794e4801babcf68065c660fdf4781ad62be5d061
-      - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-      - name: Generate coverage
-        uses: leynos/shared-actions/.github/actions/generate-coverage@794e4801babcf68065c660fdf4781ad62be5d061
+      # Ubicloud's `standard-8` label is inherited here, never measured. Sample
+      # memory and disk every 15 s so the next shape decision rests on evidence
+      # rather than on what a previous change happened to pick. Disk, not
+      # memory, is what has killed jobs elsewhere in this rollout, and it did so
+      # silently, so both are recorded.
+      - name: Start the resource sampler
+        shell: bash
+        env:
+          RESOURCE_SAMPLES: ${{ runner.temp }}/resource-samples.txt
+        run: |
+          set -euo pipefail
+          : > "$RESOURCE_SAMPLES"
+          sampler="$RUNNER_TEMP/sample-resources.sh"
+          cat > "$sampler" <<'SAMPLER'
+          #!/usr/bin/env bash
+          set -uo pipefail
+          while :; do
+            mem_used="$(free -m | awk '/^Mem:/ { print $3 }')"
+            disk="$(df -m --output=used,avail / | tail -1)"
+            printf '%s %s\n' "$mem_used" "$disk" >> "$1"
+            sleep 15
+          done
+          SAMPLER
+          chmod +x "$sampler"
+          nohup "$sampler" "$RESOURCE_SAMPLES" >/dev/null 2>&1 &
+          printf 'RESOURCE_SAMPLES=%s\n' "$RESOURCE_SAMPLES" >> "$GITHUB_ENV"
+      - name: Route the compiler cache into Ubicloud's store
+        # See ci.yml for why each variable is exported, and why this must
+        # precede the step that starts the sccache server.
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
-          features: render map text test-support observers-v1-spike
+          script: |
+            const cacheUrl = process.env.ACTIONS_CACHE_URL ?? '';
+            const runtimeToken = process.env.ACTIONS_RUNTIME_TOKEN ?? '';
+            core.info(`sccache cache endpoint present: ${Boolean(cacheUrl)}`);
+            core.info(`sccache runtime token present: ${Boolean(runtimeToken)}`);
+            if (!cacheUrl || !runtimeToken) {
+              core.warning(
+                'sccache has no Actions cache endpoint; every compilation ' +
+                  'will miss and the wrapper will only add overhead',
+              );
+            }
+            if (runtimeToken) {
+              core.setSecret(runtimeToken);
+            }
+            core.exportVariable('ACTIONS_CACHE_URL', cacheUrl);
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', runtimeToken);
+            core.exportVariable('ACTIONS_CACHE_SERVICE_V2', '');
+      - name: Install sccache
+        uses: taiki-e/install-action@c7eb1735f09259a5035e8e5d44b1406b1cddc0fb # v2.83.0
+        with:
+          tool: sccache@0.16.0
+          fallback: none
+      - name: Reset compiler-cache counters
+        # Started here rather than inside `setup-rust`, for the reason given
+        # in ci.yml: the shared action's sccache path rewrites `GITHUB_ENV`
+        # back to GitHub's v2 cache service on its way out.
+        run: |
+          set -euo pipefail
+          sccache --version
+          sccache --zero-stats
+      - name: Setup Rust
+        uses: leynos/shared-actions/.github/actions/setup-rust@3a2f2d5f17932657ddf50490a09ea5e7400ae35c
+        with:
+          # Sole owner of ~/.cargo/registry and ~/.cargo/git for this job, and
+          # the trunk writer whose entry every pull-request run restores.
+          cache-provider: github
+          # The job installs and starts sccache itself, above.
+          use-sccache: 'false'
+      - name: Generate coverage
+        uses: leynos/shared-actions/.github/actions/generate-coverage@3a2f2d5f17932657ddf50490a09ea5e7400ae35c
+        with:
+          all-features: 'true'
+          all-targets: 'true'
+          doctests: 'true'
           output-path: lcov.info
           format: lcov
           use-cargo-nextest: 'false'
           with-ratchet: 'true'
+          # `setup-rust` above already owns ~/.cargo/registry and ~/.cargo/git.
+          cache-provider: external
+      - name: Reclaim the coverage scratch tree
+        # See ci.yml. This job saves the trunk cache entries, so the scratch
+        # tree must be gone before the saves rather than after them.
+        if: always()
+        run: |
+          set -euo pipefail
+          df -h .
+          rm -rf -- target/llvm-cov-target
+          df -h .
+      - name: Report peak resource use
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          samples="${RESOURCE_SAMPLES:-}"
+          if [[ -z "$samples" || ! -s "$samples" ]]; then
+            echo 'No resource samples were recorded.'
+            exit 0
+          fi
+          peak_memory="$(awk '{ print $1 }' "$samples" | sort -n | tail -1)"
+          peak_disk="$(awk '{ print $2 }' "$samples" | sort -n | tail -1)"
+          least_free="$(awk '{ print $3 }' "$samples" | sort -n | head -1)"
+          count="$(wc -l < "$samples")"
+          printf 'peak used memory: %s MiB\n' "$peak_memory"
+          printf 'peak used disk: %s MiB\n' "$peak_disk"
+          printf 'least free disk: %s MiB\n' "$least_free"
+          printf 'samples: %s at 15 second intervals\n' "$count"
+          {
+            printf '### Resources (%s)\n\n' "${GITHUB_JOB}"
+            printf -- '- peak used memory: %s MiB\n' "$peak_memory"
+            printf -- '- peak used disk: %s MiB\n' "$peak_disk"
+            printf -- '- least free disk: %s MiB\n' "$least_free"
+            printf -- '- samples: %s at 15 second intervals\n' "$count"
+          } >> "${GITHUB_STEP_SUMMARY}"
+      - name: Record compiler-cache effectiveness
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          # `if: always()` runs this even when an earlier step failed before
+          # sccache was installed. Reporting nothing is correct there; failing
+          # here would bury the real failure under a second one.
+          if ! command -v sccache >/dev/null 2>&1; then
+            echo 'sccache is not installed; no compiler-cache statistics to report.'
+            exit 0
+          fi
+          # To the log as well as the summary: the summary is not readable
+          # through the REST API.
+          stats="$(sccache --show-stats)"
+          printf '%s\n' "$stats"
+          {
+            printf '### sccache statistics (%s)\n\n' "${GITHUB_JOB}"
+            printf '```text\n'
+            printf '%s\n' "$stats"
+            printf '```\n'
+          } >> "${GITHUB_STEP_SUMMARY}"
       - name: Upload coverage data to CodeScene
         env:
           CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN }}
         if: env.CS_ACCESS_TOKEN != ''
-        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@794e4801babcf68065c660fdf4781ad62be5d061
+        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@3a2f2d5f17932657ddf50490a09ea5e7400ae35c
         with:
           format: lcov
           access-token: ${{ env.CS_ACCESS_TOKEN }}

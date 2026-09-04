@@ -3,19 +3,36 @@ name: CI
 on:
   pull_request:
     branches: [main]
+  # Warm-run dispatches. A dispatch restores the caches a pull request
+  # would restore and writes none of them: coverage-main.yml is the only
+  # writer on this repository, so a manual run can measure a warm build
+  # without displacing the trunk entry it read.
+  workflow_dispatch:
 
 jobs:
   build-test:
     runs-on: ubicloud-standard-8
+    # Ubicloud jobs bill by the minute, so a hung step must not run to the
+    # 6-hour platform default. The 2026-09-03 baseline median was 1656 s.
+    timeout-minutes: 90
     permissions:
       contents: read
     env:
       CARGO_TERM_COLOR: always
       BUILD_PROFILE: debug
-      WHITAKER_INSTALLER_VERSION: '0.2.7'
       # Bevy's render features make the coverage build heavy; lift the
       # shared-action cargo wall-clock cap (default 600 s) accordingly.
       RUN_RUST_CARGO_WAIT_TIMEOUT: '1800'
+      # sccache is the sole owner of compiler output: no step archives a
+      # `target` tree. RUSTC_WRAPPER is what engages it, and
+      # SCCACHE_GHA_ENABLED is what points it at the Actions cache. Without
+      # the second, sccache falls back to `~/.cache/sccache`, which nothing
+      # persists, and the wrapper becomes pure overhead.
+      RUSTC_WRAPPER: sccache
+      SCCACHE_GHA_ENABLED: 'true'
+      # sccache cannot cache incremental compilation, and an incremental
+      # build would defeat every hit.
+      CARGO_INCREMENTAL: '0'
     steps:
       - uses: actions/checkout@v7
         with:
@@ -23,68 +40,204 @@ jobs:
           # (`upload-codescene-coverage` with `mode: check`) can reach
           # the pull request's merge base.
           fetch-depth: 0
+      # Ubicloud's `standard-8` label is inherited here, never measured. Sample
+      # memory and disk every 15 s so the next shape decision rests on evidence
+      # rather than on what a previous change happened to pick. Disk, not
+      # memory, is what has killed jobs elsewhere in this rollout, and it did so
+      # silently, so both are recorded.
+      - name: Start the resource sampler
+        shell: bash
+        env:
+          RESOURCE_SAMPLES: ${{ runner.temp }}/resource-samples.txt
+        run: |
+          set -euo pipefail
+          : > "$RESOURCE_SAMPLES"
+          sampler="$RUNNER_TEMP/sample-resources.sh"
+          cat > "$sampler" <<'SAMPLER'
+          #!/usr/bin/env bash
+          set -uo pipefail
+          while :; do
+            mem_used="$(free -m | awk '/^Mem:/ { print $3 }')"
+            disk="$(df -m --output=used,avail / | tail -1)"
+            printf '%s %s\n' "$mem_used" "$disk" >> "$1"
+            sleep 15
+          done
+          SAMPLER
+          chmod +x "$sampler"
+          nohup "$sampler" "$RESOURCE_SAMPLES" >/dev/null 2>&1 &
+          printf 'RESOURCE_SAMPLES=%s\n' "$RESOURCE_SAMPLES" >> "$GITHUB_ENV"
+      - name: Route the compiler cache into Ubicloud's store
+        # sccache's GitHub Actions backend reads these from the environment,
+        # but the runner exposes them to action code rather than to later
+        # steps, so re-export them for the shell steps that compile. On
+        # Ubicloud `ACTIONS_CACHE_URL` names the runner's local cache proxy,
+        # which is what puts sccache's traffic in Ubicloud's store instead of
+        # GitHub's. `ACTIONS_CACHE_SERVICE_V2` is cleared because the v2
+        # service bypasses that proxy; exporting `ACTIONS_RESULTS_URL` does
+        # not route through it either (measured 2026-09-04).
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            // Report where the endpoint came from, and whether a token was
+            // present at all, so a misconfigured backend is diagnosable from
+            // the log rather than from a slower build. Never print the token.
+            const cacheUrl = process.env.ACTIONS_CACHE_URL ?? '';
+            const runtimeToken = process.env.ACTIONS_RUNTIME_TOKEN ?? '';
+            core.info(`sccache cache endpoint present: ${Boolean(cacheUrl)}`);
+            core.info(`sccache runtime token present: ${Boolean(runtimeToken)}`);
+            if (!cacheUrl || !runtimeToken) {
+              core.warning(
+                'sccache has no Actions cache endpoint; every compilation ' +
+                  'will miss and the wrapper will only add overhead',
+              );
+            }
+            if (runtimeToken) {
+              core.setSecret(runtimeToken);
+            }
+            core.exportVariable('ACTIONS_CACHE_URL', cacheUrl);
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', runtimeToken);
+            core.exportVariable('ACTIONS_CACHE_SERVICE_V2', '');
+      - name: Install sccache
+        # A pinned prebuilt binary, with `fallback: none` so the action fails
+        # rather than compiling sccache from source. Installing inside an
+        # action step is safe; starting the server there is not, which is why
+        # the next step is a `run:` step.
+        uses: taiki-e/install-action@c7eb1735f09259a5035e8e5d44b1406b1cddc0fb # v2.83.0
+        with:
+          tool: sccache@0.16.0
+          fallback: none
+      - name: Reset compiler-cache counters
+        # This starts the sccache server, and starting it here rather than
+        # inside `setup-rust` is the point. The shared action's sccache path
+        # runs the mozilla sccache-action, whose last act writes
+        # `ACTIONS_CACHE_SERVICE_V2=on`, GitHub's results URL, and GitHub's
+        # token back to `GITHUB_ENV`, clobbering the export above for every
+        # later step. Measured on `ubicloud-standard-2`: `run:` steps do see
+        # the export, so the export itself was never the problem. Starting the
+        # server here means it binds the proxy before anything can overwrite
+        # the endpoint it read.
+        run: |
+          set -euo pipefail
+          sccache --version
+          sccache --zero-stats
       - name: Setup Rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@794e4801babcf68065c660fdf4781ad62be5d061
-      - name: Spelling
-        run: make spelling
-      - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-      - name: Check format
-        run: make check-fmt
-      - name: Cache Whitaker installer
+        uses: leynos/shared-actions/.github/actions/setup-rust@3a2f2d5f17932657ddf50490a09ea5e7400ae35c
+        with:
+          # Sole owner of ~/.cargo/registry and ~/.cargo/git for this job. It
+          # runs before the first cargo invocation so the lint step reads a
+          # warm registry.
+          cache-provider: github
+          # The job installs and starts sccache itself, above. This action's
+          # sccache path would rewrite `GITHUB_ENV` back to GitHub's v2 cache
+          # service on its way out, so every later step would lose the proxy.
+          use-sccache: 'false'
+      - name: Cache uv tool layers
+        # `make spelling` drives uv with repository-local UV_CACHE_DIR and
+        # UV_TOOL_DIR, so these two directories are the whole uv surface. This
+        # job is the only one in the repository that installs uv tools, so it
+        # is necessarily both the reader and the single writer; there is no
+        # trunk job to designate as the writer instead.
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
-            ~/.cargo/bin/whitaker-installer
-            ~/.cache/cargo-binstall
-          key: whitaker-installer-${{ runner.os }}-${{ runner.arch }}-${{ env.WHITAKER_INSTALLER_VERSION }}
+            .uv-cache
+            .uv-tools
+          key: uv-tools-v1-${{ runner.os }}-${{ runner.arch }}-${{ runner.environment }}-${{ hashFiles('Makefile', 'scripts/*.py') }}
+          restore-keys: |
+            uv-tools-v1-${{ runner.os }}-${{ runner.arch }}-${{ runner.environment }}-
+      - name: Spelling
+        run: make spelling
+      - name: Check format
+        run: make check-fmt
       - name: Install the Whitaker Dylint suite
-        run: |
-          install_whitaker() {
-            # Prefer cargo-binstall, but fall back to a locked cargo install
-            # when binstall is unavailable OR its install attempt fails (e.g.
-            # no prebuilt binary for this version/target). Running the install
-            # inside the `if` condition keeps a binstall failure from aborting
-            # the step under `set -e`.
-            if cargo binstall --version >/dev/null 2>&1 \
-              && cargo binstall --no-confirm --locked \
-                "whitaker-installer@${WHITAKER_INSTALLER_VERSION}"; then
-              return 0
-            fi
-            echo "cargo binstall unavailable or failed; building whitaker-installer from crates.io"
-            cargo install --locked whitaker-installer --version "${WHITAKER_INSTALLER_VERSION}"
-          }
-          # Reuse a cached installer only when its reported version is exactly
-          # the pinned version. A bare `command -v` check would keep a stale
-          # binary, and a substring/word match could accept a near-miss version.
-          installed_version=""
-          if command -v whitaker-installer >/dev/null 2>&1; then
-            installed_version="$(whitaker-installer --version 2>/dev/null | awk 'NF{print $NF}')" \
-              || installed_version=""
-          fi
-          if [ "${installed_version}" = "${WHITAKER_INSTALLER_VERSION}" ]; then
-            echo "whitaker-installer ${WHITAKER_INSTALLER_VERSION} already present; skipping install"
-          else
-            install_whitaker
-          fi
-          whitaker-installer
+        # Downloads the pinned prebuilt installer and verifies it against a
+        # digest pinned in the action. The action owns the cache for the
+        # installer binary, its version marker, and ~/.local/share/whitaker.
+        uses: leynos/shared-actions/.github/actions/install-whitaker@3a2f2d5f17932657ddf50490a09ea5e7400ae35c
+        with:
+          installer-version: '0.2.7'
+          cache-provider: github
       - name: Lint
         run: |
           cargo clippy --all-targets --all-features -- -D warnings
           RUSTFLAGS="-D warnings" whitaker --all -- --all-targets --all-features
-      - name: Test
-        run: cargo test
-      # Coverage is generated with the shared action (replacing the bespoke
-      # cargo-llvm-cov steps) so the whole estate shares one recipe. The
-      # ratchet compares against the baseline written by coverage-main.yml.
+      # The instrumented run is this workflow's only test execution on Linux:
+      # a separate uninstrumented `cargo test` repeated the suite for no extra
+      # evidence and doubled the billed compile. `all-features` names exactly
+      # the set the explicit feature list used to name.
       - name: Generate coverage
-        uses: leynos/shared-actions/.github/actions/generate-coverage@794e4801babcf68065c660fdf4781ad62be5d061
+        uses: leynos/shared-actions/.github/actions/generate-coverage@3a2f2d5f17932657ddf50490a09ea5e7400ae35c
         with:
-          features: render map text test-support observers-v1-spike
+          all-features: 'true'
+          all-targets: 'true'
+          doctests: 'true'
           output-path: lcov.info
           format: lcov
           use-cargo-nextest: 'false'
           with-ratchet: 'true'
+          # `setup-rust` above already owns ~/.cargo/registry and ~/.cargo/git;
+          # this keeps the action from becoming a second owner of them.
+          cache-provider: external
+      - name: Reclaim the coverage scratch tree
+        # The instrumented tree has no later consumer. Deleting it before the
+        # caches are saved keeps a disk that has silently killed jobs on
+        # smaller shapes from filling, and the two `df` calls make a shrinking
+        # margin visible before it becomes a failure.
+        if: always()
+        run: |
+          set -euo pipefail
+          df -h .
+          rm -rf -- target/llvm-cov-target
+          df -h .
+      - name: Report peak resource use
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          samples="${RESOURCE_SAMPLES:-}"
+          if [[ -z "$samples" || ! -s "$samples" ]]; then
+            echo 'No resource samples were recorded.'
+            exit 0
+          fi
+          peak_memory="$(awk '{ print $1 }' "$samples" | sort -n | tail -1)"
+          peak_disk="$(awk '{ print $2 }' "$samples" | sort -n | tail -1)"
+          least_free="$(awk '{ print $3 }' "$samples" | sort -n | head -1)"
+          count="$(wc -l < "$samples")"
+          printf 'peak used memory: %s MiB\n' "$peak_memory"
+          printf 'peak used disk: %s MiB\n' "$peak_disk"
+          printf 'least free disk: %s MiB\n' "$least_free"
+          printf 'samples: %s at 15 second intervals\n' "$count"
+          {
+            printf '### Resources (%s)\n\n' "${GITHUB_JOB}"
+            printf -- '- peak used memory: %s MiB\n' "$peak_memory"
+            printf -- '- peak used disk: %s MiB\n' "$peak_disk"
+            printf -- '- least free disk: %s MiB\n' "$least_free"
+            printf -- '- samples: %s at 15 second intervals\n' "$count"
+          } >> "${GITHUB_STEP_SUMMARY}"
+      - name: Record compiler-cache effectiveness
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          # `if: always()` runs this even when an earlier step failed before
+          # sccache was installed. Reporting nothing is correct there; failing
+          # here would bury the real failure under a second one.
+          if ! command -v sccache >/dev/null 2>&1; then
+            echo 'sccache is not installed; no compiler-cache statistics to report.'
+            exit 0
+          fi
+          # Print to the log as well as the job summary: the summary is not
+          # readable through the REST API, so the log copy is what lets anyone
+          # confirm `Cache location`, the hit rate, and any read or write
+          # error after the fact.
+          stats="$(sccache --show-stats)"
+          printf '%s\n' "$stats"
+          {
+            printf '### sccache statistics (%s)\n\n' "${GITHUB_JOB}"
+            printf '```text\n'
+            printf '%s\n' "$stats"
+            printf '```\n'
+          } >> "${GITHUB_STEP_SUMMARY}"
       # The CodeScene changed-line gate: diffs the PR against its merge
       # base and evaluates changed-line coverage. Guarded so secret-less
       # runs (forks, repos not yet onboarded) skip rather than fail.
@@ -93,7 +246,7 @@ jobs:
         env:
           CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN }}
         if: env.CS_ACCESS_TOKEN != '' && github.event_name == 'pull_request'
-        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@794e4801babcf68065c660fdf4781ad62be5d061
+        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@3a2f2d5f17932657ddf50490a09ea5e7400ae35c
         with:
           format: lcov
           mode: check
