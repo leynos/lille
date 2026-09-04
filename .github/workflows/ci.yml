@@ -11,9 +11,11 @@ on:
 
 jobs:
   build-test:
-    runs-on: ubicloud-standard-8
+    runs-on: ubicloud-standard-4
     # Ubicloud jobs bill by the minute, so a hung step must not run to the
-    # 6-hour platform default. The 2026-09-03 baseline median was 1656 s.
+    # 6-hour platform default. Measured on eight vCPUs: 1656 s median before
+    # the compiler cache, 1478 s warm after it. Four vCPUs will be slower, and
+    # 90 minutes leaves room for that without leaving room for a hang.
     timeout-minutes: 90
     permissions:
       contents: read

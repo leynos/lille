@@ -14,9 +14,12 @@ on:
 
 jobs:
   coverage-upload:
-    runs-on: ubicloud-standard-8
+    runs-on: ubicloud-standard-4
     # Ubicloud jobs bill by the minute, so a hung step must not run to the
-    # 6-hour platform default. The 2026-09-03 baseline median was 561 s.
+    # 6-hour platform default. Measured on eight vCPUs: 561 s median before the
+    # compiler cache, 1757 s for the cold writer that populates it. Four vCPUs
+    # will be slower, and 60 minutes leaves room for that without leaving room
+    # for a hang.
     timeout-minutes: 60
     permissions:
       contents: read

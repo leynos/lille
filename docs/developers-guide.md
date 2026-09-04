@@ -344,7 +344,7 @@ Dylint suite.
 
 Two workflows do the developer-blocking work. `ci.yml`'s `build-test` job runs
 on every pull request, and `coverage-main.yml`'s `coverage-upload` job runs on
-every push to `main`. Both use the `ubicloud-standard-8` runner label, which is
+every push to `main`. Both use the `ubicloud-standard-4` runner label, which is
 registered in `.github/actionlint.yaml`, and both declare `timeout-minutes` so
 a hung step cannot bill to the platform's six-hour default.
 
@@ -477,35 +477,29 @@ summary. Disk is sampled alongside memory because disk, not memory, is what has
 exhausted runners elsewhere in this estate, and it did so with no error text at
 all.
 
-The `ubicloud-standard-8` label is inherited, not measured. It predates this
-work and no evidence on this repository argued for it. The first samples, from
-`build-test`:
+`ubicloud-standard-8` was inherited rather than chosen: it predated this work
+and no evidence on this repository argued for it. These are the samples that
+replaced the assumption, all on the eight-vCPU shape:
 
-| Measure | Cold writer | Warm |
-| --- | --- | --- |
-| Peak used memory | 8,812 MiB | 6,815 MiB |
-| Peak used disk | 95,609 MiB | 94,521 MiB |
-| Least free disk | 101,691 MiB | 102,779 MiB |
-| Samples | 156 | 65 |
+| Measure | build-test cold | build-test warm | coverage-upload cold |
+| --- | --- | --- | --- |
+| Peak used memory | 8,812 MiB | 7,907 MiB | 6,442 MiB |
+| Peak used disk | 95,609 MiB | 95,418 MiB | 90,998 MiB |
+| Least free disk | 101,691 MiB | 101,882 MiB | 106,302 MiB |
 
 Memory is the binding constraint, not disk: free disk never fell below 99 GiB
-on either run.
+on any run.
 
-**The cold writer sets the memory floor, not the warm run.** The warm peak of
-6,815 MiB would fit `ubicloud-standard-2` at 8 GB, and reading only that number
-would be a mistake, because the cold writer peaked at 8,812 MiB and the cold
-writer is the run that has to succeed. Size the runner for the run that
-populates the cache, not the run that reads it. On that rule standard-2 is out
-and `ubicloud-standard-4` at 16 GB is the safe shrink.
+**The cold writer sets the memory floor, not the warm run.** A warm run has
+peaked as low as 6,815 MiB, which would fit `ubicloud-standard-2` at 8 GB, and
+reading only that number would be a mistake: the cold writer reached 8,812 MiB
+and the cold writer is the run that has to succeed. Size the runner for the run
+that populates the cache, not the run that reads it. That rules out standard-2
+and makes `ubicloud-standard-4` at 16 GB the safe shrink, which is the shape
+these workflows now use.
 
-The shape is unchanged here on purpose: halving the vCPU count trades wall time
-against the lower rate, and a Bevy workspace is where that trade bites, so it
-belongs in its own pull request with its own measurement rather than folded
-into this one. The sequence is: this merge push is the cold writer on `main`,
-then two sequential runs of `ci.yml` against `main` for warm evidence, then a
-follow-up moving both jobs to `ubicloud-standard-4` with the samplers kept.
-Accept that follow-up only if its own warm `build-test` stays under 25 minutes
-and its cold writer's memory peak stays under 12 GB.
+Keep the samplers. The shape is only defensible while it is measured, and the
+next person to question it needs the same evidence this change rested on.
 
 `ci.yml` accepts `workflow_dispatch` so a warm run can be measured on demand.
 A dispatch restores what a pull request restores and writes nothing:

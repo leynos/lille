@@ -26,7 +26,7 @@ pub const CACHE_ACTION_SHA: &str = "55cc8345863c7cc4c66a329aec7e433d2d1c52a9";
 pub const SHARED_ACTIONS_SHA: &str = "3a2f2d5f17932657ddf50490a09ea5e7400ae35c";
 
 /// Runner label used by this repository's Ubicloud build and test jobs.
-pub const UBICLOUD_LABEL: &str = "ubicloud-standard-8";
+pub const UBICLOUD_LABEL: &str = "ubicloud-standard-4";
 
 /// Publisher whose composite actions this repository is allowed to call.
 pub const SHARED_ACTIONS_OWNER: &str = "leynos/shared-actions";
