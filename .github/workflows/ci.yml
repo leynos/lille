@@ -11,9 +11,11 @@ on:
 
 jobs:
   build-test:
-    runs-on: ubicloud-standard-8
+    runs-on: ubicloud-standard-4
     # Ubicloud jobs bill by the minute, so a hung step must not run to the
-    # 6-hour platform default. The 2026-09-03 baseline median was 1656 s.
+    # 6-hour platform default. Measured warm: 1,478 s on eight vCPUs and
+    # 1,215 s on four. A cold run on four vCPUs is the case this bounds, and
+    # 90 minutes leaves room for it without leaving room for a hang.
     timeout-minutes: 90
     permissions:
       contents: read
@@ -21,8 +23,12 @@ jobs:
       CARGO_TERM_COLOR: always
       BUILD_PROFILE: debug
       # Bevy's render features make the coverage build heavy; lift the
-      # shared-action cargo wall-clock cap (default 600 s) accordingly.
-      RUN_RUST_CARGO_WAIT_TIMEOUT: '1800'
+      # shared-action cargo wall-clock cap (default 600 s) accordingly. This is
+      # a cap on one cargo command, not on the job, so it has to clear the
+      # slowest single build rather than the median job. On eight vCPUs the
+      # cold writer's job took 1,757 s in total; four vCPUs are slower again,
+      # and 1,800 s would have killed cargo before the job timeout noticed.
+      RUN_RUST_CARGO_WAIT_TIMEOUT: '3600'
       # sccache is the sole owner of compiler output: no step archives a
       # `target` tree. RUSTC_WRAPPER is what engages it, and
       # SCCACHE_GHA_ENABLED is what points it at the Actions cache. Without

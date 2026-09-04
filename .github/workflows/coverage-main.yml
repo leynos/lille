@@ -14,18 +14,21 @@ on:
 
 jobs:
   coverage-upload:
-    runs-on: ubicloud-standard-8
+    runs-on: ubicloud-standard-4
     # Ubicloud jobs bill by the minute, so a hung step must not run to the
-    # 6-hour platform default. The 2026-09-03 baseline median was 561 s.
-    timeout-minutes: 60
+    # 6-hour platform default. The eight-vCPU cold writer took 1,757 s, and
+    # this job is always the cold writer, so four vCPUs put it close to the
+    # old 60-minute bound. Raised to 75, still well short of a hang.
+    timeout-minutes: 75
     permissions:
       contents: read
     env:
       CARGO_TERM_COLOR: always
       BUILD_PROFILE: debug
-      # Bevy's render features make the coverage build heavy; lift the
-      # shared-action cargo wall-clock cap (default 600 s) accordingly.
-      RUN_RUST_CARGO_WAIT_TIMEOUT: '1800'
+      # See ci.yml. This job is the cold writer, so it is the one that would
+      # have hit the old 1,800 s cargo cap first: its eight-vCPU run already
+      # took 1,757 s.
+      RUN_RUST_CARGO_WAIT_TIMEOUT: '3600'
       # See ci.yml. This job is the trunk writer, so it is the run that
       # populates the compiler cache every pull request then reads.
       RUSTC_WRAPPER: sccache
