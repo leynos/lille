@@ -43,6 +43,16 @@ size-of = { version = "0.1", package = "feldera-size-of", features = ["ordered-f
 rkyv = { version = "0.7", default-features = false, features = ["std", "size_64", "validation", "uuid"] }
 dbsp = "0.98"
 once_cell = "1"
+# Resolution constraint only; no code here names this crate. `tinyvec` arrives
+# transitively through Bevy's text and font stack, and 1.13.0 imports
+# `alloc::vec` as a module and then invokes the `vec!` macro, which the pinned
+# nightly rejects with "cannot find macro `vec` in this scope". This workspace
+# commits no `Cargo.lock`, so without the bound every build resolves the broken
+# release and `make lint` fails. A tilde requirement, permitted by `AGENTS.md`
+# for a documented lock to patch-level updates, holds resolution at 1.12.
+# Upstream: Lokathor/tinyvec#225 reports it, Lokathor/tinyvec#226 proposes the
+# fix. Remove this entry per https://github.com/leynos/lille/issues/340.
+tinyvec = "~1.12"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 bevy = { workspace = true, default-features = false, features = ["x11"] }
