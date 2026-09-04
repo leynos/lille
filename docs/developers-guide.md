@@ -422,14 +422,22 @@ action step is safe here because installing a binary does not start the sccache
 server.
 
 **Start.** A `run:` step runs `sccache --zero-stats`, which starts the server.
-This must be a `run:` step and it must follow the export. The Ubicloud runner
-re-injects `ACTIONS_CACHE_SERVICE_V2=on` and `ACTIONS_RESULTS_URL` into every
-action step, overriding what the export wrote to `GITHUB_ENV`. A server started
-inside an action step, which is what `setup-rust` with `use-sccache: 'true'`
-would do, therefore binds GitHub's v2 service; its writes then fail and nothing
-reaches Ubicloud's store. The server binds its backend once, at start, so a
-later change to the environment is invisible to it. That is why `setup-rust` is
-called with `use-sccache: 'false'` in both jobs.
+It must follow the export, and it must not be `setup-rust`'s job. The reason is
+narrower than it first looks, and the obvious guess is wrong: `run:` steps do
+see what the export wrote, measured on `ubicloud-standard-2`, so the export is
+not being hidden from them. What happens is that `setup-rust` with
+`use-sccache: 'true'` runs the mozilla sccache-action, and that action's last
+act writes `ACTIONS_CACHE_SERVICE_V2=on`, GitHub's results URL and GitHub's
+token back to `GITHUB_ENV`. Every step after it therefore sees GitHub's v2
+cache service instead of Ubicloud's proxy, and a server started under those
+values writes where nothing is reading. The server binds its backend once, at
+start, so starting it before that clobbering happens is what makes it stick.
+Hence `use-sccache: 'false'` in both jobs.
+
+The failure is silent and total, which is why it is worth this much text.
+Before the fix, a run reported `Cache location: ghac`, an endpoint and a token
+both present, and 8,170 write errors out of 8,170 writes. After it, the same
+job reported 5 write errors in 5,442 and a 33.45 % hit rate.
 
 **Report.** `sccache --show-stats` runs after the build, printing the counters
 to the log as well as to the job summary. The log copy is the one that matters:
@@ -447,12 +455,35 @@ with no error text.
 ### Resource sampling
 
 Both build jobs start a background sampler after checkout that records used
-memory and used and free disk every 15 seconds, and report the peaks at the
-end of the job. The `ubicloud-standard-8` label was inherited rather than
-measured, so the samples are what a future decision to keep or shrink the shape
-will rest on. Disk is sampled alongside memory because disk, not memory, is
-what has exhausted runners in this estate, and it did so with no error text at
+memory and used and free disk every 15 seconds, and report peak memory, peak
+disk and least free disk at the end of the job, to the log as well as the job
+summary. Disk is sampled alongside memory because disk, not memory, is what has
+exhausted runners elsewhere in this estate, and it did so with no error text at
 all.
+
+The `ubicloud-standard-8` label is inherited, not measured. It predates this
+work and no evidence on this repository argued for it. The first samples, from
+`build-test` on a cold cache, are:
+
+| Measure | Value |
+| --- | --- |
+| Peak used memory | 8,812 MiB |
+| Peak used disk | 95,609 MiB |
+| Least free disk | 101,691 MiB |
+| Samples | 156 at 15 s intervals |
+
+Memory is the binding constraint. The 8.6 GiB peak rules out
+`ubicloud-standard-2`, which has 8 GB, and fits inside `ubicloud-standard-4`,
+which has 16 GB; free disk never fell below 99 GiB, so disk is not deciding
+anything here.
+
+That is not sufficient to shrink the shape, because halving the vCPU count
+trades wall time against the lower rate, and a Bevy workspace is where that
+trade bites. Decide it on a warm cache, not a cold one. The rule is: after this
+lands, the merge push is the cold writer on `main`, then run `ci.yml` twice
+against `main` in sequence; if the second warm `build-test` comes in under 25
+minutes, open a follow-up moving both jobs to `ubicloud-standard-4` with the
+samplers kept, and measure again.
 
 `ci.yml` accepts `workflow_dispatch` so a warm run can be measured on demand.
 A dispatch restores what a pull request restores and writes nothing:

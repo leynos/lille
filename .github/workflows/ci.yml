@@ -107,12 +107,15 @@ jobs:
           tool: sccache@0.16.0
           fallback: none
       - name: Reset compiler-cache counters
-        # This starts the sccache server, and it must be a `run:` step. The
-        # Ubicloud runner re-injects `ACTIONS_CACHE_SERVICE_V2=on` and
-        # `ACTIONS_RESULTS_URL` into every action step, overriding what the
-        # export above wrote to `GITHUB_ENV`, so a server started inside an
-        # action binds GitHub's v2 service and its writes never reach
-        # Ubicloud's store. A `run:` step sees only `GITHUB_ENV`.
+        # This starts the sccache server, and starting it here rather than
+        # inside `setup-rust` is the point. The shared action's sccache path
+        # runs the mozilla sccache-action, whose last act writes
+        # `ACTIONS_CACHE_SERVICE_V2=on`, GitHub's results URL, and GitHub's
+        # token back to `GITHUB_ENV`, clobbering the export above for every
+        # later step. Measured on `ubicloud-standard-2`: `run:` steps do see
+        # the export, so the export itself was never the problem. Starting the
+        # server here means it binds the proxy before anything can overwrite
+        # the endpoint it read.
         run: |
           set -euo pipefail
           sccache --version
@@ -124,9 +127,9 @@ jobs:
           # runs before the first cargo invocation so the lint step reads a
           # warm registry.
           cache-provider: github
-          # The job installs and starts sccache itself, above. Letting this
-          # action do it would start the server inside an action step, where
-          # the runner's re-injected variables bind GitHub's v2 service.
+          # The job installs and starts sccache itself, above. This action's
+          # sccache path would rewrite `GITHUB_ENV` back to GitHub's v2 cache
+          # service on its way out, so every later step would lose the proxy.
           use-sccache: 'false'
       - name: Cache uv tool layers
         # `make spelling` drives uv with repository-local UV_CACHE_DIR and

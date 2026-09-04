@@ -287,9 +287,9 @@ fn setup_rust_owns_the_registry_but_not_the_compiler_cache(workflows: Vec<Workfl
         let job = job_named(&workflows, id);
         let step = step_using(job, &shared_action("setup-rust"));
         assert_input(id, step, "cache-provider", "github");
-        // The action would start the sccache server inside an action step,
-        // where the Ubicloud runner re-injects its own cache variables and the
-        // server binds GitHub's v2 service instead of the local proxy. The job
+        // The action's sccache path runs the mozilla sccache-action, which
+        // writes GitHub's v2 cache service back to `GITHUB_ENV` as its last
+        // act, clobbering the proxy export for every later step. The job
         // installs and starts sccache itself instead.
         assert_input(id, step, "use-sccache", "false");
     }
@@ -331,9 +331,9 @@ fn sccache_is_installed_from_a_pinned_prebuilt_release(workflows: Vec<Workflow>)
 
 /// The sccache server binds its backend once, when it starts, so the order of
 /// these steps is the contract. Started before the export it binds GitHub's v2
-/// service instead of Ubicloud's proxy; started after the toolchain is in
-/// place it can miss the first compilation; reported before the build it
-/// measures nothing.
+/// service instead of Ubicloud's proxy; started after `setup-rust`, whose
+/// sccache path rewrites the cache service back into `GITHUB_ENV`, it binds
+/// whatever that left behind; reported before the build it measures nothing.
 #[rstest]
 fn the_compiler_cache_is_wired_in_the_only_order_that_works(workflows: Vec<Workflow>) {
     for id in BUILD_JOB_IDS {

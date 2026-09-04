@@ -87,9 +87,9 @@ jobs:
           tool: sccache@0.16.0
           fallback: none
       - name: Reset compiler-cache counters
-        # A `run:` step, for the reason given in ci.yml: a server started
-        # inside an action step binds GitHub's v2 service instead of the
-        # Ubicloud proxy.
+        # Started here rather than inside `setup-rust`, for the reason given
+        # in ci.yml: the shared action's sccache path rewrites `GITHUB_ENV`
+        # back to GitHub's v2 cache service on its way out.
         run: |
           set -euo pipefail
           sccache --version
