@@ -292,6 +292,35 @@ circuit.step()?;
 assert_eq!(collect_weighted(&output), vec![(7, 2)]);
 ```
 
+## Dependency resolution constraints
+
+No `Cargo.lock` is committed, so Cargo resolves the graph afresh on every
+machine and every CI run. A broken release of a transitive dependency
+therefore reaches the build the day it is published, and the only lever is a
+direct requirement in `Cargo.toml`.
+
+`tinyvec = "~1.12"` is such a lever, not a dependency. No code here names the
+crate; it arrives through Bevy's text and font stack. Version 1.13.0, published
+on 2026-09-03, imports `alloc::vec` as a module and then invokes the `vec!`
+macro, which the pinned nightly rejects with ``cannot find macro `vec` in this
+scope``. Every `--all-features` build and `make lint` fail on it. The
+requirement is a tilde rather than a caret because it must hold at 1.12 until
+the breakage is fixed; `AGENTS.md` permits that for a documented lock to
+patch-level updates.
+
+`tests/dependency_resolution.rs` fails if 1.13 or later is ever selected, and
+says which version was chosen. Without it the only symptom is a macro error
+inside a crate nothing here mentions.
+
+Remove the requirement and the test together once upstream ships a fixed
+release or yanks 1.13.0, tracked in
+[issue 340](https://github.com/leynos/lille/issues/340). Upstream discussion is
+in Lokathor/tinyvec#225 and Lokathor/tinyvec#226.
+
+A future constraint of this kind belongs here too: a bare version requirement
+with no explanation is indistinguishable from a real dependency, and the next
+contributor will not know whether removing it is safe.
+
 ## Commit gates
 
 Run the deterministic gates before committing (see `AGENTS.md` and the
