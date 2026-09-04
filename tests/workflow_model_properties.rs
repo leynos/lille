@@ -158,6 +158,24 @@ proptest! {
         prop_assert_eq!(reported(&job), reported(&job_of(rotated)));
     }
 
+    /// An action that merely shares the `actions/cache` prefix owns nothing.
+    ///
+    /// `actions/cache-audit` is a different action. Reading it as a cache step
+    /// would invent a claim on whatever `path` input it happened to carry, and
+    /// that invented claim could report a duplicate that does not exist.
+    #[test]
+    fn a_prefixed_non_cache_action_claims_nothing(
+        path in prop::sample::select(PATHS.to_vec()),
+        filler in prop::collection::vec(any_step(), 0..4),
+    ) {
+        let mut steps = vec![
+            cache_step("Cache", path),
+            action_step("Audit", "actions/cache-audit@sha", &[("path", path)]),
+        ];
+        steps.extend(without_claims_on(filler, path));
+        prop_assert!(!reported(&job_of(steps)).contains(path));
+    }
+
     /// Two restores sharing a key are two owners, not one half of a pair.
     ///
     /// The split-cache exception exists for one restore and one save. Applying

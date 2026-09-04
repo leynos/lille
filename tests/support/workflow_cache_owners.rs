@@ -6,6 +6,10 @@
 //! the path. This module reduces both kinds to the same `(path, owner)` list
 //! so one contract can compare them.
 //!
+//! A step owns a cache only when its `uses` names one of the three
+//! `actions/cache` coordinates exactly. A prefix match would enrol
+//! `actions/cache-audit` and invent a claim it never makes.
+//!
 //! Owner identity is the step's position in its job, never its display name:
 //! two steps may legitimately share a name, and collapsing them would hide a
 //! duplicate owner. The one deliberate exception is a split cache, where an
@@ -71,6 +75,23 @@ fn action_path(uses: &str) -> &str {
     uses.split('@').next().unwrap_or_default()
 }
 
+/// The three `actions/cache` coordinates that make a step a cache owner.
+const CACHE_ACTIONS: [&str; 3] = [
+    "actions/cache",
+    "actions/cache/restore",
+    "actions/cache/save",
+];
+
+/// Reports whether a `uses` reference is one of the cache actions.
+///
+/// Matched exactly rather than by prefix: `actions/cache-audit` shares the
+/// prefix but caches nothing, and treating it as an owner would invent a
+/// duplicate claim on whatever path it happened to carry.
+#[must_use]
+pub fn is_cache_action(uses: &str) -> bool {
+    CACHE_ACTIONS.contains(&action_path(uses))
+}
+
 /// The half of a split cache a step is, if it is one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SplitHalf {
@@ -115,7 +136,7 @@ fn owner_identity(step: &Step, index: usize, paired: bool) -> String {
 
 /// Returns the claims an `actions/cache` step makes on its own `path` input.
 fn direct_owners(step: &Step, index: usize, paired: bool) -> Vec<CacheOwner> {
-    if !action_path(&step.uses).starts_with("actions/cache") {
+    if !is_cache_action(&step.uses) {
         return Vec::new();
     }
     let owner = owner_identity(step, index, paired);

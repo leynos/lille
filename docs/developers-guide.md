@@ -435,9 +435,25 @@ start, so starting it before that clobbering happens is what makes it stick.
 Hence `use-sccache: 'false'` in both jobs.
 
 The failure is silent and total, which is why it is worth this much text.
-Before the fix, a run reported `Cache location: ghac`, an endpoint and a token
-both present, and 8,170 write errors out of 8,170 writes. After it, the same
-job reported 5 write errors in 5,442 and a 33.45 % hit rate.
+Three runs of `build-test` on the same shape, differing only in the
+shared-actions pin and in whether the store had been populated, show both the
+failure and what the cache is worth:
+
+| Measure | Before the fix | After, cold | After, warm |
+| --- | --- | --- | --- |
+| Cache location | ghac | ghac | ghac |
+| Hit rate | 0.00 % | 33.45 % | 99.79 % |
+| Rust hit rate | 0.00 % | 0.19 % | 99.60 % |
+| Read errors | 0 | 0 | 0 |
+| Write errors | 8170 | 5 | 0 |
+| Wall | 25m44s | 39m14s | 16m31s |
+
+The first run had a correct backend, an endpoint and a token both present, and
+every one of its 8,170 writes failed, so nothing reached the store and nothing
+in the log said so except the write counter. The second populated the store,
+which is why it is the slowest. The third reads what the second wrote. The
+cache is worth about nine minutes a run on this workspace, 16m31s warm against
+25m44s for the run that cached nothing at all.
 
 **Report.** `sccache --show-stats` runs after the build, printing the counters
 to the log as well as to the job summary. The log copy is the one that matters:
@@ -463,27 +479,33 @@ all.
 
 The `ubicloud-standard-8` label is inherited, not measured. It predates this
 work and no evidence on this repository argued for it. The first samples, from
-`build-test` on a cold cache, are:
+`build-test`:
 
-| Measure | Value |
-| --- | --- |
-| Peak used memory | 8,812 MiB |
-| Peak used disk | 95,609 MiB |
-| Least free disk | 101,691 MiB |
-| Samples | 156 at 15 s intervals |
+| Measure | Cold writer | Warm |
+| --- | --- | --- |
+| Peak used memory | 8,812 MiB | 6,815 MiB |
+| Peak used disk | 95,609 MiB | 94,521 MiB |
+| Least free disk | 101,691 MiB | 102,779 MiB |
+| Samples | 156 | 65 |
 
-Memory is the binding constraint. The 8.6 GiB peak rules out
-`ubicloud-standard-2`, which has 8 GB, and fits inside `ubicloud-standard-4`,
-which has 16 GB; free disk never fell below 99 GiB, so disk is not deciding
-anything here.
+Memory is the binding constraint, not disk: free disk never fell below 99 GiB
+on either run.
 
-That is not sufficient to shrink the shape, because halving the vCPU count
-trades wall time against the lower rate, and a Bevy workspace is where that
-trade bites. Decide it on a warm cache, not a cold one. The rule is: after this
-lands, the merge push is the cold writer on `main`, then run `ci.yml` twice
-against `main` in sequence; if the second warm `build-test` comes in under 25
-minutes, open a follow-up moving both jobs to `ubicloud-standard-4` with the
-samplers kept, and measure again.
+**The cold writer sets the memory floor, not the warm run.** The warm peak of
+6,815 MiB would fit `ubicloud-standard-2` at 8 GB, and reading only that number
+would be a mistake, because the cold writer peaked at 8,812 MiB and the cold
+writer is the run that has to succeed. Size the runner for the run that
+populates the cache, not the run that reads it. On that rule standard-2 is out
+and `ubicloud-standard-4` at 16 GB is the safe shrink.
+
+The shape is unchanged here on purpose: halving the vCPU count trades wall time
+against the lower rate, and a Bevy workspace is where that trade bites, so it
+belongs in its own pull request with its own measurement rather than folded
+into this one. The sequence is: this merge push is the cold writer on `main`,
+then two sequential runs of `ci.yml` against `main` for warm evidence, then a
+follow-up moving both jobs to `ubicloud-standard-4` with the samplers kept.
+Accept that follow-up only if its own warm `build-test` stays under 25 minutes
+and its cold writer's memory peak stays under 12 GB.
 
 `ci.yml` accepts `workflow_dispatch` so a warm run can be measured on demand.
 A dispatch restores what a pull request restores and writes nothing:
@@ -509,48 +531,75 @@ two. A workflow contract in `tests/workflow_contracts.rs` fails if a second
 
 ### Workflow contracts
 
-`tests/workflow_contracts.rs` asserts the rules
-above: pinned cache and shared-action references, no source-built tools, one
-owner per cached path, GitHub-hosted placement for non-build jobs, registered
-runner labels, an installer before the first use of what it installs, and a
-single test execution per build job. It also pins the inputs that make those
-rules true, so a workflow cannot keep the shape of the policy while dropping
-its substance: `cache-provider`, `use-sccache`, the Whitaker installer
-version, the coverage flags, the uv cache paths and key, a bounded
-`timeout-minutes` for each build job, the resource sampler and its report, and
-the compiler-cache wiring: the two job-level variables, and the export,
-install, start, build, report order that the sccache server's one-shot backend
-binding depends on.
+`tests/workflow_contracts.rs` asserts the rules above. It is a harness rather
+than a test file: the rules live in four modules under `tests/contracts/`,
+split by the question each asks.
+
+| Module | Asks |
+| --- | --- |
+| `supply_chain.rs` | What will the estate execute? Pinned cache and shared-action references, no source-built tools, prebuilt Whitaker and sccache. |
+| `placement.rs` | What does it cost, and who owns each cache? Runner placement and labels, bounded timeouts, one owner per cached path, an installer before the first use of what it installs, a single test execution per build job, the uv cache key. |
+| `compiler_cache.rs` | Is sccache actually working? The two job-level variables, the export, install, start, build, report order, the proxy export, and the resource sampler with its report. |
+| `parsing.rs` | Does the loader read workflows correctly? Its subject is the loader, not any workflow in this repository. |
+
+Each module also pins the inputs that make its rules true, so a workflow cannot
+keep the shape of the policy while dropping its substance: `cache-provider`,
+`use-sccache`, the Whitaker installer version, the coverage flags, and the uv
+cache paths and key.
+
+The split is not only about the 400-line limit. `parsing.rs` reads a different
+subject from the other three, and separating it makes that visible: a failure
+there means the loader is wrong, not that a workflow is.
 
 `tests/support/workflow_model.rs` holds the job, step, and runner-selection
 types the properties and the contracts share;
 `tests/support/workflow_estate.rs` holds the pinned commits, the whole-file
 `Workflow` type, and the errors parsing reports, which only the contracts need.
-`tests/support/workflow_loader.rs` turns files into those values.
+`tests/support/workflow_loader.rs` turns workflow files into those values, and
+`tests/support/workflow_config.rs` reads the other repository files a contract
+needs, currently `actionlint`'s runner registration. They are separate because
+the subject differs: a failure in one is a workflow that would not parse, in
+the other a configuration file that could not be read.
 
 Parsing is strict about shape and permissive about spelling. A field that is
 present but of the wrong type is an error rather than a silent default, because
 a contract that read an empty string for a mistyped `runs-on` would pass a
-workflow it should reject. A step that sets both `uses` and `run` is rejected
-too: GitHub Actions runs a step one way or the other, never both. Against that,
-every form the platform genuinely accepts must parse. `runs-on` may be a label,
-a list of labels, or a mapping naming a runner group, and `on` may be an event,
-a list, or a mapping, read under the bare key that YAML 1.1 turns into the
-boolean true. The files are read through a `cap_std` directory capability
-rooted at `.github/workflows`.
+workflow it should reject. The exclusive shapes GitHub Actions enforces are
+enforced here too: a step sets `uses` or `run`, never both, and a job either
+calls a reusable workflow or names a runner and runs its own steps, never both.
+Accepting a mixture would let the contracts reason about a job the runner would
+never schedule.
 
-Action references are matched on the whole coordinate before the `@`, publisher
-included. A suffix match would let `untrusted/setup-rust` satisfy a rule
-written about the shared `setup-rust`, which is the opposite of what a pinning
-rule is for.
+Against that, every form the platform genuinely accepts must parse. `runs-on`
+may be a label, a list of labels, or a mapping naming a runner group, and `on`
+may be an event, a list, or a mapping, read under the bare key that YAML 1.1
+turns into the boolean true. The files are read through a `cap_std` directory
+capability rooted at `.github/workflows`.
+
+Three matching rules exist because a loose match quietly defeats the rule it is
+part of.
+
+- Action references are compared on the whole coordinate before the `@`,
+  publisher included. A suffix match would let `untrusted/setup-rust` satisfy a
+  rule written about the shared `setup-rust`.
+- A step owns a cache only when its `uses` names `actions/cache`,
+  `actions/cache/restore`, or `actions/cache/save` exactly.
+  `actions/cache-audit` shares the prefix, caches nothing, and would otherwise
+  contribute an invented claim on whatever `path` input it carried.
+- Runner labels are compared against the parsed
+  `self-hosted-runner.labels` list in `.github/actionlint.yaml`, by equality.
+  Searching the file as text would accept `standard-8` because
+  `ubicloud-standard-8` contains it, and would accept a label that appears only
+  in a comment.
 
 Two assurance methods are used together, following
 [ADR 003](adr-003-bounded-rstest-over-property-testing.md).
-`tests/workflow_contracts.rs` holds bounded `rstest` cases over the workflow
-files as they stand, and `tests/workflow_model_properties.rs` samples the
-wider domain with `proptest`: arbitrary step orderings, repeated display
-names, interleaved unrelated steps, and split caches whose halves agree or
-disagree on a key, or where a third step claims a paired key. The properties
+The contract modules hold bounded `rstest` cases over the workflow files as
+they stand, and `tests/workflow_model_properties.rs` samples the wider domain
+with `proptest`: arbitrary step orderings, repeated display names, interleaved
+unrelated steps, actions that merely share the `actions/cache` prefix, and
+split caches whose halves agree or disagree on a key, or where a third step
+claims a paired key. The properties
 check cache-owner uniqueness and installer-ordering against small oracles
 written independently of the implementation. Run both with `make test`, and run
 `actionlint` after editing any workflow.

@@ -153,6 +153,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # `if: always()` runs this even when an earlier step failed before
+          # sccache was installed. Reporting nothing is correct there; failing
+          # here would bury the real failure under a second one.
+          if ! command -v sccache >/dev/null 2>&1; then
+            echo 'sccache is not installed; no compiler-cache statistics to report.'
+            exit 0
+          fi
           # To the log as well as the summary: the summary is not readable
           # through the REST API.
           stats="$(sccache --show-stats)"

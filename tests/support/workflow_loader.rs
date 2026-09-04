@@ -31,7 +31,7 @@ use crate::workflow_model::{Job, RunnerSelection, Step};
 /// GitHub Actions coerces booleans and numbers to strings when it passes an
 /// input to an action, so `doctests: true` and `doctests: 'true'` reach the
 /// action identically and must compare equal here too.
-fn render_scalar(value: &Value) -> Option<String> {
+pub fn render_scalar(value: &Value) -> Option<String> {
     match value {
         Value::String(text) => Some(text.clone()),
         Value::Bool(flag) => Some(flag.to_string()),
@@ -172,14 +172,28 @@ fn parse_runs_on(raw: &Value, at: &Location) -> Result<RunnerSelection, Workflow
     Ok(RunnerSelection::Group { group, labels })
 }
 
+/// Reports whether a job mixes the two shapes GitHub Actions keeps apart.
+///
+/// A job calls a reusable workflow, or it names a runner and runs its own
+/// steps. `declares_steps` is presence, not emptiness: `steps: []` beside
+/// `uses` is exactly as invalid as steps with content in them.
+const fn mixes_job_modes(job: &Job, declares_steps: bool) -> bool {
+    if job.uses.is_empty() {
+        return false;
+    }
+    job.runs_on.names_a_runner() || declares_steps
+}
+
 /// Parses one job of a workflow.
 ///
 /// # Errors
 ///
-/// Returns an error when a field is mistyped, `steps` is not a sequence, or
-/// the job neither names a runner nor calls a reusable workflow.
+/// Returns an error when a field is mistyped, `steps` is not a sequence, the
+/// job neither names a runner nor calls a reusable workflow, or it calls a
+/// reusable workflow and also sets `runs-on` or `steps`.
 fn parse_job(id: &str, raw: &Value, file: &Location) -> Result<Job, WorkflowError> {
     let at = file.job(id);
+    let declares_steps = raw.get("steps").is_some();
     let steps = match raw.get("steps") {
         None => Vec::new(),
         Some(value) => value
@@ -199,6 +213,11 @@ fn parse_job(id: &str, raw: &Value, file: &Location) -> Result<Job, WorkflowErro
     };
     if !job.runs_on.names_a_runner() && job.uses.is_empty() {
         return Err(at.shape("a job must set `runs-on` or `uses`"));
+    }
+    // Accepting the mixture would let the contracts reason about a job the
+    // runner would never schedule.
+    if mixes_job_modes(&job, declares_steps) {
+        return Err(at.shape("a job that sets `uses` must not also set `runs-on` or `steps`"));
     }
     Ok(job)
 }
@@ -324,20 +343,6 @@ pub fn load_workflows_in(root: &Utf8Path) -> Result<Vec<Workflow>, WorkflowError
 pub fn load_workflows() -> Result<Vec<Workflow>, WorkflowError> {
     let root = Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(WORKFLOW_DIR);
     load_workflows_in(&root)
-}
-
-/// Reads a file from this repository's root through a directory capability.
-///
-/// # Errors
-///
-/// Returns an error when the repository root cannot be opened or the file
-/// cannot be read.
-pub fn read_repository_file(relative: &str) -> Result<String, WorkflowError> {
-    let root = Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let dir = Dir::open_ambient_dir(&root, ambient_authority())
-        .map_err(|err| WorkflowError::Read(root.to_string(), err))?;
-    dir.read_to_string(relative)
-        .map_err(|err| WorkflowError::Read(relative.to_owned(), err))
 }
 
 /// Returns every step of every job, tagged with its workflow and job.
