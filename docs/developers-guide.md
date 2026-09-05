@@ -488,8 +488,14 @@ replaced the assumption:
 | Least free disk | 101,691 MiB | 101,882 MiB | 106,302 MiB | 53,166 MiB |
 | Wall | 39m14s | 24m38s | 29m17s | 16m47s |
 
-Memory is the binding constraint, not disk: free disk never fell below 52 GiB
-on any run.
+*Table 2: Sampled resource use and wall time by runner shape.*
+
+Read the constraint per shape rather than as one rule. On eight vCPUs memory
+was what decided the sizing: the cold writer's 8,812 MiB is the figure that
+ruled out `ubicloud-standard-2` at 8 GB. On four vCPUs memory is not close to
+binding, at 3,889 to 4,637 MiB against a 12 GB bound, and what bounds the shape
+instead is the cargo watchdog and, at a distance, disk. Free disk never fell
+below 52 GiB on any run.
 
 **Peak memory is a property of the shape, not only of the workload.** This is
 the part that is easy to get wrong. Cargo scales its parallelism with the
@@ -510,17 +516,23 @@ so the run intended as the cold writer found the store already populated and
 returned a 100 % hit rate. Every four-vCPU peak observed lies between 3,889 and
 4,637 MiB, and reduced parallelism means a genuinely cold run should stay below
 its eight-vCPU counterpart of 8,812 MiB, so the 12 GB bound looks safe by a
-wide margin. That is inference. The next dependency bump or cache eviction will
-produce a real cold run and settle it; until then, treat the cold figure as
-unconfirmed rather than as evidence.
+wide margin. That is inference, and it needs a particular kind of run to
+settle it, rather than merely the passage of time. A dependency bump
+invalidates only the objects
+it touches, and eviction removes only what it happens to reach, so either can
+leave a partly warm build whose peak says nothing about a cold one. What
+settles it is a run that reports a zero or near-zero hit rate, whether that
+arrives by a wide enough invalidation or is produced deliberately. Until such a
+run exists, treat the cold figure as unconfirmed rather than as evidence.
 
-Two things bound the four-vCPU shape rather than memory. `RUN_RUST_CARGO_WAIT_TIMEOUT`
-caps a single cargo command rather than the job, and had to rise from 1,800 s
-before the shape could shrink: the eight-vCPU cold writer already ran 1,757 s,
-so a slower shape would have had cargo killed before either job timeout
-noticed, and the casualty would have been the cold writer on `main`. And free
-disk fell to 52 GiB against 99 GiB on the larger shape, which is still ample
-but is the first measure to move materially.
+Of the two constraints that do bind the four-vCPU shape, the watchdog is the
+one that had to move first. `RUN_RUST_CARGO_WAIT_TIMEOUT` caps a single cargo
+command rather than the job, and had to rise from 1,800 s before the shape
+could shrink: the eight-vCPU cold writer already ran 1,757 s, so a slower shape
+would have had cargo killed before either job timeout noticed, and the casualty
+would have been the cold writer on `main`. Disk is the other, at a distance: it
+fell to 52 GiB against 99 GiB on the larger shape, still ample, but the only
+measure to move materially.
 
 Keep the samplers. The shape is only defensible while it is measured, and the
 next person to question it needs the same evidence this change rested on.
