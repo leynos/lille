@@ -193,6 +193,41 @@ dependency accepts 5.x (ideally including the `Float` → `FloatCore` bound fix)
 Progress against these steps is tracked in
 [issue #294](https://github.com/leynos/lille/issues/294).
 
+## The font download in `build_support`
+
+`build_support::font` fetches Fira Sans at build time and verifies it against
+the `FONT_SHA256` constant, so the font need not be committed. Two details of
+that path are deliberate.
+
+### `to_lower_hex` instead of `{:x}`
+
+`build_support::hex::to_lower_hex` renders digest bytes as lowercase
+hexadecimal. It exists because `sha2` 0.11 changed `Sha256::digest` and
+`Sha256::finalize` to return `hybrid_array::Array<u8, _>`, which does not
+implement `core::fmt::LowerHex`; `format!("{digest:x}")` no longer compiles
+against it. The same release dropped the `std::io::Write` impl on the hasher, so
+`io::copy(&mut reader, &mut hasher)` would also need replacing with a buffered
+read loop that calls `hasher.update`. No such call site exists here today, but
+the sibling RustCrypto crates move in lockstep — `sha1`, `sha3`, and `md-5` to
+0.11, and `hmac`, `hkdf`, and `pbkdf2` to 0.13 — so expect the same break there.
+
+A crate-internal encoder is preferred over a `hex` dependency: the whole
+requirement is two table lookups per byte, and `build_support` runs on every
+build.
+
+### The download is size-capped
+
+`read_capped` bounds the response body at `MAX_FONT_BYTES` (8 MiB, against a
+~400 KiB font). The checksum can only be verified once the body is buffered, so
+without a cap a hostile or misbehaving origin could drive build-time memory use
+arbitrarily high — and because this runs in a build script, the failure would
+land on every developer and CI job.
+
+The reader is capped at `MAX_FONT_BYTES + 1` rather than `MAX_FONT_BYTES`. A
+plain cap cannot distinguish a body sitting exactly on the limit from one
+silently truncated by it; the extra byte makes an oversized body observable so
+it is reported rather than hashed as a short font.
+
 ## DBSP synchronization
 
 Each frame, `DbspPlugin` chains two systems so the first runs to completion
