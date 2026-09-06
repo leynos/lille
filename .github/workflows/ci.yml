@@ -81,7 +81,7 @@ jobs:
         # GitHub's. `ACTIONS_CACHE_SERVICE_V2` is cleared because the v2
         # service bypasses that proxy; exporting `ACTIONS_RESULTS_URL` does
         # not route through it either (measured 2026-09-04).
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             // Report where the endpoint came from, and whether a token was
@@ -108,7 +108,7 @@ jobs:
         # rather than compiling sccache from source. Installing inside an
         # action step is safe; starting the server there is not, which is why
         # the next step is a `run:` step.
-        uses: taiki-e/install-action@c7eb1735f09259a5035e8e5d44b1406b1cddc0fb # v2.83.0
+        uses: taiki-e/install-action@1ed6d7be6168f6c9046541087ff549b6bc581fdf # v2.87.2
         with:
           tool: sccache@0.16.0
           fallback: none
@@ -127,7 +127,7 @@ jobs:
           sccache --version
           sccache --zero-stats
       - name: Setup Rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@3a2f2d5f17932657ddf50490a09ea5e7400ae35c
+        uses: leynos/shared-actions/.github/actions/setup-rust@2055f0a7aba1a9d439dd7aba1f3559416b0a08ce
         with:
           # Sole owner of ~/.cargo/registry and ~/.cargo/git for this job. It
           # runs before the first cargo invocation so the lint step reads a
@@ -159,7 +159,7 @@ jobs:
         # Downloads the pinned prebuilt installer and verifies it against a
         # digest pinned in the action. The action owns the cache for the
         # installer binary, its version marker, and ~/.local/share/whitaker.
-        uses: leynos/shared-actions/.github/actions/install-whitaker@3a2f2d5f17932657ddf50490a09ea5e7400ae35c
+        uses: leynos/shared-actions/.github/actions/install-whitaker@2055f0a7aba1a9d439dd7aba1f3559416b0a08ce
         with:
           installer-version: '0.2.7'
           cache-provider: github
@@ -172,7 +172,7 @@ jobs:
       # evidence and doubled the billed compile. `all-features` names exactly
       # the set the explicit feature list used to name.
       - name: Generate coverage
-        uses: leynos/shared-actions/.github/actions/generate-coverage@3a2f2d5f17932657ddf50490a09ea5e7400ae35c
+        uses: leynos/shared-actions/.github/actions/generate-coverage@2055f0a7aba1a9d439dd7aba1f3559416b0a08ce
         with:
           all-features: 'true'
           all-targets: 'true'
@@ -252,7 +252,7 @@ jobs:
         env:
           CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN }}
         if: env.CS_ACCESS_TOKEN != '' && github.event_name == 'pull_request'
-        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@3a2f2d5f17932657ddf50490a09ea5e7400ae35c
+        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@2055f0a7aba1a9d439dd7aba1f3559416b0a08ce
         with:
           format: lcov
           mode: check
