@@ -343,28 +343,38 @@ Dylint suite.
 ### The Makefile shell
 
 The `Makefile` sets `.ONESHELL:` with `SHELL := bash` and
-`.SHELLFLAGS := -ec`. The errexit flag is what makes a gate honest. Under
-`.ONESHELL:` make hands a whole recipe to one shell invocation, so only that
-shell's final exit status reaches make; with make's default `-c` alone, a lint
-or test that fails on an earlier line of a multi-line recipe is reported
+`.SHELLFLAGS := -eo pipefail -c`. Those two flags are what make a gate honest.
+Under `.ONESHELL:` make hands a whole recipe to one shell invocation, so only
+that shell's final exit status reaches make; with make's default `-c` alone, a
+lint or test that fails on an earlier line of a multi-line recipe is reported
 nowhere and the target succeeds. `make spelling` is the case that matters here:
 it depends on `spelling-helper-test`, whose three commands run ruff's formatter
 check, ruff's linter, and pytest in that order, and only the last of them would
 have decided the result. Wildside ran into exactly this, where a job logged
 ruff's `Found 3 errors.` and passed.
 
+`pipefail` covers the half `-e` cannot see. A pipeline reports its last
+command's status, so `spelling`'s `git ls-files -z '*.md' | xargs ... typos`
+would succeed whenever the `git ls-files` side failed and `typos` was handed
+nothing. Any gate written as a pipeline needs it.
+
 Keep `-c` when changing `.SHELLFLAGS`; it is make's own default and the shell
 will not read the recipe without it. A recipe that genuinely needs a non-zero
-intermediate status handles that status itself, with an `if`, a `||`, or a `-`
-line prefix, rather than by weakening the flag for every other recipe.
+intermediate status handles that status itself, with an `if` or a `||`, rather
+than by weakening the flags for every other recipe. The `-` line prefix is not
+an option here: under `.ONESHELL:` GNU make checks only the first line of a
+recipe for the special prefix characters, and the shell's own errexit would
+have exited at the failing command regardless.
 
-`tests/makefile_shell_contract.rs` holds the flag in place. It copies the
+`tests/makefile_shell_contract.rs` holds the flags in place. It copies the
 `.ONESHELL:`, `SHELL` and `.SHELLFLAGS` lines out of the real `Makefile` into a
-scratch one, gives it a recipe whose first line fails and whose second
-succeeds, and asserts GNU make reports the failure. It drives make rather than
-reading the file for the flag, because an assertion that merely finds
-`.SHELLFLAGS` is satisfied by a value that does not enable errexit. Deleting
-the `.SHELLFLAGS` line makes the test fail, which is how it was proved.
+scratch one, gives it a recipe whose failure make must not swallow, and asserts
+GNU make reports it. One case fails on an earlier line and one at the head of a
+pipeline, so each flag has a case that depends on it. It drives make rather
+than reading the file for the flags because an assertion that merely finds
+`.SHELLFLAGS` is satisfied by a value that enables neither. Deleting `-e` fails
+both cases and deleting `-o pipefail` fails the pipeline case, which is how
+they were proved.
 
 ## Continuous integration
 
