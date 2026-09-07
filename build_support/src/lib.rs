@@ -2,6 +2,7 @@
 //! Handles asset downloads for font resources.
 
 pub mod font;
+pub mod hex;
 
 use anyhow::Result;
 use std::path::PathBuf;
