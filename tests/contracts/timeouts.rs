@@ -43,6 +43,28 @@ const OUTSIDE_WATCHDOG_ALLOWANCE_SECONDS: u64 = 15 * 60;
 /// The name of the coverage action, without its owner or pin.
 const COVERAGE_ACTION: &str = "generate-coverage";
 
+/// The watchdog every coverage job must set, in seconds, as
+/// `docs/developers-guide.md` records it. Pinned rather than merely
+/// checked for shape: the ordering below holds for a wide range of
+/// values, so nothing else would notice this one drifting.
+const REQUIRED_WATCHDOG_SECONDS: u64 = 3_600;
+
+/// The ceiling every coverage job must declare, in minutes, likewise
+/// from the guide. It is the requirement plus the fifteen minutes of
+/// slack the guide asks for, so the two arithmetic statements meet here.
+const REQUIRED_CEILING_MINUTES: u64 = 90;
+
+/// Returns whether a step invokes the coverage action.
+///
+/// The `uses` value is the coordinate, an `@`, and a pin. Matching the
+/// coordinate as a prefix of the whole string would also match a
+/// sibling action whose name merely begins with this one's, such as
+/// `generate-coverage-variant`, and that action has no watchdog of its
+/// own for the assertions below to be about.
+fn invokes_coverage(uses: &str, coordinate: &str) -> bool {
+    uses.split('@').next().unwrap_or(uses) == coordinate
+}
+
 /// Returns every job that invokes the coverage action, with its file.
 fn coverage_jobs(workflows: &[Workflow]) -> Vec<(String, crate::workflow_model::Job)> {
     let coordinate = shared_action(COVERAGE_ACTION);
@@ -51,9 +73,19 @@ fn coverage_jobs(workflows: &[Workflow]) -> Vec<(String, crate::workflow_model::
         .filter(|(_, job)| {
             job.steps
                 .iter()
-                .any(|step| step.uses.starts_with(&coordinate))
+                .any(|step| invokes_coverage(&step.uses, &coordinate))
         })
         .collect()
+}
+
+/// Returns whether a ceiling contains a watchdog and the work around it.
+///
+/// Extracted so the decision is one named thing and the three messages
+/// below are only messages. `None` is a job that declares no ceiling at
+/// all, which is not a smaller number but a different failure: GitHub's
+/// six-hour default applies and nothing in the workflow says so.
+fn ceiling_covers_watchdog_budget(ceiling_seconds: Option<u64>, watchdog: u64) -> bool {
+    ceiling_seconds.is_some_and(|seconds| seconds >= watchdog + OUTSIDE_WATCHDOG_ALLOWANCE_SECONDS)
 }
 
 #[rstest]
@@ -123,22 +155,27 @@ fn the_job_ceiling_covers_the_watchdog_and_the_work_around_it(workflows: Vec<Wor
             let watchdog: u64 = job.env(WATCHDOG_VARIABLE).parse().ok()?;
             let required = watchdog + OUTSIDE_WATCHDOG_ALLOWANCE_SECONDS;
             let ceiling = job.timeout_minutes.map(|minutes| minutes * 60);
-            match ceiling {
-                Some(seconds) if seconds >= required => None,
-                Some(seconds) => Some(format!(
-                    "{file}:{}: timeout-minutes gives {seconds}s, below the \
-                     {required}s needed to cover a {watchdog}s watchdog plus \
-                     {OUTSIDE_WATCHDOG_ALLOWANCE_SECONDS}s of measured work \
-                     outside it",
-                    job.id
-                )),
-                None => Some(format!(
-                    "{file}:{}: runs cargo under a {watchdog}s watchdog in a \
-                     job with no timeout-minutes; the outermost tier is \
-                     missing and GitHub's six-hour default applies",
-                    job.id
-                )),
+            if ceiling_covers_watchdog_budget(ceiling, watchdog) {
+                return None;
             }
+            let detail = ceiling.map_or_else(
+                || {
+                    format!(
+                        "runs cargo under a {watchdog}s watchdog in a job with \
+                         no timeout-minutes; the outermost tier is missing and \
+                         GitHub's six-hour default applies"
+                    )
+                },
+                |seconds| {
+                    format!(
+                        "timeout-minutes gives {seconds}s, below the \
+                         {required}s needed to cover a {watchdog}s watchdog \
+                         plus {OUTSIDE_WATCHDOG_ALLOWANCE_SECONDS}s of \
+                         measured work outside it"
+                    )
+                },
+            );
+            Some(format!("{file}:{}: {detail}", job.id))
         })
         .collect();
     assert!(
@@ -166,7 +203,7 @@ fn the_nextest_tiers_are_absent_rather_than_unset(workflows: Vec<Workflow>) {
             let id = job.id.clone();
             job.steps
                 .iter()
-                .filter(|step| step.uses.starts_with(&coordinate))
+                .filter(|step| invokes_coverage(&step.uses, &coordinate))
                 .filter(|step| step.input("use-cargo-nextest") != "false")
                 .map(|step| {
                     format!(
@@ -183,5 +220,95 @@ fn the_nextest_tiers_are_absent_rather_than_unset(workflows: Vec<Workflow>) {
          whole-run budget with nothing setting either; introduce both in \
          `.config/nextest.toml` and update the developers' guide in the same \
          change: {enabled:?}"
+    );
+}
+
+#[rstest]
+fn every_coverage_job_carries_the_documented_watchdog(workflows: Vec<Workflow>) {
+    // The ordering above holds for a wide range of watchdogs, so on its
+    // own it would let this one drift away from the developers' guide
+    // without failing anything. The value and its ceiling are one
+    // statement, and the guide is where that statement lives.
+    let wrong: Vec<String> = coverage_jobs(&workflows)
+        .into_iter()
+        .filter(|(_, job)| job.env(WATCHDOG_VARIABLE) != REQUIRED_WATCHDOG_SECONDS.to_string())
+        .map(|(file, job)| {
+            format!(
+                "{file}:{}: {WATCHDOG_VARIABLE}={:?}",
+                job.id,
+                job.env(WATCHDOG_VARIABLE)
+            )
+        })
+        .collect();
+    assert!(
+        wrong.is_empty(),
+        "these coverage jobs do not set the documented \
+         {REQUIRED_WATCHDOG_SECONDS}s watchdog: {wrong:?}; change the \
+         developers' guide with them or change them back"
+    );
+}
+
+#[rstest]
+fn every_coverage_job_carries_the_documented_ceiling(workflows: Vec<Workflow>) {
+    // Likewise for the outermost tier. The derived check accepts any
+    // ceiling at or above 75 minutes; the guide states 90, which is that
+    // requirement plus the fifteen minutes of slack it asks for.
+    let wrong: Vec<String> = coverage_jobs(&workflows)
+        .into_iter()
+        .filter(|(_, job)| job.timeout_minutes != Some(REQUIRED_CEILING_MINUTES))
+        .map(|(file, job)| format!("{file}:{}: {:?}", job.id, job.timeout_minutes))
+        .collect();
+    assert!(
+        wrong.is_empty(),
+        "these coverage jobs do not carry the documented \
+         {REQUIRED_CEILING_MINUTES}-minute ceiling: {wrong:?}"
+    );
+}
+
+#[rstest]
+#[case::the_action_itself("leynos/shared-actions/.github/actions/generate-coverage@abc", true)]
+#[case::an_unpinned_reference("leynos/shared-actions/.github/actions/generate-coverage", true)]
+#[case::a_sibling_with_a_longer_name(
+    "leynos/shared-actions/.github/actions/generate-coverage-variant@abc",
+    false
+)]
+#[case::a_different_action("leynos/shared-actions/.github/actions/install-nixie@abc", false)]
+#[case::a_different_owner("someone/shared-actions/.github/actions/generate-coverage@abc", false)]
+fn the_coverage_coordinate_matches_the_whole_action_path(
+    #[case] uses: &str,
+    #[case] expected: bool,
+) {
+    // Every workflow in this tree pins the action itself, so the
+    // assertions above are satisfied by a prefix match that would also
+    // claim a sibling action beginning with the same name. That sibling
+    // has no watchdog of its own, so the claim would be a failing
+    // assertion about a job that never runs coverage.
+    let coordinate = shared_action(COVERAGE_ACTION);
+    assert_eq!(
+        invokes_coverage(uses, &coordinate),
+        expected,
+        "{uses:?} must {} the coverage action",
+        if expected { "match" } else { "not match" }
+    );
+}
+
+#[rstest]
+#[case::comfortably_above(Some(5_400), 3_600, true)]
+#[case::exactly_the_requirement(Some(4_500), 3_600, true)]
+#[case::one_second_short(Some(4_499), 3_600, false)]
+#[case::no_ceiling_at_all(None, 3_600, false)]
+fn the_ceiling_predicate_decides_the_three_cases(
+    #[case] ceiling_seconds: Option<u64>,
+    #[case] watchdog: u64,
+    #[case] expected: bool,
+) {
+    // Both lanes here sit fifteen minutes above their requirement, so
+    // the assertion over the workflows cannot distinguish a predicate
+    // that compares correctly from one that ignores the allowance
+    // entirely. Driving the predicate is what makes that visible.
+    assert_eq!(
+        ceiling_covers_watchdog_budget(ceiling_seconds, watchdog),
+        expected,
+        "a ceiling of {ceiling_seconds:?}s against a {watchdog}s watchdog"
     );
 }

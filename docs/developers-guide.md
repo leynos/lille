@@ -645,22 +645,22 @@ Four independent timers can end a test run, and the canonical statement of how
 they must be ordered lives in the `generate-coverage` README in
 [`leynos/shared-actions`][shared-actions-coverage]. Two of the four exist here.
 
-| Tier | What it bounds | Where it is set | Current value |
-| --- | --- | --- | --- |
-| Per-test `slow-timeout` | one test | nextest, not used here | absent |
-| nextest `global-timeout` | the whole test run | nextest, not used here | absent |
-| Cargo watchdog | one `cargo` invocation, wall clock | `RUN_RUST_CARGO_WAIT_TIMEOUT` at job level in `ci.yml` and `coverage-main.yml` | 3,600 s (60 m) |
-| Job `timeout-minutes` | the whole job | job level | 90 m in both `ci.yml` and `coverage-main.yml` |
+| Tier                     | What it bounds                     | Where it is set                                                                | Current value                                 |
+| ------------------------ | ---------------------------------- | ------------------------------------------------------------------------------ | --------------------------------------------- |
+| Per-test `slow-timeout`  | one test                           | nextest, not used here                                                         | absent                                        |
+| nextest `global-timeout` | the whole test run                 | nextest, not used here                                                         | absent                                        |
+| Cargo watchdog           | one `cargo` invocation, wall clock | `RUN_RUST_CARGO_WAIT_TIMEOUT` at job level in `ci.yml` and `coverage-main.yml` | 3,600 s (60 m)                                |
+| Job `timeout-minutes`    | the whole job                      | job level                                                                      | 90 m in both `ci.yml` and `coverage-main.yml` |
 
 *Table: the timers that can end a run, innermost first.*
 
 The two nextest tiers are absent by construction rather than by omission. The
 coverage step passes `use-cargo-nextest: 'false'`, so the instrumented run is
-`cargo llvm-cov` over plain `cargo test`, and there is no `.config/nextest.toml`
-for anyone to have set a per-test or whole-run budget in. Turning nextest on
-would introduce both tiers at once, unbounded, underneath a watchdog sized for
-neither, so the contract fails if the input changes and the guide has to change
-with it.
+`cargo llvm-cov` over plain `cargo test`, and there is no
+`.config/nextest.toml` for anyone to have set a per-test or whole-run budget
+in. Turning nextest on would introduce both tiers at once, unbounded,
+underneath a watchdog sized for neither, so the contract fails if the input
+changes and the guide has to change with it.
 
 #### The watchdog is the tier nobody expects
 
@@ -681,8 +681,7 @@ budget.
 ```
 
 Take the message at its word. Nothing was detected as hung. A budget expired,
-and on a cold compiler cache that is the expected outcome rather than a
-symptom.
+and on a cold compiler cache that is the expected outcome rather than a symptom.
 
 #### The clocks do not start together
 
@@ -695,10 +694,10 @@ overrun, and a cancellation discards the log that would have explained it.
 The ceiling is therefore sized as the watchdog plus the work outside its
 window, measured from the worst of several runs rather than one:
 
-| Lane | Worst coverage step | Worst whole job | Outside the step | Run |
-| --- | --- | --- | --- | --- |
-| `ci.yml` `build-test` | 1,702 s | 2,354 s | 859 s | 33830336409 |
-| `coverage-main.yml` `coverage-upload` | 1,728 s | 1,775 s | 286 s | 31892219565 |
+| Lane                                  | Worst coverage step | Worst whole job | Outside the step | Run         |
+| ------------------------------------- | ------------------- | --------------- | ---------------- | ----------- |
+| `ci.yml` `build-test`                 | 1,702 s             | 2,354 s         | 859 s            | 33830336409 |
+| `coverage-main.yml` `coverage-upload` | 1,728 s             | 1,775 s         | 286 s            | 31892219565 |
 
 *Table: measured coverage-step and whole-job durations, read across fifteen
 successful `ci.yml` runs and twenty of `coverage-main.yml`.*
@@ -720,5 +719,25 @@ set explicitly rather than inherited, requires it to parse as whole seconds,
 requires each job's ceiling to clear the watchdog plus the allowance, and fails
 if a job declares no ceiling at all, since that would silently mean GitHub's
 six-hour default.
+
+It pins the two documented values as well as ordering them: the 3,600 second
+watchdog and the 90 minute ceiling. The derived check accepts any ceiling at or
+above 75 minutes, so on its own it would let either value drift away from this
+section without failing anything. Pinning them makes the guide and the
+workflows one statement.
+
+The coverage action is matched by its whole path, taking the part of `uses`
+before the `@` rather than testing the coordinate as a prefix. Every workflow
+here pins the action itself, so a prefix test passes on this tree while also
+claiming a sibling action whose name merely begins with the same text, and that
+sibling has no watchdog for these assertions to be about. A near-miss case
+covers it.
+
+The three-way ceiling decision is a named predicate rather than a branch inside
+the diagnostic. Both lanes sit fifteen minutes above their requirement, so the
+assertion over the workflows cannot tell a predicate that compares correctly
+from one that ignores the allowance entirely; the predicate is therefore driven
+directly with a ceiling on its requirement, one second below it, and none at
+all.
 
 [shared-actions-coverage]: https://github.com/leynos/shared-actions/blob/main/.github/actions/generate-coverage/README.md
