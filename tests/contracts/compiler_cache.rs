@@ -161,6 +161,36 @@ fn compiler_cache_effectiveness_is_measured_around_the_build(workflows: Vec<Work
 /// The `ubicloud-standard-8` shape is inherited here, not measured. Sampling
 /// memory and disk is what turns the next shape decision into evidence, and
 /// disk is the one that has killed jobs silently elsewhere in this rollout.
+/// Shapes that keep a command's text on a line without running it, or
+/// without letting its failure end the step.
+///
+/// `if false; then free -m; fi` satisfies a substring search while
+/// sampling nothing, so the resource requirement below would be met by
+/// a sampler that never ran. `free -m || true` runs but discards its
+/// verdict.
+///
+/// Narrower than rejecting every compound line, deliberately. The
+/// samplers here legitimately use pipes and command substitution, as in
+/// `mem_used="$(free -m | awk ...)"`, so only the disabling forms are
+/// refused rather than every line that is more than a bare command.
+const DISABLING_FORMS: [&str; 4] = ["if false", "if [ 1 -eq 0 ]", "|| true", "|| :"];
+
+/// Returns whether a job samples one measure in a form that runs.
+///
+/// # Examples
+///
+/// ```ignore
+/// assert!(samples(&job, "free -m"));           // mem="$(free -m | awk ...)"
+/// assert!(!samples(&job, "df -m"));            // if false; then df -m; fi
+/// ```
+fn samples(job: &crate::workflow_model::Job, measure: &str) -> bool {
+    job.steps.iter().any(|step| {
+        step.run.lines().any(|line| {
+            line.contains(measure) && !DISABLING_FORMS.iter().any(|form| line.contains(form))
+        })
+    })
+}
+
 #[rstest]
 fn both_build_jobs_sample_and_report_their_resource_use(workflows: Vec<Workflow>) {
     for id in BUILD_JOB_IDS {
@@ -177,8 +207,11 @@ fn both_build_jobs_sample_and_report_their_resource_use(workflows: Vec<Workflow>
         );
         for measure in ["free -m", "df -m"] {
             assert!(
-                job.steps.iter().any(|step| step.run.contains(measure)),
-                "`{id}` must sample `{measure}`; disk and memory are both needed"
+                samples(job, measure),
+                "`{id}` must sample `{measure}` in a form that runs; disk and \
+                 memory are both needed, and a substring search alone would be \
+                 satisfied by a sampler wrapped in `if false` or one whose \
+                 failure is discarded with `|| true`"
             );
         }
         assert!(

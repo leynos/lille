@@ -634,14 +634,25 @@ arbitrary step orderings, repeated display names, interleaved unrelated steps,
 actions that merely share the `actions/cache` prefix, and split caches whose
 halves agree or disagree on a key, or where a third step claims a paired key.
 The properties check cache-owner uniqueness and installer-ordering against
-small oracles written independently of the implementation. `timeout_budgets.rs`
-follows the same split for the ceiling arithmetic: bounded cases at the
-boundary, and a `proptest` property over the whole `u64` domain, since both a
-watchdog and a `timeout-minutes` are parsed from a workflow file and a value
-near the maximum is reachable by editing one. Both conversions saturate rather
-than wrap, so such a value stays preposterous instead of becoming a small
-number that fails the ordering for the wrong reason. Run both with `make test`,
-and run `actionlint` after editing any workflow.
+small oracles written independently of the implementation.
+
+A contract that requires a command to run reads each line and refuses the
+disabling forms rather than searching the whole `run` value:
+`if false; then free -m; fi` satisfies a substring search while sampling
+nothing, and `free -m || true` runs but discards its verdict. The refusal is
+narrow on purpose, because these samplers legitimately use pipes and command
+substitution, so only the disabling forms are rejected rather than every line
+that is more than a bare command. Contracts that forbid a command, such as the
+single-test-execution and no-source-build rules, keep the substring search:
+wrapping a prohibited command leaves its text in place, so the wrap makes those
+stricter rather than weaker. `timeout_budgets.rs` follows the same split for
+the ceiling arithmetic: bounded cases at the boundary, and a `proptest`
+property over the whole `u64` domain, since both a watchdog and a
+`timeout-minutes` are parsed from a workflow file and a value near the maximum
+is reachable by editing one. Both conversions saturate rather than wrap, so
+such a value stays preposterous instead of becoming a small number that fails
+the ordering for the wrong reason. Run both with `make test`, and run
+`actionlint` after editing any workflow.
 
 Only one restore and one save sharing a key count as a single owner. Two
 restores on the same key are two owners, and so are a matching pair plus a
