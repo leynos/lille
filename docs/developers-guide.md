@@ -638,3 +638,81 @@ Only one restore and one save sharing a key count as a single owner. Two
 restores on the same key are two owners, and so are a matching pair plus a
 third step, because otherwise a genuine duplicate could hide behind the
 split-cache exception.
+
+### Test timeouts: the two tiers this repository has
+
+Four independent timers can end a test run, and the canonical statement of how
+they must be ordered lives in the `generate-coverage` README in
+[`leynos/shared-actions`][shared-actions-coverage]. Two of the four exist here.
+
+| Tier | What it bounds | Where it is set | Current value |
+| --- | --- | --- | --- |
+| Per-test `slow-timeout` | one test | nextest, not used here | absent |
+| nextest `global-timeout` | the whole test run | nextest, not used here | absent |
+| Cargo watchdog | one `cargo` invocation, wall clock | `RUN_RUST_CARGO_WAIT_TIMEOUT` at job level in `ci.yml` and `coverage-main.yml` | 3,600 s (60 m) |
+| Job `timeout-minutes` | the whole job | job level | 90 m in `ci.yml`, 75 m in `coverage-main.yml` |
+
+*Table: the timers that can end a run, innermost first.*
+
+The two nextest tiers are absent by construction rather than by omission. The
+coverage step passes `use-cargo-nextest: 'false'`, so the instrumented run is
+`cargo llvm-cov` over plain `cargo test`, and there is no `.config/nextest.toml`
+for anyone to have set a per-test or whole-run budget in. Turning nextest on
+would introduce both tiers at once, unbounded, underneath a watchdog sized for
+neither, so the contract fails if the input changes and the guide has to change
+with it.
+
+#### The watchdog is the tier nobody expects
+
+It belongs to the shared `generate-coverage` action, which wraps the `cargo`
+invocation and kills it after a wall-clock budget. It defaults to 1,800 s, and
+nothing in this repository would mention it if a job stopped setting the
+variable. That default is not far above the work: the coverage step has already
+taken 1,728 s on run 33940327512.
+
+When it fires the step prints:
+
+```text
+::error::cargo did not exit within 3600s; killing. This is a budget, not a
+detected hang: raise the cargo-wait-timeout input, or
+RUN_RUST_CARGO_WAIT_TIMEOUT, if the build is legitimately slower. A cold
+sccache store makes the first run on a branch compile everything inside this
+budget.
+```
+
+Take the message at its word. Nothing was detected as hung. A budget expired,
+and on a cold compiler cache that is the expected outcome rather than a
+symptom.
+
+#### The clocks do not start together
+
+The job timer starts when the job starts, before the checkout, the toolchain
+setup and the cache restore, and it is still running through whatever follows
+the coverage step. The watchdog starts when `cargo` does. So a ceiling merely
+above the watchdog still cancels the job before the watchdog can report an
+overrun, and a cancellation discards the log that would have explained it.
+
+The ceiling is therefore sized as the watchdog plus the work outside its
+window, measured from the worst of several runs rather than one:
+
+| Lane | Worst coverage step | Worst whole job | Outside the step | Run |
+| --- | --- | --- | --- | --- |
+| `ci.yml` `build-test` | 1,702 s | 2,354 s | 859 s | 33830336409 |
+| `coverage-main.yml` `coverage-upload` | 1,728 s | 1,775 s | 286 s | 31892219565 |
+
+*Table: measured coverage-step and whole-job durations, read across fifteen
+successful `ci.yml` runs and twenty of `coverage-main.yml`.*
+
+The widest gap is 859 s, so the contract allows 15 minutes. That makes the
+requirement 3,600 s + 900 s = 75 minutes. `ci.yml` has 15 minutes of slack
+above that; `coverage-main.yml` sits exactly on it, so a step added to that job
+needs its ceiling raised in the same change, and the contract will say so.
+
+`tests/contracts/timeouts.rs` asserts all of this by value over every job that
+invokes the coverage action, in both workflows. It requires the watchdog to be
+set explicitly rather than inherited, requires it to parse as whole seconds,
+requires each job's ceiling to clear the watchdog plus the allowance, and fails
+if a job declares no ceiling at all, since that would silently mean GitHub's
+six-hour default.
+
+[shared-actions-coverage]: https://github.com/leynos/shared-actions/blob/main/.github/actions/generate-coverage/README.md
