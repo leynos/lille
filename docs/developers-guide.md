@@ -650,7 +650,7 @@ they must be ordered lives in the `generate-coverage` README in
 | Per-test `slow-timeout` | one test | nextest, not used here | absent |
 | nextest `global-timeout` | the whole test run | nextest, not used here | absent |
 | Cargo watchdog | one `cargo` invocation, wall clock | `RUN_RUST_CARGO_WAIT_TIMEOUT` at job level in `ci.yml` and `coverage-main.yml` | 3,600 s (60 m) |
-| Job `timeout-minutes` | the whole job | job level | 90 m in `ci.yml`, 75 m in `coverage-main.yml` |
+| Job `timeout-minutes` | the whole job | job level | 90 m in both `ci.yml` and `coverage-main.yml` |
 
 *Table: the timers that can end a run, innermost first.*
 
@@ -704,9 +704,15 @@ window, measured from the worst of several runs rather than one:
 successful `ci.yml` runs and twenty of `coverage-main.yml`.*
 
 The widest gap is 859 s, so the contract allows 15 minutes. That makes the
-requirement 3,600 s + 900 s = 75 minutes. `ci.yml` has 15 minutes of slack
-above that; `coverage-main.yml` sits exactly on it, so a step added to that job
-needs its ceiling raised in the same change, and the contract will say so.
+requirement 3,600 s + 900 s = 75 minutes, and both lanes are set to 90, which
+is 15 minutes above it.
+
+`coverage-main.yml` was 75, sitting exactly on its requirement. That is enough
+to satisfy the contract and not enough to survive: a ceiling on its requirement
+has no slack, so the first cold run that spends the full watchdog is cancelled
+with budget left, and the cancellation discards the log that would have
+explained it. This job is always the cold writer, so it is the one lane where
+that is not hypothetical.
 
 `tests/contracts/timeouts.rs` asserts all of this by value over every job that
 invokes the coverage action, in both workflows. It requires the watchdog to be
