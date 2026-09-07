@@ -17,8 +17,9 @@ jobs:
     runs-on: ubicloud-standard-4
     # Ubicloud jobs bill by the minute, so a hung step must not run to the
     # 6-hour platform default. The eight-vCPU cold writer took 1,757 s, and
-    # this job is always the cold writer, so four vCPUs put it close to the
-    # old 60-minute bound.
+    # this job is always the cold writer, so halving it to four vCPUs is
+    # what took this lane past its original 60-minute bound and up to the
+    # 75 this change replaces.
     #
     # 90, not 75. The ordering requires the ceiling to clear the 3,600 s
     # watchdog plus the 900 s allowed for work outside it, which is 75
