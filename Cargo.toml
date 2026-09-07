@@ -126,6 +126,9 @@ serde_norway = "0.9"
 cap-std = { version = "4", features = ["fs_utf8"] }
 camino = "1"
 test_utils = { path = "test_utils" }
+# Scratch directory for the Makefile shell contract, which drives GNU make on
+# a generated Makefile rather than on the repository's own.
+tempfile = "3.20.0"
 trybuild = "1.0"
 # Non-optional in dev builds so the `trybuild` compile-pass fixture, which is a
 # standalone crate, can name `bevy_ecs_tiled` directly. In-package tests already

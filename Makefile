@@ -3,6 +3,13 @@
 
 .ONESHELL:
 SHELL := bash
+# .ONESHELL feeds each recipe to one shell, so without -e only the last line's
+# exit status reaches make and an earlier failure passes silently. pipefail
+# covers the other half: a pipeline reports its last command's status, so
+# without it `spelling`'s `git ls-files | xargs typos` succeeds when the
+# git side fails. -c is make's own default and must be kept when SHELLFLAGS
+# is overridden.
+.SHELLFLAGS := -eo pipefail -c
 
 RUSTFLAGS_STRICT := -D warnings
 RUST_FLAGS ?= $(RUSTFLAGS_STRICT)

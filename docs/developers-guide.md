@@ -340,6 +340,53 @@ buffered-message compile-pass harness
 `cargo clippy --all-targets --all-features -- -D warnings`, and the Whitaker
 Dylint suite.
 
+### The Makefile shell
+
+The `Makefile` sets `.ONESHELL:` with `SHELL := bash` and
+`.SHELLFLAGS := -eo pipefail -c`. Those two flags are what make a gate honest.
+Under `.ONESHELL:` make hands a whole recipe to one shell invocation, so only
+that shell's final exit status reaches make; with make's default `-c` alone, a
+lint or test that fails on an earlier line of a multi-line recipe is reported
+nowhere and the target succeeds. `make spelling` is the case that matters here:
+it depends on `spelling-helper-test`, whose three commands run ruff's formatter
+check, ruff's linter, and pytest in that order, and only the last of them would
+have decided the result. Wildside ran into exactly this, where a job logged
+ruff's `Found 3 errors.` and passed.
+
+`pipefail` covers the half `-e` cannot see. A pipeline reports its last
+command's status, so `spelling`'s `git ls-files -z '*.md' | xargs ... typos`
+would succeed whenever the `git ls-files` side failed and `typos` was handed
+nothing. Any gate written as a pipeline needs it.
+
+Keep `-c` when changing `.SHELLFLAGS`; it is make's own default and the shell
+will not read the recipe without it. A recipe that genuinely needs a non-zero
+intermediate status handles that status itself, with an `if` or a `||`, rather
+than by weakening the flags for every other recipe. The `-` line prefix is not
+an option here: under `.ONESHELL:` GNU make checks only the first line of a
+recipe for the special prefix characters, and the shell's own errexit would
+have exited at the failing command regardless.
+
+`tests/makefile_shell_contract.rs` holds the flags in place. It copies the
+`.ONESHELL:`, `SHELL` and `.SHELLFLAGS` lines out of the real `Makefile` into a
+scratch one, gives it a recipe whose failure make must not swallow, and asserts
+GNU make reports it. One case fails on an earlier line and one at the head of a
+pipeline, so each flag has a case that depends on it. It drives make rather
+than reading the file for the flags because an assertion that merely finds
+`.SHELLFLAGS` is satisfied by a value that enables neither.
+
+Two further tests stop those probes passing for the wrong reason, because a
+prologue that fails every recipe would satisfy both. One asserts `.ONESHELL:`
+is still a target rather than a variable, since `.ONESHELL = 1` defines a
+variable of that name and leaves batching off. The other runs a recipe in which
+nothing fails and asserts make agrees, which catches a `SHELL` that cannot be
+started or a flag the shell rejects.
+
+Changing one element of the prologue at a time, deleting `-o pipefail` fails
+the pipeline case, deleting `-e` fails the earlier-line case, weakening
+`.ONESHELL:` to `.ONESHELL = 1` fails only the batching guard, and pointing
+`SHELL` at an unusable path fails only the clean-recipe control. That is how
+each was proved.
+
 ## Continuous integration
 
 Two workflows do the developer-blocking work. `ci.yml`'s `build-test` job runs
