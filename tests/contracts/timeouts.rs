@@ -85,7 +85,18 @@ fn coverage_jobs(workflows: &[Workflow]) -> Vec<(String, crate::workflow_model::
 /// all, which is not a smaller number but a different failure: GitHub's
 /// six-hour default applies and nothing in the workflow says so.
 fn ceiling_covers_watchdog_budget(ceiling_seconds: Option<u64>, watchdog: u64) -> bool {
-    ceiling_seconds.is_some_and(|seconds| seconds >= watchdog + OUTSIDE_WATCHDOG_ALLOWANCE_SECONDS)
+    ceiling_seconds.is_some_and(|seconds| seconds >= required_ceiling(watchdog))
+}
+
+/// Returns the smallest acceptable ceiling for one watchdog, in seconds.
+///
+/// Saturating rather than wrapping. The watchdog is parsed from a
+/// workflow, so a value near `u64::MAX` is reachable by editing a file;
+/// a wrapping add would turn it into a small requirement that every
+/// ceiling satisfies, which is the opposite of what a preposterous
+/// watchdog should produce.
+const fn required_ceiling(watchdog: u64) -> u64 {
+    watchdog.saturating_add(OUTSIDE_WATCHDOG_ALLOWANCE_SECONDS)
 }
 
 #[rstest]
@@ -153,7 +164,7 @@ fn the_job_ceiling_covers_the_watchdog_and_the_work_around_it(workflows: Vec<Wor
         .into_iter()
         .filter_map(|(file, job)| {
             let watchdog: u64 = job.env(WATCHDOG_VARIABLE).parse().ok()?;
-            let required = watchdog + OUTSIDE_WATCHDOG_ALLOWANCE_SECONDS;
+            let required = required_ceiling(watchdog);
             let ceiling = job.timeout_minutes.map(|minutes| minutes * 60);
             if ceiling_covers_watchdog_budget(ceiling, watchdog) {
                 return None;
@@ -310,5 +321,57 @@ fn the_ceiling_predicate_decides_the_three_cases(
         ceiling_covers_watchdog_budget(ceiling_seconds, watchdog),
         expected,
         "a ceiling of {ceiling_seconds:?}s against a {watchdog}s watchdog"
+    );
+}
+
+proptest::proptest! {
+    /// The predicate agrees with the arithmetic over the whole domain.
+    ///
+    /// The bounded cases above cover the boundary; this covers the rest,
+    /// as ADR 003 allows for a domain this large. `u64` watchdogs are
+    /// reachable from a workflow file, so the saturating requirement is
+    /// exercised here rather than assumed: a wrapping add would turn a
+    /// preposterous watchdog into a small requirement that every ceiling
+    /// satisfies.
+    #[test]
+    fn the_ceiling_predicate_agrees_with_the_requirement(
+        watchdog in proptest::prelude::any::<u64>(),
+        ceiling in proptest::prelude::any::<Option<u64>>(),
+    ) {
+        let required = required_ceiling(watchdog);
+        proptest::prop_assert!(required >= watchdog);
+        proptest::prop_assert_eq!(
+            ceiling_covers_watchdog_budget(ceiling, watchdog),
+            ceiling.is_some_and(|seconds| seconds >= required)
+        );
+    }
+
+    /// A job with no ceiling never passes, whatever the watchdog.
+    #[test]
+    fn a_missing_ceiling_never_covers_anything(watchdog in proptest::prelude::any::<u64>()) {
+        proptest::prop_assert!(!ceiling_covers_watchdog_budget(None, watchdog));
+    }
+}
+
+#[rstest]
+#[case::an_ordinary_watchdog(3_600, 4_500)]
+#[case::zero(0, OUTSIDE_WATCHDOG_ALLOWANCE_SECONDS)]
+#[case::the_largest_representable(u64::MAX, u64::MAX)]
+#[case::just_inside_the_ceiling(u64::MAX - 100, u64::MAX)]
+fn the_requirement_saturates_rather_than_wrapping(#[case] watchdog: u64, #[case] expected: u64) {
+    // A watchdog is parsed from a workflow file, so a value near
+    // `u64::MAX` is reachable by editing one. A wrapping add would turn
+    // it into a small requirement that every ceiling satisfies, which is
+    // the opposite of what a preposterous watchdog should produce, and
+    // the property above will not sample close enough to the boundary to
+    // notice on its own.
+    assert_eq!(
+        required_ceiling(watchdog),
+        expected,
+        "the requirement for a {watchdog}s watchdog"
+    );
+    assert!(
+        required_ceiling(watchdog) >= watchdog,
+        "the requirement can never fall below the watchdog it contains"
     );
 }

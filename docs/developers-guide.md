@@ -562,15 +562,16 @@ two. A workflow contract in `tests/workflow_contracts.rs` fails if a second
 ### Workflow contracts
 
 `tests/workflow_contracts.rs` asserts the rules above. It is a harness rather
-than a test file: the rules live in four modules under `tests/contracts/`,
+than a test file: the rules live in five modules under `tests/contracts/`,
 split by the question each asks.
 
-| Module | Asks |
-| --- | --- |
-| `supply_chain.rs` | What will the estate execute? Pinned cache and shared-action references, no source-built tools, prebuilt Whitaker and sccache. |
-| `placement.rs` | What does it cost, and who owns each cache? Runner placement and labels, bounded timeouts, one owner per cached path, an installer before the first use of what it installs, a single test execution per build job, the uv cache key. |
-| `compiler_cache.rs` | Is sccache actually working? The two job-level variables, the export, install, start, build, report order, the proxy export, and the resource sampler with its report. |
-| `parsing.rs` | Does the loader read workflows correctly? Its subject is the loader, not any workflow in this repository. |
+| Module              | Asks                                                                                                                                                                                                                                                                                    |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `supply_chain.rs`   | What will the estate execute? Pinned cache and shared-action references, no source-built tools, prebuilt Whitaker and sccache.                                                                                                                                                          |
+| `placement.rs`      | What does it cost, and who owns each cache? Runner placement and labels, bounded timeouts, one owner per cached path, an installer before the first use of what it installs, a single test execution per build job, the uv cache key.                                                   |
+| `compiler_cache.rs` | Is sccache actually working? The two job-level variables, the export, install, start, build, report order, the proxy export, and the resource sampler with its report.                                                                                                                  |
+| `parsing.rs`        | Does the loader read workflows correctly? Its subject is the loader, not any workflow in this repository.                                                                                                                                                                               |
+| `timeouts.rs`       | Which timer ends a run first? The coverage action's cargo watchdog set explicitly and by value, each coverage job's ceiling above that watchdog plus the measured work around it and equal to the documented 90 minutes, and the two nextest tiers absent rather than silently enabled. |
 
 Each module also pins the inputs that make its rules true, so a workflow cannot
 keep the shape of the policy while dropping its substance: `cache-provider`,
@@ -623,16 +624,19 @@ part of.
   in a comment.
 
 Two assurance methods are used together, following
-[ADR 003](adr-003-bounded-rstest-over-property-testing.md).
-The contract modules hold bounded `rstest` cases over the workflow files as
-they stand, and `tests/workflow_model_properties.rs` samples the wider domain
-with `proptest`: arbitrary step orderings, repeated display names, interleaved
-unrelated steps, actions that merely share the `actions/cache` prefix, and
-split caches whose halves agree or disagree on a key, or where a third step
-claims a paired key. The properties
-check cache-owner uniqueness and installer-ordering against small oracles
-written independently of the implementation. Run both with `make test`, and run
-`actionlint` after editing any workflow.
+[ADR 003](adr-003-bounded-rstest-over-property-testing.md). The contract
+modules hold bounded `rstest` cases over the workflow files as they stand, and
+`tests/workflow_model_properties.rs` samples the wider domain with `proptest`:
+arbitrary step orderings, repeated display names, interleaved unrelated steps,
+actions that merely share the `actions/cache` prefix, and split caches whose
+halves agree or disagree on a key, or where a third step claims a paired key.
+The properties check cache-owner uniqueness and installer-ordering against
+small oracles written independently of the implementation. `timeouts.rs`
+follows the same split for the ceiling requirement: bounded cases at the
+boundary, and a `proptest` property over the whole `u64` domain, since a
+watchdog is parsed from a workflow file and a value near the maximum is
+reachable by editing one. Run both with `make test`, and run `actionlint`
+after editing any workflow.
 
 Only one restore and one save sharing a key count as a single owner. Two
 restores on the same key are two owners, and so are a matching pair plus a
