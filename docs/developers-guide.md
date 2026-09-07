@@ -372,9 +372,20 @@ scratch one, gives it a recipe whose failure make must not swallow, and asserts
 GNU make reports it. One case fails on an earlier line and one at the head of a
 pipeline, so each flag has a case that depends on it. It drives make rather
 than reading the file for the flags because an assertion that merely finds
-`.SHELLFLAGS` is satisfied by a value that enables neither. Deleting `-e` fails
-both cases and deleting `-o pipefail` fails the pipeline case, which is how
-they were proved.
+`.SHELLFLAGS` is satisfied by a value that enables neither.
+
+Two further tests stop those probes passing for the wrong reason, because a
+prologue that fails every recipe would satisfy both. One asserts `.ONESHELL:`
+is still a target rather than a variable, since `.ONESHELL = 1` defines a
+variable of that name and leaves batching off. The other runs a recipe in which
+nothing fails and asserts make agrees, which catches a `SHELL` that cannot be
+started or a flag the shell rejects.
+
+Changing one element of the prologue at a time, deleting `-o pipefail` fails
+the pipeline case, deleting `-e` fails the earlier-line case, weakening
+`.ONESHELL:` to `.ONESHELL = 1` fails only the batching guard, and pointing
+`SHELL` at an unusable path fails only the clean-recipe control. That is how
+each was proved.
 
 ## Continuous integration
 
