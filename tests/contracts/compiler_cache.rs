@@ -161,8 +161,7 @@ fn compiler_cache_effectiveness_is_measured_around_the_build(workflows: Vec<Work
 /// The `ubicloud-standard-8` shape is inherited here, not measured. Sampling
 /// memory and disk is what turns the next shape decision into evidence, and
 /// disk is the one that has killed jobs silently elsewhere in this rollout.
-/// Shapes that keep a command's text on a line without running it, or
-/// without letting its failure end the step.
+/// Shapes that disable a command while keeping its text.
 ///
 /// `if false; then free -m; fi` satisfies a substring search while
 /// sampling nothing, so the resource requirement below would be met by
@@ -173,22 +172,171 @@ fn compiler_cache_effectiveness_is_measured_around_the_build(workflows: Vec<Work
 /// samplers here legitimately use pipes and command substitution, as in
 /// `mem_used="$(free -m | awk ...)"`, so only the disabling forms are
 /// refused rather than every line that is more than a bare command.
-const DISABLING_FORMS: [&str; 4] = ["if false", "if [ 1 -eq 0 ]", "|| true", "|| :"];
+const DISABLING_FORMS: [&str; 2] = ["|| true", "|| :"];
+
+/// Shapes that open a block whose body never runs.
+///
+/// A guard is not confined to its own line. `if false` followed by
+/// `free -m` on the next line and `fi` on the third disables the sampler
+/// as thoroughly as the one-line form, and a line-by-line search sees an
+/// undisabled `free -m` in the middle of it.
+const DISABLING_GUARDS: [&str; 2] = ["if false", "if [ 1 -eq 0 ]"];
+
+/// Tracks whether the scanner is inside quotes or a command substitution.
+///
+/// Quoted text is not a command: `echo 'df -m'` prints three characters
+/// and samples nothing. Command substitution is a command even inside
+/// double quotes, which is how this repository's samplers are written:
+/// `mem_used="$(free -m | awk '{print $3}')"`, so entering `$(` stacks
+/// the quoting and leaving it restores what was there before.
+#[derive(Default)]
+struct Quoting {
+    quoted: bool,
+    closer: Option<char>,
+    stack: Vec<(bool, Option<char>)>,
+}
+
+impl Quoting {
+    /// Records a quote character, opening or closing a quoted run.
+    const fn quote(&mut self, ch: char) {
+        match self.closer {
+            Some(open) if open == ch => {
+                self.closer = None;
+                self.quoted = false;
+            }
+            Some(_) => {}
+            None => {
+                self.closer = Some(ch);
+                self.quoted = true;
+            }
+        }
+    }
+
+    /// Enters a command substitution, whose contents run.
+    fn enter(&mut self) {
+        self.stack.push((self.quoted, self.closer));
+        self.quoted = false;
+        self.closer = None;
+    }
+
+    /// Whether `$(` here opens a substitution.
+    ///
+    /// Single quotes suppress it; double quotes do not, which is the
+    /// case the samplers rely on.
+    fn allows_substitution(&self) -> bool {
+        self.closer != Some('\'')
+    }
+
+    /// Returns what one character contributes to the masked line.
+    ///
+    /// Spaces stand in for everything that will not be run, so the
+    /// result lines up with the original and can be searched directly.
+    /// A quote character is consumed here rather than by the caller,
+    /// which is what keeps the scanning loop to one branch.
+    fn render(&mut self, ch: char, opened: bool) -> String {
+        if opened {
+            return "  ".to_owned();
+        }
+        if ch == ')' && self.leave() {
+            return " ".to_owned();
+        }
+        if ch == '\'' || ch == '"' {
+            self.quote(ch);
+            return " ".to_owned();
+        }
+        if self.quoted {
+            return " ".to_owned();
+        }
+        ch.to_string()
+    }
+
+    /// Leaves a command substitution, restoring the quoting around it.
+    fn leave(&mut self) -> bool {
+        match self.stack.pop() {
+            Some((quoted, closer)) => {
+                self.quoted = quoted;
+                self.closer = closer;
+                true
+            }
+            None => false,
+        }
+    }
+}
+
+/// Returns the line with quoted text blanked out.
+///
+/// Characters are replaced by spaces rather than removed, so what comes
+/// back can be searched directly for a command's text.
+fn command_text(line: &str) -> String {
+    let mut out = String::with_capacity(line.len());
+    let mut chars = line.chars().peekable();
+    let mut state = Quoting::default();
+    while let Some(ch) = chars.next() {
+        let opens = ch == '$' && chars.peek() == Some(&'(') && state.allows_substitution();
+        if opens {
+            chars.next();
+            state.enter();
+        }
+        out.push_str(&state.render(ch, opens));
+    }
+    out
+}
+
+/// Returns the part of a masked line before any comment.
+///
+/// Safe to do by position because [`command_text`] has already blanked
+/// every quoted character, so a `#` surviving into its output is one the
+/// shell would read as starting a comment.
+fn before_comment(text: &str) -> &str {
+    text.split_once('#').map_or(text, |(before, _)| before)
+}
+
+/// Returns the executable part of one line.
+fn executable_text(line: &str) -> String {
+    before_comment(&command_text(line)).to_owned()
+}
 
 /// Returns whether a job samples one measure in a form that runs.
+///
+/// Three things have to hold: the measure appears as text that will be
+/// executed rather than printed or commented out, the line does not
+/// discard its verdict, and the line is not inside a guard whose body
+/// never runs.
 ///
 /// # Examples
 ///
 /// ```ignore
-/// assert!(samples(&job, "free -m"));           // mem="$(free -m | awk ...)"
-/// assert!(!samples(&job, "df -m"));            // if false; then df -m; fi
+/// assert!(samples(&job, "free -m"));  // mem="$(free -m | awk ...)"
+/// assert!(!samples(&job, "df -m"));   // if false; then df -m; fi
+/// assert!(!samples(&job, "df -m"));   // echo 'df -m'
 /// ```
 fn samples(job: &crate::workflow_model::Job, measure: &str) -> bool {
-    job.steps.iter().any(|step| {
-        step.run.lines().any(|line| {
-            line.contains(measure) && !DISABLING_FORMS.iter().any(|form| line.contains(form))
-        })
-    })
+    job.steps
+        .iter()
+        .any(|step| step_samples(&step.run, measure))
+}
+
+/// Returns whether one `run` script samples a measure in a form that runs.
+fn step_samples(run: &str, measure: &str) -> bool {
+    let mut guard_depth: usize = 0;
+    for raw in run.lines() {
+        let line = executable_text(raw);
+        let opens_guard = DISABLING_GUARDS.iter().any(|form| line.contains(form));
+        let closes = line.matches("fi").count();
+        let opens = line.matches("if ").count();
+        if guard_depth > 0 {
+            guard_depth = guard_depth.saturating_add(opens).saturating_sub(closes);
+            continue;
+        }
+        if opens_guard {
+            guard_depth = opens.saturating_sub(closes);
+            continue;
+        }
+        if line.contains(measure) && !DISABLING_FORMS.iter().any(|form| line.contains(form)) {
+            return true;
+        }
+    }
+    false
 }
 
 #[rstest]
@@ -219,4 +367,32 @@ fn both_build_jobs_sample_and_report_their_resource_use(workflows: Vec<Workflow>
             "`{id}` must report peak disk, not memory alone"
         );
     }
+}
+
+/// Cases the workflows cannot carry, driven against the reading itself.
+///
+/// The samplers in `.github/workflows` are all written the same way, so
+/// the tree exercises one shape and says nothing about the rest. These
+/// are the shapes a substring search accepts while nothing is sampled.
+#[rstest]
+#[case::a_bare_command("free -m", true)]
+#[case::command_substitution("mem_used=\"$(free -m | awk '{print $3}')\"", true)]
+#[case::a_pipeline("free -m | tee -a \"$log\"", true)]
+#[case::single_quoted("echo 'free -m'", false)]
+#[case::double_quoted("echo \"free -m\"", false)]
+#[case::a_comment("# free -m", false)]
+#[case::a_trailing_comment("uptime  # free -m", false)]
+#[case::verdict_discarded("free -m || true", false)]
+#[case::verdict_discarded_with_colon("free -m || :", false)]
+#[case::one_line_guard("if false; then free -m; fi", false)]
+#[case::multi_line_guard("if false; then\n  free -m\nfi", false)]
+#[case::multi_line_guard_with_test("if [ 1 -eq 0 ]; then\n  free -m\nfi", false)]
+#[case::after_a_closed_guard("if false; then\n  true\nfi\nfree -m", true)]
+fn the_sampler_reading_judges_execution_not_text(#[case] run: &str, #[case] expected: bool) {
+    assert_eq!(
+        step_samples(run, "free -m"),
+        expected,
+        "`{run}` must {} as sampling `free -m`",
+        if expected { "read" } else { "not read" }
+    );
 }
