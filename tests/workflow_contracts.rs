@@ -5,11 +5,12 @@
 //! on the change that introduces a violation rather than on the CI run that
 //! suffers from it.
 //!
-//! This file is the harness. The rules live in four modules, split by the
+//! This file is the harness. The rules live in six modules, split by the
 //! question each asks: `supply_chain` for what the estate will execute,
 //! `placement` for what it costs and who owns each cache, `compiler_cache` for
-//! the sccache wiring and the resource sampling, and `parsing` for the loader
-//! itself.
+//! the sccache wiring and the resource sampling, `timeouts` for the ordering
+//! of the timers that can end a run, `timeout_budgets` for the arithmetic
+//! that ordering rests on, and `parsing` for the loader itself.
 
 #[path = "support/workflow_assertions.rs"]
 mod workflow_assertions;
@@ -32,6 +33,10 @@ mod parsing;
 mod placement;
 #[path = "contracts/supply_chain.rs"]
 mod supply_chain;
+#[path = "contracts/timeout_budgets.rs"]
+mod timeout_budgets;
+#[path = "contracts/timeouts.rs"]
+mod timeouts;
 
 use workflow_estate::SHARED_ACTIONS_OWNER;
 

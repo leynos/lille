@@ -609,15 +609,19 @@ two. A workflow contract in `tests/workflow_contracts.rs` fails if a second
 ### Workflow contracts
 
 `tests/workflow_contracts.rs` asserts the rules above. It is a harness rather
-than a test file: the rules live in four modules under `tests/contracts/`,
-split by the question each asks.
+than a test file: the rules live in six modules under `tests/contracts/`, split
+by the question each asks.
 
-| Module | Asks |
-| --- | --- |
-| `supply_chain.rs` | What will the estate execute? Pinned cache and shared-action references, no source-built tools, prebuilt Whitaker and sccache. |
-| `placement.rs` | What does it cost, and who owns each cache? Runner placement and labels, bounded timeouts, one owner per cached path, an installer before the first use of what it installs, a single test execution per build job, the uv cache key. |
-| `compiler_cache.rs` | Is sccache actually working? The two job-level variables, the export, install, start, build, report order, the proxy export, and the resource sampler with its report. |
-| `parsing.rs` | Does the loader read workflows correctly? Its subject is the loader, not any workflow in this repository. |
+| Module               | Asks                                                                                                                                                                                                                                                                                    |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `supply_chain.rs`    | What will the estate execute? Pinned cache and shared-action references, no source-built tools, prebuilt Whitaker and sccache.                                                                                                                                                          |
+| `placement.rs`       | What does it cost, and who owns each cache? Runner placement and labels, bounded timeouts, one owner per cached path, an installer before the first use of what it installs, a single test execution per build job, the uv cache key.                                                   |
+| `compiler_cache.rs`  | Is sccache actually working? The two job-level variables, the export, install, start, build, report order, the proxy export, and the resource sampler with its report.                                                                                                                  |
+| `parsing.rs`         | Does the loader read workflows correctly? Its subject is the loader, not any workflow in this repository.                                                                                                                                                                               |
+| `timeouts.rs`        | Which timer ends a run first? The coverage action's cargo watchdog set explicitly and by value, each coverage job's ceiling above that watchdog plus the measured work around it and equal to the documented 90 minutes, and the two nextest tiers absent rather than silently enabled. |
+| `timeout_budgets.rs` | Do the readings that ordering rests on say what they claim? The coordinate match, the ceiling predicate, and the two conversions, driven with values chosen to separate a correct reading from a plausible wrong one.                                                                   |
+
+*Table: the six contract modules, and the question each one asks of the estate.*
 
 Each module also pins the inputs that make its rules true, so a workflow cannot
 keep the shape of the policy while dropping its substance: `cache-provider`,
@@ -670,18 +674,137 @@ part of.
   in a comment.
 
 Two assurance methods are used together, following
-[ADR 003](adr-003-bounded-rstest-over-property-testing.md).
-The contract modules hold bounded `rstest` cases over the workflow files as
-they stand, and `tests/workflow_model_properties.rs` samples the wider domain
-with `proptest`: arbitrary step orderings, repeated display names, interleaved
-unrelated steps, actions that merely share the `actions/cache` prefix, and
-split caches whose halves agree or disagree on a key, or where a third step
-claims a paired key. The properties
-check cache-owner uniqueness and installer-ordering against small oracles
-written independently of the implementation. Run both with `make test`, and run
+[ADR 003](adr-003-bounded-rstest-over-property-testing.md). The contract
+modules hold bounded `rstest` cases over the workflow files as they stand, and
+`tests/workflow_model_properties.rs` samples the wider domain with `proptest`:
+arbitrary step orderings, repeated display names, interleaved unrelated steps,
+actions that merely share the `actions/cache` prefix, and split caches whose
+halves agree or disagree on a key, or where a third step claims a paired key.
+The properties check cache-owner uniqueness and installer-ordering against
+small oracles written independently of the implementation.
+
+A contract that requires a command to run reads each line and refuses the
+disabling forms rather than searching the whole `run` value:
+`if false; then free -m; fi` satisfies a substring search while sampling
+nothing, and `free -m || true` runs but discards its verdict. The refusal is
+narrow on purpose, because these samplers legitimately use pipes and command
+substitution, so only the disabling forms are rejected rather than every line
+that is more than a bare command. Contracts that forbid a command, such as the
+single-test-execution and no-source-build rules, keep the substring search:
+wrapping a prohibited command leaves its text in place, so the wrap makes those
+stricter rather than weaker. `timeout_budgets.rs` follows the same split for
+the ceiling arithmetic: bounded cases at the boundary, and a `proptest`
+property over the whole `u64` domain, since both a watchdog and a
+`timeout-minutes` are parsed from a workflow file and a value near the maximum
+is reachable by editing one. Both conversions saturate rather than wrap, so
+such a value stays preposterous instead of becoming a small number that fails
+the ordering for the wrong reason. Run both with `make test`, and run
 `actionlint` after editing any workflow.
 
 Only one restore and one save sharing a key count as a single owner. Two
 restores on the same key are two owners, and so are a matching pair plus a
 third step, because otherwise a genuine duplicate could hide behind the
 split-cache exception.
+
+### Test timeouts: the two tiers this repository has
+
+Four independent timers can end a test run, and the canonical statement of how
+they must be ordered lives in the `generate-coverage` README in
+[`leynos/shared-actions`][shared-actions-coverage]. Two of the four exist here.
+
+| Tier                     | What it bounds                     | Where it is set                                                                | Current value                                 |
+| ------------------------ | ---------------------------------- | ------------------------------------------------------------------------------ | --------------------------------------------- |
+| Per-test `slow-timeout`  | one test                           | nextest, not used here                                                         | absent                                        |
+| nextest `global-timeout` | the whole test run                 | nextest, not used here                                                         | absent                                        |
+| Cargo watchdog           | one `cargo` invocation, wall clock | `RUN_RUST_CARGO_WAIT_TIMEOUT` at job level in `ci.yml` and `coverage-main.yml` | 3,600 s (60 m)                                |
+| Job `timeout-minutes`    | the whole job                      | job level                                                                      | 90 m in both `ci.yml` and `coverage-main.yml` |
+
+*Table: the timers that can end a run, innermost first.*
+
+The two nextest tiers are absent by construction rather than by omission. The
+coverage step passes `use-cargo-nextest: 'false'`, so the instrumented run is
+`cargo llvm-cov` over plain `cargo test`, and there is no
+`.config/nextest.toml` for anyone to have set a per-test or whole-run budget
+in. Turning nextest on would introduce both tiers at once, unbounded,
+underneath a watchdog sized for neither, so the contract fails if the input
+changes and the guide has to change with it.
+
+#### The watchdog is the tier nobody expects
+
+It belongs to the shared `generate-coverage` action, which wraps the `cargo`
+invocation and kills it after a wall-clock budget. It defaults to 1,800 s, and
+nothing in this repository would mention it if a job stopped setting the
+variable. That default is not far above the work: the coverage step has already
+taken 1,728 s on run 33940327512.
+
+When it fires the step prints:
+
+```text
+::error::cargo did not exit within 3600s; killing. This is a budget, not a
+detected hang: raise the cargo-wait-timeout input, or
+RUN_RUST_CARGO_WAIT_TIMEOUT, if the build is legitimately slower. A cold
+sccache store makes the first run on a branch compile everything inside this
+budget.
+```
+
+Take the message at its word. Nothing was detected as hung. A budget expired,
+and on a cold compiler cache that is the expected outcome rather than a symptom.
+
+#### The clocks do not start together
+
+The job timer starts when the job starts, before the checkout, the toolchain
+setup and the cache restore, and it is still running through whatever follows
+the coverage step. The watchdog starts when `cargo` does. So a ceiling merely
+above the watchdog still cancels the job before the watchdog can report an
+overrun, and a cancellation discards the log that would have explained it.
+
+The ceiling is therefore sized as the watchdog plus the work outside its
+window, measured from the worst of several runs rather than one:
+
+| Lane                                  | Worst coverage step | Worst whole job | Outside the step | Run         |
+| ------------------------------------- | ------------------- | --------------- | ---------------- | ----------- |
+| `ci.yml` `build-test`                 | 1,702 s             | 2,354 s         | 859 s            | 33830336409 |
+| `coverage-main.yml` `coverage-upload` | 1,728 s             | 1,775 s         | 286 s            | 31892219565 |
+
+*Table: measured coverage-step and whole-job durations, read across fifteen
+successful `ci.yml` runs and twenty of `coverage-main.yml`.*
+
+The widest gap is 859 s, so the contract allows 15 minutes. That makes the
+requirement 3,600 s + 900 s = 75 minutes, and both lanes are set to 90, which
+is 15 minutes above it.
+
+`coverage-main.yml` was 75, sitting exactly on its requirement. That is enough
+to satisfy the contract and not enough to survive: a ceiling on its requirement
+has no slack, so the first cold run that spends the full watchdog is cancelled
+with budget left, and the cancellation discards the log that would have
+explained it. This job is always the cold writer, so it is the one lane where
+that is not hypothetical.
+
+`tests/contracts/timeouts.rs` asserts all of this by value over every job that
+invokes the coverage action, in both workflows. It requires the watchdog to be
+set explicitly rather than inherited, requires it to parse as whole seconds,
+requires each job's ceiling to clear the watchdog plus the allowance, and fails
+if a job declares no ceiling at all, since that would silently mean GitHub's
+six-hour default.
+
+It pins the two documented values as well as ordering them: the 3,600-second
+watchdog and the 90-minute ceiling. The derived check accepts any ceiling at or
+above 75 minutes, so on its own it would let either value drift away from this
+section without failing anything. Pinning them makes the guide and the
+workflows one statement.
+
+The coverage action is matched by its whole path, taking the part of `uses`
+before the `@` rather than testing the coordinate as a prefix. Every workflow
+here pins the action itself, so a prefix test passes on this tree while also
+claiming a sibling action whose name merely begins with the same text, and that
+sibling has no watchdog for these assertions to be about. A near-miss case
+covers it.
+
+The three-way ceiling decision is a named predicate rather than a branch inside
+the diagnostic. Both lanes sit fifteen minutes above their requirement, so the
+assertion over the workflows cannot tell a predicate that compares correctly
+from one that ignores the allowance entirely; the predicate is therefore driven
+directly with a ceiling on its requirement, one second below it, and none at
+all.
+
+[shared-actions-coverage]: https://github.com/leynos/shared-actions/blob/main/.github/actions/generate-coverage/README.md

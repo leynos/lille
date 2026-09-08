@@ -17,9 +17,18 @@ jobs:
     runs-on: ubicloud-standard-4
     # Ubicloud jobs bill by the minute, so a hung step must not run to the
     # 6-hour platform default. The eight-vCPU cold writer took 1,757 s, and
-    # this job is always the cold writer, so four vCPUs put it close to the
-    # old 60-minute bound. Raised to 75, still well short of a hang.
-    timeout-minutes: 75
+    # this job is always the cold writer, so halving it to four vCPUs is
+    # what took this lane past its original 60-minute bound and up to the
+    # 75 this change replaces.
+    #
+    # 90, not 75. The ordering requires the ceiling to clear the 3,600 s
+    # watchdog plus the 900 s allowed for work outside it, which is 75
+    # exactly. A ceiling sitting on its requirement has no slack: the first
+    # cold run that spends the full watchdog is cancelled with budget left,
+    # and a cancellation discards the log that would have explained it.
+    # This carries the same 15 minutes above the requirement that ci.yml's
+    # lane has at 90 against a requirement of 75.
+    timeout-minutes: 90
     permissions:
       contents: read
     env:
