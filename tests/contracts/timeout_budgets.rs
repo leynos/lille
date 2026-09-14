@@ -106,6 +106,24 @@ pub const fn ceiling_seconds(minutes: u64) -> u64 {
     minutes.saturating_mul(60)
 }
 
+/// The documented pair, evaluated where only a `const fn` can be.
+///
+/// Both conversions are `const fn`, and every other use of them here is
+/// a call from a test body, which is an ordinary runtime call and would
+/// go on compiling if the `const` were dropped. Binding the results to
+/// constants is what does not: this block fails to build the moment
+/// either function stops being usable where a constant is required.
+///
+/// The values are the guide's. A ninety-minute ceiling is 5,400 s, and
+/// the hour-long watchdog requires 4,500 s, so the arithmetic is
+/// checked at compile time as well as in the cases below.
+const _CONST_CONTEXT: () = {
+    const DOCUMENTED_CEILING_SECONDS: u64 = ceiling_seconds(90);
+    const DOCUMENTED_REQUIREMENT_SECONDS: u64 = required_ceiling(3_600);
+    assert!(DOCUMENTED_CEILING_SECONDS == 5_400);
+    assert!(DOCUMENTED_REQUIREMENT_SECONDS == 4_500);
+};
+
 #[rstest]
 #[case::the_action_itself("leynos/shared-actions/.github/actions/generate-coverage@abc", true)]
 #[case::an_unpinned_reference("leynos/shared-actions/.github/actions/generate-coverage", true)]

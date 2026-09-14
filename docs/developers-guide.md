@@ -562,19 +562,21 @@ two. A workflow contract in `tests/workflow_contracts.rs` fails if a second
 ### Workflow contracts
 
 `tests/workflow_contracts.rs` asserts the rules above. It is a harness rather
-than a test file: the rules live in six modules under `tests/contracts/`, split
-by the question each asks.
+than a test file: the rules live in seven modules under `tests/contracts/`,
+split by the question each asks.
 
 | Module               | Asks                                                                                                                                                                                                                                                                                    |
 | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `supply_chain.rs`    | What will the estate execute? Pinned cache and shared-action references, no source-built tools, prebuilt Whitaker and sccache.                                                                                                                                                          |
 | `placement.rs`       | What does it cost, and who owns each cache? Runner placement and labels, bounded timeouts, one owner per cached path, an installer before the first use of what it installs, a single test execution per build job, the uv cache key.                                                   |
 | `compiler_cache.rs`  | Is sccache actually working? The two job-level variables, the export, install, start, build, report order, the proxy export, and the resource sampler with its report.                                                                                                                  |
+| `sampler_reading.rs` | Does a line in a `run` script actually run? The quoting, comment, escape and guard reading that `compiler_cache.rs` asks its sampling question through, driven with shapes the workflows do not contain.                                                                                |
 | `parsing.rs`         | Does the loader read workflows correctly? Its subject is the loader, not any workflow in this repository.                                                                                                                                                                               |
 | `timeouts.rs`        | Which timer ends a run first? The coverage action's cargo watchdog set explicitly and by value, each coverage job's ceiling above that watchdog plus the measured work around it and equal to the documented 90 minutes, and the two nextest tiers absent rather than silently enabled. |
 | `timeout_budgets.rs` | Do the readings that ordering rests on say what they claim? The coordinate match, the ceiling predicate, and the two conversions, driven with values chosen to separate a correct reading from a plausible wrong one.                                                                   |
 
-*Table: the six contract modules, and the question each one asks of the estate.*
+*Table: the seven contract modules, and the question each one asks of the
+estate.*
 
 Each module also pins the inputs that make its rules true, so a workflow cannot
 keep the shape of the policy while dropping its substance: `cache-provider`,
@@ -642,8 +644,20 @@ disabling forms rather than searching the whole `run` value:
 nothing, and `free -m || true` runs but discards its verdict. The refusal is
 narrow on purpose, because these samplers legitimately use pipes and command
 substitution, so only the disabling forms are rejected rather than every line
-that is more than a bare command. Contracts that forbid a command, such as the
-single-test-execution and no-source-build rules, keep the substring search:
+that is more than a bare command.
+
+That reading works on shell words, not on letters, and it is the words that
+make it hold. The spacing between an operator and its operand is the shell's
+to choose, so `free -m ||    true` discards the verdict exactly as the
+one-space spelling does and a search for the text `|| true` misses it. A
+guard's depth counts the words `if` and `fi`, because `find` in a guard's body
+contains the letters `fi` and would otherwise close the guard and expose the
+lines beneath it as though they ran. A backslash makes the next character
+literal outside single quotes, so `echo "\$(free -m)"` prints the text and
+samples nothing, where the unescaped spelling beside it does sample.
+
+Contracts that forbid a command, such as the single-test-execution and
+no-source-build rules, keep the substring search:
 wrapping a prohibited command leaves its text in place, so the wrap makes those
 stricter rather than weaker. `timeout_budgets.rs` follows the same split for
 the ceiling arithmetic: bounded cases at the boundary, and a `proptest`
@@ -651,8 +665,10 @@ property over the whole `u64` domain, since both a watchdog and a
 `timeout-minutes` are parsed from a workflow file and a value near the maximum
 is reachable by editing one. Both conversions saturate rather than wrap, so
 such a value stays preposterous instead of becoming a small number that fails
-the ordering for the wrong reason. Run both with `make test`, and run
-`actionlint` after editing any workflow.
+the ordering for the wrong reason. Both are also `const fn`, which a call from
+a test body cannot demonstrate, so the module binds the documented pair to
+constants: dropping either `const` fails the build rather than a test. Run
+both with `make test`, and run `actionlint` after editing any workflow.
 
 Only one restore and one save sharing a key count as a single owner. Two
 restores on the same key are two owners, and so are a matching pair plus a

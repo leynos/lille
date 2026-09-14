@@ -5,12 +5,13 @@
 //! on the change that introduces a violation rather than on the CI run that
 //! suffers from it.
 //!
-//! This file is the harness. The rules live in six modules, split by the
+//! This file is the harness. The rules live in seven modules, split by the
 //! question each asks: `supply_chain` for what the estate will execute,
 //! `placement` for what it costs and who owns each cache, `compiler_cache` for
-//! the sccache wiring and the resource sampling, `timeouts` for the ordering
-//! of the timers that can end a run, `timeout_budgets` for the arithmetic
-//! that ordering rests on, and `parsing` for the loader itself.
+//! the sccache wiring and the resource sampling, `sampler_reading` for the
+//! shell reading that sampling requirement rests on, `timeouts` for the
+//! ordering of the timers that can end a run, `timeout_budgets` for the
+//! arithmetic that ordering rests on, and `parsing` for the loader itself.
 
 #[path = "support/workflow_assertions.rs"]
 mod workflow_assertions;
@@ -31,6 +32,8 @@ mod compiler_cache;
 mod parsing;
 #[path = "contracts/placement.rs"]
 mod placement;
+#[path = "contracts/sampler_reading.rs"]
+mod sampler_reading;
 #[path = "contracts/supply_chain.rs"]
 mod supply_chain;
 #[path = "contracts/timeout_budgets.rs"]
