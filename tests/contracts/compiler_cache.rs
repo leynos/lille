@@ -8,8 +8,8 @@
 
 use rstest::rstest;
 
-use crate::sampler_reading::{samples, Measure};
 use crate::shared_action;
+use crate::shell_reading::{samples, Measure};
 use crate::workflow_assertions::{assert_input, job_named, step_using, workflows};
 use crate::workflow_estate::{Workflow, BUILD_JOB_IDS};
 

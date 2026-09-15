@@ -9,10 +9,13 @@
 //! question each asks: `supply_chain` for what the estate will execute,
 //! `placement` for what it costs and who owns each cache, `compiler_cache` for
 //! the sccache wiring and the resource sampling, `sampler_reading` for the
-//! shell reading that sampling requirement rests on, `timeouts` for the
+//! cases that hold the `shell_reading` support module to what a shell
+//! would actually run, `timeouts` for the
 //! ordering of the timers that can end a run, `timeout_budgets` for the
 //! arithmetic that ordering rests on, and `parsing` for the loader itself.
 
+#[path = "support/shell_reading.rs"]
+mod shell_reading;
 #[path = "support/workflow_assertions.rs"]
 mod workflow_assertions;
 #[path = "support/workflow_cache_owners.rs"]

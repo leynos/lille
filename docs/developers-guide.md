@@ -570,7 +570,7 @@ split by the question each asks.
 | `supply_chain.rs`    | What will the estate execute? Pinned cache and shared-action references, no source-built tools, prebuilt Whitaker and sccache.                                                                                                                                                          |
 | `placement.rs`       | What does it cost, and who owns each cache? Runner placement and labels, bounded timeouts, one owner per cached path, an installer before the first use of what it installs, a single test execution per build job, the uv cache key.                                                   |
 | `compiler_cache.rs`  | Is sccache actually working? The two job-level variables, the export, install, start, build, report order, the proxy export, and the resource sampler with its report.                                                                                                                  |
-| `sampler_reading.rs` | Does a line in a `run` script actually run? The quoting, comment, escape and guard reading that `compiler_cache.rs` asks its sampling question through, driven with shapes the workflows do not contain.                                                                                |
+| `sampler_reading.rs` | Does a line in a `run` script actually run? The quoting, comment, escape, and guard reading in `tests/support/shell_reading.rs`, which `compiler_cache.rs` asks its sampling question through, driven with shapes the workflows do not contain.                                         |
 | `parsing.rs`         | Does the loader read workflows correctly? Its subject is the loader, not any workflow in this repository.                                                                                                                                                                               |
 | `timeouts.rs`        | Which timer ends a run first? The coverage action's cargo watchdog set explicitly and by value, each coverage job's ceiling above that watchdog plus the measured work around it and equal to the documented 90 minutes, and the two nextest tiers absent rather than silently enabled. |
 | `timeout_budgets.rs` | Do the readings that ordering rests on say what they claim? The coordinate match, the ceiling predicate, and the two conversions, driven with values chosen to separate a correct reading from a plausible wrong one.                                                                   |
@@ -593,7 +593,11 @@ types the properties and the contracts share;
 `Workflow` type, and the errors parsing reports, which only the contracts need.
 `tests/support/workflow_loader.rs` turns workflow files into those values, and
 `tests/support/workflow_config.rs` reads the other repository files a contract
-needs, currently `actionlint`'s runner registration. They are separate because
+needs, currently `actionlint`'s runner registration.
+`tests/support/shell_reading.rs` holds the bounded shell reading that separates
+a command from text that merely spells one; it sits in `support` because
+`compiler_cache.rs` asks a question through it while `sampler_reading.rs` asks
+a question about it. They are separate because
 the subject differs: a failure in one is a workflow that would not parse, in
 the other a configuration file that could not be read.
 
