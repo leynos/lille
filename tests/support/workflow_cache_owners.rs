@@ -39,7 +39,7 @@ pub struct CacheOwner {
 /// Paths a shared composite action caches when `cache-provider` is `github`.
 ///
 /// These mirror the action definitions at
-/// `leynos/shared-actions@3a2f2d5f17932657ddf50490a09ea5e7400ae35c`. A caller
+/// `leynos/shared-actions@c5a54701c8603a0fa756a6b34c49bc2af75a6c11`. A caller
 /// that sets `cache-provider: external` takes the path away from the action,
 /// which is how a second owner of the Cargo registry is avoided.
 const SHARED_ACTION_CACHES: [(&str, &[&str]); 3] = [

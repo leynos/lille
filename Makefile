@@ -1,6 +1,16 @@
 .PHONY: all clean build fmt check-fmt test test-observers-v1 lint build-support-run \
 	markdownlint nixie typecheck spelling
 
+# `make fmt` and `make check-fmt` call mdtablefix directly. `--git` selects the
+# Markdown files Git tracks and `--include-untracked` adds the untracked files
+# Git does not ignore, so a new document is formatted before it is staged.
+# Both modes need mdtablefix 0.6.0 or later; CI pins the version at the
+# install-mdtablefix step.
+MDLINT ?= $(shell command -v markdownlint-cli2 2>/dev/null || printf '%s' "$$HOME/.bun/bin/markdownlint-cli2")
+MDTABLEFIX ?= mdtablefix
+MDTABLEFIX_SELECT = --git --include-untracked
+MDTABLEFIX_RULES = --wrap --renumber --breaks --ellipsis --fences
+
 .ONESHELL:
 SHELL := bash
 # .ONESHELL feeds each recipe to one shell, so without -e only the last line's
@@ -44,10 +54,12 @@ typecheck:
 
 fmt:
 	cargo fmt $(WORKSPACE_PACKAGES)
-	mdformat-all
+	$(MDTABLEFIX) --in-place $(MDTABLEFIX_SELECT) $(MDTABLEFIX_RULES)
+	@unset FORCE_COLOR; $(MDLINT) --fix "**/*.md"
 
 check-fmt:
 	cargo fmt $(WORKSPACE_PACKAGES) -- --check
+	$(MDTABLEFIX) --check $(MDTABLEFIX_SELECT) $(MDTABLEFIX_RULES)
 
 build-support-run:
 	./scripts/build_support_runner.sh
