@@ -28,6 +28,9 @@ use crate::shell_reading::{step_samples, Measure};
 #[case::multi_line_guard_with_test("if [ 1 -eq 0 ]; then\n  free -m\nfi", false)]
 #[case::after_a_closed_guard("if false; then\n  true\nfi\nfree -m", true)]
 #[case::guard_body_naming_find("if false; then\n  find . -name x\n  free -m\nfi", false)]
+#[case::guard_after_a_close_on_one_line("fi; if false; then\n  free -m\nfi", false)]
+#[case::close_then_run_on_one_line("fi\nfree -m", true)]
+#[case::guard_opened_and_closed_on_one_line("if false; then true; fi\nfree -m", true)]
 fn the_sampler_reading_judges_execution_not_text(#[case] run: &str, #[case] expected: bool) {
     assert_eq!(
         step_samples(run, Measure("free -m")),

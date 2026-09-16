@@ -316,9 +316,9 @@ impl Tokens {
             .count()
     }
 
-    /// Returns whether the tokens carry a shape adjacently and in order.
-    fn carries(&self, shape: Shape) -> bool {
-        self.0.windows(shape.0.len()).any(|window| {
+    /// Returns where a shape begins, when the tokens carry it.
+    fn position(&self, shape: Shape) -> Option<usize> {
+        self.0.windows(shape.0.len()).position(|window| {
             window
                 .iter()
                 .zip(shape.0)
@@ -326,14 +326,30 @@ impl Tokens {
         })
     }
 
+    /// Returns whether the tokens carry a shape adjacently and in order.
+    fn carries(&self, shape: Shape) -> bool {
+        self.position(shape).is_some()
+    }
+
     /// Returns whether the line throws away the verdict of what it ran.
     fn discards_verdict(&self) -> bool {
         DISABLING_FORMS.iter().any(|form| self.carries(*form))
     }
 
-    /// Returns whether the line opens a guard whose body never runs.
-    fn opens_disabling_guard(&self) -> bool {
-        DISABLING_GUARDS.iter().any(|guard| self.carries(*guard))
+    /// Returns the depth a guard whose body never runs opens here.
+    ///
+    /// Counted from the guard onwards, not over the whole line. A line
+    /// may close an earlier block before opening this guard, as
+    /// `fi; if false; then` does, and counting over the whole line then
+    /// cancels the guard against a `fi` belonging to something else,
+    /// leaving the guarded body reading as executable.
+    fn disabling_guard_depth(&self) -> Option<usize> {
+        let start = DISABLING_GUARDS
+            .iter()
+            .filter_map(|guard| self.position(*guard))
+            .min()?;
+        let body = Self(self.0.get(start..)?.to_vec());
+        Some(body.count(IF).saturating_sub(body.count(FI)))
     }
 }
 
@@ -369,8 +385,8 @@ pub fn step_samples(run: &str, measure: Measure) -> bool {
             guard_depth = guard_depth.saturating_add(opens).saturating_sub(closes);
             continue;
         }
-        if tokens.opens_disabling_guard() {
-            guard_depth = opens.saturating_sub(closes);
+        if let Some(depth) = tokens.disabling_guard_depth() {
+            guard_depth = depth;
             continue;
         }
         if line.names(measure) && !tokens.discards_verdict() {
