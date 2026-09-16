@@ -914,12 +914,12 @@ and the logic systems use that data. The plugin is just the bridge.
 
 Before spawning the primary map, the plugin validates the `primary_map` path
 configured on `LilleMapSettings`. The path must be a relative asset-server
-path; anything else is rejected and no primary map is spawned. Rejection
-emits a `LilleMapError::InvalidPrimaryMapAssetPath` event carrying the
-offending path, which the plugin’s observer logs rather than panicking on.
-Parent-directory traversal is rejected only when `..` forms a whole path
-component (checked against both `/` and `\` separators), so a filename that
-merely contains `..` as a substring is still accepted.
+path; anything else is rejected and no primary map is spawned. Rejection emits a
+`LilleMapError::InvalidPrimaryMapAssetPath` event carrying the offending path,
+which the plugin’s observer logs rather than panicking on. Parent-directory
+traversal is rejected only when `..` forms a whole path component (checked
+against both `/` and `\` separators), so a filename that merely contains `..`
+as a substring is still accepted.
 
 - **Rejected:** an empty path.
 - **Rejected:** an absolute path, for example `/etc/maps/primary.tmx`.
@@ -1040,45 +1040,39 @@ they run after the map spawn, but using events largely decouples that ordering):
 
 System order is well defined. `bevy_ecs_tiled` emits `TiledEvent<MapCreated>`
 from its internal `process_loaded_maps` system, which runs in the `PreUpdate`
-schedule under the `TiledPreUpdateSystems::ProcessLoadedMaps` system
-set, after layer, tile, and object entities and their custom
-properties have been spawned. `TiledEvent<E>` is delivered both as a
-triggered entity event, observable synchronously regardless of
-schedule ordering, and as a buffered `Message`, readable via
-`MessageReader<TiledEvent<MapCreated>>`. A buffered reader placed in
-`Update` or later sees the message in the same frame, because
-emission happens earlier in `PreUpdate`. A reader that must run in
-`PreUpdate` alongside emission should be ordered
-`.after(TiledPreUpdateSystems::ProcessLoadedMaps)`.
+schedule under the `TiledPreUpdateSystems::ProcessLoadedMaps` system set, after
+layer, tile, and object entities and their custom properties have been spawned.
+`TiledEvent<E>` is delivered both as a triggered entity event, observable
+synchronously regardless of schedule ordering, and as a buffered `Message`,
+readable via `MessageReader<TiledEvent<MapCreated>>`. A buffered reader placed
+in `Update` or later sees the message in the same frame, because emission
+happens earlier in `PreUpdate`. A reader that must run in `PreUpdate` alongside
+emission should be ordered `.after(TiledPreUpdateSystems::ProcessLoadedMaps)`.
 
-`LilleMapPlugin` registers the post-processing as separate `Update`
-systems rather than one combined system: `attach_collision_blocks`
-(adding blocks and slopes) and `spawn_actors_at_spawn_points` (spawning
-the player and NPCs) each hold their own
-`MessageReader<TiledEvent<MapCreated>>`, alongside
-`monitor_primary_map_load_state`. Each system therefore waits
-independently for the same message, and all of them observe a fully
-populated map because the event is emitted only after every object
-exists.
+`LilleMapPlugin` registers the post-processing as separate `Update` systems
+rather than one combined system: `attach_collision_blocks` (adding blocks and
+slopes) and `spawn_actors_at_spawn_points` (spawning the player and NPCs) each
+hold their own `MessageReader<TiledEvent<MapCreated>>`, alongside
+`monitor_primary_map_load_state`. Each system therefore waits independently for
+the same message, and all of them observe a fully populated map because the
+event is emitted only after every object exists.
 
-Once-per-map-load behaviour comes from two gates rather than from
-single-system scheduling. The `MessageReader` gate means each reader
-independently tracks the messages it has not yet read and consumes each
-message exactly once, so no reader acts on the same `MapCreated` twice.
-Handling happens on the delivery frame because `MapCreated` is emitted
-during `PreUpdate`, before the `Update` consumers run; a reader
-scheduled so that it does not run that frame still observes the
-retained message later rather than missing it. Marker components then
-make the work idempotent for the entities involved:
-`spawn_actors_at_spawn_points` queries
-`Without<PlayerSpawnConsumed>` and `Without<SpawnPointConsumed>` and
-inserts those markers as it consumes each spawn point, so a spawn
-marker is never processed twice, and `attach_collision_blocks` skips
-tiles that already carry a `Block`.
+Once-per-map-load behaviour comes from two gates rather than from single-system
+scheduling. The `MessageReader` gate means each reader independently tracks the
+messages it has not yet read and consumes each message exactly once, so no
+reader acts on the same `MapCreated` twice. Handling happens on the delivery
+frame because `MapCreated` is emitted during `PreUpdate`, before the `Update`
+consumers run; a reader scheduled so that it does not run that frame still
+observes the retained message later rather than missing it. Marker components
+then make the work idempotent for the entities involved:
+`spawn_actors_at_spawn_points` queries `Without<PlayerSpawnConsumed>` and
+`Without<SpawnPointConsumed>` and inserts those markers as it consumes each
+spawn point, so a spawn marker is never processed twice, and
+`attach_collision_blocks` skips tiles that already carry a `Block`.
 
-The pseudo-code below shows the whole of that work in one system, to keep
-the sequence readable in a single listing; the shipped code splits it
-across the systems described above:
+The pseudo-code below shows the whole of that work in one system, to keep the
+sequence readable in a single listing; the shipped code splits it across the
+systems described above:
 
 ```rust
 fn on_map_loaded(

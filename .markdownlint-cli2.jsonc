@@ -15,6 +15,11 @@
     "**/node_modules/**",
     "**/target/**",
     // Vendored upstream crate fork; not subject to this repo's Markdown style.
-    "third_party/feldera-size-of/**"
+    "third_party/feldera-size-of/**",
+    ".vtcode/**",
+    ".terraform/**",
+    ".uv-cache/**",
+    "memories/**",
+    "CRUSH.md"
   ]
 }

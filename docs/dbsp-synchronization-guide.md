@@ -7,15 +7,14 @@ scheduled, how per-frame state is tracked and rolled back on failure, how
 circuit outputs are applied back to components, and the local tooling used to
 lint the `dbsp_sync` module.
 
-For the circuit's data model and dataflow construction, see [Declarative
-world inference with DBSP and Rust](
-declarative-world-inference-with-dbsp-and-rust.md). For the health and damage
-synchronization protocol in more depth, see §3.5 of [Lille physics engine
-design](lille-physics-engine-design.md). For the test-writing patterns used
-throughout `dbsp_sync`, see [Testing declarative game logic in DBSP](
-testing-declarative-game-logic-in-dbsp.md). For the `observers-v1-spike`
-feature's effect on scheduling, see [ADR-001: DBSP Observers V1 spike](
-adr-001-dbsp-observers-v1-spike.md).
+For the circuit's data model and dataflow construction, see
+[Declarative world inference with DBSP and Rust]( declarative-world-inference-with-dbsp-and-rust.md).
+For the health and damage synchronization protocol in more depth, see §3.5 of
+[Lille physics engine design](lille-physics-engine-design.md). For the
+test-writing patterns used throughout `dbsp_sync`, see
+[Testing declarative game logic in DBSP]( testing-declarative-game-logic-in-dbsp.md).
+For the `observers-v1-spike` feature's effect on scheduling, see
+[ADR-001: DBSP Observers V1 spike]( adr-001-dbsp-observers-v1-spike.md).
 
 ## 1. Frame lifecycle
 
@@ -23,15 +22,14 @@ adr-001-dbsp-observers-v1-spike.md).
 systems into the app during plugin construction:
 
 1. It registers `log_dbsp_error` as an observer of `DbspSyncError` events, so
-   failures are logged (via `error!`) even when raised before any schedule
-   runs.
+   failures are logged (via `error!`) even when raised before any schedule runs.
 2. Under the `observers-v1-spike` feature, it also registers
    `observers_v1::buffer_damage_ingress`.
 3. It calls `init_dbsp_system` synchronously to construct the `DbspCircuit`
-   and insert the `DbspState` non-send resource. If circuit construction
-   fails, it triggers a `DbspSyncError` with context `Init` and returns
-   *without* registering the sync chain — the plugin is otherwise inert for
-   the rest of the app's lifetime.
+   and insert the `DbspState` non-send resource. If circuit construction fails,
+   it triggers a `DbspSyncError` with context `Init` and returns *without*
+   registering the sync chain — the plugin is otherwise inert for the rest of
+   the app's lifetime.
 4. It initializes the `DamageInbox` resource, schedules
    `init_world_handle_system` at `Startup`, and calls `add_dbsp_sync_chain`.
 
@@ -62,9 +60,9 @@ Within a single pass of the chain:
 
 ## 2. Frame-rollback API on `DbspState`
 
-`cache_state_for_dbsp_impl` mutates several `DbspState` bookkeeping
-collections before it is known whether `apply_dbsp_outputs_system` will
-successfully step the circuit this frame:
+`cache_state_for_dbsp_impl` mutates several `DbspState` bookkeeping collections
+before it is known whether `apply_dbsp_outputs_system` will successfully step
+the circuit this frame:
 
 - `health_snapshot`: the last `HealthState` pushed per entity, drained and
   retracted (`-1` weight) so this frame can push a fresh snapshot.
@@ -77,28 +75,26 @@ successfully step the circuit this frame:
 
 `health_snapshot`, `pending_damage_retractions`, and `applied_unsequenced`
 persist meaningfully frame-to-frame, so `rollback_frame_tracking()` restores
-each to its pre-frame value on a failed step. `expected_health_retractions`
-is different: it is transient rather than persistent state.
+each to its pre-frame value on a failed step. `expected_health_retractions` is
+different: it is transient rather than persistent state.
 `cache_state_for_dbsp_impl` clears and rebuilds it from scratch at the very
-start of every pass, before any retraction is issued, and it is only ever
-read within that same frame — inside `should_apply_health_delta`
-(`src/dbsp_sync/output/mod.rs`) — to suppress `HealthDelta` outputs that
-merely echo a retraction this frame already issued. Because the next
-frame's cache pass unconditionally clears it before reading it, leaving it
-"advanced" after a failed step has no observable effect under the current
-`.chain()`-ordered systems (`src/dbsp_sync/plugin.rs`).
-`rollback_frame_tracking()` clears it anyway: this is defensive
-completeness, not a fix for an observed bug — it stops correctness
-depending on that chained ordering holding forever.
+start of every pass, before any retraction is issued, and it is only ever read
+within that same frame — inside `should_apply_health_delta`
+(`src/dbsp_sync/output/mod.rs`) — to suppress `HealthDelta` outputs that merely
+echo a retraction this frame already issued. Because the next frame's cache
+pass unconditionally clears it before reading it, leaving it "advanced" after a
+failed step has no observable effect under the current `.chain()`-ordered
+systems (`src/dbsp_sync/plugin.rs`). `rollback_frame_tracking()` clears it
+anyway: this is defensive completeness, not a fix for an observed bug — it
+stops correctness depending on that chained ordering holding forever.
 
 If `state.step_circuit()` later fails, these mutations must be undone: the
 circuit's inputs are cleared without ever being accepted, so the Rust-side
-bookkeeping must be restored to match what the circuit actually holds (that
-is, nothing from this frame). `DbspState` exposes five methods to restore
-three of the four collections above (`health_snapshot`,
-`pending_damage_retractions`, and `applied_unsequenced`) and clear the
-fourth (`expected_health_retractions`), without a per-frame deep clone of
-the tracking state:
+bookkeeping must be restored to match what the circuit actually holds (that is,
+nothing from this frame). `DbspState` exposes five methods to restore three of
+the four collections above (`health_snapshot`, `pending_damage_retractions`, and
+`applied_unsequenced`) and clear the fourth (`expected_health_retractions`),
+without a per-frame deep clone of the tracking state:
 
 - **`begin_frame_rollback()`** — called at the very start of
   `cache_state_for_dbsp_impl`. Resets `health_snapshot_backup` and
@@ -106,16 +102,16 @@ the tracking state:
   log, starting a fresh rollback record for this frame.
 - **`record_unsequenced_undo(entity)`** — called from `ingest_damage_events`
   for each *unsequenced* damage event, immediately before the entity's
-  `applied_unsequenced` entry is mutated by the deduplication check. It
-  records that entity's prior `applied_unsequenced` value once per frame
-  (repeat calls for the same entity in the same frame are no-ops), so a
-  rollback can restore exactly that value later.
+  `applied_unsequenced` entry is mutated by the deduplication check. It records
+  that entity's prior `applied_unsequenced` value once per frame (repeat calls
+  for the same entity in the same frame are no-ops), so a rollback can restore
+  exactly that value later.
 - **`stash_frame_rollback(health_snapshot, pending_damage)`** — called once,
-  at the end of `cache_state_for_dbsp_impl`, after the cache pass has
-  finished mutating the live state. It stores the `Vec<HealthState>` and
+  at the end of `cache_state_for_dbsp_impl`, after the cache pass has finished
+  mutating the live state. It stores the `Vec<HealthState>` and
   `Vec<DamageEvent>` that were already extracted from the live collections
-  earlier in the pass (via `collect_previous_health_snapshots` and
-  `mem::take`) as the frame's backups.
+  earlier in the pass (via `collect_previous_health_snapshots` and `mem::take`)
+  as the frame's backups.
 - **`commit_frame_tracking()`** — called by `apply_dbsp_outputs_system` after
   a successful `step_circuit()` call. Discards the backups and undo log, so a
   later, stray call to `rollback_frame_tracking()` cannot revert this frame's
@@ -125,28 +121,28 @@ the tracking state:
   backed-up `Vec<HealthState>` (keyed by `entity`), restores
   `pending_damage_retractions` from the backed-up `Vec<DamageEvent>`, clears
   `expected_health_retractions`, and replays the `applied_unsequenced_undo`
-  log: entities with a recorded prior value have it reinserted; entities
-  with a recorded `None` (meaning they had no entry before this frame) have
-  their entry removed.
+  log: entities with a recorded prior value have it reinserted; entities with a
+  recorded `None` (meaning they had no entry before this frame) have their
+  entry removed.
 
-The design goal is to avoid deep-cloning the whole tracking state every
-frame. The health/damage backups reuse the same vectors the cache pass
-already extracts via `mem::take`/`drain`-style moves — no extra clone is
-taken solely for rollback purposes. The `applied_unsequenced` undo log takes
-a different approach because that collection is a map mutated key-by-key
-rather than wholesale: instead of cloning the whole map,
-`applied_unsequenced_undo` records only the prior value for each entity
-actually touched this frame, the first time it is touched.
+The design goal is to avoid deep-cloning the whole tracking state every frame.
+The health/damage backups reuse the same vectors the cache pass already
+extracts via `mem::take`/`drain`-style moves — no extra clone is taken solely
+for rollback purposes. The `applied_unsequenced` undo log takes a different
+approach because that collection is a map mutated key-by-key rather than
+wholesale: instead of cloning the whole map, `applied_unsequenced_undo` records
+only the prior value for each entity actually touched this frame, the first
+time it is touched.
 
 This is exercised directly in `src/dbsp_sync/state/tests.rs`'s unit tests:
 `rollback_restores_health_snapshot_and_pending_damage` covers the health and
 pending-damage backups; `stash_frame_rollback_keeps_first_values` asserts a
-second `stash_frame_rollback` call in the same frame cannot overwrite the
-true pre-frame values with already-advanced ones; and
-`applied_unsequenced_rollback_matrix` is a parameterized test over whether
-the entity had a prior entry, whether the undo was recorded once or twice,
-and whether the frame commits or rolls back — asserting rollback restores
-the exact pre-frame value and commit makes a later rollback a no-op.
+second `stash_frame_rollback` call in the same frame cannot overwrite the true
+pre-frame values with already-advanced ones; and
+`applied_unsequenced_rollback_matrix` is a parameterized test over whether the
+entity had a prior entry, whether the undo was recorded once or twice, and
+whether the frame commits or rolls back — asserting rollback restores the exact
+pre-frame value and commit makes a later rollback a no-op.
 
 ## 3. Step-failure handling
 
@@ -162,24 +158,23 @@ the exact pre-frame value and commit makes a later rollback a no-op.
    the schedule's next command-application point — not synchronously at this
    line.
 2. Independently of when that trigger flushes, the system synchronously
-   clears every circuit input handle via `state.circuit.clear_inputs()`, so
-   the buffered records this frame's cache pass pushed (positions,
-   velocities, health state, damage events) are never replayed on a later,
-   successful frame.
+   clears every circuit input handle via `state.circuit.clear_inputs()`, so the
+   buffered records this frame's cache pass pushed (positions, velocities,
+   health state, damage events) are never replayed on a later, successful frame.
 3. It then calls `state.rollback_frame_tracking()` to restore the pre-frame
    `health_snapshot`, `pending_damage_retractions`, and `applied_unsequenced`
    entries, and to clear `expected_health_retractions`, as described in
    [§2](#2-frame-rollback-api-on-dbspstate). Clearing the inputs alone would
-   leave that bookkeeping pointing at records the circuit never accepted,
-   which would corrupt the retractions the *next* frame's cache pass issues.
+   leave that bookkeeping pointing at records the circuit never accepted, which
+   would corrupt the retractions the *next* frame's cache pass issues.
 4. The function returns early. `apply_positions`, `apply_velocities`, and
-   `apply_health_deltas` are never called on a failed step, so no ECS
-   component is mutated — the circuit remains the sole authority and no
-   partial writes occur.
+   `apply_health_deltas` are never called on a failed step, so no ECS component
+   is mutated — the circuit remains the sole authority and no partial writes
+   occur.
 
 On success, the system applies outputs (see [§4](#4-output-weight-semantics)),
-drains any remaining circuit output via `take_from_all()` on each output
-handle so stale values cannot be reapplied next frame, clears
+drains any remaining circuit output via `take_from_all()` on each output handle
+so stale values cannot be reapplied next frame, clears
 `expected_health_retractions` and the circuit's inputs, and finally calls
 `state.commit_frame_tracking()` to discard the now-unneeded rollback backups.
 
@@ -190,17 +185,17 @@ that a failed step leaves the ECS `Transform` untouched;
 successful run does not replay the cleared inputs;
 `failed_step_rolls_back_health_tracking` runs a full pipeline (two real
 `app.update()` calls) to assert that `DbspState::health_snapshot` after a
-failed step exactly matches its value before that frame's cache pass ran;
-and `rolled_back_retraction_markers_do_not_suppress_a_later_delta` primes a
-stray `expected_health_retractions` marker before rolling back, then asserts
-a later, legitimate `HealthDelta` for the same `(entity, at_tick, seq)` is
-still applied rather than silently swallowed.
+failed step exactly matches its value before that frame's cache pass ran; and
+`rolled_back_retraction_markers_do_not_suppress_a_later_delta` primes a stray
+`expected_health_retractions` marker before rolling back, then asserts a later,
+legitimate `HealthDelta` for the same `(entity, at_tick, seq)` is still applied
+rather than silently swallowed.
 
 ## 4. Output weight semantics
 
 `apply_positions`, `apply_velocities`, `apply_health_deltas`, and
-`report_movement_aggregations` (all in `src/dbsp_sync/output/mod.rs`) each
-read from a DBSP output handle (`new_position_out`, `new_velocity_out`,
+`report_movement_aggregations` (all in `src/dbsp_sync/output/mod.rs`) each read
+from a DBSP output handle (`new_position_out`, `new_velocity_out`,
 `health_delta_out`, and `movement_aggregation_out` respectively), call
 `.consolidate()` on it, and iterate the resulting `(record, (), weight)`
 tuples. Each loop begins with the same guard:
@@ -212,25 +207,24 @@ if weight <= 0 {
 ```
 
 Unlike the other three, `report_movement_aggregations` does not write a
-surviving record to an ECS component; it logs a `warn!` diagnostic naming
-the entity and its total weight, reporting that the circuit collapsed
-several movement decisions for that entity.
+surviving record to an ECS component; it logs a `warn!` diagnostic naming the
+entity and its total weight, reporting that the circuit collapsed several
+movement decisions for that entity.
 
 DBSP's `consolidate()` merges every contribution to a Z-set by key and
 **removes entries whose net weight is zero** — a record present with equal
 positive and negative weight contributions in the same batch simply does not
-appear in the consolidated output. Consequently, the `weight <= 0` guard
-never observes a genuine zero-weight record in practice; its operative
-effect is skipping records with a strictly **negative** weight, which
-represent retractions (for example, an entity's previous position or health
-snapshot being withdrawn as part of the retract/reinsert pattern described
-in [§2](#2-frame-rollback-api-on-dbspstate)). The `<= 0` comparison, rather
-than `< 0`, is written defensively against any non-positive weight rather
-than to handle an expected zero-weight case.
+appear in the consolidated output. Consequently, the `weight <= 0` guard never
+observes a genuine zero-weight record in practice; its operative effect is
+skipping records with a strictly **negative** weight, which represent
+retractions (for example, an entity's previous position or health snapshot
+being withdrawn as part of the retract/reinsert pattern described in
+[§2](#2-frame-rollback-api-on-dbspstate)). The `<= 0` comparison, rather than
+`< 0`, is written defensively against any non-positive weight rather than to
+handle an expected zero-weight case.
 
 This is exercised by dedicated tests asserting a negative-weight record does
-not mutate its target component:
-`negative_weight_position_is_not_applied` and
+not mutate its target component: `negative_weight_position_is_not_applied` and
 `negative_weight_velocity_is_not_applied` (in
 `src/dbsp_sync/output/tests/mod.rs` and
 `src/dbsp_sync/output/tests/edge_cases.rs` respectively) push a position or
@@ -252,36 +246,36 @@ lint:
 	$(RUST_FLAGS_ENV) $(WHITAKER) --all -- --all-targets --all-features
 ```
 
-1. `cargo doc --workspace --no-deps` with `RUSTDOCFLAGS` set to `--cfg
-   docsrs -D warnings`, so broken intra-doc links or other rustdoc warnings
-   fail the build.
+1. `cargo doc --workspace --no-deps` with `RUSTDOCFLAGS` set to
+   `--cfg docsrs -D warnings`, so broken intra-doc links or other rustdoc
+   warnings fail the build.
 2. `cargo clippy --all-targets --all-features -- -D warnings`.
-3. The Whitaker Dylint suite, invoked as `whitaker --all -- --all-targets
-   --all-features` (the `whitaker` binary is looked up on `PATH` by default;
-   override it by setting the `WHITAKER` make variable).
+3. The Whitaker Dylint suite, invoked as
+   `whitaker --all -- --all-targets --all-features` (the `whitaker` binary is
+   looked up on `PATH` by default; override it by setting the `WHITAKER` make
+   variable).
 
-CI (`.github/workflows/ci.yml`) runs the same clippy and Whitaker checks in
-its "Lint" step, but first has to ensure the `whitaker-installer` and
-`whitaker` binaries are present. The "Install the Whitaker Dylint suite"
-step:
+CI (`.github/workflows/ci.yml`) runs the same clippy and Whitaker checks in its
+"Lint" step, but first has to ensure the `whitaker-installer` and `whitaker`
+binaries are present. The "Install the Whitaker Dylint suite" step:
 
 - Reuses a cached `whitaker-installer` binary (restored from
   `~/.cargo/bin/whitaker-installer` and `~/.cache/cargo-binstall` by
-  `actions/cache`) only when its reported `whitaker-installer --version`
-  output exactly matches the pinned `WHITAKER_INSTALLER_VERSION` environment
-  variable defined in `.github/workflows/ci.yml`. A bare presence check or a
-  substring match on the version string is deliberately avoided, since
-  either could accept a stale or near-miss version.
+  `actions/cache`) only when its reported `whitaker-installer --version` output
+  exactly matches the pinned `WHITAKER_INSTALLER_VERSION` environment variable
+  defined in `.github/workflows/ci.yml`. A bare presence check or a substring
+  match on the version string is deliberately avoided, since either could
+  accept a stale or near-miss version.
 - Otherwise, it installs `whitaker-installer`, preferring `cargo binstall`:
   it checks `cargo binstall --version` succeeds, then attempts to binstall
   `whitaker-installer` pinned to `WHITAKER_INSTALLER_VERSION` with
-  `--no-confirm --locked`. If `cargo binstall` is unavailable, or that
-  install attempt fails, it falls back to a locked source build: `cargo
+  `--no-confirm --locked`. If `cargo binstall` is unavailable, or that install
+  attempt fails, it falls back to a locked source build:
+  `cargo
   install --locked whitaker-installer --version
   "${WHITAKER_INSTALLER_VERSION}"`.
 - Finally runs `whitaker-installer` (with no arguments) to complete
-  installation of the `whitaker` tool itself before the "Lint" step invokes
-  it.
+  installation of the `whitaker` tool itself before the "Lint" step invokes it.
 
 > The exact behaviour of the bare `whitaker-installer` invocation (for
 > example, which `whitaker` binary version it installs and where) is not
@@ -290,15 +284,15 @@ step:
 
 ## 6. Testing strategy for invariants
 
-The DBSP-sync and map lifecycle code has several small, finite invariants
-that must hold exactly — not merely "usually" — because they govern
-correctness properties such as at-most-one decision per entity or exact
-frame rollback. These invariants are covered in two layers: **bounded, near-exhaustive
-`rstest` case matrices** plus focused regression tests, using the `rstest`
-stack already in use throughout the codebase (see [Mastering test fixtures
-in Rust with `rstest`](rust-testing-with-rstest-fixtures.md)); and **sampled
-`proptest` properties** that supplement those matrices over the domains a
-matrix can only sample from.
+The DBSP-sync and map lifecycle code has several small, finite invariants that
+must hold exactly — not merely "usually" — because they govern correctness
+properties such as at-most-one decision per entity or exact frame rollback.
+These invariants are covered in two layers: **bounded, near-exhaustive `rstest`
+case matrices** plus focused regression tests, using the `rstest` stack already
+in use throughout the codebase (see
+[Mastering test fixtures in Rust with `rstest`](rust-testing-with-rstest-fixtures.md));
+and **sampled `proptest` properties** that supplement those matrices over the
+domains a matrix can only sample from.
 
 The invariant-heavy paths and their concrete test entry points are:
 
@@ -310,8 +304,9 @@ The invariant-heavy paths and their concrete test entry points are:
   `src/dbsp_circuit/streams/behaviour/decide/tests.rs`, by
   `duplicate_targets_produce_single_decision` in
   `src/dbsp_circuit/streams/behaviour/tests.rs`, and over generated weighted
-  decision sets by `properties::to_decision_matches_the_overflow_safe_weight_oracle`
-  and `properties::dedupe_emits_at_most_one_decision_of_multiplicity_one`.
+  decision sets by
+  `properties::to_decision_matches_the_overflow_safe_weight_oracle` and
+  `properties::dedupe_emits_at_most_one_decision_of_multiplicity_one`.
 - **Frame rollback** — exact pre-frame restoration of `health_snapshot`,
   `pending_damage_retractions`, and `applied_unsequenced` on a failed
   `step_circuit()` call, versus retention of the frame's changes on commit.
@@ -322,47 +317,45 @@ The invariant-heavy paths and their concrete test entry points are:
   in the same module.
 - **Asset-path validation** — rejection of rooted paths and standalone `..`
   traversal components (checked against both `/` and `\` separators), versus
-  acceptance of relative paths where `..` appears only as a substring.
-  Covered by `validate_asset_path_component_matrix` in
-  `src/map/lifecycle/tests.rs`, and over arbitrary strings by
-  `properties::validate_asset_path_agrees_with_the_documented_contract` in
-  the same module.
+  acceptance of relative paths where `..` appears only as a substring. Covered
+  by `validate_asset_path_component_matrix` in `src/map/lifecycle/tests.rs`,
+  and over arbitrary strings by
+  `properties::validate_asset_path_agrees_with_the_documented_contract` in the
+  same module.
 - **Non-positive output weights** — retractions (negative-weight records)
   are ignored rather than applied to ECS components, as are zero-weight
   records. Covered by the tests named in [§4](#4-output-weight-semantics).
 
 ### Why both matrices and properties
 
-Property-based *sampling* (`proptest`) and formal *proof* tools (Kani,
-Verus) are different classes of tool. `proptest` draws randomized samples
-from an input domain; Kani and Verus instead prove a property over a bounded
-or whole domain. `proptest` is a development-only workspace dependency and
-is used here; Kani and Verus are not adopted.
+Property-based *sampling* (`proptest`) and formal *proof* tools (Kani, Verus)
+are different classes of tool. `proptest` draws randomized samples from an
+input domain; Kani and Verus instead prove a property over a bounded or whole
+domain. `proptest` is a development-only workspace dependency and is used here;
+Kani and Verus are not adopted.
 
 The two layers answer different questions, which is why neither replaces the
 other.
 
-The bounded `rstest` matrices are **exhaustive over the finite dimensions
-they enumerate** — the rollback/commit orderings, and the
-prior-entry/repeat-undo/commit-vs-rollback state combinations. Sampling
-cannot improve on a complete enumeration, so the matrices stay the canonical
-statement of those invariants.
+The bounded `rstest` matrices are **exhaustive over the finite dimensions they
+enumerate** — the rollback/commit orderings, and the
+prior-entry/repeat-undo/commit-vs-rollback state combinations. Sampling cannot
+improve on a complete enumeration, so the matrices stay the canonical statement
+of those invariants.
 
 For the movement-decision weights (`i64`-valued) the domain is large but
 finite, and for asset-path strings it is genuinely unbounded. There a matrix
-can only enumerate representative **equivalence classes** (positive,
-negative, and net-zero weights; rooted, `..`-component, and substring-`..`
-path forms). The `proptest` properties cover those **broader domains by
-sampling**: arbitrary path strings, weighted decision sets drawn from the
-full `i64` weight range, and generated sequences of frame-rollback lifecycle
-actions, each checked against a small independent oracle or reference model.
-Sampling is not a proof — a passing run is not evidence that no
-counter-example exists — but it reaches value classes no handwritten matrix
-enumerates.
+can only enumerate representative **equivalence classes** (positive, negative,
+and net-zero weights; rooted, `..`-component, and substring-`..` path forms).
+The `proptest` properties cover those **broader domains by sampling**:
+arbitrary path strings, weighted decision sets drawn from the full `i64` weight
+range, and generated sequences of frame-rollback lifecycle actions, each
+checked against a small independent oracle or reference model. Sampling is not
+a proof — a passing run is not evidence that no counter-example exists — but it
+reaches value classes no handwritten matrix enumerates.
 
 The rationale for keeping the deterministic matrices, and the record of when
-`proptest` was adopted alongside them, is in [ADR-003: bounded `rstest`
-matrices over a property-testing
-framework](adr-003-bounded-rstest-over-property-testing.md). Should a domain
-warrant assurance stronger than sampling, a bounded model checker such as
-Kani would be the next escalation.
+`proptest` was adopted alongside them, is in
+[ADR-003: bounded `rstest` matrices over a property-testing framework](adr-003-bounded-rstest-over-property-testing.md).
+Should a domain warrant assurance stronger than sampling, a bounded model
+checker such as Kani would be the next escalation.

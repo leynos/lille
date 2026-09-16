@@ -197,12 +197,11 @@ Progress against these steps is tracked in
 
 Each frame, `DbspPlugin` chains two systems so the first runs to completion
 before the second starts: `cache_state_for_dbsp_system` reads ECS component
-state into the DBSP circuit's input handles, then
-`apply_dbsp_outputs_system` steps the circuit and writes its outputs back
-onto ECS components.
+state into the DBSP circuit's input handles, then `apply_dbsp_outputs_system`
+steps the circuit and writes its outputs back onto ECS components.
 
-`DbspState` exposes frame-rollback methods that keep Rust-side bookkeeping
-in step with the circuit, called in this order:
+`DbspState` exposes frame-rollback methods that keep Rust-side bookkeeping in
+step with the circuit, called in this order:
 
 - `begin_frame_rollback` — start of the cache pass; clears the previous
   frame's rollback log.
@@ -215,14 +214,13 @@ in step with the circuit, called in this order:
 - `rollback_frame_tracking` — on a failed step, restores the pre-frame
   tracking.
 
-When `state.step_circuit()` returns `Err`, the output system clears the
-circuit inputs, restores the Rust-side tracking
-(`rollback_frame_tracking`), emits a `DbspSyncError` event, and applies no
-ECS output writes that frame.
+When `state.step_circuit()` returns `Err`, the output system clears the circuit
+inputs, restores the Rust-side tracking (`rollback_frame_tracking`), emits a
+`DbspSyncError` event, and applies no ECS output writes that frame.
 
 `apply_positions`, `apply_velocities`, and `apply_health_deltas` apply only
-consolidated records with a positive Z-set weight; non-positive
-(retraction) weights are skipped.
+consolidated records with a positive Z-set weight; non-positive (retraction)
+weights are skipped.
 
 For the detailed walkthrough, see
 [DBSP synchronization developer's guide](dbsp-synchronization-guide.md).
@@ -231,10 +229,10 @@ For the detailed walkthrough, see
 
 `movement_decision_streams` returns the same deduplicated `MovementDecision`
 stream as `movement_decision_stream`, plus a diagnostic
-`Stream<RootCircuit, OrdZSet<MovementAggregation>>`. The deduplication
-boundary still guarantees at most one emitted movement decision per entity,
-and a net-zero total weight still emits no decision; the diagnostic stream
-adds visibility without changing that behaviour.
+`Stream<RootCircuit, OrdZSet<MovementAggregation>>`. The deduplication boundary
+still guarantees at most one emitted movement decision per entity, and a
+net-zero total weight still emits no decision; the diagnostic stream adds
+visibility without changing that behaviour.
 
 ```rust
 let (decisions, aggregations) =
@@ -243,24 +241,23 @@ let (decisions, aggregations) =
 
 `MovementAggregation { entity, total_weight }` reports that the circuit
 collapsed movement decisions for one entity into one normalized vector. The
-circuit emits an aggregation record only when the accumulated
-`total_weight` falls outside `-1..=1`: a single decision emits no
-diagnostic, and a net-zero total emits neither a movement decision nor an
-aggregation record.
+circuit emits an aggregation record only when the accumulated `total_weight`
+falls outside `-1..=1`: a single decision emits no diagnostic, and a net-zero
+total emits neither a movement decision nor an aggregation record.
 
 `DbspCircuit::movement_aggregation_out()` exposes the diagnostic stream as
 `OutputHandle<OrdZSet<MovementAggregation>>`. As with every other circuit
 output, consumers must consolidate the handle, process only records with a
-positive Z-set weight, and drain the handle every frame — otherwise
-diagnostics can accumulate and be reported again.
+positive Z-set weight, and drain the handle every frame — otherwise diagnostics
+can accumulate and be reported again.
 
 `apply_dbsp_outputs_system` performs that lifecycle:
-`report_movement_aggregations` emits the warning in the command layer, then
-the system calls `take_from_all()` on `movement_aggregation_out()`. Keep
-the distinction explicit: the DBSP fold stays pure and does not log; the
-output system owns logging. See [Movement-aggregation
-diagnostics](users-guide.md#movement-aggregation-diagnostics) in the user's
-guide for the consumer-facing contract.
+`report_movement_aggregations` emits the warning in the command layer, then the
+system calls `take_from_all()` on `movement_aggregation_out()`. Keep the
+distinction explicit: the DBSP fold stays pure and does not log; the output
+system owns logging. See
+[Movement-aggregation diagnostics](users-guide.md#movement-aggregation-diagnostics)
+in the user's guide for the consumer-facing contract.
 
 ### Asserting Z-set weights with `collect_weighted`
 
@@ -269,11 +266,10 @@ weights, not just the records. `test_utils::collect_weighted` consolidates a
 `dbsp::OutputHandle<OrdZSet<T>>` and returns `Vec<(T, ZWeight)>`, retaining
 each consolidated Z-set weight rather than discarding it.
 
-That retained weight is what lets a test assert multiplicity and retractions.
-A record pushed twice consolidates into one record with weight `2`, so a
+That retained weight is what lets a test assert multiplicity and retractions. A
+record pushed twice consolidates into one record with weight `2`, so a
 deduplicated output can be asserted to have multiplicity `1` — which
-distinguishes "emitted once" from "emitted twice and collapsed only when
-read".
+distinguishes "emitted once" from "emitted twice and collapsed only when read".
 
 ```rust
 use dbsp::RootCircuit;
@@ -295,9 +291,9 @@ assert_eq!(collect_weighted(&output), vec![(7, 2)]);
 ## Dependency resolution constraints
 
 No `Cargo.lock` is committed, so Cargo resolves the graph afresh on every
-machine and every CI run. A broken release of a transitive dependency
-therefore reaches the build the day it is published, and the only lever is a
-direct requirement in `Cargo.toml`.
+machine and every CI run. A broken release of a transitive dependency therefore
+reaches the build the day it is published, and the only lever is a direct
+requirement in `Cargo.toml`.
 
 `tinyvec = "~1.12"` is such a lever. It is a direct Cargo dependency, but no
 source file in this repository names the crate: it arrives through Bevy's text
@@ -481,19 +477,19 @@ values writes where nothing is reading. The server binds its backend once, at
 start, so starting it before that clobbering happens is what makes it stick.
 Hence `use-sccache: 'false'` in both jobs.
 
-The failure is silent and total, which is why it is worth this much text.
-Three runs of `build-test` on the same shape, differing only in the
-shared-actions pin and in whether the store had been populated, show both the
-failure and what the cache is worth:
+The failure is silent and total, which is why it is worth this much text. Three
+runs of `build-test` on the same shape, differing only in the shared-actions
+pin and in whether the store had been populated, show both the failure and what
+the cache is worth:
 
-| Measure | Before the fix | After, cold | After, warm |
-| --- | --- | --- | --- |
-| Cache location | ghac | ghac | ghac |
-| Hit rate | 0.00 % | 33.45 % | 99.79 % |
-| Rust hit rate | 0.00 % | 0.19 % | 99.60 % |
-| Read errors | 0 | 0 | 0 |
-| Write errors | 8170 | 5 | 0 |
-| Wall | 25m44s | 39m14s | 16m31s |
+| Measure        | Before the fix | After, cold | After, warm |
+| -------------- | -------------- | ----------- | ----------- |
+| Cache location | ghac           | ghac        | ghac        |
+| Hit rate       | 0.00 %         | 33.45 %     | 99.79 %     |
+| Rust hit rate  | 0.00 %         | 0.19 %      | 99.60 %     |
+| Read errors    | 0              | 0           | 0           |
+| Write errors   | 8170           | 5           | 0           |
+| Wall           | 25m44s         | 39m14s      | 16m31s      |
 
 The first run had a correct backend, an endpoint and a token both present, and
 every one of its 8,170 writes failed, so nothing reached the store and nothing
@@ -528,12 +524,12 @@ all.
 and no evidence on this repository argued for it. These are the samples that
 replaced the assumption:
 
-| Measure | 8 vCPU, build-test cold | 8 vCPU, build-test warm | 8 vCPU, coverage-upload cold | 4 vCPU, build-test warm |
-| --- | --- | --- | --- | --- |
-| Peak used memory | 8,812 MiB | 7,907 MiB | 6,442 MiB | 3,889 MiB |
-| Peak used disk | 95,609 MiB | 95,418 MiB | 90,998 MiB | 94,537 MiB |
-| Least free disk | 101,691 MiB | 101,882 MiB | 106,302 MiB | 53,166 MiB |
-| Wall | 39m14s | 24m38s | 29m17s | 16m47s |
+| Measure          | 8 vCPU, build-test cold | 8 vCPU, build-test warm | 8 vCPU, coverage-upload cold | 4 vCPU, build-test warm |
+| ---------------- | ----------------------- | ----------------------- | ---------------------------- | ----------------------- |
+| Peak used memory | 8,812 MiB               | 7,907 MiB               | 6,442 MiB                    | 3,889 MiB               |
+| Peak used disk   | 95,609 MiB              | 95,418 MiB              | 90,998 MiB                   | 94,537 MiB              |
+| Least free disk  | 101,691 MiB             | 101,882 MiB             | 106,302 MiB                  | 53,166 MiB              |
+| Wall             | 39m14s                  | 24m38s                  | 29m17s                       | 16m47s                  |
 
 *Table 2: Sampled resource use and wall time by runner shape.*
 
@@ -563,14 +559,13 @@ so the run intended as the cold writer found the store already populated and
 returned a 100 % hit rate. Every four-vCPU peak observed lies between 3,889 and
 4,637 MiB, and reduced parallelism means a genuinely cold run should stay below
 its eight-vCPU counterpart of 8,812 MiB, so the 12 GB bound looks safe by a
-wide margin. That is inference, and it needs a particular kind of run to
-settle it, rather than merely the passage of time. A dependency bump
-invalidates only the objects
-it touches, and eviction removes only what it happens to reach, so either can
-leave a partly warm build whose peak says nothing about a cold one. What
-settles it is a run that reports a zero or near-zero hit rate, whether that
-arrives by a wide enough invalidation or is produced deliberately. Until such a
-run exists, treat the cold figure as unconfirmed rather than as evidence.
+wide margin. That is inference, and it needs a particular kind of run to settle
+it, rather than merely the passage of time. A dependency bump invalidates only
+the objects it touches, and eviction removes only what it happens to reach, so
+either can leave a partly warm build whose peak says nothing about a cold one.
+What settles it is a run that reports a zero or near-zero hit rate, whether
+that arrives by a wide enough invalidation or is produced deliberately. Until
+such a run exists, treat the cold figure as unconfirmed rather than as evidence.
 
 Of the two constraints that do bind the four-vCPU shape, the watchdog is the
 one that had to move first. `RUN_RUST_CARGO_WAIT_TIMEOUT` caps a single cargo
@@ -584,8 +579,8 @@ measure to move materially.
 Keep the samplers. The shape is only defensible while it is measured, and the
 next person to question it needs the same evidence this change rested on.
 
-`ci.yml` accepts `workflow_dispatch` so a warm run can be measured on demand.
-A dispatch restores what a pull request restores and writes nothing:
+`ci.yml` accepts `workflow_dispatch` so a warm run can be measured on demand. A
+dispatch restores what a pull request restores and writes nothing:
 `coverage-main.yml` is the only job that saves on this repository.
 
 One download remains deliberately uncached. The `cs-coverage` CLI is fetched on
@@ -612,12 +607,12 @@ two. A workflow contract in `tests/workflow_contracts.rs` fails if a second
 than a test file: the rules live in four modules under `tests/contracts/`,
 split by the question each asks.
 
-| Module | Asks |
-| --- | --- |
-| `supply_chain.rs` | What will the estate execute? Pinned cache and shared-action references, no source-built tools, prebuilt Whitaker and sccache. |
-| `placement.rs` | What does it cost, and who owns each cache? Runner placement and labels, bounded timeouts, one owner per cached path, an installer before the first use of what it installs, a single test execution per build job, the uv cache key. |
-| `compiler_cache.rs` | Is sccache actually working? The two job-level variables, the export, install, start, build, report order, the proxy export, and the resource sampler with its report. |
-| `parsing.rs` | Does the loader read workflows correctly? Its subject is the loader, not any workflow in this repository. |
+| Module              | Asks                                                                                                                                                                                                                                  |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `supply_chain.rs`   | What will the estate execute? Pinned cache and shared-action references, no source-built tools, prebuilt Whitaker and sccache.                                                                                                        |
+| `placement.rs`      | What does it cost, and who owns each cache? Runner placement and labels, bounded timeouts, one owner per cached path, an installer before the first use of what it installs, a single test execution per build job, the uv cache key. |
+| `compiler_cache.rs` | Is sccache actually working? The two job-level variables, the export, install, start, build, report order, the proxy export, and the resource sampler with its report.                                                                |
+| `parsing.rs`        | Does the loader read workflows correctly? Its subject is the loader, not any workflow in this repository.                                                                                                                             |
 
 Each module also pins the inputs that make its rules true, so a workflow cannot
 keep the shape of the policy while dropping its substance: `cache-provider`,
@@ -670,16 +665,15 @@ part of.
   in a comment.
 
 Two assurance methods are used together, following
-[ADR 003](adr-003-bounded-rstest-over-property-testing.md).
-The contract modules hold bounded `rstest` cases over the workflow files as
-they stand, and `tests/workflow_model_properties.rs` samples the wider domain
-with `proptest`: arbitrary step orderings, repeated display names, interleaved
-unrelated steps, actions that merely share the `actions/cache` prefix, and
-split caches whose halves agree or disagree on a key, or where a third step
-claims a paired key. The properties
-check cache-owner uniqueness and installer-ordering against small oracles
-written independently of the implementation. Run both with `make test`, and run
-`actionlint` after editing any workflow.
+[ADR 003](adr-003-bounded-rstest-over-property-testing.md). The contract
+modules hold bounded `rstest` cases over the workflow files as they stand, and
+`tests/workflow_model_properties.rs` samples the wider domain with `proptest`:
+arbitrary step orderings, repeated display names, interleaved unrelated steps,
+actions that merely share the `actions/cache` prefix, and split caches whose
+halves agree or disagree on a key, or where a third step claims a paired key.
+The properties check cache-owner uniqueness and installer-ordering against
+small oracles written independently of the implementation. Run both with
+`make test`, and run `actionlint` after editing any workflow.
 
 Only one restore and one save sharing a key count as a single owner. Two
 restores on the same key are two owners, and so are a matching pair plus a
