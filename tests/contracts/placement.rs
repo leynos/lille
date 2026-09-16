@@ -12,6 +12,20 @@ use crate::workflow_cache_owners;
 use crate::workflow_config::registered_runner_labels;
 use crate::workflow_estate::{Workflow, BUILD_JOB_IDS, UBICLOUD_LABEL};
 use crate::workflow_loader::all_steps;
+use crate::workflow_model::is_hosted_label;
+
+/// The runner a fork's pull request falls back to.
+///
+/// A fork cannot obtain an Ubicloud runner, and the point of the arm is that
+/// it names one GitHub hosts, so this is the only value it may take.
+const FORK_FALLBACK_LABEL: &str = "ubuntu-latest";
+
+/// The context field that tells a fork's pull request from this repository's.
+///
+/// Named rather than matched by shape: `private` and `archived` sit in the
+/// same position, parse the same way and evaluate, and either would send every
+/// pull request down one arm.
+const FORK_GUARD: &str = "github.event.pull_request.head.repo.fork";
 
 /// Commands that would run the test suite a second time in a build job.
 const REPEAT_TEST_COMMANDS: [&str; 4] = ["cargo test", "cargo nextest", "make test", "make all"];
@@ -70,9 +84,11 @@ fn build_jobs_keep_their_label_and_a_bounded_timeout(
 ) {
     let job = job_named(&workflows, id);
     assert_eq!(
-        job.runs_on.labels(),
-        [UBICLOUD_LABEL],
-        "`{id}` must keep its measured runner label"
+        job.runs_on.owned_label(),
+        Some(UBICLOUD_LABEL),
+        "`{id}` must keep its measured runner label for this repository's own \
+         branches; it declares {}",
+        job.runs_on
     );
     let timeout = job
         .timeout_minutes
@@ -106,9 +122,13 @@ fn every_runner_label_is_registered_with_actionlint(workflows: Vec<Workflow>) {
         .into_iter()
         .filter(|(_, job)| job.runs_on.names_a_runner() && !job.is_github_hosted())
         .filter(|(_, job)| {
+            // Only the labels GitHub does not host need registering. A
+            // fork-fallback job carries one of each, and requiring its hosted
+            // arm would put `ubuntu-latest` in the self-hosted registry.
             !job.runs_on
                 .labels()
                 .iter()
+                .filter(|label| !is_hosted_label(label))
                 .all(|label| registered.contains(label))
         })
         .map(|(file, job)| format!("{file}:{}: {}", job.id, job.runs_on))
@@ -194,4 +214,73 @@ fn the_uv_cache_names_its_layers_and_keys_them_by_runner(workflows: Vec<Workflow
             "the uv cache key `{key}` must vary with `{fragment}`"
         );
     }
+}
+
+/// A fork's pull request must be able to obtain the runner its lane names.
+///
+/// Without the arm the lane never starts on a fork's pull request, and a
+/// required check that never reports presents as a pull request waiting rather
+/// than as a placement fault.
+#[rstest]
+fn the_pull_request_lane_falls_back_to_a_hosted_runner_for_forks(workflows: Vec<Workflow>) {
+    let job = job_named(&workflows, "build-test");
+    assert_eq!(
+        job.runs_on.guard(),
+        Some(FORK_GUARD),
+        "`build-test` must branch on `{FORK_GUARD}`; it declares {}",
+        job.runs_on
+    );
+    assert_eq!(
+        job.runs_on.fork_label(),
+        Some(FORK_FALLBACK_LABEL),
+        "a fork's pull request must be sent to `{FORK_FALLBACK_LABEL}`"
+    );
+    assert_eq!(
+        job.runs_on.owned_label(),
+        Some(UBICLOUD_LABEL),
+        "this repository's own branches must keep `{UBICLOUD_LABEL}`"
+    );
+}
+
+/// A lane no fork reaches must not carry an arm nothing takes.
+///
+/// `coverage-upload` runs on push, so the expression would add a branch to
+/// keep correct for a case that cannot occur. Asserted so the arm does not
+/// spread by imitation.
+#[rstest]
+fn lanes_no_fork_reaches_name_their_runner_outright(workflows: Vec<Workflow>) {
+    let job = job_named(&workflows, "coverage-upload");
+    assert_eq!(
+        job.runs_on.labels(),
+        [UBICLOUD_LABEL],
+        "`coverage-upload` is on no pull-request lane, so it must name its \
+         runner outright; it declares {}",
+        job.runs_on
+    );
+}
+
+/// A `runs-on` that parses to more than one line is a defect the run hides.
+///
+/// A folded scalar whose continuation is indented deeper than its key keeps
+/// the break, so the expression arrives with a newline inside it. GitHub
+/// evaluates the value regardless and the lane runs, so a green run is not
+/// evidence that the declaration is well formed. This is the only place that
+/// reads it.
+#[rstest]
+fn no_runs_on_declaration_carries_a_line_break(workflows: Vec<Workflow>) {
+    let broken: Vec<String> = jobs(&workflows)
+        .into_iter()
+        .filter(|(_, job)| {
+            job.runs_on
+                .labels()
+                .iter()
+                .any(|label| label.contains('\n'))
+        })
+        .map(|(file, job)| format!("{file}:{}", job.id))
+        .collect();
+    assert!(
+        broken.is_empty(),
+        "a `runs-on` must parse to one line; keep a folded scalar's \
+         continuation at the same indent as its first line: {broken:?}"
+    );
 }
