@@ -159,7 +159,15 @@ fn parse_runs_on(raw: &Value, at: &Location) -> Result<RunnerSelection, Workflow
         return Ok(RunnerSelection::Delegated);
     };
     if value.as_mapping().is_none() {
-        return Ok(RunnerSelection::Labels(parse_labels(value, at)?));
+        let labels = parse_labels(value, at)?;
+        // A fork-fallback expression is one scalar that names two runners, so
+        // it is read here rather than left as a label nothing can classify.
+        if let [only] = labels.as_slice() {
+            if let Some(selection) = RunnerSelection::from_expression(only) {
+                return Ok(selection);
+            }
+        }
+        return Ok(RunnerSelection::Labels(labels));
     }
     let group = value
         .get("group")

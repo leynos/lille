@@ -11,6 +11,7 @@ use rstest::rstest;
 
 use crate::workflow_estate::WorkflowSource;
 use crate::workflow_loader::{load_workflows_in, parse_workflow};
+use crate::workflow_model::{is_hosted_label, RunnerSelection};
 
 #[rstest]
 #[case::not_a_workflow("scratch.yml", "steps: []")]
@@ -76,6 +77,75 @@ fn every_valid_runs_on_shape_parses(#[case] runs_on: &str, #[case] expected: &[&
     assert!(
         job.runs_on.names_a_runner(),
         "`{runs_on}` names a runner and must say so"
+    );
+}
+
+/// The expression reader must classify only the shape it exists to read.
+///
+/// A literal label, a matrix reference and an expression of another shape must
+/// all read as no fork fallback, or a job the reader misclassified would be
+/// held to the wrong rules while every assertion still passed. The line-break
+/// case is the one that matters most: a declaration carrying a newline must
+/// read as no fork fallback here, so the assertion written for it reports it
+/// rather than this reader quietly parsing through it.
+#[rstest]
+#[case::the_deployed_shape(
+    "${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || 'ubicloud-standard-4' }}",
+    Some(("github.event.pull_request.head.repo.fork", "ubuntu-latest", "ubicloud-standard-4"))
+)]
+#[case::generous_internal_spacing(
+    "${{   github.event.pull_request.head.repo.fork   &&   'a'   ||   'b'   }}",
+    Some(("github.event.pull_request.head.repo.fork", "a", "b"))
+)]
+#[case::a_literal_label("ubuntu-latest", None)]
+#[case::a_matrix_reference("${{ matrix.os }}", None)]
+#[case::a_single_armed_expression("${{ github.event.pull_request.head.repo.fork && 'a' }}", None)]
+// The estate prescribes one spelling. A negated guard or a comparison says the
+// same thing with the arms the other way round, and reading either as the
+// prescribed form would let two spellings of the placement drift apart while
+// both satisfied the contract. They read as no fork fallback, so the lane is
+// reported as not declaring it.
+#[case::a_negated_guard("${{ !github.event.pull_request.head.repo.fork && 'a' || 'b' }}", None)]
+#[case::a_compared_guard(
+    "${{ github.event.pull_request.head.repo.owner == 'leynos' && 'a' || 'b' }}",
+    None
+)]
+#[case::a_declaration_carrying_a_line_break(
+    "${{ github.event.pull_request.head.repo.fork\n&& 'a' || 'b' }}",
+    None
+)]
+fn the_expression_reader_accepts_one_shape_and_refuses_the_rest(
+    #[case] text: &str,
+    #[case] expected: Option<(&str, &str, &str)>,
+) {
+    let read = RunnerSelection::from_expression(text);
+    let rendered = read.as_ref().map(|selection| {
+        (
+            selection.guard().unwrap_or_default(),
+            selection.fork_label().unwrap_or_default(),
+            selection.owned_label().unwrap_or_default(),
+        )
+    });
+    assert_eq!(rendered, expected, "`{text}` was read as {read:?}");
+}
+
+/// A label is GitHub-hosted by its image prefix, whatever the job around it is.
+///
+/// Read per label because a fork-fallback selection holds one hosted and one
+/// self-hosted, and the actionlint registry must be asked only about the
+/// second.
+#[rstest]
+#[case::ubuntu("ubuntu-latest", true)]
+#[case::windows("windows-2022", true)]
+#[case::macos("macos-14", true)]
+#[case::ubicloud("ubicloud-standard-4", false)]
+#[case::self_hosted("self-hosted", false)]
+#[case::a_prefix_without_its_separator("ubuntulatest", false)]
+fn a_hosted_label_is_told_from_a_self_hosted_one(#[case] label: &str, #[case] hosted: bool) {
+    assert_eq!(
+        is_hosted_label(label),
+        hosted,
+        "`{label}` was misclassified"
     );
 }
 

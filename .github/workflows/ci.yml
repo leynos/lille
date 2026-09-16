@@ -11,7 +11,15 @@ on:
 
 jobs:
   build-test:
-    runs-on: ubicloud-standard-4
+    # A pull request from a fork cannot obtain an Ubicloud runner, so the
+    # fork arm falls back to a GitHub-hosted one. Keep the continuation at
+    # this indent: a deeper one is a more-indented line inside a folded
+    # scalar, so YAML keeps the break and the expression arrives with a
+    # newline in it. GitHub evaluates it anyway, so a green run proves
+    # nothing; `no_runs_on_declaration_carries_a_line_break` reads it.
+    runs-on: >-
+      ${{ github.event.pull_request.head.repo.fork
+      && 'ubuntu-latest' || 'ubicloud-standard-4' }}
     # Ubicloud jobs bill by the minute, so a hung step must not run to the
     # 6-hour platform default. Measured warm: 1,478 s on eight vCPUs and
     # 1,215 s on four. A cold run on four vCPUs is the case this bounds, and

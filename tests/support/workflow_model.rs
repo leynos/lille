@@ -36,6 +36,58 @@ pub enum RunnerSelection {
         /// Labels required within the group, possibly empty.
         labels: Vec<String>,
     },
+    /// Two runners, chosen between when the workflow is evaluated.
+    ///
+    /// A pull request from a fork cannot obtain an Ubicloud runner, so a lane
+    /// that serves pull requests names a GitHub-hosted runner on one arm and
+    /// this repository's own runner on the other. Both arms are runners the
+    /// job may execute on, so both are labels for every rule that reads them.
+    ForkFallback {
+        /// The context field the expression branches on.
+        guard: String,
+        /// The fork's runner first, then this repository's own.
+        arms: [String; 2],
+    },
+}
+
+/// Returns the text inside `${{` and `}}`, or `None` when it is not wrapped.
+fn expression_body(text: &str) -> Option<&str> {
+    text.strip_prefix("${{")?.strip_suffix("}}")
+}
+
+/// Returns a single-quoted literal's contents, or `None` for anything else.
+///
+/// GitHub's expression syntax has no escape inside a single-quoted literal
+/// other than a doubled quote, so a value containing one is not the simple
+/// literal this reader accepts and is refused rather than guessed at.
+fn quoted_literal(text: &str) -> Option<&str> {
+    let inner = text.trim().strip_prefix('\'')?.strip_suffix('\'')?;
+    (!inner.contains('\'')).then_some(inner)
+}
+
+/// Reports whether the text is a bare context path such as `github.event.x`.
+///
+/// A guard has to be one field reference. Anything else, a call, a comparison
+/// or a second operator, is a different question about the pull request and is
+/// refused here so the assertion naming the expected field can report it.
+fn is_context_path(text: &str) -> bool {
+    let trimmed = text.trim();
+    !trimmed.is_empty()
+        && trimmed
+            .chars()
+            .all(|character| character.is_alphanumeric() || character == '_' || character == '.')
+}
+
+/// Reports whether a label names one of GitHub's own hosted images.
+///
+/// Read per label rather than per job, because a fork-fallback selection holds
+/// one of each and the two questions asked about it differ: which arm must be
+/// registered with actionlint, and whether the job as a whole is hosted.
+#[must_use]
+pub fn is_hosted_label(label: &str) -> bool {
+    ["ubuntu-", "windows-", "macos-"]
+        .iter()
+        .any(|prefix| label.starts_with(prefix))
 }
 
 impl RunnerSelection {
@@ -45,7 +97,65 @@ impl RunnerSelection {
         match self {
             Self::Delegated => &[],
             Self::Labels(labels) | Self::Group { labels, .. } => labels,
+            Self::ForkFallback { arms, .. } => arms.as_slice(),
         }
+    }
+
+    /// Returns the runner this repository's own branches get, when there is one.
+    ///
+    /// A fork-fallback selection has two arms and only one of them is the
+    /// measured shape, so a contract pinning that shape asks for this rather
+    /// than for the whole label set.
+    #[must_use]
+    pub fn owned_label(&self) -> Option<&str> {
+        match self {
+            Self::Labels(labels) if labels.len() == 1 => labels.first().map(String::as_str),
+            Self::ForkFallback { arms, .. } => arms.last().map(String::as_str),
+            Self::Delegated | Self::Labels(_) | Self::Group { .. } => None,
+        }
+    }
+
+    /// Returns the runner a fork's pull request gets, when the job names one.
+    #[must_use]
+    pub fn fork_label(&self) -> Option<&str> {
+        match self {
+            Self::ForkFallback { arms, .. } => arms.first().map(String::as_str),
+            Self::Delegated | Self::Labels(_) | Self::Group { .. } => None,
+        }
+    }
+
+    /// Returns the context field a fork-fallback selection branches on.
+    #[must_use]
+    pub const fn guard(&self) -> Option<&str> {
+        match self {
+            Self::ForkFallback { guard, .. } => Some(guard.as_str()),
+            Self::Delegated | Self::Labels(_) | Self::Group { .. } => None,
+        }
+    }
+
+    /// Reads a scalar `runs-on` as a fork-fallback selection, or returns `None`.
+    ///
+    /// A literal label, a matrix reference and a declaration carrying a line
+    /// break all read as no fork fallback, so each is refused by the assertion
+    /// written for it rather than repaired here.
+    #[must_use]
+    pub fn from_expression(text: &str) -> Option<Self> {
+        if text.contains('\n') {
+            return None;
+        }
+        let body = expression_body(text)?;
+        let (guard, arms) = body.split_once("&&")?;
+        let (fork, owned) = arms.split_once("||")?;
+        if !is_context_path(guard) {
+            return None;
+        }
+        Some(Self::ForkFallback {
+            guard: guard.trim().to_owned(),
+            arms: [
+                quoted_literal(fork)?.to_owned(),
+                quoted_literal(owned)?.to_owned(),
+            ],
+        })
     }
 
     /// Reports whether the job names a runner of its own.
@@ -64,6 +174,10 @@ impl fmt::Display for RunnerSelection {
             Self::Group { group, labels } if labels.is_empty() => write!(f, "group {group}"),
             Self::Group { group, labels } => {
                 write!(f, "group {group} ({})", labels.join(", "))
+            }
+            Self::ForkFallback { guard, arms } => {
+                let [fork, owned] = arms;
+                write!(f, "{fork} if {guard}, else {owned}")
             }
         }
     }
@@ -147,9 +261,14 @@ impl Job {
     pub fn is_github_hosted(&self) -> bool {
         match &self.runs_on {
             RunnerSelection::Labels(labels) => {
-                !labels.is_empty() && labels.iter().all(|label| label.starts_with("ubuntu-"))
+                !labels.is_empty() && labels.iter().all(|label| is_hosted_label(label))
             }
-            RunnerSelection::Delegated | RunnerSelection::Group { .. } => false,
+            // One arm is hosted and the other is not, so the job is not: it
+            // runs on this repository's own runner for every branch of this
+            // repository.
+            RunnerSelection::Delegated
+            | RunnerSelection::Group { .. }
+            | RunnerSelection::ForkFallback { .. } => false,
         }
     }
 
