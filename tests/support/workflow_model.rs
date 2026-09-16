@@ -50,6 +50,30 @@ pub enum RunnerSelection {
     },
 }
 
+/// The runner labels GitHub hosts, written out rather than matched by prefix.
+///
+/// The registry question needs an exact set. A prefix test silently absorbs
+/// any new label that looks hosted, so a lane moved onto an unknown image
+/// would drop out of "in use" and its registration would go unnoticed. A name
+/// added here is a deliberate statement that GitHub hosts it.
+///
+/// `is_hosted_label` keeps its prefix test for the separate question of
+/// whether a whole job runs on GitHub's pool, where a new image of a known
+/// family is a job that is still hosted.
+pub const GITHUB_HOSTED_LABELS: [&str; 5] = [
+    "ubuntu-latest",
+    "ubuntu-24.04",
+    "ubuntu-22.04",
+    "windows-latest",
+    "macos-latest",
+];
+
+/// Reports whether a label is one GitHub hosts, by name.
+#[must_use]
+pub fn is_github_hosted_label(label: &str) -> bool {
+    GITHUB_HOSTED_LABELS.contains(&label)
+}
+
 /// Reports whether a label names one of GitHub's own hosted images.
 ///
 /// Read per label rather than per job, because a fork-fallback selection holds

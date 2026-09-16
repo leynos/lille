@@ -4,6 +4,8 @@
 //! path, and that the suite runs once rather than twice. These are the rules
 //! that decide what the estate costs and whether a cache miss is explainable.
 
+use std::collections::BTreeSet;
+
 use rstest::rstest;
 
 use crate::shared_action;
@@ -12,7 +14,7 @@ use crate::workflow_cache_owners;
 use crate::workflow_config::registered_runner_labels;
 use crate::workflow_estate::{Workflow, BUILD_JOB_IDS, UBICLOUD_LABEL};
 use crate::workflow_loader::all_steps;
-use crate::workflow_model::is_hosted_label;
+use crate::workflow_model::is_github_hosted_label;
 
 /// The runner a fork's pull request falls back to.
 ///
@@ -116,26 +118,23 @@ fn the_pull_request_workflow_accepts_a_warm_run_dispatch(workflows: Vec<Workflow
 
 #[rstest]
 fn every_runner_label_is_registered_with_actionlint(workflows: Vec<Workflow>) {
-    let registered = registered_runner_labels()
+    let declared = registered_runner_labels()
         .unwrap_or_else(|err| panic!("actionlint configuration must be readable: {err}"));
-    let unregistered: Vec<String> = jobs(&workflows)
+    // Both arms of a conditional count as in use, minus the labels GitHub
+    // hosts. A fork-fallback job carries one of each, and requiring its hosted
+    // arm would put `ubuntu-latest` in the self-hosted registry.
+    let in_use: BTreeSet<String> = jobs(&workflows)
         .into_iter()
-        .filter(|(_, job)| job.runs_on.names_a_runner() && !job.is_github_hosted())
-        .filter(|(_, job)| {
-            // Only the labels GitHub does not host need registering. A
-            // fork-fallback job carries one of each, and requiring its hosted
-            // arm would put `ubuntu-latest` in the self-hosted registry.
-            !job.runs_on
-                .labels()
-                .iter()
-                .filter(|label| !is_hosted_label(label))
-                .all(|label| registered.contains(label))
-        })
-        .map(|(file, job)| format!("{file}:{}: {}", job.id, job.runs_on))
+        .flat_map(|(_, job)| job.runs_on.labels().to_vec())
+        .filter(|label| !is_github_hosted_label(label))
         .collect();
-    assert!(
-        unregistered.is_empty(),
-        "every self-hosted label must appear in .github/actionlint.yaml: {unregistered:?}"
+    let registered: BTreeSet<String> = declared.into_iter().collect();
+    assert_eq!(
+        registered, in_use,
+        "`.github/actionlint.yaml` must register exactly the self-hosted \
+         labels the workflows use. An unregistered label fails actionlint; a \
+         registered but unused one hides a runner assignment that has already \
+         been retired"
     );
 }
 

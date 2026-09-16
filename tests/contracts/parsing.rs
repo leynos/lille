@@ -11,7 +11,7 @@ use rstest::rstest;
 
 use crate::workflow_estate::WorkflowSource;
 use crate::workflow_loader::{load_workflows_in, parse_workflow};
-use crate::workflow_model::{is_hosted_label, RunnerSelection};
+use crate::workflow_model::{is_github_hosted_label, is_hosted_label, RunnerSelection};
 
 #[rstest]
 #[case::not_a_workflow("scratch.yml", "steps: []")]
@@ -146,6 +146,26 @@ fn a_hosted_label_is_told_from_a_self_hosted_one(#[case] label: &str, #[case] ho
         is_hosted_label(label),
         hosted,
         "`{label}` was misclassified"
+    );
+}
+
+/// The registry question asks by name, not by prefix, and the two differ.
+///
+/// A prefix test absorbs any new label that looks hosted, so a lane moved onto
+/// an unknown image would drop out of "in use" and its registration would go
+/// unnoticed. `ubuntu-20.04` is the case that separates them: a hosted family,
+/// a label this estate does not use, and one that must therefore be reported
+/// rather than silently excused.
+#[rstest]
+#[case::a_named_hosted_label("ubuntu-latest", true)]
+#[case::another_named_one("macos-latest", true)]
+#[case::a_hosted_family_member_not_named("ubuntu-20.04", false)]
+#[case::the_paid_label("ubicloud-standard-4", false)]
+fn the_registry_reads_hosted_labels_by_name(#[case] label: &str, #[case] hosted: bool) {
+    assert_eq!(
+        is_github_hosted_label(label),
+        hosted,
+        "`{label}` must be classified by name for the registry question"
     );
 }
 
