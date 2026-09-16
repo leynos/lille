@@ -404,7 +404,7 @@ No tool is compiled from source. `whitaker-installer` is installed by
 pinned prebuilt release archive and verifies it against a digest pinned inside
 the action, then runs the installer to place the Whitaker Dylint suite. Every
 `leynos/shared-actions` reference pins commit
-`3a2f2d5f17932657ddf50490a09ea5e7400ae35c`.
+`c5a54701c8603a0fa756a6b34c49bc2af75a6c11`.
 
 sccache is installed the same way, by `taiki-e/install-action` with
 `tool: sccache@0.16.0` and `fallback: none`. The fallback matters: without it
