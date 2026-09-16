@@ -8,13 +8,13 @@ circuit outputs are applied back to components, and the local tooling used to
 lint the `dbsp_sync` module.
 
 For the circuit's data model and dataflow construction, see
-[Declarative world inference with DBSP and Rust]( declarative-world-inference-with-dbsp-and-rust.md).
+[Declarative world inference with DBSP and Rust](declarative-world-inference-with-dbsp-and-rust.md).
 For the health and damage synchronization protocol in more depth, see §3.5 of
 [Lille physics engine design](lille-physics-engine-design.md). For the
 test-writing patterns used throughout `dbsp_sync`, see
-[Testing declarative game logic in DBSP]( testing-declarative-game-logic-in-dbsp.md).
+[Testing declarative game logic in DBSP](testing-declarative-game-logic-in-dbsp.md).
 For the `observers-v1-spike` feature's effect on scheduling, see
-[ADR-001: DBSP Observers V1 spike]( adr-001-dbsp-observers-v1-spike.md).
+[ADR-001: DBSP Observers V1 spike](adr-001-dbsp-observers-v1-spike.md).
 
 ## 1. Frame lifecycle
 

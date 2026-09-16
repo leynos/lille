@@ -40,7 +40,7 @@ amendment below; Kani and Verus remain unadopted.
   rooted, `..`-component, and substring-`..` path forms), not the entire domain.
 - The `rstest` stack is already used throughout the codebase's test suite
   (see
-  [Mastering test fixtures in Rust with `rstest`]( rust-testing-with-rstest-fixtures.md)),
+  [Mastering test fixtures in Rust with `rstest`](rust-testing-with-rstest-fixtures.md)),
   so a case-matrix approach reuses existing infrastructure.
 - Adding a dependency is a supply-chain cost (new dependency, new tool to
   install and maintain) that this testing strategy does not need to pay where
