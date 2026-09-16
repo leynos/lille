@@ -26,6 +26,8 @@ mod coverage_boundary;
 mod coverage_publisher;
 #[path = "support/coverage_reach.rs"]
 mod coverage_reach;
+#[path = "support/placement_expression.rs"]
+mod placement_expression;
 #[path = "support/shell_reading.rs"]
 mod shell_reading;
 #[path = "support/workflow_assertions.rs"]
