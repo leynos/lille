@@ -11,6 +11,8 @@
 //! Each property is checked against a small oracle expressed independently of
 //! the implementation, rather than by re-deriving the implementation's answer.
 
+#[path = "support/placement_expression.rs"]
+mod placement_expression;
 #[path = "support/workflow_cache_owners.rs"]
 mod workflow_cache_owners;
 #[path = "support/workflow_model.rs"]

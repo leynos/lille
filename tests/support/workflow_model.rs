@@ -50,34 +50,6 @@ pub enum RunnerSelection {
     },
 }
 
-/// Returns the text inside `${{` and `}}`, or `None` when it is not wrapped.
-fn expression_body(text: &str) -> Option<&str> {
-    text.strip_prefix("${{")?.strip_suffix("}}")
-}
-
-/// Returns a single-quoted literal's contents, or `None` for anything else.
-///
-/// GitHub's expression syntax has no escape inside a single-quoted literal
-/// other than a doubled quote, so a value containing one is not the simple
-/// literal this reader accepts and is refused rather than guessed at.
-fn quoted_literal(text: &str) -> Option<&str> {
-    let inner = text.trim().strip_prefix('\'')?.strip_suffix('\'')?;
-    (!inner.contains('\'')).then_some(inner)
-}
-
-/// Reports whether the text is a bare context path such as `github.event.x`.
-///
-/// A guard has to be one field reference. Anything else, a call, a comparison
-/// or a second operator, is a different question about the pull request and is
-/// refused here so the assertion naming the expected field can report it.
-fn is_context_path(text: &str) -> bool {
-    let trimmed = text.trim();
-    !trimmed.is_empty()
-        && trimmed
-            .chars()
-            .all(|character| character.is_alphanumeric() || character == '_' || character == '.')
-}
-
 /// Reports whether a label names one of GitHub's own hosted images.
 ///
 /// Read per label rather than per job, because a fork-fallback selection holds
@@ -135,27 +107,13 @@ impl RunnerSelection {
 
     /// Reads a scalar `runs-on` as a fork-fallback selection, or returns `None`.
     ///
-    /// A literal label, a matrix reference and a declaration carrying a line
-    /// break all read as no fork fallback, so each is refused by the assertion
-    /// written for it rather than repaired here.
+    /// The grammar it is read against lives in `placement_expression`, so this
+    /// type states the shapes a `runs-on` can have and that module states what
+    /// counts as one of them.
     #[must_use]
     pub fn from_expression(text: &str) -> Option<Self> {
-        if text.contains('\n') {
-            return None;
-        }
-        let body = expression_body(text)?;
-        let (guard, arms) = body.split_once("&&")?;
-        let (fork, owned) = arms.split_once("||")?;
-        if !is_context_path(guard) {
-            return None;
-        }
-        Some(Self::ForkFallback {
-            guard: guard.trim().to_owned(),
-            arms: [
-                quoted_literal(fork)?.to_owned(),
-                quoted_literal(owned)?.to_owned(),
-            ],
-        })
+        let (guard, arms) = crate::placement_expression::read(text)?;
+        Some(Self::ForkFallback { guard, arms })
     }
 
     /// Reports whether the job names a runner of its own.

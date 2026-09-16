@@ -14,6 +14,8 @@
 //! ordering of the timers that can end a run, `timeout_budgets` for the
 //! arithmetic that ordering rests on, and `parsing` for the loader itself.
 
+#[path = "support/placement_expression.rs"]
+mod placement_expression;
 #[path = "support/shell_reading.rs"]
 mod shell_reading;
 #[path = "support/workflow_assertions.rs"]
