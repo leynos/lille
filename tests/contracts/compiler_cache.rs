@@ -9,6 +9,7 @@
 use rstest::rstest;
 
 use crate::shared_action;
+use crate::shell_reading::{samples, Measure};
 use crate::workflow_assertions::{assert_input, job_named, step_using, workflows};
 use crate::workflow_estate::{Workflow, BUILD_JOB_IDS};
 
@@ -175,10 +176,13 @@ fn both_build_jobs_sample_and_report_their_resource_use(workflows: Vec<Workflow>
             start < report_at,
             "`{id}` must start the sampler before it reports the peaks"
         );
-        for measure in ["free -m", "df -m"] {
+        for measure in [Measure("free -m"), Measure("df -m")] {
             assert!(
-                job.steps.iter().any(|step| step.run.contains(measure)),
-                "`{id}` must sample `{measure}`; disk and memory are both needed"
+                samples(job, measure),
+                "`{id}` must sample `{measure}` in a form that runs; disk and \
+                 memory are both needed, and a substring search alone would be \
+                 satisfied by a sampler wrapped in `if false` or one whose \
+                 failure is discarded with `|| true`"
             );
         }
         assert!(
