@@ -74,7 +74,7 @@ jobs:
       - name: Route the compiler cache into Ubicloud's store
         # See ci.yml for why each variable is exported, and why this must
         # precede the step that starts the sccache server.
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const cacheUrl = process.env.ACTIONS_CACHE_URL ?? '';
@@ -94,7 +94,7 @@ jobs:
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', runtimeToken);
             core.exportVariable('ACTIONS_CACHE_SERVICE_V2', '');
       - name: Install sccache
-        uses: taiki-e/install-action@c7eb1735f09259a5035e8e5d44b1406b1cddc0fb # v2.83.0
+        uses: taiki-e/install-action@c3ec0de9ae7f1019cea21aa96aa0a895b9552063 # v2.87.9
         with:
           tool: sccache@0.16.0
           fallback: none
@@ -107,7 +107,7 @@ jobs:
           sccache --version
           sccache --zero-stats
       - name: Setup Rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@c5a54701c8603a0fa756a6b34c49bc2af75a6c11
+        uses: leynos/shared-actions/.github/actions/setup-rust@944b039cf98dccec77bd051e1d901bcb36e8e246
         with:
           # Sole owner of ~/.cargo/registry and ~/.cargo/git for this job, and
           # the trunk writer whose entry every pull-request run restores.
@@ -115,7 +115,7 @@ jobs:
           # The job installs and starts sccache itself, above.
           use-sccache: 'false'
       - name: Generate coverage
-        uses: leynos/shared-actions/.github/actions/generate-coverage@c5a54701c8603a0fa756a6b34c49bc2af75a6c11
+        uses: leynos/shared-actions/.github/actions/generate-coverage@944b039cf98dccec77bd051e1d901bcb36e8e246
         with:
           all-features: 'true'
           all-targets: 'true'
@@ -186,7 +186,7 @@ jobs:
         env:
           CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN }}
         if: env.CS_ACCESS_TOKEN != ''
-        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@c5a54701c8603a0fa756a6b34c49bc2af75a6c11
+        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@944b039cf98dccec77bd051e1d901bcb36e8e246
         with:
           format: lcov
           access-token: ${{ env.CS_ACCESS_TOKEN }}
