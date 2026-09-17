@@ -264,6 +264,37 @@ impl fmt::Display for RunnerSelection {
     }
 }
 
+/// An `if` or `continue-on-error` value that is constantly false.
+///
+/// A workflow may write either as a bare YAML boolean or as an expression, so
+/// the rendered scalar is compared against every spelling of a constant that
+/// decides the same way every time the workflow runs.
+const CONSTANT_FALSE: [&str; 3] = ["false", "${{ false }}", "${{false}}"];
+
+/// An `if` or `continue-on-error` value that is constantly true.
+const CONSTANT_TRUE: [&str; 3] = ["true", "${{ true }}", "${{true}}"];
+
+/// Reports whether a rendered condition is a constant that never holds.
+///
+/// Read on `if`, where it means the scope is dead: every rule about how the
+/// scope is configured stays satisfiable while nothing it configures ever
+/// executes. A guard that cannot run is worse than no guard, because the
+/// contract above it goes on passing.
+#[must_use]
+pub fn is_constantly_false(condition: &str) -> bool {
+    CONSTANT_FALSE.contains(&condition.trim())
+}
+
+/// Reports whether a rendered condition is a constant that always holds.
+///
+/// Read on `continue-on-error`, where it means the scope's result is advisory:
+/// the job reports success whatever it found, so every budget and placement
+/// rule about it describes a lane that cannot fail.
+#[must_use]
+pub fn is_constantly_true(condition: &str) -> bool {
+    CONSTANT_TRUE.contains(&condition.trim())
+}
+
 /// One step of a workflow job, reduced to the fields the contracts inspect.
 #[derive(Debug, Clone, Default)]
 pub struct Step {
@@ -273,11 +304,32 @@ pub struct Step {
     pub uses: String,
     /// Shell script, or an empty string for a `uses` step.
     pub run: String,
+    /// Declared `if`, when present, rendered as written.
+    ///
+    /// Absence and an empty string are kept apart: the first is a step that
+    /// always runs, the second a condition GitHub reads as false.
+    pub condition: Option<String>,
+    /// Declared `continue-on-error`, when present, rendered as written.
+    pub continue_on_error: Option<String>,
     /// Inputs supplied to the action, rendered as GitHub would pass them.
     pub with: BTreeMap<String, String>,
 }
 
 impl Step {
+    /// Reports whether the step's `if` is a constant that never holds.
+    #[must_use]
+    pub fn never_runs(&self) -> bool {
+        self.condition.as_deref().is_some_and(is_constantly_false)
+    }
+
+    /// Reports whether the step's failures are advisory rather than fatal.
+    #[must_use]
+    pub fn result_is_advisory(&self) -> bool {
+        self.continue_on_error
+            .as_deref()
+            .is_some_and(is_constantly_true)
+    }
+
     /// Returns the value of a `with` input, or an empty string when absent.
     ///
     /// Every input was validated as a scalar during parsing, so an absent
@@ -320,6 +372,19 @@ pub struct Job {
     pub uses: String,
     /// Declared `timeout-minutes`, when present.
     pub timeout_minutes: Option<u64>,
+    /// Declared `if`, when present, rendered as written.
+    ///
+    /// Modelled because placement and budget rules are all statements about a
+    /// job that runs. A job carrying `if: false` keeps a valid `runs_on`, a
+    /// bounded `timeout-minutes` and a correct cache key while executing
+    /// nothing, so every contract about it passes and none of them is true of
+    /// anything.
+    pub condition: Option<String>,
+    /// Declared `continue-on-error`, when present, rendered as written.
+    ///
+    /// The same argument one step further on: a lane whose failures do not
+    /// count is a lane the rules describe and the gate cannot enforce.
+    pub continue_on_error: Option<String>,
     /// Job-level environment, rendered as GitHub would export it.
     pub env: BTreeMap<String, String>,
     /// Steps in declaration order.
@@ -374,6 +439,20 @@ impl Job {
             | RunnerSelection::Group { .. }
             | RunnerSelection::ForkFallback { .. } => false,
         }
+    }
+
+    /// Reports whether the job's own `if` is a constant that never holds.
+    #[must_use]
+    pub fn never_runs(&self) -> bool {
+        self.condition.as_deref().is_some_and(is_constantly_false)
+    }
+
+    /// Reports whether the job's failures are advisory rather than fatal.
+    #[must_use]
+    pub fn result_is_advisory(&self) -> bool {
+        self.continue_on_error
+            .as_deref()
+            .is_some_and(is_constantly_true)
     }
 
     /// Returns the first step whose `run` or `uses` text contains `needle`.

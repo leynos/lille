@@ -435,6 +435,16 @@ image family rather than about hosting in general. The two questions differ by
 exactly the jobs that would move to Windows or macOS: GitHub hosts both, and
 neither is where this rule puts a lane.
 
+Every one of these rules is a statement about a job that runs. None of them
+reads whether it does, so a build lane carrying `if: false`, or
+`continue-on-error: true`, keeps a valid `runs-on`, a bounded `timeout-minutes`
+and a correct cache key while executing nothing or reporting success whatever
+it found. `no_scope_is_dead_or_advisory` reads both fields at job and step
+scope and refuses a constant, in any of its spellings. A condition that depends
+on the event is not refused, because that is what `if` is for and
+`dependabot-automerge.yml` declares one: the rule is that a scope must be able
+to run, not that it must always run.
+
 ### Tool installation
 
 No tool is compiled from source. `whitaker-installer` is installed by

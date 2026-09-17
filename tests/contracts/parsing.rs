@@ -12,8 +12,8 @@ use rstest::rstest;
 use crate::workflow_estate::WorkflowSource;
 use crate::workflow_loader::{load_workflows_in, parse_workflow};
 use crate::workflow_model::{
-    is_github_hosted_label, is_hosted_label, is_hosted_ubuntu_label, ContextPath, Job,
-    RunnerLabel, RunnerSelection,
+    is_constantly_false, is_constantly_true, is_github_hosted_label, is_hosted_label,
+    is_hosted_ubuntu_label, ContextPath, Job, RunnerLabel, RunnerSelection,
 };
 
 #[rstest]
@@ -237,6 +237,118 @@ fn a_job_is_placeable_only_when_every_label_is_hosted_ubuntu(
         placeable,
         "`{}` was misclassified for the placement question",
         job.runs_on
+    );
+}
+
+/// A constant condition is read from the value, not from its spelling.
+///
+/// A workflow may write `if` and `continue-on-error` as bare YAML booleans or
+/// as expressions, and the loader renders both to a string. Recognising only
+/// the bare spelling would let `if: ${{ false }}` describe a dead job that
+/// every rule went on passing.
+///
+/// A condition naming a context is not constant and is not refused: that is
+/// what `if` is for, and `dependabot-automerge` declares one.
+#[rstest]
+#[case::bare_false("false", true, false)]
+#[case::bare_true("true", false, true)]
+#[case::an_expression_false("${{ false }}", true, false)]
+#[case::an_expression_false_unspaced("${{false}}", true, false)]
+#[case::an_expression_true("${{ true }}", false, true)]
+#[case::padded("  false  ", true, false)]
+#[case::a_context_condition("github.event_name == 'pull_request'", false, false)]
+#[case::always("always()", false, false)]
+#[case::empty("", false, false)]
+fn a_constant_condition_is_told_from_one_that_depends_on_the_event(
+    #[case] condition: &str,
+    #[case] never: bool,
+    #[case] always: bool,
+) {
+    assert_eq!(
+        is_constantly_false(condition),
+        never,
+        "`{condition}` was misread as a condition that never holds"
+    );
+    assert_eq!(
+        is_constantly_true(condition),
+        always,
+        "`{condition}` was misread as a condition that always holds"
+    );
+}
+
+/// A dead or advisory scope is reported, and an absent field is neither.
+///
+/// The contract that reads these lives in `placement.rs` and runs over this
+/// repository's own workflows, none of which carries a dead scope, so it would
+/// pass with the readers deleted. The readers are driven here instead.
+#[rstest]
+#[case::no_declarations(
+    "on: push\njobs:\n  a:\n    runs-on: x\n    steps:\n      - run: echo\n",
+    false,
+    false,
+    false,
+    false
+)]
+#[case::a_dead_job(
+    "on: push\njobs:\n  a:\n    runs-on: x\n    if: false\n    steps:\n      - run: echo\n",
+    true,
+    false,
+    false,
+    false
+)]
+#[case::an_advisory_job(
+    "on: push\njobs:\n  a:\n    runs-on: x\n    continue-on-error: true\n    steps:\n      - run: echo\n",
+    false,
+    true,
+    false,
+    false
+)]
+#[case::a_dead_step(
+    "on: push\njobs:\n  a:\n    runs-on: x\n    steps:\n      - run: echo\n        if: ${{ false }}\n",
+    false,
+    false,
+    true,
+    false
+)]
+#[case::an_advisory_step(
+    "on: push\njobs:\n  a:\n    runs-on: x\n    steps:\n      - run: echo\n        continue-on-error: true\n",
+    false,
+    false,
+    false,
+    true
+)]
+#[case::a_live_condition(
+    "on: push\njobs:\n  a:\n    runs-on: x\n    if: github.event_name == 'push'\n    steps:\n      - run: echo\n        if: always()\n",
+    false,
+    false,
+    false,
+    false
+)]
+fn a_dead_or_advisory_scope_is_reported_at_either_level(
+    #[case] text: &str,
+    #[case] dead_job: bool,
+    #[case] advisory_job: bool,
+    #[case] dead_step: bool,
+    #[case] advisory_step: bool,
+) {
+    let workflow = parse_workflow(WorkflowSource {
+        file: "scratch.yml",
+        text,
+    })
+    .expect("the fixture workflow must parse");
+    let job = workflow.jobs.first().expect("the fixture declares one job");
+    let step = job.steps.first().expect("the fixture declares one step");
+    assert_eq!(job.never_runs(), dead_job, "job condition misread");
+    assert_eq!(
+        job.result_is_advisory(),
+        advisory_job,
+        "job `continue-on-error` misread"
+    );
+    assert_eq!(step.never_runs(), dead_step, "step condition misread");
+    assert_eq!(
+        step.result_is_advisory(),
+        advisory_step,
+        "step `continue-on-error` misread"
     );
 }
 
