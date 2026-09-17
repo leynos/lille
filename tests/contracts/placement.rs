@@ -56,18 +56,26 @@ fn each_cached_path_has_exactly_one_owner(workflows: Vec<Workflow>) {
     );
 }
 
+/// Every lane that is not a measured build sits on `ubuntu-latest`.
+///
+/// The predicate is the Ubuntu-only one on purpose. Asking merely whether the
+/// runner is GitHub-hosted would let an API-bound job move to `windows-latest`
+/// and still pass, which is not the invariant this exists for. The predicate
+/// itself is driven case by case in `parsing.rs`, because over this
+/// repository's own workflows the loose and strict readings agree exactly.
 #[rstest]
-fn non_build_jobs_stay_on_github_hosted_runners(workflows: Vec<Workflow>) {
+fn non_build_jobs_stay_on_hosted_ubuntu_runners(workflows: Vec<Workflow>) {
     let misplaced: Vec<String> = jobs(&workflows)
         .into_iter()
         .filter(|(_, job)| job.runs_on.names_a_runner())
         .filter(|(_, job)| !BUILD_JOB_IDS.contains(&job.id.as_str()))
-        .filter(|(_, job)| !job.is_github_hosted())
+        .filter(|(_, job)| !job.stays_on_hosted_ubuntu())
         .map(|(file, job)| format!("{file}:{}: {}", job.id, job.runs_on))
         .collect();
     assert!(
         misplaced.is_empty(),
-        "delayed-comment, metadata, and other API-bound jobs must stay GitHub-hosted: {misplaced:?}"
+        "delayed-comment, metadata, and other API-bound jobs must stay on a \
+         GitHub-hosted Ubuntu runner: {misplaced:?}"
     );
 }
 

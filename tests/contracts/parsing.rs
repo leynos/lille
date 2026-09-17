@@ -11,7 +11,10 @@ use rstest::rstest;
 
 use crate::workflow_estate::WorkflowSource;
 use crate::workflow_loader::{load_workflows_in, parse_workflow};
-use crate::workflow_model::{is_github_hosted_label, is_hosted_label, RunnerSelection};
+use crate::workflow_model::{
+    is_github_hosted_label, is_hosted_label, is_hosted_ubuntu_label, ContextPath, Job,
+    RunnerLabel, RunnerSelection,
+};
 
 #[rstest]
 #[case::not_a_workflow("scratch.yml", "steps: []")]
@@ -146,6 +149,94 @@ fn a_hosted_label_is_told_from_a_self_hosted_one(#[case] label: &str, #[case] ho
         is_hosted_label(label),
         hosted,
         "`{label}` was misclassified"
+    );
+}
+
+/// Placement asks about one family; "hosted" asks who pays. They differ.
+///
+/// The separating labels are `windows-2022` and `macos-14`: GitHub hosts both,
+/// and the placement rule allows neither. A single predicate served both
+/// questions, so a delayed-comment job moved onto Windows satisfied a contract
+/// whose message names `ubuntu-latest`. Over this repository's own workflows
+/// the two readings agree exactly, so they are driven here rather than proved
+/// through the contract that reads those workflows.
+#[rstest]
+#[case::hosted_ubuntu("ubuntu-latest", true, true)]
+#[case::another_hosted_ubuntu("ubuntu-24.04", true, true)]
+#[case::hosted_windows("windows-2022", true, false)]
+#[case::hosted_macos("macos-14", true, false)]
+#[case::the_paid_label("ubicloud-standard-4", false, false)]
+#[case::a_prefix_without_its_separator("ubuntulatest", false, false)]
+fn placement_reads_a_narrower_family_than_hosting(
+    #[case] label: &str,
+    #[case] hosted: bool,
+    #[case] placeable: bool,
+) {
+    assert_eq!(
+        is_hosted_label(label),
+        hosted,
+        "`{label}` was misclassified for the hosting question"
+    );
+    assert_eq!(
+        is_hosted_ubuntu_label(label),
+        placeable,
+        "`{label}` was misclassified for the placement question"
+    );
+}
+
+/// A job is placeable only when every label it names is a hosted Ubuntu one.
+///
+/// Driven through `Job` rather than the label predicate because the job-level
+/// reading adds three answers of its own: a reusable-workflow call names no
+/// runner, a runner group is never GitHub's, and a fork-fallback selection
+/// holds one hosted arm and one that is not, so it is neither hosted nor
+/// placeable.
+#[rstest]
+#[case::hosted_ubuntu(RunnerSelection::Labels(vec![RunnerLabel::from("ubuntu-latest")]), true, true)]
+#[case::hosted_windows(RunnerSelection::Labels(vec![RunnerLabel::from("windows-latest")]), true, false)]
+#[case::hosted_macos(RunnerSelection::Labels(vec![RunnerLabel::from("macos-latest")]), true, false)]
+#[case::mixed(
+    RunnerSelection::Labels(vec![RunnerLabel::from("ubuntu-latest"), RunnerLabel::from("self-hosted")]),
+    false,
+    false
+)]
+#[case::the_paid_label(RunnerSelection::Labels(vec![RunnerLabel::from("ubicloud-standard-2")]), false, false)]
+#[case::no_labels(RunnerSelection::Labels(Vec::new()), false, false)]
+#[case::delegated(RunnerSelection::Delegated, false, false)]
+#[case::group(
+    RunnerSelection::Group { group: "estate".to_owned(), labels: vec![RunnerLabel::from("ubuntu-latest")] },
+    false,
+    false
+)]
+#[case::fork_fallback(
+    RunnerSelection::ForkFallback {
+        guard: ContextPath::from("github.event.pull_request.head.repo.fork"),
+        arms: [RunnerLabel::from("ubuntu-latest"), RunnerLabel::from("ubicloud-standard-2")],
+    },
+    false,
+    false
+)]
+fn a_job_is_placeable_only_when_every_label_is_hosted_ubuntu(
+    #[case] runs_on: RunnerSelection,
+    #[case] hosted: bool,
+    #[case] placeable: bool,
+) {
+    let job = Job {
+        id: "example".to_owned(),
+        runs_on,
+        ..Job::default()
+    };
+    assert_eq!(
+        job.is_github_hosted(),
+        hosted,
+        "`{}` was misclassified for the hosting question",
+        job.runs_on
+    );
+    assert_eq!(
+        job.stays_on_hosted_ubuntu(),
+        placeable,
+        "`{}` was misclassified for the placement question",
+        job.runs_on
     );
 }
 
