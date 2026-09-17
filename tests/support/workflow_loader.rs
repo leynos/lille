@@ -25,7 +25,7 @@ use serde_norway::Value;
 
 use crate::workflow_concurrency::parse_concurrency;
 use crate::workflow_estate::{Location, Workflow, WorkflowError, WorkflowSource, WORKFLOW_DIR};
-use crate::workflow_model::{Job, RunnerSelection, Step};
+use crate::workflow_model::{Job, RunnerLabel, RunnerSelection, Step};
 use crate::workflow_triggers::parse_triggers;
 
 /// Renders a YAML scalar as the string a workflow expression would see.
@@ -169,7 +169,9 @@ fn parse_runs_on(raw: &Value, at: &Location) -> Result<RunnerSelection, Workflow
                 return Ok(selection);
             }
         }
-        return Ok(RunnerSelection::Labels(labels));
+        return Ok(RunnerSelection::Labels(
+            labels.into_iter().map(RunnerLabel::from).collect(),
+        ));
     }
     let group = value
         .get("group")
@@ -179,7 +181,10 @@ fn parse_runs_on(raw: &Value, at: &Location) -> Result<RunnerSelection, Workflow
         None => Vec::new(),
         Some(labels) => parse_labels(labels, at)?,
     };
-    Ok(RunnerSelection::Group { group, labels })
+    Ok(RunnerSelection::Group {
+        group,
+        labels: labels.into_iter().map(RunnerLabel::from).collect(),
+    })
 }
 
 /// Reports whether a job mixes the two shapes GitHub Actions keeps apart.
