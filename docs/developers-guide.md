@@ -414,7 +414,7 @@ not spread by imitation.
 Keep the continuation at the same indent as the first line. A more-indented
 line inside a folded scalar keeps its break, so the expression arrives with a
 newline inside it. GitHub evaluates it anyway and the lane runs, which is why a
-green run is not evidence that the declaration is well formed;
+green run is not evidence that the declaration is well-formed;
 `no_runs_on_declaration_carries_a_line_break` is what reads it.
 
 The loader models the expression as a fourth `runs-on` shape carrying the guard

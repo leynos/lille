@@ -22,6 +22,11 @@
 //! ```
 
 /// Returns the text inside `${{` and `}}`, or `None` when it is not wrapped.
+///
+/// ```no_run
+/// assert_eq!(expression_body("${{ a.b }}"), Some(" a.b "));
+/// assert_eq!(expression_body("ubuntu-latest"), None);
+/// ```
 fn expression_body(text: &str) -> Option<&str> {
     text.strip_prefix("${{")?.strip_suffix("}}")
 }
@@ -31,6 +36,12 @@ fn expression_body(text: &str) -> Option<&str> {
 /// GitHub's expression syntax has no escape inside a single-quoted literal
 /// other than a doubled quote, so a value containing one is not the simple
 /// literal this reader accepts and is refused rather than guessed at.
+///
+/// ```no_run
+/// assert_eq!(quoted_literal(" 'ubuntu-latest' "), Some("ubuntu-latest"));
+/// assert_eq!(quoted_literal("'it''s'"), None);
+/// assert_eq!(quoted_literal("ubuntu-latest"), None);
+/// ```
 fn quoted_literal(text: &str) -> Option<&str> {
     let inner = text.trim().strip_prefix('\'')?.strip_suffix('\'')?;
     (!inner.contains('\'')).then_some(inner)
@@ -41,6 +52,13 @@ fn quoted_literal(text: &str) -> Option<&str> {
 /// A guard has to be one field reference. Anything else, a call, a comparison
 /// or a second operator, is a different question about the pull request and is
 /// refused here so the assertion naming the expected field can report it.
+///
+/// ```no_run
+/// assert!(is_context_path(" github.event.pull_request.head.repo.fork "));
+/// assert!(!is_context_path("!github.event.x"));
+/// assert!(!is_context_path("github.event_name == 'push'"));
+/// assert!(!is_context_path("   "));
+/// ```
 fn is_context_path(text: &str) -> bool {
     let trimmed = text.trim();
     !trimmed.is_empty()
