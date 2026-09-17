@@ -141,6 +141,17 @@ pub const GITHUB_HOSTED_LABELS: [&str; 5] = [
 ];
 
 /// Reports whether a label is one GitHub hosts, by name.
+///
+/// Membership of [`GITHUB_HOSTED_LABELS`], not a prefix test, which is the
+/// whole point: `ubuntu-20.04` is a hosted family member this estate does not
+/// use, so it must be reported rather than silently excused.
+///
+/// ```no_run
+/// assert!(workflow_model::is_github_hosted_label("ubuntu-latest"));
+/// assert!(workflow_model::is_github_hosted_label("macos-latest"));
+/// assert!(!workflow_model::is_github_hosted_label("ubuntu-20.04"));
+/// assert!(!workflow_model::is_github_hosted_label("ubicloud-standard-4"));
+/// ```
 #[must_use]
 pub fn is_github_hosted_label(label: &str) -> bool {
     GITHUB_HOSTED_LABELS.contains(&label)
