@@ -79,6 +79,57 @@ fn non_build_jobs_stay_on_hosted_ubuntu_runners(workflows: Vec<Workflow>) {
     );
 }
 
+/// A rule about a job is a statement about a job that runs.
+///
+/// Every placement, budget and cache rule in this module reads a job's
+/// declared configuration. None of them reads whether the job executes, so
+/// `if: false` on a build lane, or `continue-on-error: true`, leaves every one
+/// of them satisfied while the lane runs nothing or reports success whatever
+/// it found. The same holds one scope down, where a step whose `if` never
+/// holds is a step the supply-chain and cache rules describe and the runner
+/// never reaches.
+///
+/// Only a constant is refused. A condition that depends on the event is what
+/// `if` is for, and `dependabot-automerge` declares one; the rule is that a
+/// scope must be able to run, not that it must always run.
+#[rstest]
+fn no_scope_is_dead_or_advisory(workflows: Vec<Workflow>) {
+    let dead: Vec<String> = jobs(&workflows)
+        .into_iter()
+        .flat_map(|(file, job)| {
+            let mut offences = Vec::new();
+            if job.never_runs() {
+                offences.push(format!("{file}:{}: job `if` never holds", job.id));
+            }
+            if job.result_is_advisory() {
+                offences.push(format!("{file}:{}: job failures do not count", job.id));
+            }
+            for step in &job.steps {
+                if step.never_runs() {
+                    offences.push(format!(
+                        "{file}:{}: step `{}` has an `if` that never holds",
+                        job.id,
+                        step.label()
+                    ));
+                }
+                if step.result_is_advisory() {
+                    offences.push(format!(
+                        "{file}:{}: step `{}` failures do not count",
+                        job.id,
+                        step.label()
+                    ));
+                }
+            }
+            offences
+        })
+        .collect();
+    assert!(
+        dead.is_empty(),
+        "a scope that cannot run, or whose failure cannot fail the gate, \
+         satisfies every rule written about it while enforcing none: {dead:?}"
+    );
+}
+
 /// The measured bounds for each build job's `timeout-minutes`.
 ///
 /// The lower bound keeps the timeout above the observed median so a normal run

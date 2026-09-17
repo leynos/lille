@@ -69,6 +69,26 @@ fn optional_u64(raw: &Value, key: &str, at: &Location) -> Result<Option<u64>, Wo
         .ok_or_else(|| at.shape(&format!("`{key}` must be an unsigned integer")))
 }
 
+/// Reads an optional scalar field, keeping absence apart from an empty value.
+///
+/// `if` and `continue-on-error` are the fields this exists for. Both may be
+/// written as a bare boolean or as an expression string, and for both the
+/// difference between "absent" and "present and empty" is the difference
+/// between a job that runs and one whose condition nothing has read. Rendering
+/// an absent field as `""`, as `optional_string` does, erases it.
+///
+/// # Errors
+///
+/// Returns an error when the field is present but is not a scalar.
+fn optional_scalar(raw: &Value, key: &str, at: &Location) -> Result<Option<String>, WorkflowError> {
+    let Some(value) = raw.get(key) else {
+        return Ok(None);
+    };
+    render_scalar(value)
+        .map(Some)
+        .ok_or_else(|| at.shape(&format!("`{key}` must be a scalar")))
+}
+
 /// Returns an error when `with` is not a mapping or an input is not a scalar.
 fn parse_inputs(raw: &Value, at: &Location) -> Result<BTreeMap<String, String>, WorkflowError> {
     parse_scalar_mapping(raw, "with", at)
@@ -118,6 +138,8 @@ fn parse_step(raw: &Value, at: &Location) -> Result<Step, WorkflowError> {
         name: optional_string(raw, "name", at)?,
         uses: optional_string(raw, "uses", at)?,
         run: optional_string(raw, "run", at)?,
+        condition: optional_scalar(raw, "if", at)?,
+        continue_on_error: optional_scalar(raw, "continue-on-error", at)?,
         with: parse_inputs(raw, at)?,
     };
     match (step.uses.is_empty(), step.run.is_empty()) {
@@ -223,6 +245,8 @@ fn parse_job(id: &str, raw: &Value, file: &Location) -> Result<Job, WorkflowErro
         runs_on: parse_runs_on(raw, &at)?,
         uses: optional_string(raw, "uses", &at)?,
         timeout_minutes: optional_u64(raw, "timeout-minutes", &at)?,
+        condition: optional_scalar(raw, "if", &at)?,
+        continue_on_error: optional_scalar(raw, "continue-on-error", &at)?,
         env: parse_scalar_mapping(raw, "env", &at)?,
         steps,
     };

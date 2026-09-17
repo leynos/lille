@@ -46,6 +46,8 @@ fn action_step(name: &str, uses: &str, inputs: &[(&str, &str)]) -> Step {
         name: name.to_owned(),
         uses: uses.to_owned(),
         run: String::new(),
+        condition: None,
+        continue_on_error: None,
         with: inputs
             .iter()
             .map(|(key, value)| ((*key).to_owned(), (*value).to_owned()))
