@@ -14,7 +14,7 @@ use crate::workflow_cache_owners;
 use crate::workflow_config::registered_runner_labels;
 use crate::workflow_estate::{Workflow, BUILD_JOB_IDS, UBICLOUD_LABEL};
 use crate::workflow_loader::all_steps;
-use crate::workflow_model::is_github_hosted_label;
+use crate::workflow_model::{is_github_hosted_label, RunnerLabel};
 
 /// The runner a fork's pull request falls back to.
 ///
@@ -126,6 +126,7 @@ fn every_runner_label_is_registered_with_actionlint(workflows: Vec<Workflow>) {
     let in_use: BTreeSet<String> = jobs(&workflows)
         .into_iter()
         .flat_map(|(_, job)| job.runs_on.labels().to_vec())
+        .map(|label: RunnerLabel| label.as_str().to_owned())
         .filter(|label| !is_github_hosted_label(label))
         .collect();
     let registered: BTreeSet<String> = declared.into_iter().collect();
@@ -273,7 +274,7 @@ fn no_runs_on_declaration_carries_a_line_break(workflows: Vec<Workflow>) {
             job.runs_on
                 .labels()
                 .iter()
-                .any(|label| label.contains('\n'))
+                .any(|label| label.as_str().contains('\n'))
         })
         .map(|(file, job)| format!("{file}:{}", job.id))
         .collect();

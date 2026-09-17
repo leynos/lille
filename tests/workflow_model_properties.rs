@@ -32,7 +32,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use proptest::prelude::*;
 
 use workflow_cache_owners::duplicated_paths;
-use workflow_model::{Job, RunnerSelection, Step};
+use workflow_model::{Job, RunnerLabel, RunnerSelection, Step};
 
 /// Cache paths the generators draw from, kept small so collisions are common.
 const PATHS: [&str; 4] = ["~/.cargo/registry", "~/.cargo/git", ".uv-cache", "target-x"];
@@ -79,7 +79,7 @@ fn run_step(script: &str) -> Step {
 fn job_of(steps: Vec<Step>) -> Job {
     Job {
         id: "j".to_owned(),
-        runs_on: RunnerSelection::Labels(vec!["ubuntu-latest".to_owned()]),
+        runs_on: RunnerSelection::Labels(vec![RunnerLabel::from("ubuntu-latest")]),
         steps,
         ..Job::default()
     }
