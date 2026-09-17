@@ -158,6 +158,19 @@ pub fn is_hosted_label(label: &str) -> bool {
         .any(|prefix| label.starts_with(prefix))
 }
 
+/// Reports whether a label names one of GitHub's own hosted Ubuntu images.
+///
+/// A narrower question than `is_hosted_label`, and a separate one. "Hosted"
+/// answers who pays for the runner; this answers whether a job sits where the
+/// placement rule puts the lanes that are not measured. The two were one
+/// predicate, so a delayed-comment job moved to `windows-latest` satisfied a
+/// contract whose message says `ubuntu-latest`, and the invariant the contract
+/// exists for was no longer the one it read.
+#[must_use]
+pub fn is_hosted_ubuntu_label(label: &str) -> bool {
+    label.starts_with("ubuntu-")
+}
+
 impl RunnerSelection {
     /// Returns the labels the selection requires, empty when it names none.
     #[must_use]
@@ -320,20 +333,43 @@ impl Job {
         self.env.get(key).map_or("", String::as_str)
     }
 
-    /// Reports whether the job runs on a GitHub-hosted Ubuntu runner.
+    /// Reports whether the job runs on a runner GitHub hosts, of any family.
     ///
     /// A runner group is never GitHub-hosted, and a label set is only when
-    /// every label in it is one of GitHub's Ubuntu images: a job that also
-    /// requires a self-hosted label runs somewhere else.
+    /// every label in it is one of GitHub's images: a job that also requires a
+    /// self-hosted label runs somewhere else.
+    ///
+    /// This answers who pays for the runner. For where a job is allowed to
+    /// sit, ask `stays_on_hosted_ubuntu` instead: the placement rule names one
+    /// family, and the two questions differ by exactly the jobs that would
+    /// move to Windows or macOS.
     #[must_use]
     pub fn is_github_hosted(&self) -> bool {
+        self.every_label_is(is_hosted_label)
+    }
+
+    /// Reports whether the job sits on a GitHub-hosted Ubuntu runner.
+    ///
+    /// The placement rule keeps every lane that is not a measured build on
+    /// `ubuntu-latest`, so a job that satisfies `is_github_hosted` on a
+    /// Windows or macOS image does not satisfy this. They were the same
+    /// predicate, and the looser one was the one the contract read.
+    #[must_use]
+    pub fn stays_on_hosted_ubuntu(&self) -> bool {
+        self.every_label_is(is_hosted_ubuntu_label)
+    }
+
+    /// Reports whether the job names labels and every one of them satisfies
+    /// `classify`.
+    ///
+    /// A fork-fallback selection holds one hosted arm and one that is not, so
+    /// it is never wholly hosted: it runs on this repository's own runner for
+    /// every branch of this repository.
+    fn every_label_is(&self, classify: fn(&str) -> bool) -> bool {
         match &self.runs_on {
             RunnerSelection::Labels(labels) => {
-                !labels.is_empty() && labels.iter().all(|label| is_hosted_label(label.as_str()))
+                !labels.is_empty() && labels.iter().all(|label| classify(label.as_str()))
             }
-            // One arm is hosted and the other is not, so the job is not: it
-            // runs on this repository's own runner for every branch of this
-            // repository.
             RunnerSelection::Delegated
             | RunnerSelection::Group { .. }
             | RunnerSelection::ForkFallback { .. } => false,
