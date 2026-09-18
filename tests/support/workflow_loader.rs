@@ -24,7 +24,7 @@ use cap_std::{ambient_authority, fs_utf8::Dir};
 use serde_norway::Value;
 
 use crate::workflow_estate::{Location, Workflow, WorkflowError, WorkflowSource, WORKFLOW_DIR};
-use crate::workflow_model::{Job, RunnerSelection, Step};
+use crate::workflow_model::{Job, RunnerLabel, RunnerSelection, Step};
 
 /// Renders a YAML scalar as the string a workflow expression would see.
 ///
@@ -65,6 +65,26 @@ fn optional_u64(raw: &Value, key: &str, at: &Location) -> Result<Option<u64>, Wo
         .as_u64()
         .map(Some)
         .ok_or_else(|| at.shape(&format!("`{key}` must be an unsigned integer")))
+}
+
+/// Reads an optional scalar field, keeping absence apart from an empty value.
+///
+/// `if` and `continue-on-error` are the fields this exists for. Both may be
+/// written as a bare boolean or as an expression string, and for both the
+/// difference between "absent" and "present and empty" is the difference
+/// between a job that runs and one whose condition nothing has read. Rendering
+/// an absent field as `""`, as `optional_string` does, erases it.
+///
+/// # Errors
+///
+/// Returns an error when the field is present but is not a scalar.
+fn optional_scalar(raw: &Value, key: &str, at: &Location) -> Result<Option<String>, WorkflowError> {
+    let Some(value) = raw.get(key) else {
+        return Ok(None);
+    };
+    render_scalar(value)
+        .map(Some)
+        .ok_or_else(|| at.shape(&format!("`{key}` must be a scalar")))
 }
 
 /// Returns an error when `with` is not a mapping or an input is not a scalar.
@@ -116,6 +136,8 @@ fn parse_step(raw: &Value, at: &Location) -> Result<Step, WorkflowError> {
         name: optional_string(raw, "name", at)?,
         uses: optional_string(raw, "uses", at)?,
         run: optional_string(raw, "run", at)?,
+        condition: optional_scalar(raw, "if", at)?,
+        continue_on_error: optional_scalar(raw, "continue-on-error", at)?,
         with: parse_inputs(raw, at)?,
     };
     match (step.uses.is_empty(), step.run.is_empty()) {
@@ -159,7 +181,17 @@ fn parse_runs_on(raw: &Value, at: &Location) -> Result<RunnerSelection, Workflow
         return Ok(RunnerSelection::Delegated);
     };
     if value.as_mapping().is_none() {
-        return Ok(RunnerSelection::Labels(parse_labels(value, at)?));
+        let labels = parse_labels(value, at)?;
+        // A fork-fallback expression is one scalar that names two runners, so
+        // it is read here rather than left as a label nothing can classify.
+        if let [only] = labels.as_slice() {
+            if let Some(selection) = RunnerSelection::from_expression(only) {
+                return Ok(selection);
+            }
+        }
+        return Ok(RunnerSelection::Labels(
+            labels.into_iter().map(RunnerLabel::from).collect(),
+        ));
     }
     let group = value
         .get("group")
@@ -169,7 +201,10 @@ fn parse_runs_on(raw: &Value, at: &Location) -> Result<RunnerSelection, Workflow
         None => Vec::new(),
         Some(labels) => parse_labels(labels, at)?,
     };
-    Ok(RunnerSelection::Group { group, labels })
+    Ok(RunnerSelection::Group {
+        group,
+        labels: labels.into_iter().map(RunnerLabel::from).collect(),
+    })
 }
 
 /// Reports whether a job mixes the two shapes GitHub Actions keeps apart.
@@ -208,6 +243,8 @@ fn parse_job(id: &str, raw: &Value, file: &Location) -> Result<Job, WorkflowErro
         runs_on: parse_runs_on(raw, &at)?,
         uses: optional_string(raw, "uses", &at)?,
         timeout_minutes: optional_u64(raw, "timeout-minutes", &at)?,
+        condition: optional_scalar(raw, "if", &at)?,
+        continue_on_error: optional_scalar(raw, "continue-on-error", &at)?,
         env: parse_scalar_mapping(raw, "env", &at)?,
         steps,
     };

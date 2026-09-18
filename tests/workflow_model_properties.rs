@@ -11,6 +11,8 @@
 //! Each property is checked against a small oracle expressed independently of
 //! the implementation, rather than by re-deriving the implementation's answer.
 
+#[path = "support/placement_expression.rs"]
+mod placement_expression;
 #[path = "support/workflow_cache_owners.rs"]
 mod workflow_cache_owners;
 #[path = "support/workflow_model.rs"]
@@ -30,7 +32,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use proptest::prelude::*;
 
 use workflow_cache_owners::duplicated_paths;
-use workflow_model::{Job, RunnerSelection, Step};
+use workflow_model::{Job, RunnerLabel, RunnerSelection, Step};
 
 /// Cache paths the generators draw from, kept small so collisions are common.
 const PATHS: [&str; 4] = ["~/.cargo/registry", "~/.cargo/git", ".uv-cache", "target-x"];
@@ -44,6 +46,8 @@ fn action_step(name: &str, uses: &str, inputs: &[(&str, &str)]) -> Step {
         name: name.to_owned(),
         uses: uses.to_owned(),
         run: String::new(),
+        condition: None,
+        continue_on_error: None,
         with: inputs
             .iter()
             .map(|(key, value)| ((*key).to_owned(), (*value).to_owned()))
@@ -77,7 +81,7 @@ fn run_step(script: &str) -> Step {
 fn job_of(steps: Vec<Step>) -> Job {
     Job {
         id: "j".to_owned(),
-        runs_on: RunnerSelection::Labels(vec!["ubuntu-latest".to_owned()]),
+        runs_on: RunnerSelection::Labels(vec![RunnerLabel::from("ubuntu-latest")]),
         steps,
         ..Job::default()
     }

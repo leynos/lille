@@ -391,11 +391,59 @@ every push to `main`. Both use the `ubicloud-standard-4` runner label, which is
 registered in `.github/actionlint.yaml`, and both declare `timeout-minutes` so
 a hung step cannot bill to the platform's six-hour default.
 
+### The fork arm on the pull-request lane
+
+A pull request from a fork cannot obtain an Ubicloud runner, so `build-test`
+names its runner through an expression rather than a label:
+
+```yaml
+runs-on: >-
+  ${{ github.event.pull_request.head.repo.fork
+  && 'ubuntu-latest' || 'ubicloud-standard-4' }}
+```
+
+Without the arm the job never starts on a fork's pull request, and a required
+check that never reports presents as a pull request waiting rather than as a
+placement fault.
+
+`coverage-upload` keeps the plain label. It runs on push, so no fork reaches
+it, and an arm nothing takes is a branch to keep correct for nothing. The
+contract asserts that absence as well as the two arms, so the expression does
+not spread by imitation.
+
+Keep the continuation at the same indent as the first line. A more-indented
+line inside a folded scalar keeps its break, so the expression arrives with a
+newline inside it. GitHub evaluates it anyway and the lane runs, which is why a
+green run is not evidence that the declaration is well-formed;
+`no_runs_on_declaration_carries_a_line_break` is what reads it.
+
+The loader models the expression as a fourth `runs-on` shape carrying the guard
+and both arms, so each arm stays a label for every rule that reads one. That
+matters for the actionlint registry, which must be asked about the Ubicloud arm
+and must not be asked about the hosted one. Only the prescribed spelling is
+read: a negated guard or a comparison says the same thing with the arms
+reversed, and reading either as the prescribed form would let two spellings
+drift apart while both satisfied the contract.
+
 Every other job stays on GitHub-hosted `ubuntu-latest`. That placement is a
 rule, not an accident: delayed comments, metadata lookups, label handling, and
 release orchestration are API-bound, so paid runner capacity buys them nothing
 and their queue time is already short. `dependabot-automerge.yml` calls a
 reusable workflow, which chooses its own runner.
+`non_build_jobs_stay_on_hosted_ubuntu_runners` reads it, and it asks about one
+image family rather than about hosting in general. The two questions differ by
+exactly the jobs that would move to Windows or macOS: GitHub hosts both, and
+neither is where this rule puts a lane.
+
+Every one of these rules is a statement about a job that runs. None of them
+reads whether it does, so a build lane carrying `if: false`, or
+`continue-on-error: true`, keeps a valid `runs-on`, a bounded `timeout-minutes`
+and a correct cache key while executing nothing or reporting success whatever
+it found. `no_scope_is_dead_or_advisory` reads both fields at job and step
+scope and refuses a constant, in any of its spellings. A condition that depends
+on the event is not refused, because that is what `if` is for and
+`dependabot-automerge.yml` declares one: the rule is that a scope must be able
+to run, not that it must always run.
 
 ### Tool installation
 

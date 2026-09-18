@@ -11,6 +11,10 @@ use rstest::rstest;
 
 use crate::workflow_estate::WorkflowSource;
 use crate::workflow_loader::{load_workflows_in, parse_workflow};
+use crate::workflow_model::{
+    is_constantly_false, is_constantly_true, is_github_hosted_label, is_hosted_label,
+    is_hosted_ubuntu_label, ContextPath, Job, RunnerLabel, RunnerSelection,
+};
 
 #[rstest]
 #[case::not_a_workflow("scratch.yml", "steps: []")]
@@ -76,6 +80,328 @@ fn every_valid_runs_on_shape_parses(#[case] runs_on: &str, #[case] expected: &[&
     assert!(
         job.runs_on.names_a_runner(),
         "`{runs_on}` names a runner and must say so"
+    );
+}
+
+/// The expression reader must classify only the shape it exists to read.
+///
+/// A literal label, a matrix reference and an expression of another shape must
+/// all read as no fork fallback, or a job the reader misclassified would be
+/// held to the wrong rules while every assertion still passed. The line-break
+/// case is the one that matters most: a declaration carrying a newline must
+/// read as no fork fallback here, so the assertion written for it reports it
+/// rather than this reader quietly parsing through it.
+#[rstest]
+#[case::the_deployed_shape(
+    "${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || 'ubicloud-standard-4' }}",
+    Some(("github.event.pull_request.head.repo.fork", "ubuntu-latest", "ubicloud-standard-4"))
+)]
+#[case::generous_internal_spacing(
+    "${{   github.event.pull_request.head.repo.fork   &&   'a'   ||   'b'   }}",
+    Some(("github.event.pull_request.head.repo.fork", "a", "b"))
+)]
+#[case::a_literal_label("ubuntu-latest", None)]
+#[case::a_matrix_reference("${{ matrix.os }}", None)]
+#[case::a_single_armed_expression("${{ github.event.pull_request.head.repo.fork && 'a' }}", None)]
+// The estate prescribes one spelling. A negated guard or a comparison says the
+// same thing with the arms the other way round, and reading either as the
+// prescribed form would let two spellings of the placement drift apart while
+// both satisfied the contract. They read as no fork fallback, so the lane is
+// reported as not declaring it.
+#[case::a_negated_guard("${{ !github.event.pull_request.head.repo.fork && 'a' || 'b' }}", None)]
+#[case::a_compared_guard(
+    "${{ github.event.pull_request.head.repo.owner == 'leynos' && 'a' || 'b' }}",
+    None
+)]
+#[case::a_declaration_carrying_a_line_break(
+    "${{ github.event.pull_request.head.repo.fork\n&& 'a' || 'b' }}",
+    None
+)]
+fn the_expression_reader_accepts_one_shape_and_refuses_the_rest(
+    #[case] text: &str,
+    #[case] expected: Option<(&str, &str, &str)>,
+) {
+    let read = RunnerSelection::from_expression(text);
+    let rendered = read.as_ref().map(|selection| {
+        (
+            selection.guard().unwrap_or_default(),
+            selection.fork_label().unwrap_or_default(),
+            selection.owned_label().unwrap_or_default(),
+        )
+    });
+    assert_eq!(rendered, expected, "`{text}` was read as {read:?}");
+}
+
+/// A label is GitHub-hosted by its image prefix, whatever the job around it is.
+///
+/// Read per label because a fork-fallback selection holds one hosted and one
+/// self-hosted, and the actionlint registry must be asked only about the
+/// second.
+#[rstest]
+#[case::ubuntu("ubuntu-latest", true)]
+#[case::windows("windows-2022", true)]
+#[case::macos("macos-14", true)]
+#[case::ubicloud("ubicloud-standard-4", false)]
+#[case::self_hosted("self-hosted", false)]
+#[case::a_prefix_without_its_separator("ubuntulatest", false)]
+fn a_hosted_label_is_told_from_a_self_hosted_one(#[case] label: &str, #[case] hosted: bool) {
+    assert_eq!(
+        is_hosted_label(label),
+        hosted,
+        "`{label}` was misclassified"
+    );
+}
+
+/// Placement asks about one family; "hosted" asks who pays. They differ.
+///
+/// The separating labels are `windows-2022` and `macos-14`: GitHub hosts both,
+/// and the placement rule allows neither. A single predicate served both
+/// questions, so a delayed-comment job moved onto Windows satisfied a contract
+/// whose message names `ubuntu-latest`. Over this repository's own workflows
+/// the two readings agree exactly, so they are driven here rather than proved
+/// through the contract that reads those workflows.
+#[rstest]
+#[case::hosted_ubuntu("ubuntu-latest", true, true)]
+#[case::another_hosted_ubuntu("ubuntu-24.04", true, true)]
+#[case::hosted_windows("windows-2022", true, false)]
+#[case::hosted_macos("macos-14", true, false)]
+#[case::the_paid_label("ubicloud-standard-4", false, false)]
+#[case::a_prefix_without_its_separator("ubuntulatest", false, false)]
+fn placement_reads_a_narrower_family_than_hosting(
+    #[case] label: &str,
+    #[case] hosted: bool,
+    #[case] placeable: bool,
+) {
+    assert_eq!(
+        is_hosted_label(label),
+        hosted,
+        "`{label}` was misclassified for the hosting question"
+    );
+    assert_eq!(
+        is_hosted_ubuntu_label(label),
+        placeable,
+        "`{label}` was misclassified for the placement question"
+    );
+}
+
+/// A job is placeable only when every label it names is a hosted Ubuntu one.
+///
+/// Driven through `Job` rather than the label predicate because the job-level
+/// reading adds three answers of its own: a reusable-workflow call names no
+/// runner, a runner group is never GitHub's, and a fork-fallback selection
+/// holds one hosted arm and one that is not, so it is neither hosted nor
+/// placeable.
+#[rstest]
+#[case::hosted_ubuntu(RunnerSelection::Labels(vec![RunnerLabel::from("ubuntu-latest")]), true, true)]
+#[case::hosted_windows(RunnerSelection::Labels(vec![RunnerLabel::from("windows-latest")]), true, false)]
+#[case::hosted_macos(RunnerSelection::Labels(vec![RunnerLabel::from("macos-latest")]), true, false)]
+#[case::mixed(
+    RunnerSelection::Labels(vec![RunnerLabel::from("ubuntu-latest"), RunnerLabel::from("self-hosted")]),
+    false,
+    false
+)]
+#[case::the_paid_label(RunnerSelection::Labels(vec![RunnerLabel::from("ubicloud-standard-2")]), false, false)]
+#[case::no_labels(RunnerSelection::Labels(Vec::new()), false, false)]
+#[case::delegated(RunnerSelection::Delegated, false, false)]
+#[case::group(
+    RunnerSelection::Group { group: "estate".to_owned(), labels: vec![RunnerLabel::from("ubuntu-latest")] },
+    false,
+    false
+)]
+#[case::fork_fallback(
+    RunnerSelection::ForkFallback {
+        guard: ContextPath::from("github.event.pull_request.head.repo.fork"),
+        arms: [RunnerLabel::from("ubuntu-latest"), RunnerLabel::from("ubicloud-standard-2")],
+    },
+    false,
+    false
+)]
+fn a_job_is_placeable_only_when_every_label_is_hosted_ubuntu(
+    #[case] runs_on: RunnerSelection,
+    #[case] hosted: bool,
+    #[case] placeable: bool,
+) {
+    let job = Job {
+        id: "example".to_owned(),
+        runs_on,
+        ..Job::default()
+    };
+    assert_eq!(
+        job.is_github_hosted(),
+        hosted,
+        "`{}` was misclassified for the hosting question",
+        job.runs_on
+    );
+    assert_eq!(
+        job.stays_on_hosted_ubuntu(),
+        placeable,
+        "`{}` was misclassified for the placement question",
+        job.runs_on
+    );
+}
+
+/// A constant condition is read from the value, not from its spelling.
+///
+/// A workflow may write `if` and `continue-on-error` as bare YAML booleans or
+/// as expressions, and the loader renders both to a string. Recognising only
+/// the bare spelling would let `if: ${{ false }}` describe a dead job that
+/// every rule went on passing.
+///
+/// A condition naming a context is not constant and is not refused: that is
+/// what `if` is for, and `dependabot-automerge` declares one.
+#[rstest]
+#[case::bare_false("false", true, false)]
+#[case::bare_true("true", false, true)]
+#[case::an_expression_false("${{ false }}", true, false)]
+#[case::an_expression_false_unspaced("${{false}}", true, false)]
+#[case::an_expression_true("${{ true }}", false, true)]
+#[case::padded("  false  ", true, false)]
+#[case::a_context_condition("github.event_name == 'pull_request'", false, false)]
+#[case::always("always()", false, false)]
+#[case::empty("", false, false)]
+fn a_constant_condition_is_told_from_one_that_depends_on_the_event(
+    #[case] condition: &str,
+    #[case] never: bool,
+    #[case] always: bool,
+) {
+    assert_eq!(
+        is_constantly_false(condition),
+        never,
+        "`{condition}` was misread as a condition that never holds"
+    );
+    assert_eq!(
+        is_constantly_true(condition),
+        always,
+        "`{condition}` was misread as a condition that always holds"
+    );
+}
+
+/// What one scope should read as: whether it runs, and whether its result
+/// counts.
+///
+/// The same pair of questions is asked of a job and of a step, so it is one
+/// type used twice rather than four fields side by side. Four booleans in a
+/// row read as `(false, false, true, false)` at a call site, where a
+/// transposed pair says nothing and would survive review.
+#[derive(Clone, Copy)]
+struct Scope {
+    never_runs: bool,
+    advisory: bool,
+}
+
+impl Scope {
+    /// Runs, and its failure fails the workflow: the ordinary case.
+    const LIVE: Self = Self {
+        never_runs: false,
+        advisory: false,
+    };
+    /// Declared, and cannot run.
+    const DEAD: Self = Self {
+        never_runs: true,
+        advisory: false,
+    };
+    /// Runs, and its failure is reported as success.
+    const ADVISORY: Self = Self {
+        never_runs: false,
+        advisory: true,
+    };
+}
+
+/// The two scopes of a fixture workflow's single job and single step.
+#[derive(Clone, Copy)]
+struct Scopes {
+    job: Scope,
+    step: Scope,
+}
+
+impl Scopes {
+    /// Both scopes live and mandatory.
+    const LIVE: Self = Self {
+        job: Scope::LIVE,
+        step: Scope::LIVE,
+    };
+}
+
+/// A dead or advisory scope is reported, and an absent field is neither.
+///
+/// The contract that reads these lives in `placement.rs` and runs over this
+/// repository's own workflows, none of which carries a dead scope, so it would
+/// pass with the readers deleted. The readers are driven here instead.
+#[rstest]
+#[case::no_declarations(
+    "on: push\njobs:\n  a:\n    runs-on: x\n    steps:\n      - run: echo\n",
+    Scopes::LIVE
+)]
+#[case::a_dead_job(
+    "on: push\njobs:\n  a:\n    runs-on: x\n    if: false\n    steps:\n      - run: echo\n",
+    Scopes { job: Scope::DEAD, ..Scopes::LIVE }
+)]
+#[case::an_advisory_job(
+    "on: push\njobs:\n  a:\n    runs-on: x\n    continue-on-error: true\n    steps:\n      - run: echo\n",
+    Scopes { job: Scope::ADVISORY, ..Scopes::LIVE }
+)]
+#[case::a_dead_step(
+    "on: push\njobs:\n  a:\n    runs-on: x\n    steps:\n      - run: echo\n        if: ${{ false }}\n",
+    Scopes { step: Scope::DEAD, ..Scopes::LIVE }
+)]
+#[case::an_advisory_step(
+    "on: push\njobs:\n  a:\n    runs-on: x\n    steps:\n      - run: echo\n        continue-on-error: true\n",
+    Scopes { step: Scope::ADVISORY, ..Scopes::LIVE }
+)]
+#[case::a_live_condition(
+    "on: push\njobs:\n  a:\n    runs-on: x\n    if: github.event_name == 'push'\n    steps:\n      - run: echo\n        if: always()\n",
+    Scopes::LIVE
+)]
+fn a_dead_or_advisory_scope_is_reported_at_either_level(
+    #[case] text: &str,
+    #[case] expected: Scopes,
+) {
+    let workflow = parse_workflow(WorkflowSource {
+        file: "scratch.yml",
+        text,
+    })
+    .expect("the fixture workflow must parse");
+    let job = workflow.jobs.first().expect("the fixture declares one job");
+    let step = job.steps.first().expect("the fixture declares one step");
+    assert_eq!(
+        job.never_runs(),
+        expected.job.never_runs,
+        "job condition misread"
+    );
+    assert_eq!(
+        job.result_is_advisory(),
+        expected.job.advisory,
+        "job `continue-on-error` misread"
+    );
+    assert_eq!(
+        step.never_runs(),
+        expected.step.never_runs,
+        "step condition misread"
+    );
+    assert_eq!(
+        step.result_is_advisory(),
+        expected.step.advisory,
+        "step `continue-on-error` misread"
+    );
+}
+
+/// The registry question asks by name, not by prefix, and the two differ.
+///
+/// A prefix test absorbs any new label that looks hosted, so a lane moved onto
+/// an unknown image would drop out of "in use" and its registration would go
+/// unnoticed. `ubuntu-20.04` is the case that separates them: a hosted family,
+/// a label this estate does not use, and one that must therefore be reported
+/// rather than silently excused.
+#[rstest]
+#[case::a_named_hosted_label("ubuntu-latest", true)]
+#[case::another_named_one("macos-latest", true)]
+#[case::a_hosted_family_member_not_named("ubuntu-20.04", false)]
+#[case::the_paid_label("ubicloud-standard-4", false)]
+fn the_registry_reads_hosted_labels_by_name(#[case] label: &str, #[case] hosted: bool) {
+    assert_eq!(
+        is_github_hosted_label(label),
+        hosted,
+        "`{label}` must be classified by name for the registry question"
     );
 }
 
