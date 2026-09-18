@@ -314,6 +314,52 @@ fn a_constant_condition_is_told_from_one_that_depends_on_the_event(
     );
 }
 
+/// What one scope should read as: whether it runs, and whether its result
+/// counts.
+///
+/// The same pair of questions is asked of a job and of a step, so it is one
+/// type used twice rather than four fields side by side. Four booleans in a
+/// row read as `(false, false, true, false)` at a call site, where a
+/// transposed pair says nothing and would survive review.
+#[derive(Clone, Copy)]
+struct Scope {
+    never_runs: bool,
+    advisory: bool,
+}
+
+impl Scope {
+    /// Runs, and its failure fails the workflow: the ordinary case.
+    const LIVE: Self = Self {
+        never_runs: false,
+        advisory: false,
+    };
+    /// Declared, and cannot run.
+    const DEAD: Self = Self {
+        never_runs: true,
+        advisory: false,
+    };
+    /// Runs, and its failure is reported as success.
+    const ADVISORY: Self = Self {
+        never_runs: false,
+        advisory: true,
+    };
+}
+
+/// The two scopes of a fixture workflow's single job and single step.
+#[derive(Clone, Copy)]
+struct Scopes {
+    job: Scope,
+    step: Scope,
+}
+
+impl Scopes {
+    /// Both scopes live and mandatory.
+    const LIVE: Self = Self {
+        job: Scope::LIVE,
+        step: Scope::LIVE,
+    };
+}
+
 /// A dead or advisory scope is reported, and an absent field is neither.
 ///
 /// The contract that reads these lives in `placement.rs` and runs over this
@@ -322,52 +368,31 @@ fn a_constant_condition_is_told_from_one_that_depends_on_the_event(
 #[rstest]
 #[case::no_declarations(
     "on: push\njobs:\n  a:\n    runs-on: x\n    steps:\n      - run: echo\n",
-    false,
-    false,
-    false,
-    false
+    Scopes::LIVE
 )]
 #[case::a_dead_job(
     "on: push\njobs:\n  a:\n    runs-on: x\n    if: false\n    steps:\n      - run: echo\n",
-    true,
-    false,
-    false,
-    false
+    Scopes { job: Scope::DEAD, ..Scopes::LIVE }
 )]
 #[case::an_advisory_job(
     "on: push\njobs:\n  a:\n    runs-on: x\n    continue-on-error: true\n    steps:\n      - run: echo\n",
-    false,
-    true,
-    false,
-    false
+    Scopes { job: Scope::ADVISORY, ..Scopes::LIVE }
 )]
 #[case::a_dead_step(
     "on: push\njobs:\n  a:\n    runs-on: x\n    steps:\n      - run: echo\n        if: ${{ false }}\n",
-    false,
-    false,
-    true,
-    false
+    Scopes { step: Scope::DEAD, ..Scopes::LIVE }
 )]
 #[case::an_advisory_step(
     "on: push\njobs:\n  a:\n    runs-on: x\n    steps:\n      - run: echo\n        continue-on-error: true\n",
-    false,
-    false,
-    false,
-    true
+    Scopes { step: Scope::ADVISORY, ..Scopes::LIVE }
 )]
 #[case::a_live_condition(
     "on: push\njobs:\n  a:\n    runs-on: x\n    if: github.event_name == 'push'\n    steps:\n      - run: echo\n        if: always()\n",
-    false,
-    false,
-    false,
-    false
+    Scopes::LIVE
 )]
 fn a_dead_or_advisory_scope_is_reported_at_either_level(
     #[case] text: &str,
-    #[case] dead_job: bool,
-    #[case] advisory_job: bool,
-    #[case] dead_step: bool,
-    #[case] advisory_step: bool,
+    #[case] expected: Scopes,
 ) {
     let workflow = parse_workflow(WorkflowSource {
         file: "scratch.yml",
@@ -376,16 +401,24 @@ fn a_dead_or_advisory_scope_is_reported_at_either_level(
     .expect("the fixture workflow must parse");
     let job = workflow.jobs.first().expect("the fixture declares one job");
     let step = job.steps.first().expect("the fixture declares one step");
-    assert_eq!(job.never_runs(), dead_job, "job condition misread");
+    assert_eq!(
+        job.never_runs(),
+        expected.job.never_runs,
+        "job condition misread"
+    );
     assert_eq!(
         job.result_is_advisory(),
-        advisory_job,
+        expected.job.advisory,
         "job `continue-on-error` misread"
     );
-    assert_eq!(step.never_runs(), dead_step, "step condition misread");
+    assert_eq!(
+        step.never_runs(),
+        expected.step.never_runs,
+        "step condition misread"
+    );
     assert_eq!(
         step.result_is_advisory(),
-        advisory_step,
+        expected.step.advisory,
         "step `continue-on-error` misread"
     );
 }
