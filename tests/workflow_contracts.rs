@@ -14,6 +14,8 @@
 //! wiring and the resource sampling, `concurrency` for which runs a newer
 //! push may cancel, `sampler_reading` for the cases that hold
 //! the `shell_reading` support module to what a shell would actually run,
+//! `codescene_uploader` for the coverage uploader's pin and the deprecated
+//! checksum inputs it rejects,
 //! `timeouts` for the ordering of the timers that can end a run,
 //! `timeout_budgets` for the arithmetic that ordering rests on, and `parsing`
 //! for the loader itself.
@@ -43,6 +45,8 @@ mod workflow_model;
 #[path = "support/workflow_triggers.rs"]
 mod workflow_triggers;
 
+#[path = "contracts/codescene_uploader.rs"]
+mod codescene_uploader;
 #[path = "contracts/compiler_cache.rs"]
 mod compiler_cache;
 #[path = "contracts/concurrency.rs"]

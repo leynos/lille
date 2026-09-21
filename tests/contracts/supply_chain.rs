@@ -10,7 +10,9 @@ use rstest::rstest;
 use crate::shared_action;
 use crate::workflow_assertions::{assert_input, job_named, jobs, step_using, workflows};
 use crate::workflow_cache_owners::is_cache_action;
-use crate::workflow_estate::{Workflow, BUILD_JOB_IDS, CACHE_ACTION_SHA, SHARED_ACTIONS_SHA};
+use crate::workflow_estate::{
+    required_shared_action_sha, Workflow, BUILD_JOB_IDS, CACHE_ACTION_SHA, SHARED_ACTIONS_SHA,
+};
 use crate::workflow_loader::all_steps;
 
 /// Fragments that mark a step as building a tool from source.
@@ -64,13 +66,22 @@ fn every_shared_action_reference_is_pinned(workflows: Vec<Workflow>) {
                 .map(|(file, job)| (file, job.id.clone(), job.uses)),
         )
         .filter(|(_, _, uses)| uses.starts_with("leynos/shared-actions"))
-        .filter(|(_, _, uses)| !uses.ends_with(SHARED_ACTIONS_SHA))
-        .map(|(file, job, uses)| format!("{file}:{job}: {uses}"))
+        // Each action is held to its own reviewed commit. Most take the
+        // estate-wide constant; the exceptions are named in
+        // `SHARED_ACTION_PIN_EXCEPTIONS` and are checked here by the same
+        // rule rather than waved through.
+        .filter(|(_, _, uses)| !uses.ends_with(required_shared_action_sha(uses)))
+        .map(|(file, job, uses)| {
+            let required = required_shared_action_sha(&uses);
+            format!("{file}:{job}: {uses} (must pin {required})")
+        })
         .collect();
     references.sort();
     assert!(
         references.is_empty(),
-        "every leynos/shared-actions reference must pin {SHARED_ACTIONS_SHA}: {references:?}"
+        "every leynos/shared-actions reference must pin its reviewed commit, \
+         {SHARED_ACTIONS_SHA} unless the action is listed as an exception: \
+         {references:?}"
     );
 }
 
