@@ -135,6 +135,33 @@ pub fn is_reachable_by_a_pull_request(workflow: &Workflow) -> bool {
     .any(|trigger| workflow.has_trigger(trigger))
 }
 
+/// Returns every prohibited reference one step makes, naming where it is.
+///
+/// Split from the sweep below so the sweep is two loops and a reduction rather
+/// than two loops wrapped around four rules: the rules are what change, and
+/// they change one at a time.
+fn step_offences(where_: &str, step: &Step) -> Vec<String> {
+    let mut offences = Vec::new();
+    if publishes_the_coverage_report(step) {
+        offences.push(format!(
+            "{where_} publishes the coverage report as an artefact"
+        ));
+    }
+    if action_of(step) == GENERATE_COVERAGE_ACTION && !declines_the_generated_report_archive(step) {
+        offences.push(format!(
+            "{where_} invokes the coverage action without declining its own \
+             archive ({PUBLICATION_OPT_OUT_INPUT}: {PUBLICATION_OPT_OUT_VALUE})"
+        ));
+    }
+    if action_of(step) == UPLOAD_COVERAGE_ACTION {
+        offences.push(format!("{where_} invokes the CodeScene coverage action"));
+    }
+    if step.run.contains(COVERAGE_COMMAND) {
+        offences.push(format!("{where_} runs a {COVERAGE_COMMAND} command"));
+    }
+    offences
+}
+
 /// Returns every prohibited coverage-surface reference in one workflow.
 ///
 /// The raw text is taken alongside the parsed document because the credential
@@ -143,32 +170,15 @@ pub fn is_reachable_by_a_pull_request(workflow: &Workflow) -> bool {
 #[must_use]
 pub fn coverage_surface_offenders(workflow: &Workflow, raw_text: &str) -> Vec<String> {
     let name = &workflow.file;
-    let mut offenders = Vec::new();
-    for job in &workflow.jobs {
-        for (step_index, step) in job.steps.iter().enumerate() {
-            let where_ = format!("{name}:{}: step {step_index}", job.id);
-            if publishes_the_coverage_report(step) {
-                offenders.push(format!(
-                    "{where_} publishes the coverage report as an artefact"
-                ));
-            }
-            if action_of(step) == GENERATE_COVERAGE_ACTION
-                && !declines_the_generated_report_archive(step)
-            {
-                offenders.push(format!(
-                    "{where_} invokes the coverage action without declining its \
-                     own archive ({PUBLICATION_OPT_OUT_INPUT}: \
-                     {PUBLICATION_OPT_OUT_VALUE})"
-                ));
-            }
-            if action_of(step) == UPLOAD_COVERAGE_ACTION {
-                offenders.push(format!("{where_} invokes the CodeScene coverage action"));
-            }
-            if step.run.contains(COVERAGE_COMMAND) {
-                offenders.push(format!("{where_} runs a {COVERAGE_COMMAND} command"));
-            }
-        }
-    }
+    let mut offenders: Vec<String> = workflow
+        .jobs
+        .iter()
+        .flat_map(|job| {
+            job.steps.iter().enumerate().flat_map(move |(index, step)| {
+                step_offences(&format!("{name}:{}: step {index}", job.id), step)
+            })
+        })
+        .collect();
     if raw_text.contains(CREDENTIAL_ENVIRONMENT_KEY) {
         offenders.push(format!(
             "{name}: raw text references {CREDENTIAL_ENVIRONMENT_KEY}"
