@@ -30,6 +30,8 @@ mod shell_reading;
 mod workflow_assertions;
 #[path = "support/workflow_cache_owners.rs"]
 mod workflow_cache_owners;
+#[path = "support/workflow_concurrency.rs"]
+mod workflow_concurrency;
 #[path = "support/workflow_config.rs"]
 mod workflow_config;
 #[path = "support/workflow_estate.rs"]
