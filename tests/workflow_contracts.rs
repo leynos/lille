@@ -14,6 +14,8 @@
 //! ordering of the timers that can end a run, `timeout_budgets` for the
 //! arithmetic that ordering rests on, and `parsing` for the loader itself.
 
+#[path = "support/coverage_boundary.rs"]
+mod coverage_boundary;
 #[path = "support/shell_reading.rs"]
 mod shell_reading;
 #[path = "support/workflow_assertions.rs"]
@@ -31,6 +33,8 @@ mod workflow_model;
 
 #[path = "contracts/compiler_cache.rs"]
 mod compiler_cache;
+#[path = "contracts/coverage_boundary.rs"]
+mod coverage_boundary_contract;
 #[path = "contracts/parsing.rs"]
 mod parsing;
 #[path = "contracts/placement.rs"]
