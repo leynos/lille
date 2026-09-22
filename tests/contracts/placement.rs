@@ -8,13 +8,15 @@ use std::collections::BTreeSet;
 
 use rstest::rstest;
 
+use crate::runner_selection::{is_github_hosted_label, RunnerLabel};
 use crate::shared_action;
 use crate::workflow_assertions::{assert_input, job_named, jobs, step_using, workflows};
 use crate::workflow_cache_owners;
 use crate::workflow_config::registered_runner_labels;
-use crate::workflow_estate::{Workflow, BUILD_JOB_IDS, UBICLOUD_LABEL};
-use crate::workflow_loader::all_steps;
-use crate::workflow_model::{is_github_hosted_label, RunnerLabel};
+use crate::workflow_estate::{
+    Workflow, WorkflowSource, BUILD_JOB_IDS, HOSTED_UBUNTU_LABEL, UBICLOUD_LABEL,
+};
+use crate::workflow_loader::{all_steps, parse_workflow};
 
 /// The runner a fork's pull request falls back to.
 ///
@@ -58,24 +60,34 @@ fn each_cached_path_has_exactly_one_owner(workflows: Vec<Workflow>) {
 
 /// Every lane that is not a measured build sits on `ubuntu-latest`.
 ///
-/// The predicate is the Ubuntu-only one on purpose. Asking merely whether the
-/// runner is GitHub-hosted would let an API-bound job move to `windows-latest`
-/// and still pass, which is not the invariant this exists for. The predicate
-/// itself is driven case by case in `parsing.rs`, because over this
-/// repository's own workflows the loose and strict readings agree exactly.
-#[rstest]
-fn non_build_jobs_stay_on_hosted_ubuntu_runners(workflows: Vec<Workflow>) {
-    let misplaced: Vec<String> = jobs(&workflows)
+/// The label is compared exactly, because the guide names a label rather than
+/// a family. `Job::stays_on_hosted_ubuntu` is the family question and stays
+/// where it is; it answers who hosts the runner, and this answers which runner
+/// the rule allows. Reading the family here would pass an API-bound job moved
+/// to `ubuntu-24.04`, which is not wrong about hosting but has pinned an image
+/// nobody decided to pin.
+///
+/// Over this repository's own workflows every reading agrees, so the
+/// separation is driven case by case in `parsing.rs` and by the synthetic
+/// estate below rather than by the tree.
+/// Returns every non-build job that does not name the one allowed label.
+fn misplaced_non_build_jobs(workflows: &[Workflow]) -> Vec<String> {
+    jobs(workflows)
         .into_iter()
         .filter(|(_, job)| job.runs_on.names_a_runner())
         .filter(|(_, job)| !BUILD_JOB_IDS.contains(&job.id.as_str()))
-        .filter(|(_, job)| !job.stays_on_hosted_ubuntu())
+        .filter(|(_, job)| job.runs_on.owned_label() != Some(HOSTED_UBUNTU_LABEL))
         .map(|(file, job)| format!("{file}:{}: {}", job.id, job.runs_on))
-        .collect();
+        .collect()
+}
+
+#[rstest]
+fn non_build_jobs_stay_on_hosted_ubuntu_runners(workflows: Vec<Workflow>) {
+    let misplaced = misplaced_non_build_jobs(&workflows);
     assert!(
         misplaced.is_empty(),
-        "delayed-comment, metadata, and other API-bound jobs must stay on a \
-         GitHub-hosted Ubuntu runner: {misplaced:?}"
+        "delayed-comment, metadata, and other API-bound jobs must name \
+         `{HOSTED_UBUNTU_LABEL}` exactly: {misplaced:?}"
     );
 }
 
@@ -341,5 +353,75 @@ fn no_runs_on_declaration_carries_a_line_break(workflows: Vec<Workflow>) {
         broken.is_empty(),
         "a `runs-on` must parse to one line; keep a folded scalar's \
          continuation at the same indent as its first line: {broken:?}"
+    );
+}
+
+/// The exact label and the family are different questions, and the rule is the
+/// label.
+///
+/// This repository has no API-bound job on a pinned Ubuntu image, so over its
+/// own workflows the contract above passes whichever reading it uses. The
+/// separation is driven here: `ubuntu-24.04` is GitHub-hosted, is Ubuntu, and
+/// is still not what the rule allows.
+#[rstest]
+#[case::the_allowed_label("ubuntu-latest", true)]
+#[case::a_pinned_image_of_the_same_family("ubuntu-24.04", false)]
+#[case::another_pinned_image("ubuntu-22.04", false)]
+#[case::a_hosted_runner_of_another_platform("windows-latest", false)]
+#[case::the_paid_label("ubicloud-standard-4", false)]
+fn only_one_hosted_label_is_allowed_for_a_non_build_job(
+    #[case] label: &str,
+    #[case] allowed: bool,
+) {
+    let text = format!("on: push\njobs:\n  a:\n    runs-on: {label}\n    steps: []\n");
+    let workflow = match parse_workflow(WorkflowSource {
+        file: "scratch.yml",
+        text: &text,
+    }) {
+        Ok(parsed) => parsed,
+        Err(err) => panic!("`{label}` must parse: {err}"),
+    };
+    let Some(job) = workflow.jobs.first() else {
+        panic!("`{label}` must yield a job")
+    };
+    assert_eq!(
+        job.runs_on.owned_label() == Some(HOSTED_UBUNTU_LABEL),
+        allowed,
+        "`{label}` must read as allowed={allowed} for a job that is not a build"
+    );
+    assert!(
+        job.stays_on_hosted_ubuntu() == label.starts_with("ubuntu-"),
+        "`{label}` must still answer the family question by family"
+    );
+}
+
+/// The rule itself, over an estate built to separate the two readings.
+///
+/// The case below drives `owned_label` directly, which says nothing about how
+/// the rule reads it: swapping the rule back to the family predicate left that
+/// case green. This drives the rule, so the swap fails here.
+#[rstest]
+#[case::the_allowed_label("ubuntu-latest", 0)]
+#[case::a_pinned_image_of_the_same_family("ubuntu-24.04", 1)]
+#[case::a_hosted_runner_of_another_platform("windows-latest", 1)]
+fn the_rule_reports_a_non_build_job_on_any_other_label(
+    #[case] label: &str,
+    #[case] expected: usize,
+) {
+    let text =
+        format!("on: push\njobs:\n  delayed-comment:\n    runs-on: {label}\n    steps: []\n");
+    let workflow = match parse_workflow(WorkflowSource {
+        file: "scratch.yml",
+        text: &text,
+    }) {
+        Ok(parsed) => parsed,
+        Err(err) => panic!("`{label}` must parse: {err}"),
+    };
+    let misplaced = misplaced_non_build_jobs(&[workflow]);
+    assert_eq!(
+        misplaced.len(),
+        expected,
+        "a non-build job on `{label}` must yield {expected} offence(s); the \
+         rule gave {misplaced:?}"
     );
 }

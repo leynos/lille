@@ -28,6 +28,8 @@ mod coverage_publisher;
 mod coverage_reach;
 #[path = "support/placement_expression.rs"]
 mod placement_expression;
+#[path = "support/runner_selection.rs"]
+mod runner_selection;
 #[path = "support/shell_reading.rs"]
 mod shell_reading;
 #[path = "support/workflow_assertions.rs"]
@@ -59,6 +61,8 @@ mod coverage_boundary_contract;
 mod coverage_publisher_contract;
 #[path = "contracts/coverage_reach.rs"]
 mod coverage_reach_contract;
+#[path = "contracts/execution_control.rs"]
+mod execution_control;
 #[path = "contracts/parsing.rs"]
 mod parsing;
 #[path = "contracts/placement.rs"]

@@ -13,6 +13,16 @@
 
 #[path = "support/placement_expression.rs"]
 mod placement_expression;
+#[path = "support/runner_selection.rs"]
+// These properties construct a `RunnerSelection` and read its labels; the
+// group and fork-fallback arms, and the expression reader behind them, are
+// asked only by the contracts binary. They are part of the same enum, so they
+// cannot be split out without splitting the type these properties build.
+#[expect(
+    dead_code,
+    reason = "shared vocabulary; the contracts binary asks the group and fallback queries"
+)]
+mod runner_selection;
 #[path = "support/workflow_cache_owners.rs"]
 mod workflow_cache_owners;
 #[path = "support/workflow_model.rs"]
@@ -31,8 +41,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use proptest::prelude::*;
 
+use runner_selection::{RunnerLabel, RunnerSelection};
 use workflow_cache_owners::duplicated_paths;
-use workflow_model::{Job, RunnerLabel, RunnerSelection, Step};
+use workflow_model::{Job, Step};
 
 /// Cache paths the generators draw from, kept small so collisions are common.
 const PATHS: [&str; 4] = ["~/.cargo/registry", "~/.cargo/git", ".uv-cache", "target-x"];

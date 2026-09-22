@@ -23,9 +23,10 @@ use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::{ambient_authority, fs_utf8::Dir};
 use serde_norway::Value;
 
+use crate::runner_selection::{RunnerLabel, RunnerSelection};
 use crate::workflow_concurrency::parse_concurrency;
 use crate::workflow_estate::{Location, Workflow, WorkflowError, WorkflowSource, WORKFLOW_DIR};
-use crate::workflow_model::{Job, RunnerLabel, RunnerSelection, Step};
+use crate::workflow_model::{Job, Step};
 use crate::workflow_triggers::parse_triggers;
 
 /// Renders a YAML scalar as the string a workflow expression would see.

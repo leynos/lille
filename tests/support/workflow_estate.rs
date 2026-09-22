@@ -63,6 +63,13 @@ pub fn required_shared_action_sha(uses: &str) -> &'static str {
 /// Runner label used by this repository's Ubicloud build and test jobs.
 pub const UBICLOUD_LABEL: &str = "ubicloud-standard-4";
 
+/// The one GitHub-hosted label every job that is not a build may use.
+///
+/// The developers' guide names this label rather than the family: an API-bound
+/// job on `ubuntu-24.04` is not wrong about hosting, but it has pinned an image
+/// nobody decided to pin, and the fleet then drifts one job at a time.
+pub const HOSTED_UBUNTU_LABEL: &str = "ubuntu-latest";
+
 /// Publisher whose composite actions this repository is allowed to call.
 pub const SHARED_ACTIONS_OWNER: &str = "leynos/shared-actions";
 

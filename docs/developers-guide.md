@@ -406,10 +406,11 @@ Without the arm the job never starts on a fork's pull request, and a required
 check that never reports presents as a pull request waiting rather than as a
 placement fault.
 
-`coverage-upload` keeps the plain label. It runs on push, so no fork reaches
-it, and an arm nothing takes is a branch to keep correct for nothing. The
-contract asserts that absence as well as the two arms, so the expression does
-not spread by imitation.
+`coverage-upload` keeps the plain label. It runs on push events, so a fork's
+pull request cannot reach it, and a fallback arm there would be a branch
+nothing ever takes: one more expression to keep correct, with no case that
+exercises it. The contract asserts that absence as well as the two arms, so the
+expression does not spread by imitation.
 
 Keep the continuation at the same indent as the first line. A more-indented
 line inside a folded scalar keeps its break, so the expression arrives with a
