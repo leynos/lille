@@ -92,6 +92,20 @@ pub struct WorkflowSource<'a> {
     pub text: &'a str,
 }
 
+/// A workflow's top-level `concurrency` block.
+///
+/// Both fields are rendered as written rather than interpreted. A literal
+/// `cancel-in-progress: true` and the expression that conditions
+/// cancellation on the event are both valid YAML for the same key, and a
+/// contract that read the literal as a boolean could not tell them apart.
+#[derive(Debug, Clone, Default)]
+pub struct Concurrency {
+    /// The `group` expression, empty when the block declares none.
+    pub group: String,
+    /// The `cancel-in-progress` value, empty when the block declares none.
+    pub cancel_in_progress: String,
+}
+
 /// One workflow file.
 #[derive(Debug, Clone)]
 pub struct Workflow {
@@ -99,6 +113,8 @@ pub struct Workflow {
     pub file: String,
     /// Event names under `on`, in declaration order.
     pub triggers: Vec<String>,
+    /// The top-level `concurrency` block, absent when none is declared.
+    pub concurrency: Option<Concurrency>,
     /// Jobs in declaration order.
     pub jobs: Vec<Job>,
 }

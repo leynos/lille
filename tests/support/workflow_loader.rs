@@ -23,7 +23,9 @@ use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::{ambient_authority, fs_utf8::Dir};
 use serde_norway::Value;
 
-use crate::workflow_estate::{Location, Workflow, WorkflowError, WorkflowSource, WORKFLOW_DIR};
+use crate::workflow_estate::{
+    Concurrency, Location, Workflow, WorkflowError, WorkflowSource, WORKFLOW_DIR,
+};
 use crate::workflow_model::{Job, RunnerSelection, Step};
 use crate::workflow_triggers::parse_triggers;
 
@@ -223,6 +225,46 @@ fn parse_job(id: &str, raw: &Value, file: &Location) -> Result<Job, WorkflowErro
     Ok(job)
 }
 
+/// Parses a workflow's top-level `concurrency` block.
+///
+/// The shorthand scalar form is accepted and recorded as a group with no
+/// `cancel-in-progress`, which is what it means: reading it as "no
+/// concurrency block" would let the shorthand escape every contract below.
+///
+/// # Errors
+///
+/// Returns an error when the block is neither a mapping nor a scalar, or
+/// when either of its values is not a scalar.
+fn parse_concurrency(
+    document: &Value,
+    at: &Location,
+) -> Result<Option<Concurrency>, WorkflowError> {
+    let Some(raw) = document.get("concurrency") else {
+        return Ok(None);
+    };
+    if let Some(mapping) = raw.as_mapping() {
+        let value = |key: &str| -> Result<String, WorkflowError> {
+            mapping.get(Value::from(key)).map_or_else(
+                || Ok(String::new()),
+                |found| {
+                    render_scalar(found)
+                        .ok_or_else(|| at.shape("every `concurrency` value must be a scalar"))
+                },
+            )
+        };
+        return Ok(Some(Concurrency {
+            group: value("group")?,
+            cancel_in_progress: value("cancel-in-progress")?,
+        }));
+    }
+    let group = render_scalar(raw)
+        .ok_or_else(|| at.shape("`concurrency` must be a mapping or a scalar"))?;
+    Ok(Some(Concurrency {
+        group,
+        cancel_in_progress: String::new(),
+    }))
+}
+
 /// Parses one workflow document.
 ///
 /// # Errors
@@ -249,6 +291,7 @@ pub fn parse_workflow(source: WorkflowSource<'_>) -> Result<Workflow, WorkflowEr
     Ok(Workflow {
         file: source.file.to_owned(),
         triggers: parse_triggers(&document, &at)?,
+        concurrency: parse_concurrency(&document, &at)?,
         jobs,
     })
 }
