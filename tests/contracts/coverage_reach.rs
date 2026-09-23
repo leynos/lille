@@ -13,22 +13,15 @@
 use std::collections::BTreeMap;
 
 use rstest::rstest;
-use serde_norway::Value;
 
 use crate::coverage_boundary::{
     action_of, coverage_surface_offenders, is_reachable_by_a_pull_request, pull_request_offenders,
-    CODESCENE_HOST, CREDENTIAL_ENVIRONMENT_KEY, UPLOAD_COVERAGE_ACTION,
-};
-use crate::coverage_publisher::{
-    cancelling_scopes, push_branches, token_bindings, TokenBinding, TRUNK_BRANCH,
+    CODESCENE_HOST, CREDENTIAL_ENVIRONMENT_KEY,
 };
 use crate::coverage_reach::{local_workflow_target, reachable_workflows};
 use crate::workflow_assertions::{job_named, workflows};
 use crate::workflow_estate::{Workflow, WorkflowSource};
-use crate::workflow_loader::{parse_workflow, repository_workflow_text};
-
-/// The lane that owns the upload, and is therefore exempt.
-const PUBLISHER_WORKFLOW: &str = "coverage-main.yml";
+use crate::workflow_loader::parse_workflow;
 
 /// The checkout action, whose history depth the measuring lane leaves shallow.
 const CHECKOUT_ACTION: &str = "actions/checkout";
@@ -52,27 +45,6 @@ fn estate(files: &[(&str, &str)]) -> (Vec<Workflow>, BTreeMap<String, String>) {
         .map(|(file, text)| ((*file).to_owned(), (*text).to_owned()))
         .collect();
     (workflows, texts)
-}
-
-/// Returns one repository workflow's raw text, or panics naming it.
-fn raw_text(file: &str) -> String {
-    match repository_workflow_text(file) {
-        Ok(text) => text,
-        Err(err) => panic!("{file} must be readable: {err}"),
-    }
-}
-
-/// Parses a document without the typed model, or panics naming the failure.
-fn raw_document(text: &str) -> Value {
-    match serde_norway::from_str(text) {
-        Ok(document) => document,
-        Err(err) => panic!("the document must parse: {err}"),
-    }
-}
-
-/// Returns the publisher's raw document, parsed without the typed model.
-fn publisher_document() -> Value {
-    raw_document(&raw_text(PUBLISHER_WORKFLOW))
 }
 
 /// The probe: a child declaring `workflow_call` alone, called with
@@ -273,85 +245,4 @@ fn the_measuring_lane_checks_out_shallow(workflows: Vec<Workflow>) {
         "build-test must keep the shallow default: full history was for the \
          CodeScene check, which no longer runs on a pull request; got {depths:?}"
     );
-}
-
-/// The trigger is the trunk guard, so it is held by equality.
-#[rstest]
-fn the_publisher_answers_a_push_to_the_trunk_and_nothing_else(workflows: Vec<Workflow>) {
-    let found = workflows
-        .iter()
-        .find(|workflow| workflow.file == PUBLISHER_WORKFLOW);
-    let Some(publisher) = found else {
-        panic!("the estate must define {PUBLISHER_WORKFLOW}")
-    };
-    assert_eq!(
-        publisher.triggers,
-        ["push"],
-        "{PUBLISHER_WORKFLOW} carries no ref guard of its own, so any second \
-         trigger, `workflow_dispatch` included, could upload another branch"
-    );
-    assert_eq!(
-        push_branches(&publisher_document()),
-        Some(vec![TRUNK_BRANCH.to_owned()]),
-        "{PUBLISHER_WORKFLOW} must publish on a push to {TRUNK_BRANCH} alone"
-    );
-}
-
-/// The upload must bind the credential and pass it on, asserted positively:
-/// its non-empty guard passes with the binding deleted, and the upload then
-/// skips on every run without failing.
-#[rstest]
-fn the_publisher_binds_the_credential_it_uploads_with() {
-    let bindings = token_bindings(&publisher_document(), UPLOAD_COVERAGE_ACTION);
-    assert_eq!(
-        bindings,
-        [TokenBinding {
-            env: Some("${{ secrets.CS_ACCESS_TOKEN }}".to_owned()),
-            input: Some("${{ env.CS_ACCESS_TOKEN }}".to_owned()),
-        }],
-        "{PUBLISHER_WORKFLOW} must upload once, binding CS_ACCESS_TOKEN to the \
-         secret and passing it as access-token"
-    );
-}
-
-#[rstest]
-fn the_publisher_queues_rather_than_cancels() {
-    let scopes = cancelling_scopes(&publisher_document());
-    assert!(
-        scopes.is_empty(),
-        "a cancelled publisher abandons its upload and the baseline the next pull \
-         request reads; cancel-in-progress is set on {scopes:?}"
-    );
-}
-
-#[rstest]
-#[case::a_literal_true("cancel-in-progress: true", true)]
-#[case::a_quoted_true("cancel-in-progress: 'true'", true)]
-#[case::an_expression("cancel-in-progress: ${{ github.event_name == 'push' }}", true)]
-#[case::a_literal_false("cancel-in-progress: false", false)]
-#[case::no_setting("# no cancel-in-progress", false)]
-fn a_cancelling_setting_is_found_at_either_scope(
-    #[case] setting: &str,
-    #[case] cancels: bool,
-    #[values(true, false)] at_workflow_level: bool,
-) {
-    let text = if at_workflow_level {
-        format!("concurrency:\n  group: g\n  {setting}\njobs:\n  a: {{}}\n")
-    } else {
-        format!("jobs:\n  a:\n    concurrency:\n      group: g\n      {setting}\n")
-    };
-    let document = raw_document(&text);
-    assert_eq!(!cancelling_scopes(&document).is_empty(), cancels, "{text}");
-}
-
-#[rstest]
-#[case::the_trunk("on:\n  push:\n    branches: [main]\n", Some(vec!["main"]))]
-#[case::a_second_branch("on:\n  push:\n    branches: [main, 'release/*']\n", Some(vec!["main", "release/*"]))]
-#[case::a_tag_workflow("on:\n  push:\n    tags: ['v*']\n", None)]
-#[case::an_unfiltered_push("on: push\n", None)]
-fn the_push_filter_is_read_as_declared(#[case] text: &str, #[case] expected: Option<Vec<&str>>) {
-    let document = raw_document(text);
-    let owned: Option<Vec<String>> =
-        expected.map(|branches| branches.into_iter().map(ToOwned::to_owned).collect());
-    assert_eq!(push_branches(&document), owned);
 }

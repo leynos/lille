@@ -78,37 +78,198 @@ pub fn cancelling_scopes(document: &Value) -> Vec<String> {
     scopes
 }
 
-/// The credential binding and the input one upload step declares.
-#[derive(Debug, PartialEq, Eq)]
-pub struct TokenBinding {
-    /// The step's `env.CS_ACCESS_TOKEN`, if it binds one.
-    pub env: Option<String>,
-    /// The step's `with.access-token`, if it passes one.
-    pub input: Option<String>,
+/// The one command the credential check may run.
+///
+/// The expression is evaluated before the shell starts, so the step writes a
+/// literal `true` or `false`, holds no shell conditional, and puts the token
+/// in no step's `env`.
+pub const CREDENTIAL_CHECK_COMMAND: &str =
+    "echo \"available=${{ secrets.CS_ACCESS_TOKEN != '' }}\" >> \"$GITHUB_OUTPUT\"";
+
+/// The input the upload must pass, read from the secret directly.
+pub const TOKEN_INPUT: &str = "${{ secrets.CS_ACCESS_TOKEN }}";
+
+/// The conjunct that confines the upload to the trunk, compared exactly after
+/// whitespace is normalised, because a looser match accepts a sibling field.
+pub const TRUNK_REF_GUARD: &str = "github.ref == 'refs/heads/main'";
+
+/// Returns a condition's body without the optional `${{ }}` wrapper.
+fn condition_body(condition: &str) -> &str {
+    let body = condition.trim();
+    body.strip_prefix("${{")
+        .and_then(|inner| inner.strip_suffix("}}"))
+        .map_or(body, str::trim)
 }
 
-/// Returns the binding every step calling `action` declares.
+/// Returns the condition with every single-quoted literal emptied, so an
+/// operator inside a literal is not read as one.
+fn without_literals(body: &str) -> String {
+    let mut kept = String::with_capacity(body.len());
+    let mut in_literal = false;
+    for character in body.chars() {
+        if character == '\'' {
+            in_literal = !in_literal;
+            kept.push(character);
+        } else if !in_literal {
+            kept.push(character);
+        }
+    }
+    kept
+}
+
+/// Returns why an upload condition fails to confine it to the trunk.
 ///
-/// Read positively because the step's non-empty guard passes with the binding
-/// deleted, and the upload then skips on every run without failing anything.
+/// Split on `&&`, the trunk guard must be one whole conjunct, and an unquoted
+/// `||` is refused outright: `guard && extra || dispatch` keeps the guard
+/// whole while making every conjunct optional.
 #[must_use]
-pub fn token_bindings(document: &Value, action: &str) -> Vec<TokenBinding> {
-    let text = |value: Option<&Value>| value.and_then(Value::as_str).map(ToOwned::to_owned);
+pub fn upload_condition_offences(condition: &str) -> Vec<String> {
+    let body = condition_body(condition);
+    let mut offences = Vec::new();
+    if without_literals(body).contains("||") {
+        offences.push("the upload condition contains an unquoted `||`".to_owned());
+    }
+    let has_guard = body
+        .split("&&")
+        .any(|part| part.split_whitespace().collect::<Vec<_>>().join(" ") == TRUNK_REF_GUARD);
+    if !has_guard {
+        offences.push(format!(
+            "the upload condition must require {TRUNK_REF_GUARD}"
+        ));
+    }
+    offences
+}
+
+/// The credential's name, which no `env` on the publisher may bind.
+const CREDENTIAL_NAME: &str = "CS_ACCESS_TOKEN";
+
+/// Returns the id of the step whose `available` output a condition requires.
+fn check_step_id(condition: &str) -> Option<&str> {
+    condition_body(condition).split("&&").find_map(|part| {
+        part.trim()
+            .strip_prefix("steps.")?
+            .strip_suffix(".outputs.available == 'true'")
+    })
+}
+
+/// Returns why one credential check step is not the prescribed one.
+fn check_step_offences(check: &Value) -> Vec<String> {
+    let mut offences = Vec::new();
+    if check.get("run").and_then(Value::as_str).map(str::trim) != Some(CREDENTIAL_CHECK_COMMAND) {
+        offences.push(format!(
+            "the check must run exactly {CREDENTIAL_CHECK_COMMAND:?}"
+        ));
+    }
+    offences.extend(
+        ["if", "env", "uses"]
+            .into_iter()
+            .filter(|key| check.get(*key).is_some())
+            .map(|key| format!("the check must not declare `{key}`")),
+    );
+    offences
+}
+
+/// Returns why an upload is not gated on the prescribed check, given the
+/// steps that run before it.
+fn upload_offences(upload: &Value, earlier: &[Value]) -> Vec<String> {
+    let mut offences = Vec::new();
+    if upload
+        .get("with")
+        .and_then(|with| with.get("access-token"))
+        .and_then(Value::as_str)
+        != Some(TOKEN_INPUT)
+    {
+        offences.push(format!(
+            "the upload must pass {TOKEN_INPUT} as access-token"
+        ));
+    }
+    let condition = upload.get("if").and_then(Value::as_str).unwrap_or_default();
+    offences.extend(upload_condition_offences(condition));
+    let Some(id) = check_step_id(condition) else {
+        offences.push("the upload's condition requires no credential check output".to_owned());
+        return offences;
+    };
+    match earlier
+        .iter()
+        .rev()
+        .find(|step| step.get("id").and_then(Value::as_str) == Some(id))
+    {
+        Some(check) => offences.extend(check_step_offences(check)),
+        None => offences.push(format!("no step before the upload has the id {id:?}")),
+    }
+    offences
+}
+
+/// Returns why the uploads calling `action` are not checked and passed as
+/// prescribed, or one offence when no step calls it at all.
+///
+/// Asserted positively: a guard on a binding that has been deleted passes, and
+/// the upload then skips on every run without failing anything.
+#[must_use]
+pub fn credential_check_offences(document: &Value, action: &str) -> Vec<String> {
+    let calls = |step: &Value| {
+        step.get("uses")
+            .and_then(Value::as_str)
+            .is_some_and(|uses| uses.split('@').next() == Some(action))
+    };
+    let mut uploads = 0;
+    let mut offences = Vec::new();
+    for steps in job_steps(document) {
+        for (index, step) in steps.iter().enumerate().filter(|(_, step)| calls(step)) {
+            uploads += 1;
+            let earlier = steps.get(..index).unwrap_or_default();
+            offences.extend(upload_offences(step, earlier));
+        }
+    }
+    if uploads == 0 {
+        offences.push(format!("no step calls {action}"));
+    }
+    offences
+}
+
+/// Returns every job's steps as a slice.
+fn job_steps(document: &Value) -> impl Iterator<Item = &[Value]> {
     document
         .get("jobs")
         .and_then(Value::as_mapping)
         .into_iter()
         .flat_map(|jobs| jobs.values())
         .filter_map(|job| job.get("steps").and_then(Value::as_sequence))
-        .flatten()
-        .filter(|step| {
-            step.get("uses")
-                .and_then(Value::as_str)
-                .is_some_and(|uses| uses.split('@').next() == Some(action))
-        })
-        .map(|step| TokenBinding {
-            env: text(step.get("env").and_then(|env| env.get("CS_ACCESS_TOKEN"))),
-            input: text(step.get("with").and_then(|with| with.get("access-token"))),
-        })
-        .collect()
+        .map(Vec::as_slice)
+}
+
+/// Reports whether one `env` mapping names the credential, in any case.
+fn binds(env: Option<&Value>) -> bool {
+    env.and_then(Value::as_mapping).is_some_and(|mapping| {
+        mapping
+            .keys()
+            .filter_map(Value::as_str)
+            .any(|key| key.eq_ignore_ascii_case(CREDENTIAL_NAME))
+    })
+}
+
+/// Returns every `env` scope in a document that binds the credential.
+///
+/// The upload action is composite and hands its step's `env` to the
+/// `upload-artifact` and cache steps nested inside it, so no scope may.
+#[must_use]
+pub fn credential_bindings(document: &Value) -> Vec<String> {
+    let mut scopes = Vec::new();
+    if binds(document.get("env")) {
+        scopes.push("the workflow".to_owned());
+    }
+    let jobs = document.get("jobs").and_then(Value::as_mapping);
+    for (key, job) in jobs.into_iter().flatten() {
+        let name = key.as_str().unwrap_or_default();
+        if binds(job.get("env")) {
+            scopes.push(format!("job {name}"));
+        }
+        let steps = job.get("steps").and_then(Value::as_sequence);
+        for (index, step) in steps.into_iter().flatten().enumerate() {
+            if binds(step.get("env")) {
+                scopes.push(format!("job {name} step {index}"));
+            }
+        }
+    }
+    scopes
 }

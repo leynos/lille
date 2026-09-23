@@ -7,14 +7,15 @@
 //!
 //! This file is the harness. The rules live in ten modules, split by the
 //! question each asks: `coverage_boundary` for what a pull-request lane may
-//! not publish or hold, `coverage_reach` for the closure of local calls, the
-//! publisher and the loader beneath both, `supply_chain` for what the estate
-//! will execute, `placement` for what it costs and who owns each cache,
-//! `compiler_cache` for the sccache wiring and the resource sampling,
-//! `sampler_reading` for the cases that hold the `shell_reading` support
-//! module to what a shell would actually run, `timeouts` for the ordering of
-//! the timers that can end a run, `timeout_budgets` for the arithmetic that
-//! ordering rests on, and `parsing` for the loader itself.
+//! not publish or hold, `coverage_reach` for the closure of local calls and
+//! the loader beneath it, `coverage_publisher` for the one lane that may
+//! publish, `supply_chain` for what the estate will execute, `placement` for
+//! what it costs and who owns each cache, `compiler_cache` for the sccache
+//! wiring and the resource sampling, `sampler_reading` for the cases that hold
+//! the `shell_reading` support module to what a shell would actually run,
+//! `timeouts` for the ordering of the timers that can end a run,
+//! `timeout_budgets` for the arithmetic that ordering rests on, and `parsing`
+//! for the loader itself.
 
 #[path = "support/coverage_boundary.rs"]
 mod coverage_boundary;
@@ -43,6 +44,8 @@ mod workflow_triggers;
 mod compiler_cache;
 #[path = "contracts/coverage_boundary.rs"]
 mod coverage_boundary_contract;
+#[path = "contracts/coverage_publisher.rs"]
+mod coverage_publisher_contract;
 #[path = "contracts/coverage_reach.rs"]
 mod coverage_reach_contract;
 #[path = "contracts/parsing.rs"]

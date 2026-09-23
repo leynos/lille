@@ -15,10 +15,11 @@ on:
   push:
     branches: [main]
 
-# Runs queue rather than cancel. A cancelled publisher abandons its upload
-# and the baseline write the next pull request reads; a queued one
-# finishes, and the later push's baseline wins. GitHub keeps one pending
-# run per group, so a burst of pushes still collapses to the newest.
+# Runs never cancel and never overlap. A cancelled publisher abandons its
+# upload and the baseline write the next pull request reads. GitHub keeps
+# one pending run per group, and the newest trigger replaces it, so a burst
+# of pushes collapses to the newest. The group is keyed on the ref alone,
+# so uploads land in commit order.
 concurrency:
   group: coverage-main-${{ github.ref }}
   cancel-in-progress: false
@@ -193,12 +194,22 @@ jobs:
             printf '%s\n' "$stats"
             printf '```\n'
           } >> "${GITHUB_STEP_SUMMARY}"
+      # Whether the credential exists, without putting it in any step's
+      # `env`. The expression is evaluated before the shell runs, so the
+      # command writes a literal `true` or `false` and holds no conditional.
+      # The upload action is composite and hands its step's `env` to the
+      # `upload-artifact` and cache steps nested inside it, so the token is
+      # passed to it as an input and bound nowhere else.
+      - name: Check the CodeScene credential is available
+        id: codescene-credential
+        run: echo "available=${{ secrets.CS_ACCESS_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
       - name: Upload coverage data to CodeScene
-        env:
-          CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN }}
-        if: env.CS_ACCESS_TOKEN != ''
+        # The trunk guard is a conjunct of its own even though the push to
+        # main is this workflow's only trigger: a dispatch trigger added later
+        # could otherwise upload another branch's report as the project's.
+        if: steps.codescene-credential.outputs.available == 'true' && github.ref == 'refs/heads/main'
         uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@c5a54701c8603a0fa756a6b34c49bc2af75a6c11
         with:
           format: lcov
-          access-token: ${{ env.CS_ACCESS_TOKEN }}
+          access-token: ${{ secrets.CS_ACCESS_TOKEN }}
           installer-checksum: ${{ vars.CODESCENE_CLI_SHA256 }}
