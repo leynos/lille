@@ -19,7 +19,8 @@ on:
 # upload and the baseline write the next pull request reads. GitHub keeps
 # one pending run per group, and the newest trigger replaces it, so a burst
 # of pushes collapses to the newest. The group is keyed on the ref alone,
-# so uploads land in commit order.
+# so triggered runs upload in commit order; a manual re-run of an older
+# run republishes that commit until the next push supersedes it.
 concurrency:
   group: coverage-main-${{ github.ref }}
   cancel-in-progress: false

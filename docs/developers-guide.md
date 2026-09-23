@@ -613,8 +613,10 @@ a step whose sole command, with no `if:` and no `env`, is
 `echo "available=${{ secrets.CS_ACCESS_TOKEN != '' }}" >> "$GITHUB_OUTPUT"`,
 and the upload's condition requires that output. The publisher's concurrency is
 exactly `group: coverage-main-${{ github.ref }}` with
-`cancel-in-progress: false`, so runs never overlap and uploads land in commit
-order.
+`cancel-in-progress: false`, so runs never overlap and triggered runs upload in
+commit order. A manual "Re-run jobs" on an older run keeps that run's commit:
+it is an operator action that republishes that commit's coverage and baseline
+until the next push supersedes it.
 
 Two gaps are known and accepted. A Dependabot automerge made with
 `GITHUB_TOKEN` fires no push, so that merge publishes nothing until the next

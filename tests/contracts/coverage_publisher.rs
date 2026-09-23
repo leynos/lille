@@ -144,8 +144,9 @@ fn a_credential_bound_in_any_env_is_found(#[case] text: &str, #[case] expected: 
 }
 
 /// Runs never cancel and never overlap: one group keyed on the ref alone,
-/// so the newest trigger replaces a pending run and uploads land in commit
-/// order.
+/// so the newest trigger replaces a pending run and triggered runs upload in
+/// commit order. A manual re-run of an older run republishes that commit until
+/// the next push supersedes it, which is an operator's choice, not a race.
 #[rstest]
 fn the_publisher_never_cancels_and_is_keyed_on_the_ref() {
     let document = publisher_document();
