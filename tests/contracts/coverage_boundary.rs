@@ -13,12 +13,15 @@
 //! nothing agrees with a correct one exactly, and the rule would pass with
 //! every detector deleted.
 
+use std::collections::BTreeMap;
+
 use rstest::rstest;
 
 use crate::coverage_boundary::{
     action_of, coverage_surface_offenders, declines_the_generated_report_archive,
-    is_reachable_by_a_pull_request, publishes_the_coverage_report, GENERATE_COVERAGE_ACTION,
-    PUBLICATION_OPT_OUT_INPUT, PUBLICATION_OPT_OUT_VALUE, UPLOAD_COVERAGE_ACTION,
+    is_reachable_by_a_pull_request, publishes_the_coverage_report, pull_request_offenders,
+    GENERATE_COVERAGE_ACTION, PUBLICATION_OPT_OUT_INPUT, PUBLICATION_OPT_OUT_VALUE,
+    UPLOAD_COVERAGE_ACTION,
 };
 use crate::workflow_assertions::{job_named, workflows};
 use crate::workflow_estate::{Workflow, WorkflowSource};
@@ -53,19 +56,27 @@ fn synthetic(steps: &str) -> Workflow {
     }
 }
 
+/// The boundary over every lane a pull request can start and every local
+/// workflow such a lane calls, since a reusable child declares
+/// `workflow_call` alone and would otherwise never be asked.
 #[rstest]
 fn no_pull_request_workflow_touches_the_coverage_publication_surface(workflows: Vec<Workflow>) {
+    let texts: BTreeMap<String, String> = workflows
+        .iter()
+        .map(|workflow| (workflow.file.clone(), raw_text(&workflow.file)))
+        .collect();
     let offenders: Vec<String> = workflows
         .iter()
         .filter(|workflow| workflow.file != PUBLISHER_WORKFLOW)
         .filter(|workflow| is_reachable_by_a_pull_request(workflow))
-        .flat_map(|workflow| coverage_surface_offenders(workflow, &raw_text(&workflow.file)))
+        .flat_map(|workflow| pull_request_offenders(&workflow.file, &workflows, &texts))
         .collect();
     assert!(
         offenders.is_empty(),
-        "a lane a pull request can reach must not publish the report, call the \
-         CodeScene action, run a coverage command, or hold its credential; \
-         `{PUBLISHER_WORKFLOW}` owns all four: {offenders:?}"
+        "a lane a pull request can reach, and every local workflow it calls, must \
+         not publish the report, call the CodeScene action, run a coverage command, \
+         name the CodeScene host, forward every secret, or hold the credential; \
+         `{PUBLISHER_WORKFLOW}` owns the surface: {offenders:?}"
     );
 }
 

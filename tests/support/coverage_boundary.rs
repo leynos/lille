@@ -2,9 +2,11 @@
 //!
 //! Pull-request CI generates `lcov.info` and compares it with the ratcheted
 //! baseline derived from `main`. It does not publish that report as an
-//! artefact, invoke the `CodeScene` coverage action, or carry the `CodeScene`
+//! artefact, invoke the `CodeScene` coverage action, name the `CodeScene` host,
+//! forward every secret with `secrets: inherit`, or carry the `CodeScene`
 //! credential. Those belong to `coverage-main.yml`, which is the only writer
-//! of persistent coverage state.
+//! of persistent coverage state. The rules run over every local workflow a
+//! pull-request lane calls, not over the lane alone.
 //!
 //! The coverage action archives the report it generated under a step of its
 //! own, so declining that archive is part of the same boundary: a caller that
@@ -25,6 +27,9 @@
 //! assert!(!coverage_boundary::publishes_the_coverage_report(&step));
 //! ```
 
+use std::collections::BTreeMap;
+
+use crate::coverage_reach::{jobs_inheriting_secrets, reachable_workflows, INHERITED_SECRETS};
 use crate::workflow_estate::Workflow;
 use crate::workflow_model::Step;
 
@@ -66,6 +71,13 @@ pub const COVERAGE_COMMAND: &str = "cs-coverage";
 
 /// The report the coverage action writes, and the one `CodeScene` is sent.
 pub const COVERAGE_REPORT_PATH: &str = "lcov.info";
+
+/// The service itself.
+///
+/// A pull-request lane that names its host is talking to it by some route
+/// other than the action, which is the same dependency the boundary exists to
+/// remove, spelt as a `curl`.
+pub const CODESCENE_HOST: &str = "codescene.io";
 
 /// The trigger a fork's pull request fires, which cannot read secrets.
 pub const PULL_REQUEST_TRIGGER: &str = "pull_request";
@@ -162,11 +174,24 @@ fn step_offences(where_: &str, step: &Step) -> Vec<String> {
     offences
 }
 
+/// Returns one offence when the raw text names `needle`, ignoring case.
+///
+/// GitHub resolves `secrets.cs_access_token` to the same secret as the
+/// upper-case spelling, and a host name is case-insensitive, so a
+/// case-sensitive search is one keystroke from blind.
+fn mentions(name: &str, raw_text: &str, needle: &str) -> Option<String> {
+    raw_text
+        .to_lowercase()
+        .contains(&needle.to_lowercase())
+        .then(|| format!("{name}: raw text references {needle}"))
+}
+
 /// Returns every prohibited coverage-surface reference in one workflow.
 ///
 /// The raw text is taken alongside the parsed document because the credential
-/// must not be present at all: a reference inside a comment, or in a shape the
-/// parser did not keep, is still a reference.
+/// and the host must not be present at all: a reference inside a comment, or
+/// in a shape the parser did not keep, is still a reference. It is also where
+/// `secrets: inherit` is read, since the typed model does not carry `secrets`.
 #[must_use]
 pub fn coverage_surface_offenders(workflow: &Workflow, raw_text: &str) -> Vec<String> {
     let name = &workflow.file;
@@ -179,10 +204,43 @@ pub fn coverage_surface_offenders(workflow: &Workflow, raw_text: &str) -> Vec<St
             })
         })
         .collect();
-    if raw_text.contains(CREDENTIAL_ENVIRONMENT_KEY) {
-        offenders.push(format!(
-            "{name}: raw text references {CREDENTIAL_ENVIRONMENT_KEY}"
-        ));
-    }
+    offenders.extend(jobs_inheriting_secrets(raw_text).into_iter().map(|job| {
+        format!(
+            "{name}:{job} forwards every secret (secrets: {INHERITED_SECRETS}), the \
+             credential included"
+        )
+    }));
+    offenders.extend(mentions(name, raw_text, CREDENTIAL_ENVIRONMENT_KEY));
+    offenders.extend(mentions(name, raw_text, CODESCENE_HOST));
+    offenders
+}
+
+/// Returns every offence in a workflow and in each local workflow it reaches.
+///
+/// Every pull-request clause runs over the closure rather than the entry,
+/// because a reusable child declares `workflow_call` alone and so reads as
+/// unreachable while the pull request runs it with the caller's secrets. A
+/// local call naming a workflow that is not there is an offence of its own.
+#[must_use]
+pub fn pull_request_offenders(
+    entry: &str,
+    workflows: &[Workflow],
+    raw_texts: &BTreeMap<String, String>,
+) -> Vec<String> {
+    let reach = reachable_workflows(entry, workflows);
+    let mut offenders: Vec<String> = reach
+        .reached
+        .iter()
+        .filter_map(|file| workflows.iter().find(|workflow| &workflow.file == file))
+        .flat_map(|workflow| {
+            let raw = raw_texts.get(&workflow.file).map_or("", String::as_str);
+            coverage_surface_offenders(workflow, raw)
+        })
+        .collect();
+    offenders.extend(
+        reach.missing.iter().map(|missing| {
+            format!("{entry} reaches a local workflow {missing} no rule could read")
+        }),
+    );
     offenders
 }

@@ -1,16 +1,27 @@
 name: Coverage (main)
 
 # CodeScene accepts `cs-coverage upload` only for analysed branches, so
-# main-branch coverage is uploaded here on push; pull requests run the
-# coverage build (and, once CodeScene enables the per-project gate, the
-# changed-line `cs-coverage check`) in ci.yml instead. This workflow also
-# advances the coverage ratchet baseline: caches saved on main are
-# readable by every pull-request run, so the baseline written here is the
-# one PR ratchet checks compare against.
+# main-branch coverage is uploaded here on push, and this is the only
+# workflow that may talk to CodeScene or hold its credential. Pull
+# requests measure coverage against the ratchet in ci.yml and publish
+# nothing. This workflow also advances the coverage ratchet baseline:
+# caches saved on main are readable by every pull-request run, so the
+# baseline written here is the one PR ratchet checks compare against.
 
+# The push to main is the only trigger, and the contract holds it to that
+# by equality, so the upload needs no ref guard of its own: nothing else
+# can start this workflow on another branch.
 on:
   push:
     branches: [main]
+
+# Runs queue rather than cancel. A cancelled publisher abandons its upload
+# and the baseline write the next pull request reads; a queued one
+# finishes, and the later push's baseline wins. GitHub keeps one pending
+# run per group, so a burst of pushes still collapses to the newest.
+concurrency:
+  group: coverage-main-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   coverage-upload:

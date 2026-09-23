@@ -5,17 +5,23 @@
 //! on the change that introduces a violation rather than on the CI run that
 //! suffers from it.
 //!
-//! This file is the harness. The rules live in seven modules, split by the
-//! question each asks: `supply_chain` for what the estate will execute,
-//! `placement` for what it costs and who owns each cache, `compiler_cache` for
-//! the sccache wiring and the resource sampling, `sampler_reading` for the
-//! cases that hold the `shell_reading` support module to what a shell
-//! would actually run, `timeouts` for the
-//! ordering of the timers that can end a run, `timeout_budgets` for the
-//! arithmetic that ordering rests on, and `parsing` for the loader itself.
+//! This file is the harness. The rules live in ten modules, split by the
+//! question each asks: `coverage_boundary` for what a pull-request lane may
+//! not publish or hold, `coverage_reach` for the closure of local calls, the
+//! publisher and the loader beneath both, `supply_chain` for what the estate
+//! will execute, `placement` for what it costs and who owns each cache,
+//! `compiler_cache` for the sccache wiring and the resource sampling,
+//! `sampler_reading` for the cases that hold the `shell_reading` support
+//! module to what a shell would actually run, `timeouts` for the ordering of
+//! the timers that can end a run, `timeout_budgets` for the arithmetic that
+//! ordering rests on, and `parsing` for the loader itself.
 
 #[path = "support/coverage_boundary.rs"]
 mod coverage_boundary;
+#[path = "support/coverage_publisher.rs"]
+mod coverage_publisher;
+#[path = "support/coverage_reach.rs"]
+mod coverage_reach;
 #[path = "support/shell_reading.rs"]
 mod shell_reading;
 #[path = "support/workflow_assertions.rs"]
@@ -30,11 +36,15 @@ mod workflow_estate;
 mod workflow_loader;
 #[path = "support/workflow_model.rs"]
 mod workflow_model;
+#[path = "support/workflow_triggers.rs"]
+mod workflow_triggers;
 
 #[path = "contracts/compiler_cache.rs"]
 mod compiler_cache;
 #[path = "contracts/coverage_boundary.rs"]
 mod coverage_boundary_contract;
+#[path = "contracts/coverage_reach.rs"]
+mod coverage_reach_contract;
 #[path = "contracts/parsing.rs"]
 mod parsing;
 #[path = "contracts/placement.rs"]
