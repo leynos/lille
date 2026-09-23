@@ -29,6 +29,9 @@ use crate::workflow_estate::Workflow;
 /// Where a same-repository reusable workflow lives, relative to the root.
 pub const WORKFLOW_DIRECTORY: &str = ".github/workflows/";
 
+/// The spellings GitHub accepts for a call into this repository.
+const LOCAL_CALL_PREFIXES: [&str; 2] = ["./", "$/"];
+
 /// The `secrets:` value that forwards every secret the caller holds.
 ///
 /// The credential goes with it, and the caller's text never names it, so
@@ -37,9 +40,10 @@ pub const INHERITED_SECRETS: &str = "inherit";
 
 /// Returns the workflow file a job-level `uses` names in this repository.
 ///
-/// A call is local by its shape, not by an enumerated list of prefixes: with
-/// one leading `./` removed, the remainder is a path under the workflow
-/// directory. Anything else is a call into another repository and is not
+/// A call is local by its shape: with one leading `./` or `$/` removed, the
+/// remainder is a path under the workflow directory. `$/` is GitHub's
+/// self-repository form, resolved at the running commit, so `$/...@ref` names
+/// a file that does not exist and the walk reports it as missing. Anything else is a call into another repository and is not
 /// followed, since a foreign workflow is not ours to read.
 ///
 /// ```no_run
@@ -47,7 +51,10 @@ pub const INHERITED_SECRETS: &str = "inherit";
 /// ```
 #[must_use]
 pub fn local_workflow_target(uses: &str) -> Option<&str> {
-    let path = uses.strip_prefix("./").unwrap_or(uses);
+    let path = LOCAL_CALL_PREFIXES
+        .iter()
+        .find_map(|prefix| uses.strip_prefix(prefix))
+        .unwrap_or(uses);
     path.strip_prefix(WORKFLOW_DIRECTORY)
 }
 

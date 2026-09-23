@@ -17,9 +17,11 @@ use serde_norway::Value;
 
 use crate::coverage_boundary::{
     action_of, coverage_surface_offenders, is_reachable_by_a_pull_request, pull_request_offenders,
-    CODESCENE_HOST, CREDENTIAL_ENVIRONMENT_KEY,
+    CODESCENE_HOST, CREDENTIAL_ENVIRONMENT_KEY, UPLOAD_COVERAGE_ACTION,
 };
-use crate::coverage_publisher::{cancelling_scopes, push_branches, TRUNK_BRANCH};
+use crate::coverage_publisher::{
+    cancelling_scopes, push_branches, token_bindings, TokenBinding, TRUNK_BRANCH,
+};
 use crate::coverage_reach::{local_workflow_target, reachable_workflows};
 use crate::workflow_assertions::{job_named, workflows};
 use crate::workflow_estate::{Workflow, WorkflowSource};
@@ -54,13 +56,23 @@ fn estate(files: &[(&str, &str)]) -> (Vec<Workflow>, BTreeMap<String, String>) {
 
 /// Returns one repository workflow's raw text, or panics naming it.
 fn raw_text(file: &str) -> String {
-    repository_workflow_text(file).unwrap_or_else(|err| panic!("{file} must be readable: {err}"))
+    match repository_workflow_text(file) {
+        Ok(text) => text,
+        Err(err) => panic!("{file} must be readable: {err}"),
+    }
+}
+
+/// Parses a document without the typed model, or panics naming the failure.
+fn raw_document(text: &str) -> Value {
+    match serde_norway::from_str(text) {
+        Ok(document) => document,
+        Err(err) => panic!("the document must parse: {err}"),
+    }
 }
 
 /// Returns the publisher's raw document, parsed without the typed model.
 fn publisher_document() -> Value {
-    serde_norway::from_str(&raw_text(PUBLISHER_WORKFLOW))
-        .unwrap_or_else(|err| panic!("{PUBLISHER_WORKFLOW} must parse: {err}"))
+    raw_document(&raw_text(PUBLISHER_WORKFLOW))
 }
 
 /// The probe: a child declaring `workflow_call` alone, called with
@@ -135,6 +147,7 @@ fn the_walk_stops_on_a_cycle_and_reads_each_workflow_once() {
 #[rstest]
 #[case::with_a_leading_dot("./.github/workflows/child.yml", Some("child.yml"))]
 #[case::without_one(".github/workflows/child.yml", Some("child.yml"))]
+#[case::the_self_repository_form("$/.github/workflows/child.yml", Some("child.yml"))]
 #[case::foreign("leynos/shared-actions/.github/workflows/x.yml@v1", None)]
 #[case::an_action_directory("./.github/actions/setup", None)]
 fn a_local_call_is_recognised_by_its_shape(#[case] uses: &str, #[case] target: Option<&str>) {
@@ -167,12 +180,56 @@ fn a_reference_is_found_in_any_case(#[case] step: &str, #[case] needle: &str) {
 #[case::a_sequence("on: [push, pull_request]\n")]
 #[case::a_mapping("on:\n  pull_request:\n")]
 #[case::the_boolean_key("true: pull_request\n")]
-#[case::both_keys_at_once("on: push\ntrue: pull_request\n")]
 fn every_trigger_shape_under_either_key_is_read(#[case] declaration: &str) {
     let text = format!("{declaration}jobs:\n  a:\n    runs-on: x\n    steps:\n      - run: y\n");
     assert!(
         is_reachable_by_a_pull_request(&parsed("scratch.yml", &text)),
         "{declaration:?} declares `pull_request` and must read as reachable"
+    );
+}
+
+/// Both `on` keys at once is refused, since GitHub merges them and a reader
+/// that picked one would be blind to the other's triggers.
+#[rstest]
+fn a_workflow_declaring_both_trigger_keys_is_refused() {
+    let tail = "jobs:\n  a:\n    runs-on: x\n    steps:\n      - run: y\n";
+    let both = format!("on: push\ntrue: pull_request\n{tail}");
+    let one = format!("true: pull_request\n{tail}");
+    assert!(parse_workflow(WorkflowSource {
+        file: "a.yml",
+        text: &one
+    })
+    .is_ok());
+    assert!(
+        parse_workflow(WorkflowSource {
+            file: "a.yml",
+            text: &both
+        })
+        .is_err(),
+        "a workflow declaring `on` under both keys must be refused"
+    );
+}
+
+/// `$/` resolves at the running commit, so `$/...@ref` names no workflow and
+/// the walk reports it rather than following or skipping it.
+#[rstest]
+fn a_self_repository_call_with_a_ref_is_reported() {
+    let (workflows, texts) = estate(&[
+        (
+            "parent.yml",
+            "on: pull_request\njobs:\n  a:\n    uses: $/.github/workflows/child.yml@main\n",
+        ),
+        (
+            "child.yml",
+            "on: workflow_call\njobs:\n  b:\n    runs-on: x\n    steps:\n      - run: y\n",
+        ),
+    ]);
+    let offenders = pull_request_offenders("parent.yml", &workflows, &texts);
+    assert!(
+        offenders
+            .iter()
+            .any(|offence| offence.contains("child.yml@main")),
+        "a `$/` call carrying a ref must be reported: {offenders:?}"
     );
 }
 
@@ -221,10 +278,12 @@ fn the_measuring_lane_checks_out_shallow(workflows: Vec<Workflow>) {
 /// The trigger is the trunk guard, so it is held by equality.
 #[rstest]
 fn the_publisher_answers_a_push_to_the_trunk_and_nothing_else(workflows: Vec<Workflow>) {
-    let publisher = workflows
+    let found = workflows
         .iter()
-        .find(|workflow| workflow.file == PUBLISHER_WORKFLOW)
-        .unwrap_or_else(|| panic!("the estate must define {PUBLISHER_WORKFLOW}"));
+        .find(|workflow| workflow.file == PUBLISHER_WORKFLOW);
+    let Some(publisher) = found else {
+        panic!("the estate must define {PUBLISHER_WORKFLOW}")
+    };
     assert_eq!(
         publisher.triggers,
         ["push"],
@@ -235,6 +294,23 @@ fn the_publisher_answers_a_push_to_the_trunk_and_nothing_else(workflows: Vec<Wor
         push_branches(&publisher_document()),
         Some(vec![TRUNK_BRANCH.to_owned()]),
         "{PUBLISHER_WORKFLOW} must publish on a push to {TRUNK_BRANCH} alone"
+    );
+}
+
+/// The upload must bind the credential and pass it on, asserted positively:
+/// its non-empty guard passes with the binding deleted, and the upload then
+/// skips on every run without failing.
+#[rstest]
+fn the_publisher_binds_the_credential_it_uploads_with() {
+    let bindings = token_bindings(&publisher_document(), UPLOAD_COVERAGE_ACTION);
+    assert_eq!(
+        bindings,
+        [TokenBinding {
+            env: Some("${{ secrets.CS_ACCESS_TOKEN }}".to_owned()),
+            input: Some("${{ env.CS_ACCESS_TOKEN }}".to_owned()),
+        }],
+        "{PUBLISHER_WORKFLOW} must upload once, binding CS_ACCESS_TOKEN to the \
+         secret and passing it as access-token"
     );
 }
 
@@ -264,8 +340,7 @@ fn a_cancelling_setting_is_found_at_either_scope(
     } else {
         format!("jobs:\n  a:\n    concurrency:\n      group: g\n      {setting}\n")
     };
-    let document: Value = serde_norway::from_str(&text)
-        .unwrap_or_else(|err| panic!("the synthetic document must parse: {err}"));
+    let document = raw_document(&text);
     assert_eq!(!cancelling_scopes(&document).is_empty(), cancels, "{text}");
 }
 
@@ -275,8 +350,8 @@ fn a_cancelling_setting_is_found_at_either_scope(
 #[case::a_tag_workflow("on:\n  push:\n    tags: ['v*']\n", None)]
 #[case::an_unfiltered_push("on: push\n", None)]
 fn the_push_filter_is_read_as_declared(#[case] text: &str, #[case] expected: Option<Vec<&str>>) {
-    let document: Value = serde_norway::from_str(text)
-        .unwrap_or_else(|err| panic!("the synthetic document must parse: {err}"));
-    let expected = expected.map(|branches| branches.into_iter().map(ToOwned::to_owned).collect());
-    assert_eq!(push_branches(&document), expected);
+    let document = raw_document(text);
+    let owned: Option<Vec<String>> =
+        expected.map(|branches| branches.into_iter().map(ToOwned::to_owned).collect());
+    assert_eq!(push_branches(&document), owned);
 }

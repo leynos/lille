@@ -19,29 +19,26 @@ use crate::workflow_loader::render_scalar;
 
 /// Reads the event names a workflow declares under `on`.
 ///
-/// The key is read as the string `on` and as the boolean true, since a YAML
-/// 1.1 reader turns a bare `on` into the latter, and a document carrying both
-/// has its triggers under both: a reader of one would miss the other's. The
-/// shorthand forms are accepted too: `on: push` and `on: [push, ...]` mean the
-/// same as the mapping.
+/// The key is read as the string `on` or as the boolean true, since a YAML
+/// 1.1 reader turns a bare `on` into the latter. A document carrying both is
+/// refused rather than merged: GitHub merges them, and a reader that picked
+/// one would miss the other's triggers. The shorthand forms are accepted too:
+/// `on: push` and `on: [push, ...]` mean the same as the mapping.
 ///
 /// # Errors
 ///
-/// Returns an error when neither key is present or a value is not one of
-/// those shapes.
+/// Returns an error when neither key is present, both are, or a value is not
+/// one of those shapes.
 pub fn parse_triggers(document: &Value, at: &Location) -> Result<Vec<String>, WorkflowError> {
-    let declared: Vec<&Value> = [document.get("on"), document.get(Value::Bool(true))]
-        .into_iter()
-        .flatten()
-        .collect();
-    if declared.is_empty() {
-        return Err(at.shape("missing an `on` trigger"));
+    match (document.get("on"), document.get(Value::Bool(true))) {
+        (Some(raw), None) | (None, Some(raw)) => parse_trigger_value(raw, at),
+        (None, None) => Err(at.shape("missing an `on` trigger")),
+        // GitHub merges the two, so a reader of either is blind to the other's
+        // triggers; a document spelling them twice has one spelling nobody meant.
+        (Some(_), Some(_)) => {
+            Err(at.shape("`on` is declared under both the string key and the boolean one"))
+        }
     }
-    let mut names = Vec::new();
-    for raw in declared {
-        names.extend(parse_trigger_value(raw, at)?);
-    }
-    Ok(names)
 }
 
 /// Reads the event names from one `on` value in any of its three shapes.

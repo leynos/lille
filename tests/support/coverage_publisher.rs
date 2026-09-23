@@ -77,3 +77,38 @@ pub fn cancelling_scopes(document: &Value) -> Vec<String> {
     }
     scopes
 }
+
+/// The credential binding and the input one upload step declares.
+#[derive(Debug, PartialEq, Eq)]
+pub struct TokenBinding {
+    /// The step's `env.CS_ACCESS_TOKEN`, if it binds one.
+    pub env: Option<String>,
+    /// The step's `with.access-token`, if it passes one.
+    pub input: Option<String>,
+}
+
+/// Returns the binding every step calling `action` declares.
+///
+/// Read positively because the step's non-empty guard passes with the binding
+/// deleted, and the upload then skips on every run without failing anything.
+#[must_use]
+pub fn token_bindings(document: &Value, action: &str) -> Vec<TokenBinding> {
+    let text = |value: Option<&Value>| value.and_then(Value::as_str).map(ToOwned::to_owned);
+    document
+        .get("jobs")
+        .and_then(Value::as_mapping)
+        .into_iter()
+        .flat_map(|jobs| jobs.values())
+        .filter_map(|job| job.get("steps").and_then(Value::as_sequence))
+        .flatten()
+        .filter(|step| {
+            step.get("uses")
+                .and_then(Value::as_str)
+                .is_some_and(|uses| uses.split('@').next() == Some(action))
+        })
+        .map(|step| TokenBinding {
+            env: text(step.get("env").and_then(|env| env.get("CS_ACCESS_TOKEN"))),
+            input: text(step.get("with").and_then(|with| with.get("access-token"))),
+        })
+        .collect()
+}
