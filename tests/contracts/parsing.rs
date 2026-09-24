@@ -48,11 +48,64 @@ use crate::workflow_model::Job;
     "scratch.yml",
     "jobs:\n  a:\n    uses: o/r/.github/workflows/w.yml@v1\n    steps: []\n"
 )]
+// A condition or an advisory flag that is not a scalar has no meaning GitHub
+// would give it, so it is refused rather than read as absent.
+#[case::a_sequence_step_condition(
+    "scratch.yml",
+    "on: push\njobs:\n  a:\n    runs-on: x\n    steps:\n      - run: y\n        if: [a]\n"
+)]
+#[case::a_mapping_job_advisory_flag(
+    "scratch.yml",
+    "on: push\njobs:\n  a:\n    runs-on: x\n    continue-on-error: {a: b}\n    steps:\n      - run: y\n"
+)]
 fn a_malformed_workflow_is_an_error_not_a_default(#[case] file: &str, #[case] text: &str) {
     let outcome = parse_workflow(WorkflowSource { file, text });
     assert!(
         outcome.is_err(),
         "a workflow of unexpected shape must be rejected, not silently defaulted"
+    );
+}
+
+/// A present but empty `if` or `continue-on-error` stays present.
+///
+/// GitHub reads an empty condition as falsy, so the scope never runs. Reading
+/// it as absent would excuse exactly the dead lane `no_scope_is_dead_or_advisory`
+/// refuses, so the loader keeps presence and value apart at both scopes.
+#[rstest]
+fn an_empty_control_field_is_kept_apart_from_an_absent_one() {
+    let text = concat!(
+        "on: push\njobs:\n  a:\n    runs-on: x\n    if: ''\n    continue-on-error: ''\n",
+        "    steps:\n      - run: y\n        if: ''\n        continue-on-error: ''\n",
+        "      - run: z\n",
+    );
+    let workflow = match parse_workflow(WorkflowSource {
+        file: "scratch.yml",
+        text,
+    }) {
+        Ok(workflow) => workflow,
+        Err(err) => panic!("empty control fields must parse: {err}"),
+    };
+    let Some(job) = workflow.jobs.first() else {
+        panic!("the workflow must declare one job")
+    };
+    let [empty, absent] = job.steps.as_slice() else {
+        panic!("the job must declare two steps")
+    };
+    let read = [
+        (job.condition.as_deref(), job.continue_on_error.as_deref()),
+        (
+            empty.condition.as_deref(),
+            empty.continue_on_error.as_deref(),
+        ),
+        (
+            absent.condition.as_deref(),
+            absent.continue_on_error.as_deref(),
+        ),
+    ];
+    assert_eq!(
+        read,
+        [(Some(""), Some("")), (Some(""), Some("")), (None, None)],
+        "an empty field must read as present and empty, and an absent one as absent"
     );
 }
 
@@ -156,6 +209,19 @@ fn the_raw_text_reading_takes_every_workflow_and_nothing_else() {
     "${{ github.event.pull_request.head.repo.fork\n&& 'a' || 'b' }}",
     None
 )]
+// A literal is read only in its simple form. A doubled quote is GitHub's one
+// escape, and the reader refuses it rather than guess at the label it spells;
+// an unquoted, half-quoted, mismatched, empty or missing arm names no label
+// this reader can vouch for.
+#[case::a_doubled_quote(
+    "${{ github.event.pull_request.head.repo.fork && 'a''b' || 'c' }}",
+    None
+)]
+#[case::an_unquoted_arm("${{ github.event.pull_request.head.repo.fork && a || 'b' }}", None)]
+#[case::a_half_quoted_arm("${{ github.event.pull_request.head.repo.fork && 'a || 'b' }}", None)]
+#[case::mismatched_quotes("${{ github.event.pull_request.head.repo.fork && 'a\" || 'b' }}", None)]
+#[case::an_empty_arm("${{ github.event.pull_request.head.repo.fork && '' || 'b' }}", None)]
+#[case::a_missing_arm("${{ github.event.pull_request.head.repo.fork && 'a' || }}", None)]
 fn the_expression_reader_accepts_one_shape_and_refuses_the_rest(
     #[case] text: &str,
     #[case] expected: Option<(&str, &str, &str)>,

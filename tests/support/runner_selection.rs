@@ -147,10 +147,10 @@ pub const GITHUB_HOSTED_LABELS: [&str; 5] = [
 /// use, so it must be reported rather than silently excused.
 ///
 /// ```no_run
-/// assert!(workflow_model::is_github_hosted_label("ubuntu-latest"));
-/// assert!(workflow_model::is_github_hosted_label("macos-latest"));
-/// assert!(!workflow_model::is_github_hosted_label("ubuntu-20.04"));
-/// assert!(!workflow_model::is_github_hosted_label("ubicloud-standard-4"));
+/// assert!(runner_selection::is_github_hosted_label("ubuntu-latest"));
+/// assert!(runner_selection::is_github_hosted_label("macos-latest"));
+/// assert!(!runner_selection::is_github_hosted_label("ubuntu-20.04"));
+/// assert!(!runner_selection::is_github_hosted_label("ubicloud-standard-4"));
 /// ```
 #[must_use]
 pub fn is_github_hosted_label(label: &str) -> bool {

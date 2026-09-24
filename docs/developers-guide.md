@@ -431,10 +431,11 @@ rule, not an accident: delayed comments, metadata lookups, label handling, and
 release orchestration are API-bound, so paid runner capacity buys them nothing
 and their queue time is already short. `dependabot-automerge.yml` calls a
 reusable workflow, which chooses its own runner.
-`non_build_jobs_stay_on_hosted_ubuntu_runners` reads it, and it asks about one
-image family rather than about hosting in general. The two questions differ by
-exactly the jobs that would move to Windows or macOS: GitHub hosts both, and
-neither is where this rule puts a lane.
+`non_build_jobs_stay_on_hosted_ubuntu_runners` reads it as an exact label: the
+job's own label must be `ubuntu-latest`, so `ubuntu-24.04` is reported as well
+as Windows, macOS and any paid label. Whether a label belongs to the hosted
+Ubuntu family is a separate question, `Job::stays_on_hosted_ubuntu`, which this
+rule does not ask.
 
 Every one of these rules is a statement about a job that runs. None of them
 reads whether it does, so a build lane carrying `if: false`, or

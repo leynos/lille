@@ -35,16 +35,18 @@ fn expression_body(text: &str) -> Option<&str> {
 ///
 /// GitHub's expression syntax has no escape inside a single-quoted literal
 /// other than a doubled quote, so a value containing one is not the simple
-/// literal this reader accepts and is refused rather than guessed at.
+/// literal this reader accepts and is refused rather than guessed at. An empty
+/// literal names no runner, so it is refused too rather than read as a label.
 ///
 /// ```no_run
 /// assert_eq!(quoted_literal(" 'ubuntu-latest' "), Some("ubuntu-latest"));
 /// assert_eq!(quoted_literal("'it''s'"), None);
+/// assert_eq!(quoted_literal("''"), None);
 /// assert_eq!(quoted_literal("ubuntu-latest"), None);
 /// ```
 fn quoted_literal(text: &str) -> Option<&str> {
     let inner = text.trim().strip_prefix('\'')?.strip_suffix('\'')?;
-    (!inner.contains('\'')).then_some(inner)
+    (!inner.is_empty() && !inner.contains('\'')).then_some(inner)
 }
 
 /// Reports whether the text is a bare context path such as `github.event.x`.
