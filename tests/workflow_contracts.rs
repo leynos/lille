@@ -5,7 +5,7 @@
 //! on the change that introduces a violation rather than on the CI run that
 //! suffers from it.
 //!
-//! This file is the harness. The rules live in eleven modules, split by the
+//! This file is the harness. The rules live in twelve modules, split by the
 //! question each asks: `coverage_boundary` for what a pull-request lane may
 //! not publish or hold, `coverage_reach` for the closure of local calls and
 //! the loader beneath it, `coverage_publisher` for the one lane that may

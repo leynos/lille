@@ -7,6 +7,7 @@
 //! contract modules.
 
 use camino::Utf8Path;
+use cap_std::{ambient_authority, fs_utf8::Dir};
 use rstest::rstest;
 
 use crate::workflow_estate::WorkflowSource;
@@ -86,14 +87,18 @@ fn the_raw_text_reading_takes_every_workflow_and_nothing_else() {
         Ok(scratch) => scratch,
         Err(err) => panic!("a scratch directory must be creatable: {err}"),
     };
-    for (name, text) in [("b.yaml", "b\n"), ("a.yml", "a\n"), ("notes.txt", "n\n")] {
-        if let Err(err) = std::fs::write(scratch.path().join(name), text) {
-            panic!("{name} must be writable: {err}");
-        }
-    }
     let Some(root) = Utf8Path::from_path(scratch.path()) else {
         panic!("the scratch directory must have a UTF-8 path")
     };
+    let dir = match Dir::open_ambient_dir(root, ambient_authority()) {
+        Ok(dir) => dir,
+        Err(err) => panic!("the scratch directory must open: {err}"),
+    };
+    for (name, text) in [("b.yaml", "b\n"), ("a.yml", "a\n"), ("notes.txt", "n\n")] {
+        if let Err(err) = dir.write(name, text) {
+            panic!("{name} must be writable: {err}");
+        }
+    }
     let texts = match workflow_texts_in(root) {
         Ok(texts) => texts,
         Err(err) => panic!("the scratch workflows must be readable: {err}"),
