@@ -22,7 +22,8 @@ use rstest::rstest;
 
 use crate::workflow_assertions::workflows;
 use crate::workflow_estate::{Workflow, UPLOAD_CODESCENE_COVERAGE_SHA, WORKFLOW_DIR};
-use crate::workflow_loader::{all_steps, repository_workflow_texts};
+use crate::workflow_loader::all_steps;
+use crate::workflow_texts::repository_workflow_texts;
 
 /// The uploader's coordinate, without its pinned reference.
 const UPLOADER: &str = "leynos/shared-actions/.github/actions/upload-codescene-coverage";

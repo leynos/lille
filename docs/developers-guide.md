@@ -391,11 +391,61 @@ every push to `main`. Both use the `ubicloud-standard-4` runner label, which is
 registered in `.github/actionlint.yaml`, and both declare `timeout-minutes` so
 a hung step cannot bill to the platform's six-hour default.
 
+### The fork arm on the pull-request lane
+
+A pull request from a fork cannot obtain an Ubicloud runner, so `build-test`
+names its runner through an expression rather than a label:
+
+```yaml
+runs-on: >-
+  ${{ github.event.pull_request.head.repo.fork
+  && 'ubuntu-latest' || 'ubicloud-standard-4' }}
+```
+
+Without the arm the job never starts on a fork's pull request, and a required
+check that never reports presents as a pull request waiting rather than as a
+placement fault.
+
+`coverage-upload` keeps the plain label. It runs on push events, so a fork's
+pull request cannot reach it, and a fallback arm there would be a branch
+nothing ever takes: one more expression to keep correct, with no case that
+exercises it. The contract asserts that absence as well as the two arms, so the
+expression does not spread by imitation.
+
+Keep the continuation at the same indent as the first line. A more-indented
+line inside a folded scalar keeps its break, so the expression arrives with a
+newline inside it. GitHub evaluates it anyway and the lane runs, which is why a
+green run is not evidence that the declaration is well-formed;
+`no_runs_on_declaration_carries_a_line_break` is what reads it.
+
+The loader models the expression as a fourth `runs-on` shape carrying the guard
+and both arms, so each arm stays a label for every rule that reads one. That
+matters for the actionlint registry, which must be asked about the Ubicloud arm
+and must not be asked about the hosted one. Only the prescribed spelling is
+read: a negated guard or a comparison says the same thing with the arms
+reversed, and reading either as the prescribed form would let two spellings
+drift apart while both satisfied the contract.
+
 Every other job stays on GitHub-hosted `ubuntu-latest`. That placement is a
 rule, not an accident: delayed comments, metadata lookups, label handling, and
 release orchestration are API-bound, so paid runner capacity buys them nothing
 and their queue time is already short. `dependabot-automerge.yml` calls a
 reusable workflow, which chooses its own runner.
+`non_build_jobs_stay_on_hosted_ubuntu_runners` reads it as an exact label: the
+job's own label must be `ubuntu-latest`, so `ubuntu-24.04` is reported as well
+as Windows, macOS and any paid label. Whether a label belongs to the hosted
+Ubuntu family is a separate question, `Job::stays_on_hosted_ubuntu`, which this
+rule does not ask.
+
+Every one of these rules is a statement about a job that runs. None of them
+reads whether it does, so a build lane carrying `if: false`, or
+`continue-on-error: true`, keeps a valid `runs-on`, a bounded `timeout-minutes`
+and a correct cache key while executing nothing or reporting success whatever
+it found. `no_scope_is_dead_or_advisory` reads both fields at job and step
+scope and refuses a constant, in any of its spellings. A condition that depends
+on the event is not refused, because that is what `if` is for and
+`dependabot-automerge.yml` declares one: the rule is that a scope must be able
+to run, not that it must always run.
 
 ### Tool installation
 
@@ -652,13 +702,15 @@ two. A workflow contract in `tests/workflow_contracts.rs` fails if a second
 ### Workflow contracts
 
 `tests/workflow_contracts.rs` asserts the rules above. It is a harness rather
-than a test file: the rules live in twelve modules under `tests/contracts/`,
+than a test file: the rules live in fourteen modules under `tests/contracts/`,
 split by the question each asks.
 
 | Module                  | Asks                                                                                                                                                                                                                                                                                    |
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `supply_chain.rs`       | What will the estate execute? Pinned cache and shared-action references, no source-built tools, prebuilt Whitaker and sccache.                                                                                                                                                          |
 | `placement.rs`          | What does it cost, and who owns each cache? Runner placement and labels, bounded timeouts, one owner per cached path, an installer before the first use of what it installs, a single test execution per build job, the uv cache key.                                                   |
+| `fork_fallback.rs`      | Can a fork's pull request start the lane it reaches? The pull-request lane falls back to `ubuntu-latest` for forks through the one prescribed expression, lanes no fork reaches name their runner outright, and no `runs-on` declaration carries a line break.                          |
+| `execution_control.rs`  | Do the readers of `if` and `continue-on-error` tell a constant from a condition that depends on the event, at job and step scope? The rule that consumes them lives in `placement.rs`; these drive the readers with shapes the workflows do not contain.                                |
 | `concurrency.rs`        | Which runs may a newer push cancel? Every workflow a pull request starts declares a group keyed on the pull request, falling back to the run id, and cancels only on the `pull_request` event.                                                                                          |
 | `codescene_uploader.rs` | Does the coverage uploader carry its approved commit and none of the inputs it now rejects? No `installer-checksum`, no `CODESCENE_CLI_SHA256`, and no checksum-refresh dispatch in either extension.                                                                                   |
 | `compiler_cache.rs`     | Is sccache actually working? The two job-level variables, the export, install, start, build, report order, the proxy export, and the resource sampler with its report.                                                                                                                  |
@@ -670,7 +722,7 @@ split by the question each asks.
 | `timeouts.rs`           | Which timer ends a run first? The coverage action's cargo watchdog set explicitly and by value, each coverage job's ceiling above that watchdog plus the measured work around it and equal to the documented 90 minutes, and the two nextest tiers absent rather than silently enabled. |
 | `timeout_budgets.rs`    | Do the readings that ordering rests on say what they claim? The coordinate match, the ceiling predicate, and the two conversions, driven with values chosen to separate a correct reading from a plausible wrong one.                                                                   |
 
-*Table: the twelve contract modules, and the question each one asks of the
+*Table: the fourteen contract modules, and the question each one asks of the
 estate.*
 
 Each module also pins the inputs that make its rules true, so a workflow cannot
@@ -682,13 +734,20 @@ The split is not only about the 400-line limit. `parsing.rs` reads a different
 subject from the other modules, and separating it makes that visible: a failure
 there means the loader is wrong, not that a workflow is.
 
-`tests/support/workflow_model.rs` holds the job, step, and runner-selection
-types the properties and the contracts share;
-`tests/support/workflow_estate.rs` holds the pinned commits, the whole-file
-`Workflow` type, and the errors parsing reports, which only the contracts need.
-`tests/support/workflow_loader.rs` turns workflow files into those values, and
-`tests/support/workflow_config.rs` reads the other repository files a contract
-needs, currently `actionlint`'s runner registration.
+`tests/support/workflow_model.rs` holds the job and step types the properties
+and the contracts share. `tests/support/runner_selection.rs` holds the
+`runs-on` shapes, a label, a label list, a group and the fork-fallback
+expression, with the label predicates the placement rules ask through, and
+`tests/support/placement_expression.rs` holds the one expression grammar that
+reads a fork-fallback declaration into its guard and two arms, refusing every
+other spelling rather than repairing it; `tests/support/workflow_estate.rs`
+holds the pinned commits, the whole-file `Workflow` type, and the errors
+parsing reports, which only the contracts need.
+`tests/support/workflow_loader.rs` turns workflow files into those values;
+`tests/support/workflow_texts.rs` reads the same files as raw text, through the
+same capability and file listing, for contracts that must see what the parser
+drops; and `tests/support/workflow_config.rs` reads the other repository files
+a contract needs, currently `actionlint`'s runner registration.
 `tests/support/shell_reading.rs` holds the bounded shell reading that separates
 a command from text that merely spells one; it sits in `support` because
 `compiler_cache.rs` asks a question through it while `sampler_reading.rs` asks

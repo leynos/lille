@@ -11,6 +11,18 @@
 //! Each property is checked against a small oracle expressed independently of
 //! the implementation, rather than by re-deriving the implementation's answer.
 
+#[path = "support/placement_expression.rs"]
+mod placement_expression;
+#[path = "support/runner_selection.rs"]
+// These properties construct a `RunnerSelection` and read its labels; the
+// group and fork-fallback arms, and the expression reader behind them, are
+// asked only by the contracts binary. They are part of the same enum, so they
+// cannot be split out without splitting the type these properties build.
+#[expect(
+    dead_code,
+    reason = "shared vocabulary; the contracts binary asks the group and fallback queries"
+)]
+mod runner_selection;
 #[path = "support/workflow_cache_owners.rs"]
 mod workflow_cache_owners;
 #[path = "support/workflow_model.rs"]
@@ -29,8 +41,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use proptest::prelude::*;
 
+use runner_selection::{RunnerLabel, RunnerSelection};
 use workflow_cache_owners::duplicated_paths;
-use workflow_model::{Job, RunnerSelection, Step};
+use workflow_model::{Job, Step};
 
 /// Cache paths the generators draw from, kept small so collisions are common.
 const PATHS: [&str; 4] = ["~/.cargo/registry", "~/.cargo/git", ".uv-cache", "target-x"];
@@ -44,6 +57,8 @@ fn action_step(name: &str, uses: &str, inputs: &[(&str, &str)]) -> Step {
         name: name.to_owned(),
         uses: uses.to_owned(),
         run: String::new(),
+        condition: None,
+        continue_on_error: None,
         with: inputs
             .iter()
             .map(|(key, value)| ((*key).to_owned(), (*value).to_owned()))
@@ -77,7 +92,7 @@ fn run_step(script: &str) -> Step {
 fn job_of(steps: Vec<Step>) -> Job {
     Job {
         id: "j".to_owned(),
-        runs_on: RunnerSelection::Labels(vec!["ubuntu-latest".to_owned()]),
+        runs_on: RunnerSelection::Labels(vec![RunnerLabel::from("ubuntu-latest")]),
         steps,
         ..Job::default()
     }

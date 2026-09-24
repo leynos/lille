@@ -25,7 +25,8 @@ use crate::coverage_boundary::{
 };
 use crate::workflow_assertions::{job_named, workflows};
 use crate::workflow_estate::{Workflow, WorkflowSource};
-use crate::workflow_loader::{parse_workflow, repository_workflow_text};
+use crate::workflow_loader::parse_workflow;
+use crate::workflow_texts::repository_workflow_text;
 
 /// The lane that owns the upload, and is therefore exempt.
 const PUBLISHER_WORKFLOW: &str = "coverage-main.yml";

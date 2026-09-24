@@ -23,9 +23,10 @@ use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::{ambient_authority, fs_utf8::Dir};
 use serde_norway::Value;
 
+use crate::runner_selection::{RunnerLabel, RunnerSelection};
 use crate::workflow_concurrency::parse_concurrency;
 use crate::workflow_estate::{Location, Workflow, WorkflowError, WorkflowSource, WORKFLOW_DIR};
-use crate::workflow_model::{Job, RunnerSelection, Step};
+use crate::workflow_model::{Job, Step};
 use crate::workflow_triggers::parse_triggers;
 
 /// Renders a YAML scalar as the string a workflow expression would see.
@@ -67,6 +68,26 @@ fn optional_u64(raw: &Value, key: &str, at: &Location) -> Result<Option<u64>, Wo
         .as_u64()
         .map(Some)
         .ok_or_else(|| at.shape(&format!("`{key}` must be an unsigned integer")))
+}
+
+/// Reads an optional scalar field, keeping absence apart from an empty value.
+///
+/// `if` and `continue-on-error` are the fields this exists for. Both may be
+/// written as a bare boolean or as an expression string, and for both the
+/// difference between "absent" and "present and empty" is the difference
+/// between a job that runs and one whose condition nothing has read. Rendering
+/// an absent field as `""`, as `optional_string` does, erases it.
+///
+/// # Errors
+///
+/// Returns an error when the field is present but is not a scalar.
+fn optional_scalar(raw: &Value, key: &str, at: &Location) -> Result<Option<String>, WorkflowError> {
+    let Some(value) = raw.get(key) else {
+        return Ok(None);
+    };
+    render_scalar(value)
+        .map(Some)
+        .ok_or_else(|| at.shape(&format!("`{key}` must be a scalar")))
 }
 
 /// Returns an error when `with` is not a mapping or an input is not a scalar.
@@ -118,6 +139,8 @@ fn parse_step(raw: &Value, at: &Location) -> Result<Step, WorkflowError> {
         name: optional_string(raw, "name", at)?,
         uses: optional_string(raw, "uses", at)?,
         run: optional_string(raw, "run", at)?,
+        condition: optional_scalar(raw, "if", at)?,
+        continue_on_error: optional_scalar(raw, "continue-on-error", at)?,
         with: parse_inputs(raw, at)?,
     };
     match (step.uses.is_empty(), step.run.is_empty()) {
@@ -161,7 +184,17 @@ fn parse_runs_on(raw: &Value, at: &Location) -> Result<RunnerSelection, Workflow
         return Ok(RunnerSelection::Delegated);
     };
     if value.as_mapping().is_none() {
-        return Ok(RunnerSelection::Labels(parse_labels(value, at)?));
+        let labels = parse_labels(value, at)?;
+        // A fork-fallback expression is one scalar that names two runners, so
+        // it is read here rather than left as a label nothing can classify.
+        if let [only] = labels.as_slice() {
+            if let Some(selection) = RunnerSelection::from_expression(only) {
+                return Ok(selection);
+            }
+        }
+        return Ok(RunnerSelection::Labels(
+            labels.into_iter().map(RunnerLabel::from).collect(),
+        ));
     }
     let group = value
         .get("group")
@@ -171,7 +204,10 @@ fn parse_runs_on(raw: &Value, at: &Location) -> Result<RunnerSelection, Workflow
         None => Vec::new(),
         Some(labels) => parse_labels(labels, at)?,
     };
-    Ok(RunnerSelection::Group { group, labels })
+    Ok(RunnerSelection::Group {
+        group,
+        labels: labels.into_iter().map(RunnerLabel::from).collect(),
+    })
 }
 
 /// Reports whether a job mixes the two shapes GitHub Actions keeps apart.
@@ -210,6 +246,8 @@ fn parse_job(id: &str, raw: &Value, file: &Location) -> Result<Job, WorkflowErro
         runs_on: parse_runs_on(raw, &at)?,
         uses: optional_string(raw, "uses", &at)?,
         timeout_minutes: optional_u64(raw, "timeout-minutes", &at)?,
+        condition: optional_scalar(raw, "if", &at)?,
+        continue_on_error: optional_scalar(raw, "continue-on-error", &at)?,
         env: parse_scalar_mapping(raw, "env", &at)?,
         steps,
     };
@@ -257,11 +295,14 @@ pub fn parse_workflow(source: WorkflowSource<'_>) -> Result<Workflow, WorkflowEr
 
 /// Lists the workflow file names inside an opened workflow directory.
 ///
+/// Shared with `workflow_texts`, so the parsed and the raw readings see the
+/// same set of files, both extensions included.
+///
 /// # Errors
 ///
 /// Returns an error when the directory cannot be listed or an entry's name
 /// cannot be read.
-fn workflow_names(dir: &Dir) -> Result<Vec<String>, WorkflowError> {
+pub fn workflow_names(dir: &Dir) -> Result<Vec<String>, WorkflowError> {
     let read = |err| WorkflowError::Read(WORKFLOW_DIR.to_owned(), err);
     let mut names: Vec<String> = Vec::new();
     for entry in dir.entries().map_err(read)? {
@@ -298,69 +339,6 @@ pub fn load_workflows_in(root: &Utf8Path) -> Result<Vec<Workflow>, WorkflowError
             })
         })
         .collect()
-}
-
-/// Returns one workflow file's raw text, read through a directory capability.
-///
-/// The parsed document is not enough for every question: a credential named in
-/// a comment, or in a shape the parser flattened away, is still a credential
-/// the file carries. Reading it here keeps the ambient step in the one module
-/// that already owns it rather than letting a contract reach the filesystem.
-///
-/// # Errors
-///
-/// Returns an error when the workflow directory cannot be opened or the file
-/// cannot be read.
-pub fn workflow_text(root: &Utf8Path, name: &str) -> Result<String, WorkflowError> {
-    let dir = Dir::open_ambient_dir(root, ambient_authority())
-        .map_err(|err| WorkflowError::Read(root.to_string(), err))?;
-    dir.read_to_string(name)
-        .map_err(|err| WorkflowError::Read(name.to_owned(), err))
-}
-
-/// Returns one workflow file's raw text from this repository.
-///
-/// # Errors
-///
-/// Returns the same errors as [`workflow_text`].
-pub fn repository_workflow_text(name: &str) -> Result<String, WorkflowError> {
-    let root = Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(WORKFLOW_DIR);
-    workflow_text(&root, name)
-}
-
-/// Returns every workflow file name beneath `root` paired with its raw text.
-///
-/// For contracts that must see what the parser drops, such as a reference in
-/// a comment, across the whole estate. Both of GitHub's accepted extensions
-/// are read, in name order, through the same directory capability the parser
-/// uses.
-///
-/// # Errors
-///
-/// Returns an error when the directory cannot be opened or listed, or when a
-/// file cannot be read.
-pub fn workflow_texts_in(root: &Utf8Path) -> Result<Vec<(String, String)>, WorkflowError> {
-    let dir = Dir::open_ambient_dir(root, ambient_authority())
-        .map_err(|err| WorkflowError::Read(root.to_string(), err))?;
-    workflow_names(&dir)?
-        .into_iter()
-        .map(|name| {
-            let text = dir
-                .read_to_string(&name)
-                .map_err(|err| WorkflowError::Read(name.clone(), err))?;
-            Ok((name, text))
-        })
-        .collect()
-}
-
-/// Returns every workflow in this repository paired with its raw text.
-///
-/// # Errors
-///
-/// Returns the same errors as [`workflow_texts_in`].
-pub fn repository_workflow_texts() -> Result<Vec<(String, String)>, WorkflowError> {
-    let root = Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(WORKFLOW_DIR);
-    workflow_texts_in(&root)
 }
 
 /// Loads and parses every workflow in this repository's `.github/workflows`.
