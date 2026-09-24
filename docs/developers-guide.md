@@ -613,10 +613,11 @@ a step whose sole command, with no `if:` and no `env`, is
 `echo "available=${{ secrets.CS_ACCESS_TOKEN != '' }}" >> "$GITHUB_OUTPUT"`,
 and the upload's condition requires that output. The publisher's concurrency is
 exactly `group: coverage-main-${{ github.ref }}` with
-`cancel-in-progress: false`, so runs never overlap and triggered runs upload in
-commit order. A manual "Re-run jobs" on an older run keeps that run's commit:
-it is an operator action that republishes that commit's coverage and baseline
-until the next push supersedes it.
+`cancel-in-progress: false`, so runs never overlap and a newer trigger replaces
+an older pending run. No commit order is promised beyond that, because GitHub
+does not promise to start runs in the order they were triggered. A manual
+"Re-run jobs" keeps its `run_id`, so it republishes that commit's coverage but
+replaces no ratchet baseline, which is saved under a run-keyed cache key.
 
 Two gaps are known and accepted. A Dependabot automerge made with
 `GITHUB_TOKEN` fires no push, so that merge publishes nothing until the next
@@ -652,8 +653,7 @@ by the question each asks.
 | `timeouts.rs`           | Which timer ends a run first? The coverage action's cargo watchdog set explicitly and by value, each coverage job's ceiling above that watchdog plus the measured work around it and equal to the documented 90 minutes, and the two nextest tiers absent rather than silently enabled. |
 | `timeout_budgets.rs`    | Do the readings that ordering rests on say what they claim? The coordinate match, the ceiling predicate, and the two conversions, driven with values chosen to separate a correct reading from a plausible wrong one.                                                                   |
 
-*Table: the seven contract modules, and the question each one asks of the
-estate.*
+*Table: the ten contract modules, and the question each one asks of the estate.*
 
 Each module also pins the inputs that make its rules true, so a workflow cannot
 keep the shape of the policy while dropping its substance: `cache-provider`,
@@ -661,7 +661,7 @@ keep the shape of the policy while dropping its substance: `cache-provider`,
 cache paths and key.
 
 The split is not only about the 400-line limit. `parsing.rs` reads a different
-subject from the other three, and separating it makes that visible: a failure
+subject from the other modules, and separating it makes that visible: a failure
 there means the loader is wrong, not that a workflow is.
 
 `tests/support/workflow_model.rs` holds the job, step, and runner-selection

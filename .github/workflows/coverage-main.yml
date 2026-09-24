@@ -9,18 +9,20 @@ name: Coverage (main)
 # baseline written here is the one PR ratchet checks compare against.
 
 # The push to main is the only trigger, and the contract holds it to that
-# by equality, so the upload needs no ref guard of its own: nothing else
-# can start this workflow on another branch.
+# by equality. That is the first trunk guard; the second is the upload
+# step's own `github.ref` conjunct, which still holds should another
+# trigger ever be added.
 on:
   push:
     branches: [main]
 
 # Runs never cancel and never overlap. A cancelled publisher abandons its
 # upload and the baseline write the next pull request reads. GitHub keeps
-# one pending run per group, and the newest trigger replaces it, so a burst
-# of pushes collapses to the newest. The group is keyed on the ref alone,
-# so triggered runs upload in commit order; a manual re-run of an older
-# run republishes that commit until the next push supersedes it.
+# one pending run per group, and a newer trigger replaces it, so a burst
+# of pushes collapses. No commit order is promised beyond that: GitHub
+# does not promise to start runs in trigger order. A manual re-run keeps
+# its run_id, so it republishes that commit's coverage but replaces no
+# ratchet baseline, which is saved under a run-keyed cache key.
 concurrency:
   group: coverage-main-${{ github.ref }}
   cancel-in-progress: false

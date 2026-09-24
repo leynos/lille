@@ -92,6 +92,16 @@ pub const PULL_REQUEST_TARGET_TRIGGER: &str = "pull_request_target";
 /// The trigger that resumes a run with the base repository's privileges.
 pub const SUBMISSION_TRIGGER: &str = "workflow_run";
 
+/// The merge queue's trigger.
+///
+/// It runs the pull request's merged code with the repository's secrets and
+/// gates the merge, so a `CodeScene` failure there blocks the queue exactly as
+/// it once blocked the pull request.
+pub const MERGE_QUEUE_TRIGGER: &str = "merge_group";
+
+/// The triggers a review or a review comment on a pull request fires.
+pub const REVIEW_TRIGGERS: [&str; 2] = ["pull_request_review", "pull_request_review_comment"];
+
 /// Returns a step's action reference without its version.
 ///
 /// Splitting on the version separator rather than matching a prefix keeps
@@ -109,19 +119,49 @@ pub fn action_of(step: &Step) -> &str {
         .map_or(step.uses.as_str(), |(name, _)| name)
 }
 
+/// Reports whether one artefact path entry can select the report.
+///
+/// The report sits at the workspace root, so an entry reaches it when it names
+/// the report, or when its first segment is the root, its parent, or anything
+/// the reader cannot resolve: a glob, a brace set, or an expression such as
+/// `${{ github.workspace }}`. Reading those as publication errs towards the
+/// loud failure: a narrow upload spelt with a leading glob fails the contract,
+/// where the other reading lets `path: .` publish the report unseen.
+fn path_entry_reaches_the_report(entry: &str) -> bool {
+    let mut rest = entry;
+    while let Some(stripped) = rest.strip_prefix("./") {
+        rest = stripped;
+    }
+    let first = rest.split('/').next().unwrap_or_default();
+    rest.contains(COVERAGE_REPORT_PATH)
+        || matches!(first, "" | "." | "..")
+        || first.contains(['*', '?', '[', '{', '$'])
+}
+
 /// Reports whether a step publishes the coverage report as an artefact.
 ///
-/// A step of the artefact action that names no path uploads the workspace,
-/// which holds the generated report, so it fails closed rather than reading as
-/// an exemption.
+/// The path input holds one pattern per line, and a line opening with `!`
+/// only excludes, so the step publishes when any including line reaches the
+/// report. A step that names no path uploads the workspace, which holds the
+/// generated report, so it fails closed rather than reading as an exemption.
+///
+/// ```no_run
+/// let mut step = workflow_model::Step::default();
+/// step.uses = "actions/upload-artifact@v4".to_owned();
+/// step.with.insert("path".to_owned(), "./**".to_owned());
+/// assert!(coverage_boundary::publishes_the_coverage_report(&step));
+/// ```
 #[must_use]
 pub fn publishes_the_coverage_report(step: &Step) -> bool {
     if action_of(step) != PUBLISH_ARTEFACT_ACTION {
         return false;
     }
-    step.with
-        .get("path")
-        .is_none_or(|path| path.contains(COVERAGE_REPORT_PATH))
+    step.with.get("path").is_none_or(|path| {
+        path.lines()
+            .map(str::trim)
+            .filter(|entry| !entry.is_empty() && !entry.starts_with('!'))
+            .any(path_entry_reaches_the_report)
+    })
 }
 
 /// Reports whether a step tells the coverage action not to archive.
@@ -133,17 +173,21 @@ pub fn declines_the_generated_report_archive(step: &Step) -> bool {
 
 /// Reports whether a workflow can be reached by a pull request.
 ///
-/// All three triggers count. `pull_request_target` and `workflow_run` resume
-/// in the base repository's context, so a coverage step under either is a
-/// credential a pull request's contents can influence.
+/// Every trigger a pull request's activity fires counts. `pull_request_target`
+/// and `workflow_run` resume in the base repository's context, so a coverage
+/// step under either is a credential a pull request's contents can influence;
+/// the merge queue runs the merged code with secrets and gates the merge; and
+/// a review or review comment starts a run as surely as a push to the branch.
 #[must_use]
 pub fn is_reachable_by_a_pull_request(workflow: &Workflow) -> bool {
     [
         PULL_REQUEST_TRIGGER,
         PULL_REQUEST_TARGET_TRIGGER,
         SUBMISSION_TRIGGER,
+        MERGE_QUEUE_TRIGGER,
     ]
     .iter()
+    .chain(REVIEW_TRIGGERS.iter())
     .any(|trigger| workflow.has_trigger(trigger))
 }
 

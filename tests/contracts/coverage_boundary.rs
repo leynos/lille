@@ -158,6 +158,44 @@ fn each_forbidden_element_is_reported(#[case] step: &str, #[case] expected: &str
     );
 }
 
+/// An artefact path that can select the root-level report publishes it,
+/// whether or not the path spells the report's name.
+#[rstest]
+#[case::the_workspace_root(".")]
+#[case::the_root_with_a_separator("./")]
+#[case::every_file_below_the_root("./**")]
+#[case::a_bare_glob("'*'")]
+#[case::a_glob_on_the_extension("'*.info'")]
+#[case::the_workspace_expression("${{ github.workspace }}")]
+#[case::a_broad_line_after_a_narrow_one("|\n            dist/\n            ./**")]
+fn a_broad_artefact_path_publishes_the_report(#[case] path: &str) {
+    let step = format!(
+        "      - uses: actions/upload-artifact@abc\n        with:\n          path: {path}\n"
+    );
+    let offenders = coverage_surface_offenders(&synthetic(&step), "");
+    assert!(
+        offenders
+            .iter()
+            .any(|offence| offence.contains("publishes the coverage report as an artefact")),
+        "`path: {path}` selects the root-level report and must be reported; got {offenders:?}"
+    );
+}
+
+/// A glob below a named directory, and an exclusion, cannot reach the root.
+#[rstest]
+#[case::a_glob_below_a_directory("target/*.log")]
+#[case::an_exclusion_beside_a_directory("|\n            dist/\n            !**/*.map")]
+fn a_bounded_artefact_path_is_not_accused(#[case] path: &str) {
+    let step = format!(
+        "      - uses: actions/upload-artifact@abc\n        with:\n          path: {path}\n"
+    );
+    let offenders = coverage_surface_offenders(&synthetic(&step), "");
+    assert!(
+        offenders.is_empty(),
+        "`path: {path}` cannot select the root-level report: {offenders:?}"
+    );
+}
+
 #[rstest]
 fn the_credential_is_found_in_raw_text_a_parser_would_drop() {
     let clean = synthetic("      - run: echo hello\n");

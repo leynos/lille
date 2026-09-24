@@ -6,11 +6,11 @@
 //! cannot be cancelled halfway through writing what the next pull request
 //! will read.
 //!
-//! Here the trunk guard is the trigger itself: the publisher answers a push to
-//! `main` and nothing else, which the contract asserts by equality. A
-//! condition-level guard, and the `&&`/`||` reading it would need, has nothing
-//! to guard against while no other trigger can start the workflow; adding a
-//! dispatch trigger fails the equality first.
+//! The trunk is guarded twice. The publisher answers a push to `main` and
+//! nothing else, which the contract asserts by equality; and the upload's
+//! condition carries `github.ref == 'refs/heads/main'` as a whole conjunct,
+//! which `upload_condition_offences` reads by splitting on `&&` and refusing
+//! any unquoted `||`, so the guard still holds should another trigger be added.
 //!
 //! These read the raw document, since the typed model carries neither the push
 //! filter nor the concurrency settings.
@@ -254,22 +254,31 @@ fn binds(env: Option<&Value>) -> bool {
 /// `upload-artifact` and cache steps nested inside it, so no scope may.
 #[must_use]
 pub fn credential_bindings(document: &Value) -> Vec<String> {
-    let mut scopes = Vec::new();
-    if binds(document.get("env")) {
-        scopes.push("the workflow".to_owned());
-    }
-    let jobs = document.get("jobs").and_then(Value::as_mapping);
-    for (key, job) in jobs.into_iter().flatten() {
-        let name = key.as_str().unwrap_or_default();
-        if binds(job.get("env")) {
-            scopes.push(format!("job {name}"));
-        }
-        let steps = job.get("steps").and_then(Value::as_sequence);
-        for (index, step) in steps.into_iter().flatten().enumerate() {
-            if binds(step.get("env")) {
-                scopes.push(format!("job {name} step {index}"));
-            }
-        }
-    }
-    scopes
+    let workflow = std::iter::once(("the workflow".to_owned(), document.get("env")));
+    let jobs = document
+        .get("jobs")
+        .and_then(Value::as_mapping)
+        .into_iter()
+        .flatten()
+        .flat_map(|(key, job)| job_env_scopes(key.as_str().unwrap_or_default(), job));
+    workflow
+        .chain(jobs)
+        .filter(|(_, env)| binds(*env))
+        .map(|(scope, _)| scope)
+        .collect()
+}
+
+/// Returns a job's own `env` scope followed by each of its steps' scopes.
+fn job_env_scopes<'a>(
+    name: &'a str,
+    job: &'a Value,
+) -> impl Iterator<Item = (String, Option<&'a Value>)> + 'a {
+    let steps = job
+        .get("steps")
+        .and_then(Value::as_sequence)
+        .into_iter()
+        .flatten()
+        .enumerate()
+        .map(move |(index, step)| (format!("job {name} step {index}"), step.get("env")));
+    std::iter::once((format!("job {name}"), job.get("env"))).chain(steps)
 }

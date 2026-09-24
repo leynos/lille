@@ -50,8 +50,8 @@ fn the_publisher_answers_a_push_to_the_trunk_and_nothing_else(workflows: Vec<Wor
     assert_eq!(
         publisher.triggers,
         ["push"],
-        "{PUBLISHER_WORKFLOW} carries no ref guard of its own, so any second \
-         trigger, `workflow_dispatch` included, could upload another branch"
+        "{PUBLISHER_WORKFLOW} must answer a push alone; a second trigger, \
+         `workflow_dispatch` included, is a route to the upload from another branch"
     );
     assert_eq!(
         push_branches(&publisher_document()),
@@ -134,6 +134,10 @@ fn the_credential_check_is_the_prescribed_step(#[case] variant: &str, #[case] ac
 #[rstest]
 #[case::workflow("env:\n  CS_ACCESS_TOKEN: x\njobs: {}\n", 1)]
 #[case::job_in_another_case("jobs:\n  a:\n    env:\n      cs_access_token: x\n", 1)]
+#[case::step(
+    "jobs:\n  a:\n    steps:\n      - run: x\n        env:\n          CS_ACCESS_TOKEN: y\n",
+    1
+)]
 #[case::another_name("jobs:\n  a:\n    steps:\n      - env:\n          OTHER: x\n", 0)]
 fn a_credential_bound_in_any_env_is_found(#[case] text: &str, #[case] expected: usize) {
     assert_eq!(
@@ -143,10 +147,10 @@ fn a_credential_bound_in_any_env_is_found(#[case] text: &str, #[case] expected: 
     );
 }
 
-/// Runs never cancel and never overlap: one group keyed on the ref alone,
-/// so the newest trigger replaces a pending run and triggered runs upload in
-/// commit order. A manual re-run of an older run republishes that commit until
-/// the next push supersedes it, which is an operator's choice, not a race.
+/// Runs never cancel and never overlap: one group keyed on the ref alone, so a
+/// newer trigger replaces a pending run. No commit order is claimed, since
+/// GitHub does not promise to start runs in trigger order; a manual re-run
+/// keeps its `run_id` and so replaces no run-keyed ratchet baseline.
 #[rstest]
 fn the_publisher_never_cancels_and_is_keyed_on_the_ref() {
     let document = publisher_document();

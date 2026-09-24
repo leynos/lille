@@ -152,11 +152,14 @@ fn a_reference_is_found_in_any_case(#[case] step: &str, #[case] needle: &str) {
 #[case::a_sequence("on: [push, pull_request]\n")]
 #[case::a_mapping("on:\n  pull_request:\n")]
 #[case::the_boolean_key("true: pull_request\n")]
+#[case::the_merge_queue("on: merge_group\n")]
+#[case::a_review("on:\n  pull_request_review:\n    types: [submitted]\n")]
+#[case::a_review_comment("on: [push, pull_request_review_comment]\n")]
 fn every_trigger_shape_under_either_key_is_read(#[case] declaration: &str) {
     let text = format!("{declaration}jobs:\n  a:\n    runs-on: x\n    steps:\n      - run: y\n");
     assert!(
         is_reachable_by_a_pull_request(&parsed("scratch.yml", &text)),
-        "{declaration:?} declares `pull_request` and must read as reachable"
+        "{declaration:?} declares a trigger a pull request fires and must read as reachable"
     );
 }
 
