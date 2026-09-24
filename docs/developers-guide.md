@@ -756,6 +756,57 @@ restores on the same key are two owners, and so are a matching pair plus a
 third step, because otherwise a genuine duplicate could hide behind the
 split-cache exception.
 
+### Cancelling superseded pull-request runs
+
+Every push to a pull request starts a fresh run of each gate. The run already
+in flight is answering a question about a commit nobody will merge, and left
+alone it holds a runner until it finishes, so the branch pays twice for one
+answer. Every workflow a pull request can start therefore carries a concurrency
+block:
+
+```yaml
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+```
+
+Two halves matter, and each fails in a way nothing else would notice.
+
+- **The group keys on the pull request.** A group built from
+  `github.run_id` is unique to one run, so it matches no predecessor and
+  cancels nothing while reading exactly like a concurrency control. A constant
+  group is the opposite failure: every open pull request shares one queue, and
+  the first push anywhere cancels the gates running everywhere else. The run id
+  has one legitimate place, the fallback arm after the pull request number:
+  only a push or a dispatch reaches it, and such a run has no predecessor to
+  cancel. Falling back to `github.ref` instead would put every push to a
+  branch, and every dispatch, in one queue, where a third trigger replaces a
+  pending second run that was meant to complete.
+- **Cancellation is conditioned on the event.** A literal
+  `cancel-in-progress: true` reads as the stricter setting and is a regression.
+  A push to `main`, a schedule, and a dispatch have no successor waiting, and
+  the run on `main` writes the warm cache and records the coverage that no
+  later run repeats.
+
+`pull_request_target` workflows are out of scope. They run against the base
+repository to carry a token, and the ones here automate pull-request
+housekeeping rather than building, so cancelling one mid-flight is a hazard
+with no minutes to win.
+
+#### The cancellation contract
+
+`tests/contracts/concurrency.rs`, in the `workflow_contracts` harness, reads
+`.github/workflows` and asserts, for every workflow declaring a `pull_request`
+trigger, that it declares a concurrency group, that the group names no per-run
+expression outside its fallback arm, that the fallback arm is the run id, that
+the group names something that varies per pull request, and that
+`cancel-in-progress` is exactly the expression above. A further test asserts
+that discovery still finds the workflows it is expected to, so a broken read
+cannot empty the list and turn the rest into a vacuous pass. The loader records
+the two values as written rather than interpreting them, because a literal
+`true` coerced to a boolean could not be told apart from the expression. Run
+the harness with `make test`.
+
 ### Test timeouts: the two tiers this repository has
 
 Four independent timers can end a test run, and the canonical statement of how

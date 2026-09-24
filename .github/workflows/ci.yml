@@ -9,6 +9,17 @@ on:
   # without displacing the trunk entry it read.
   workflow_dispatch:
 
+# A push to a pull request supersedes the run already in flight, and there is
+# nothing left to learn from the superseded one. Cancellation is conditioned
+# on the event so a push to `main`, a schedule, or a dispatch, none of which
+# has a successor waiting, always runs to completion. Outside a pull request
+# the group falls back to the run's own id rather than the ref: a group shared
+# by the ref would let a third push or dispatch replace a pending second run
+# that was meant to complete.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build-test:
     runs-on: ubicloud-standard-4
