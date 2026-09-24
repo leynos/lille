@@ -19,51 +19,73 @@ use crate::workflow_loader::{load_workflows_in, parse_workflow};
 use crate::workflow_model::Job;
 use crate::workflow_texts::workflow_texts_in;
 
+/// Each malformed shape is refused for its own reason: every fixture declares
+/// `on:`, or the missing trigger would be refused first and hide the shape.
 #[rstest]
-#[case::not_a_workflow("scratch.yml", "steps: []")]
-#[case::mistyped_runner("scratch.yml", "jobs:\n  a:\n    runs-on: {group: [g]}\n")]
-#[case::mistyped_runner_label("scratch.yml", "jobs:\n  a:\n    runs-on: [a, [b]]\n")]
-#[case::groupless_runner_mapping("scratch.yml", "jobs:\n  a:\n    runs-on: {labels: [a]}\n")]
-#[case::placeless_job("scratch.yml", "jobs:\n  a:\n    steps: []\n")]
-#[case::mistyped_steps("scratch.yml", "jobs:\n  a:\n    runs-on: x\n    steps: nope\n")]
+#[case::not_a_workflow("on: push\nsteps: []", "missing a `jobs` mapping")]
+#[case::mistyped_runner(
+    "on: push\njobs:\n  a:\n    runs-on: {group: [g]}\n",
+    "a mapping `runs-on` must name a `group`"
+)]
+#[case::mistyped_runner_label(
+    "on: push\njobs:\n  a:\n    runs-on: [a, [b]]\n",
+    "every `runs-on` label must be a scalar"
+)]
+#[case::groupless_runner_mapping(
+    "on: push\njobs:\n  a:\n    runs-on: {labels: [a]}\n",
+    "a mapping `runs-on` must name a `group`"
+)]
+#[case::placeless_job(
+    "on: push\njobs:\n  a:\n    steps: []\n",
+    "a job must set `runs-on` or `uses`"
+)]
+#[case::mistyped_steps(
+    "on: push\njobs:\n  a:\n    runs-on: x\n    steps: nope\n",
+    "`steps` must be a sequence"
+)]
 #[case::empty_step(
-    "scratch.yml",
-    "jobs:\n  a:\n    runs-on: x\n    steps:\n      - name: n\n"
+    "on: push\njobs:\n  a:\n    runs-on: x\n    steps:\n      - name: n\n",
+    "every step must set `uses` or `run`"
 )]
 #[case::mistyped_input(
-    "scratch.yml",
-    "jobs:\n  a:\n    runs-on: x\n    steps:\n      - uses: u\n        with:\n          k: [1]\n"
+    "on: push\njobs:\n  a:\n    runs-on: x\n    steps:\n      - uses: u\n        with:\n          k: [1]\n",
+    "input `k` must be a scalar"
 )]
 // GitHub Actions runs a step either as an action or as a script, never both.
 #[case::dual_mode_step(
-    "scratch.yml",
-    "jobs:\n  a:\n    runs-on: x\n    steps:\n      - uses: u\n        run: echo hi\n"
+    "on: push\njobs:\n  a:\n    runs-on: x\n    steps:\n      - uses: u\n        run: echo hi\n",
+    "a step must not set both `uses` and `run`"
 )]
-// A job calls a reusable workflow or runs its own steps on a runner it names.
-// GitHub Actions rejects either mixture.
+// A job calls a reusable workflow or runs steps on a runner it names, never both.
 #[case::reusable_job_with_a_runner(
-    "scratch.yml",
-    "jobs:\n  a:\n    uses: o/r/.github/workflows/w.yml@v1\n    runs-on: x\n"
+    "on: push\njobs:\n  a:\n    uses: o/r/.github/workflows/w.yml@v1\n    runs-on: x\n",
+    "a job that sets `uses` must not also set `runs-on` or `steps`"
 )]
 #[case::reusable_job_with_steps(
-    "scratch.yml",
-    "jobs:\n  a:\n    uses: o/r/.github/workflows/w.yml@v1\n    steps: []\n"
+    "on: push\njobs:\n  a:\n    uses: o/r/.github/workflows/w.yml@v1\n    steps: []\n",
+    "a job that sets `uses` must not also set `runs-on` or `steps`"
 )]
 // A condition or an advisory flag that is not a scalar has no meaning GitHub
 // would give it, so it is refused rather than read as absent.
 #[case::a_sequence_step_condition(
-    "scratch.yml",
-    "on: push\njobs:\n  a:\n    runs-on: x\n    steps:\n      - run: y\n        if: [a]\n"
+    "on: push\njobs:\n  a:\n    runs-on: x\n    steps:\n      - run: y\n        if: [a]\n",
+    "`if` must be a scalar"
 )]
 #[case::a_mapping_job_advisory_flag(
-    "scratch.yml",
-    "on: push\njobs:\n  a:\n    runs-on: x\n    continue-on-error: {a: b}\n    steps:\n      - run: y\n"
+    "on: push\njobs:\n  a:\n    runs-on: x\n    continue-on-error: {a: b}\n    steps:\n      - run: y\n",
+    "`continue-on-error` must be a scalar"
 )]
-fn a_malformed_workflow_is_an_error_not_a_default(#[case] file: &str, #[case] text: &str) {
-    let outcome = parse_workflow(WorkflowSource { file, text });
+fn a_malformed_workflow_is_an_error_not_a_default(#[case] text: &str, #[case] reason: &str) {
+    let outcome = parse_workflow(WorkflowSource {
+        file: "scratch.yml",
+        text,
+    });
+    let Err(err) = outcome else {
+        panic!("a workflow of unexpected shape must be rejected, not silently defaulted")
+    };
     assert!(
-        outcome.is_err(),
-        "a workflow of unexpected shape must be rejected, not silently defaulted"
+        err.to_string().contains(reason),
+        "the workflow must be refused because {reason:?}, not for another reason; got {err}"
     );
 }
 
