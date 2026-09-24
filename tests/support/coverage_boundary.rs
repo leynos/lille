@@ -119,23 +119,29 @@ pub fn action_of(step: &Step) -> &str {
         .map_or(step.uses.as_str(), |(name, _)| name)
 }
 
-/// Reports whether one artefact path entry can select the report.
-///
-/// The report sits at the workspace root, so an entry reaches it when it names
-/// the report, or when its first segment is the root, its parent, or anything
-/// the reader cannot resolve: a glob, a brace set, or an expression such as
-/// `${{ github.workspace }}`. Reading those as publication errs towards the
-/// loud failure: a narrow upload spelt with a leading glob fails the contract,
-/// where the other reading lets `path: .` publish the report unseen.
-fn path_entry_reaches_the_report(entry: &str) -> bool {
-    let mut rest = entry;
-    while let Some(stripped) = rest.strip_prefix("./") {
-        rest = stripped;
+/// One including line of an artefact step's `path` input.
+struct ArtefactPathEntry<'a>(&'a str);
+
+impl ArtefactPathEntry<'_> {
+    /// Reports whether the entry can select the report.
+    ///
+    /// The report sits at the workspace root, so an entry reaches it when it
+    /// names the report, or when its first segment is the root, its parent, or
+    /// anything the reader cannot resolve: a glob, a brace set, or an
+    /// expression such as `${{ github.workspace }}`. Reading those as
+    /// publication errs towards the loud failure: a narrow upload spelt with a
+    /// leading glob fails the contract, where the other reading lets `path: .`
+    /// publish the report unseen.
+    fn reaches_the_report(&self) -> bool {
+        let mut rest = self.0;
+        while let Some(stripped) = rest.strip_prefix("./") {
+            rest = stripped;
+        }
+        let first = rest.split('/').next().unwrap_or_default();
+        rest.contains(COVERAGE_REPORT_PATH)
+            || matches!(first, "" | "." | "..")
+            || first.contains(['*', '?', '[', '{', '$'])
     }
-    let first = rest.split('/').next().unwrap_or_default();
-    rest.contains(COVERAGE_REPORT_PATH)
-        || matches!(first, "" | "." | "..")
-        || first.contains(['*', '?', '[', '{', '$'])
 }
 
 /// Reports whether a step publishes the coverage report as an artefact.
@@ -160,7 +166,8 @@ pub fn publishes_the_coverage_report(step: &Step) -> bool {
         path.lines()
             .map(str::trim)
             .filter(|entry| !entry.is_empty() && !entry.starts_with('!'))
-            .any(path_entry_reaches_the_report)
+            .map(ArtefactPathEntry)
+            .any(|entry| entry.reaches_the_report())
     })
 }
 
@@ -218,16 +225,22 @@ fn step_offences(where_: &str, step: &Step) -> Vec<String> {
     offences
 }
 
-/// Returns one offence when the raw text names `needle`, ignoring case.
+/// The names a pull-request workflow's raw text may not contain at all.
+const RAW_TEXT_PROHIBITIONS: [&str; 2] = [CREDENTIAL_ENVIRONMENT_KEY, CODESCENE_HOST];
+
+/// Returns one offence for each prohibited name the raw text holds, ignoring
+/// case.
 ///
 /// GitHub resolves `secrets.cs_access_token` to the same secret as the
 /// upper-case spelling, and a host name is case-insensitive, so a
 /// case-sensitive search is one keystroke from blind.
-fn mentions(name: &str, raw_text: &str, needle: &str) -> Option<String> {
-    raw_text
-        .to_lowercase()
-        .contains(&needle.to_lowercase())
-        .then(|| format!("{name}: raw text references {needle}"))
+fn raw_text_offences(name: &str, raw_text: &str) -> Vec<String> {
+    let folded = raw_text.to_lowercase();
+    RAW_TEXT_PROHIBITIONS
+        .iter()
+        .filter(|needle| folded.contains(&needle.to_lowercase()))
+        .map(|needle| format!("{name}: raw text references {needle}"))
+        .collect()
 }
 
 /// Returns every prohibited coverage-surface reference in one workflow.
@@ -254,8 +267,7 @@ pub fn coverage_surface_offenders(workflow: &Workflow, raw_text: &str) -> Vec<St
              credential included"
         )
     }));
-    offenders.extend(mentions(name, raw_text, CREDENTIAL_ENVIRONMENT_KEY));
-    offenders.extend(mentions(name, raw_text, CODESCENE_HOST));
+    offenders.extend(raw_text_offences(name, raw_text));
     offenders
 }
 
