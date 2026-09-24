@@ -92,6 +92,36 @@ fn a_local_call_to_nothing_is_reported_rather_than_skipped() {
     );
 }
 
+/// A raw text that does not parse is reported, not read as forwarding nothing.
+#[rstest]
+fn an_unparseable_raw_text_is_reported_rather_than_read_as_clean() {
+    let text = "on: pull_request\njobs:\n  a:\n    runs-on: x\n    steps:\n      - run: y\n";
+    let offenders = coverage_surface_offenders(&parsed("scratch.yml", text), "jobs: [unclosed\n");
+    assert!(
+        offenders
+            .iter()
+            .any(|offence| offence.contains("raw text does not parse")),
+        "a raw text the reader cannot parse must be an offence: {offenders:?}"
+    );
+}
+
+/// A reached workflow whose raw text is missing is reported, not read as empty.
+#[rstest]
+fn a_reached_workflow_without_raw_text_is_reported() {
+    let (workflows, mut texts) = estate(&[(
+        "parent.yml",
+        "on: pull_request\njobs:\n  a:\n    runs-on: x\n    steps:\n      - run: y\n",
+    )]);
+    texts.clear();
+    let offenders = pull_request_offenders("parent.yml", &workflows, &texts);
+    assert!(
+        offenders
+            .iter()
+            .any(|offence| offence.contains("parent.yml: no raw text was supplied")),
+        "a workflow with no raw text must be reported, not scanned as empty: {offenders:?}"
+    );
+}
+
 /// A half-finished edit can produce a cycle; a recursing walk would hang.
 #[rstest]
 fn the_walk_stops_on_a_cycle_and_reads_each_workflow_once() {

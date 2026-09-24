@@ -249,6 +249,10 @@ fn raw_text_offences(name: &str, raw_text: &str) -> Vec<String> {
 /// and the host must not be present at all: a reference inside a comment, or
 /// in a shape the parser did not keep, is still a reference. It is also where
 /// `secrets: inherit` is read, since the typed model does not carry `secrets`.
+///
+/// Raw text that does not parse is reported as an offence of its own rather
+/// than read as forwarding nothing: the product here is the list the contract
+/// asserts empty, so the failure reaches the contract boundary by name.
 #[must_use]
 pub fn coverage_surface_offenders(workflow: &Workflow, raw_text: &str) -> Vec<String> {
     let name = &workflow.file;
@@ -261,12 +265,18 @@ pub fn coverage_surface_offenders(workflow: &Workflow, raw_text: &str) -> Vec<St
             })
         })
         .collect();
-    offenders.extend(jobs_inheriting_secrets(raw_text).into_iter().map(|job| {
-        format!(
-            "{name}:{job} forwards every secret (secrets: {INHERITED_SECRETS}), the \
-             credential included"
-        )
-    }));
+    match jobs_inheriting_secrets(raw_text) {
+        Ok(jobs) => offenders.extend(jobs.into_iter().map(|job| {
+            format!(
+                "{name}:{job} forwards every secret (secrets: {INHERITED_SECRETS}), the \
+                 credential included"
+            )
+        })),
+        Err(err) => offenders.push(format!(
+            "{name}: raw text does not parse, so `secrets: {INHERITED_SECRETS}` could not be \
+             read: {err}"
+        )),
+    }
     offenders.extend(raw_text_offences(name, raw_text));
     offenders
 }
@@ -276,7 +286,8 @@ pub fn coverage_surface_offenders(workflow: &Workflow, raw_text: &str) -> Vec<St
 /// Every pull-request clause runs over the closure rather than the entry,
 /// because a reusable child declares `workflow_call` alone and so reads as
 /// unreachable while the pull request runs it with the caller's secrets. A
-/// local call naming a workflow that is not there is an offence of its own.
+/// local call naming a workflow that is not there is an offence of its own, and
+/// so is a reached workflow with no raw text: its raw-text rules could not run.
 #[must_use]
 pub fn pull_request_offenders(
     entry: &str,
@@ -289,8 +300,15 @@ pub fn pull_request_offenders(
         .iter()
         .filter_map(|file| workflows.iter().find(|workflow| &workflow.file == file))
         .flat_map(|workflow| {
-            let raw = raw_texts.get(&workflow.file).map_or("", String::as_str);
-            coverage_surface_offenders(workflow, raw)
+            raw_texts.get(&workflow.file).map_or_else(
+                || {
+                    vec![format!(
+                        "{}: no raw text was supplied, so its raw-text rules could not run",
+                        workflow.file
+                    )]
+                },
+                |raw| coverage_surface_offenders(workflow, raw),
+            )
         })
         .collect();
     offenders.extend(

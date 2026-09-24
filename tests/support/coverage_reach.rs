@@ -100,18 +100,21 @@ pub fn reachable_workflows(entry: &str, workflows: &[Workflow]) -> Reach {
 /// Returns the id of every job in a raw document that passes `secrets: inherit`.
 ///
 /// The typed model does not carry `secrets`, because no other rule asks about
-/// it, so this reads the document the model was parsed from. Text that does
-/// not parse answers nothing here; the loader has already refused it.
-#[must_use]
-pub fn jobs_inheriting_secrets(raw_text: &str) -> Vec<String> {
-    let Ok(document) = serde_norway::from_str::<Value>(raw_text) else {
-        return Vec::new();
-    };
+/// it, so this reads the document the model was parsed from.
+///
+/// # Errors
+///
+/// Returns the parser's error when the text is not YAML. The loader refuses
+/// such a document, so reaching this means the raw text and the parsed
+/// workflow have come apart, and answering "no job" would hide exactly that.
+pub fn jobs_inheriting_secrets(raw_text: &str) -> Result<Vec<String>, serde_norway::Error> {
+    let document: Value = serde_norway::from_str(raw_text)?;
     let Some(jobs) = document.get("jobs").and_then(Value::as_mapping) else {
-        return Vec::new();
+        return Ok(Vec::new());
     };
-    jobs.iter()
+    Ok(jobs
+        .iter()
         .filter(|(_, job)| job.get("secrets").and_then(Value::as_str) == Some(INHERITED_SECRETS))
         .filter_map(|(id, _)| id.as_str().map(ToOwned::to_owned))
-        .collect()
+        .collect())
 }
