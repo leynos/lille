@@ -1,16 +1,31 @@
 name: Coverage (main)
 
 # CodeScene accepts `cs-coverage upload` only for analysed branches, so
-# main-branch coverage is uploaded here on push; pull requests run the
-# coverage build (and, once CodeScene enables the per-project gate, the
-# changed-line `cs-coverage check`) in ci.yml instead. This workflow also
-# advances the coverage ratchet baseline: caches saved on main are
-# readable by every pull-request run, so the baseline written here is the
-# one PR ratchet checks compare against.
+# main-branch coverage is uploaded here on push, and this is the only
+# workflow that may talk to CodeScene or hold its credential. Pull
+# requests measure coverage against the ratchet in ci.yml and publish
+# nothing. This workflow also advances the coverage ratchet baseline:
+# caches saved on main are readable by every pull-request run, so the
+# baseline written here is the one PR ratchet checks compare against.
 
+# The push to main is the only trigger, and the contract holds it to that
+# by equality. That is the first trunk guard; the second is the upload
+# step's own `github.ref` conjunct, which still holds should another
+# trigger ever be added.
 on:
   push:
     branches: [main]
+
+# Runs never cancel and never overlap. A cancelled publisher abandons its
+# upload and the baseline write the next pull request reads. GitHub keeps
+# one pending run per group, and a newer trigger replaces it, so a burst
+# of pushes collapses. No commit order is promised beyond that: GitHub
+# does not promise to start runs in trigger order. A manual re-run keeps
+# its run_id, so it republishes that commit's coverage but replaces no
+# ratchet baseline, which is saved under a run-keyed cache key.
+concurrency:
+  group: coverage-main-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   coverage-upload:
@@ -182,12 +197,22 @@ jobs:
             printf '%s\n' "$stats"
             printf '```\n'
           } >> "${GITHUB_STEP_SUMMARY}"
+      # Whether the credential exists, without putting it in any step's
+      # `env`. The expression is evaluated before the shell runs, so the
+      # command writes a literal `true` or `false` and holds no conditional.
+      # The upload action is composite and hands its step's `env` to the
+      # `upload-artifact` and cache steps nested inside it, so the token is
+      # passed to it as an input and bound nowhere else.
+      - name: Check the CodeScene credential is available
+        id: codescene-credential
+        run: echo "available=${{ secrets.CS_ACCESS_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
       - name: Upload coverage data to CodeScene
-        env:
-          CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN }}
-        if: env.CS_ACCESS_TOKEN != ''
+        # The trunk guard is a conjunct of its own even though the push to
+        # main is this workflow's only trigger: a dispatch trigger added later
+        # could otherwise upload another branch's report as the project's.
+        if: steps.codescene-credential.outputs.available == 'true' && github.ref == 'refs/heads/main'
         uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@c5a54701c8603a0fa756a6b34c49bc2af75a6c11
         with:
           format: lcov
-          access-token: ${{ env.CS_ACCESS_TOKEN }}
+          access-token: ${{ secrets.CS_ACCESS_TOKEN }}
           installer-checksum: ${{ vars.CODESCENE_CLI_SHA256 }}

@@ -25,6 +25,7 @@ use serde_norway::Value;
 
 use crate::workflow_estate::{Location, Workflow, WorkflowError, WorkflowSource, WORKFLOW_DIR};
 use crate::workflow_model::{Job, RunnerSelection, Step};
+use crate::workflow_triggers::parse_triggers;
 
 /// Renders a YAML scalar as the string a workflow expression would see.
 ///
@@ -222,44 +223,6 @@ fn parse_job(id: &str, raw: &Value, file: &Location) -> Result<Job, WorkflowErro
     Ok(job)
 }
 
-/// Reads the event names a workflow declares under `on`.
-///
-/// YAML 1.1 reads a bare `on` key as the boolean true, and GitHub Actions
-/// workflows are written with the bare key, so both spellings are accepted.
-/// The shorthand forms are accepted too: `on: push` and `on: [push, ...]`
-/// mean the same as the mapping.
-///
-/// # Errors
-///
-/// Returns an error when `on` is absent or is not one of those shapes.
-fn parse_triggers(document: &Value, at: &Location) -> Result<Vec<String>, WorkflowError> {
-    let raw = document
-        .get("on")
-        .or_else(|| document.get(Value::Bool(true)))
-        .ok_or_else(|| at.shape("missing an `on` trigger"))?;
-    if let Some(mapping) = raw.as_mapping() {
-        return mapping
-            .keys()
-            .map(|key| {
-                key.as_str()
-                    .map(ToOwned::to_owned)
-                    .ok_or_else(|| at.shape("every `on` key must be a string"))
-            })
-            .collect();
-    }
-    if let Some(items) = raw.as_sequence() {
-        return items
-            .iter()
-            .map(|item| {
-                render_scalar(item).ok_or_else(|| at.shape("every `on` entry must be a scalar"))
-            })
-            .collect();
-    }
-    render_scalar(raw)
-        .map(|event| vec![event])
-        .ok_or_else(|| at.shape("`on` must be an event, a list of events, or a mapping"))
-}
-
 /// Parses one workflow document.
 ///
 /// # Errors
@@ -333,6 +296,34 @@ pub fn load_workflows_in(root: &Utf8Path) -> Result<Vec<Workflow>, WorkflowError
             })
         })
         .collect()
+}
+
+/// Returns one workflow file's raw text, read through a directory capability.
+///
+/// The parsed document is not enough for every question: a credential named in
+/// a comment, or in a shape the parser flattened away, is still a credential
+/// the file carries. Reading it here keeps the ambient step in the one module
+/// that already owns it rather than letting a contract reach the filesystem.
+///
+/// # Errors
+///
+/// Returns an error when the workflow directory cannot be opened or the file
+/// cannot be read.
+pub fn workflow_text(root: &Utf8Path, name: &str) -> Result<String, WorkflowError> {
+    let dir = Dir::open_ambient_dir(root, ambient_authority())
+        .map_err(|err| WorkflowError::Read(root.to_string(), err))?;
+    dir.read_to_string(name)
+        .map_err(|err| WorkflowError::Read(name.to_owned(), err))
+}
+
+/// Returns one workflow file's raw text from this repository.
+///
+/// # Errors
+///
+/// Returns the same errors as [`workflow_text`].
+pub fn repository_workflow_text(name: &str) -> Result<String, WorkflowError> {
+    let root = Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(WORKFLOW_DIR);
+    workflow_text(&root, name)
 }
 
 /// Loads and parses every workflow in this repository's `.github/workflows`.

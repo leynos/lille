@@ -593,6 +593,39 @@ ownership rule. They are cached by the pull-request job that installs them,
 which is also the only job that installs them, so there is no trunk job to
 designate as the sole writer instead.
 
+### Who may publish coverage
+
+`coverage-main.yml` owns the CodeScene upload and the ratchet baseline. It
+answers a push to `main` and nothing else, which the contract holds by
+equality. The upload's condition also carries `github.ref == 'refs/heads/main'`
+as a whole conjunct, split on `&&`, with any unquoted `||` refused, so a
+dispatch trigger added later cannot reopen a branch upload. No workflow a pull
+request can reach may call the CodeScene action, run `cs-coverage`, name
+`codescene.io`, forward every secret, or carry the credential. The rule is
+CV-005, and its reason is availability: a pull request must not turn red
+because an external service or a token did.
+
+The credential is bound in no `env` on the publisher. The upload action is
+composite and hands its step's `env` to the `upload-artifact` and cache steps
+nested inside it, so `access-token` is passed straight from
+`${{ secrets.CS_ACCESS_TOKEN }}`. Whether the credential exists is answered by
+a step whose sole command, with no `if:` and no `env`, is
+`echo "available=${{ secrets.CS_ACCESS_TOKEN != '' }}" >> "$GITHUB_OUTPUT"`,
+and the upload's condition requires that output. The publisher's concurrency is
+exactly `group: coverage-main-${{ github.ref }}` with
+`cancel-in-progress: false`, so runs never overlap and a newer trigger replaces
+an older pending run. No commit order is promised beyond that, because GitHub
+does not promise to start runs in the order they were triggered. A manual
+"Re-run jobs" keeps its `run_id`, so it republishes that commit's coverage but
+replaces no ratchet baseline, which is saved under a run-keyed cache key.
+
+Two gaps are known and accepted. A Dependabot automerge made with
+`GITHUB_TOKEN` fires no push, so that merge publishes nothing until the next
+push to `main`. And should the publisher gain a dispatch trigger, a dispatch
+that replaced a pending push would upload the same or a newer commit, but the
+ratchet baseline is saved only on a push, so it would stay one commit behind
+until the next one.
+
 ### One test execution per pull request
 
 The instrumented coverage run is the only test execution on Linux. It uses
@@ -604,21 +637,23 @@ two. A workflow contract in `tests/workflow_contracts.rs` fails if a second
 ### Workflow contracts
 
 `tests/workflow_contracts.rs` asserts the rules above. It is a harness rather
-than a test file: the rules live in seven modules under `tests/contracts/`,
-split by the question each asks.
+than a test file: the rules live in ten modules under `tests/contracts/`, split
+by the question each asks.
 
-| Module               | Asks                                                                                                                                                                                                                                                                                    |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `supply_chain.rs`    | What will the estate execute? Pinned cache and shared-action references, no source-built tools, prebuilt Whitaker and sccache.                                                                                                                                                          |
-| `placement.rs`       | What does it cost, and who owns each cache? Runner placement and labels, bounded timeouts, one owner per cached path, an installer before the first use of what it installs, a single test execution per build job, the uv cache key.                                                   |
-| `compiler_cache.rs`  | Is sccache actually working? The two job-level variables, the export, install, start, build, report order, the proxy export, and the resource sampler with its report.                                                                                                                  |
-| `sampler_reading.rs` | Does a line in a `run` script actually run? The quoting, comment, escape, and guard reading in `tests/support/shell_reading.rs`, which `compiler_cache.rs` asks its sampling question through, driven with shapes the workflows do not contain.                                         |
-| `parsing.rs`         | Does the loader read workflows correctly? Its subject is the loader, not any workflow in this repository.                                                                                                                                                                               |
-| `timeouts.rs`        | Which timer ends a run first? The coverage action's cargo watchdog set explicitly and by value, each coverage job's ceiling above that watchdog plus the measured work around it and equal to the documented 90 minutes, and the two nextest tiers absent rather than silently enabled. |
-| `timeout_budgets.rs` | Do the readings that ordering rests on say what they claim? The coordinate match, the ceiling predicate, and the two conversions, driven with values chosen to separate a correct reading from a plausible wrong one.                                                                   |
+| Module                  | Asks                                                                                                                                                                                                                                                                                    |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `supply_chain.rs`       | What will the estate execute? Pinned cache and shared-action references, no source-built tools, prebuilt Whitaker and sccache.                                                                                                                                                          |
+| `placement.rs`          | What does it cost, and who owns each cache? Runner placement and labels, bounded timeouts, one owner per cached path, an installer before the first use of what it installs, a single test execution per build job, the uv cache key.                                                   |
+| `compiler_cache.rs`     | Is sccache actually working? The two job-level variables, the export, install, start, build, report order, the proxy export, and the resource sampler with its report.                                                                                                                  |
+| `sampler_reading.rs`    | Does a line in a `run` script actually run? The quoting, comment, escape, and guard reading in `tests/support/shell_reading.rs`, which `compiler_cache.rs` asks its sampling question through, driven with shapes the workflows do not contain.                                         |
+| `parsing.rs`            | Does the loader read workflows correctly? Its subject is the loader, not any workflow in this repository.                                                                                                                                                                               |
+| `coverage_boundary.rs`  | May a pull-request lane publish coverage? No CodeScene action, command, host or credential, no `secrets: inherit`, and no report artefact, over every workflow a pull request reaches and every local workflow those call.                                                              |
+| `coverage_reach.rs`     | What does a pull request reach? The closure of local calls, the trigger forms, and the loader's refusals.                                                                                                                                                                               |
+| `coverage_publisher.rs` | Can the publisher only publish from the trunk, with its credential checked and bound nowhere, without cancelling?                                                                                                                                                                       |
+| `timeouts.rs`           | Which timer ends a run first? The coverage action's cargo watchdog set explicitly and by value, each coverage job's ceiling above that watchdog plus the measured work around it and equal to the documented 90 minutes, and the two nextest tiers absent rather than silently enabled. |
+| `timeout_budgets.rs`    | Do the readings that ordering rests on say what they claim? The coordinate match, the ceiling predicate, and the two conversions, driven with values chosen to separate a correct reading from a plausible wrong one.                                                                   |
 
-*Table: the seven contract modules, and the question each one asks of the
-estate.*
+*Table: the ten contract modules, and the question each one asks of the estate.*
 
 Each module also pins the inputs that make its rules true, so a workflow cannot
 keep the shape of the policy while dropping its substance: `cache-provider`,
@@ -626,7 +661,7 @@ keep the shape of the policy while dropping its substance: `cache-provider`,
 cache paths and key.
 
 The split is not only about the 400-line limit. `parsing.rs` reads a different
-subject from the other three, and separating it makes that visible: a failure
+subject from the other modules, and separating it makes that visible: a failure
 there means the loader is wrong, not that a workflow is.
 
 `tests/support/workflow_model.rs` holds the job, step, and runner-selection
