@@ -19,6 +19,12 @@
 //! derived from `github.run_id` is unique per run and so cancels nothing,
 //! while a constant group would let one branch cancel another's gates.
 //!
+//! The run id has exactly one legitimate place: the fallback arm after the
+//! pull request number, which only a push or a dispatch reaches. Those runs
+//! have no predecessor to cancel, and falling back to the ref instead would
+//! let a third push or dispatch replace a pending second run that was meant
+//! to complete.
+//!
 //! Only `pull_request` is in scope. A `pull_request_target` workflow runs
 //! against the base repository to carry a token, and the one that uses it
 //! here automates pull-request housekeeping rather than building; cancelling
@@ -50,6 +56,18 @@ const RUN_UNIQUE_EXPRESSIONS: [&str; 4] = [
     "github.run_attempt",
     "github.sha",
 ];
+
+/// The one position a run-unique value may take in a pull-request group.
+///
+/// The arm after `github.event.pull_request.number` is evaluated only when
+/// there is no pull request, so a run id there cancels nothing a pull request
+/// needs cancelled.
+const RUN_UNIQUE_FALLBACK: &str = " || github.run_id }}";
+
+/// Returns a group with its run-unique fallback arm removed, if it has one.
+fn without_the_fallback(group: &str) -> String {
+    group.replacen(RUN_UNIQUE_FALLBACK, " }}", 1)
+}
 
 /// Expressions that differ between two pull requests.
 ///
@@ -121,7 +139,9 @@ fn the_concurrency_group_is_not_unique_to_one_run(workflows: Vec<Workflow>) {
         let group = workflow
             .concurrency
             .as_ref()
-            .map_or("", |declared| declared.group.as_str());
+            .map_or(String::new(), |declared| {
+                without_the_fallback(&declared.group)
+            });
         for expression in RUN_UNIQUE_EXPRESSIONS {
             assert!(
                 !group.contains(expression),
@@ -150,6 +170,24 @@ fn the_concurrency_group_distinguishes_one_pull_request_from_another(workflows: 
             "`{}` must key its concurrency group on the pull request, by naming \
              one of {PER_PULL_REQUEST_EXPRESSIONS:?}; a group shared by every \
              branch would cancel unrelated pull requests",
+            workflow.file
+        );
+    }
+}
+
+#[rstest]
+fn outside_a_pull_request_the_group_falls_back_to_the_run(workflows: Vec<Workflow>) {
+    // A fallback to the ref puts every push to a branch, and every dispatch,
+    // in one queue, where a third trigger replaces a pending second run.
+    for workflow in pull_request_workflows(&workflows) {
+        let group = workflow
+            .concurrency
+            .as_ref()
+            .map_or("", |declared| declared.group.as_str());
+        assert!(
+            group.ends_with(RUN_UNIQUE_FALLBACK),
+            "`{}` must end its concurrency group with `{RUN_UNIQUE_FALLBACK}`, so a \
+             run outside a pull request is its own group; got `{group}`",
             workflow.file
         );
     }
