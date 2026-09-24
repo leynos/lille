@@ -22,8 +22,43 @@ pub const WORKFLOW_DIR: &str = ".github/workflows";
 /// Commit that every `actions/cache` reference must pin (v6.1.0).
 pub const CACHE_ACTION_SHA: &str = "55cc8345863c7cc4c66a329aec7e433d2d1c52a9";
 
-/// Commit that every `leynos/shared-actions` reference must pin.
+/// Commit that a `leynos/shared-actions` reference must pin by default.
 pub const SHARED_ACTIONS_SHA: &str = "c5a54701c8603a0fa756a6b34c49bc2af75a6c11";
+
+/// Commit the `CodeScene` uploader must pin.
+///
+/// The uploader moved ahead of the rest of the estate on its own schedule.
+/// At this revision its committed `cli-manifest.json` is the trust anchor
+/// for the `cs-coverage` archive, and the action rejects the deprecated
+/// `installer-checksum` input outright, so a caller that still passes it
+/// fails rather than silently ignoring a checksum nobody checks.
+pub const UPLOAD_CODESCENE_COVERAGE_SHA: &str = "a5765019912a8ab6882b12db049c7cde635f3a85";
+
+/// Shared actions whose reviewed revision is not [`SHARED_ACTIONS_SHA`].
+///
+/// The estate's rule is that no reference floats, not that every action
+/// moves together. Holding them all to one constant made the rule easy to
+/// state and impossible to satisfy the moment one action had to move alone,
+/// which is how a deliberate repin turns into a repository-wide repin
+/// nobody asked for. Each exception is named here with the action it
+/// governs, so a reference is still held to a reviewed commit by value and
+/// a new exception has to be added deliberately.
+pub const SHARED_ACTION_PIN_EXCEPTIONS: [(&str, &str); 1] =
+    [("upload-codescene-coverage", UPLOAD_CODESCENE_COVERAGE_SHA)];
+
+/// Return the commit a `leynos/shared-actions` reference must pin.
+///
+/// `uses` is the whole `owner/repo/.github/actions/<name>@<ref>` coordinate.
+/// An action with no exception takes [`SHARED_ACTIONS_SHA`].
+#[must_use]
+pub fn required_shared_action_sha(uses: &str) -> &'static str {
+    let path = uses.split('@').next().unwrap_or(uses);
+    let name = path.rsplit('/').next().unwrap_or(path);
+    SHARED_ACTION_PIN_EXCEPTIONS
+        .iter()
+        .find(|(action, _)| *action == name)
+        .map_or(SHARED_ACTIONS_SHA, |(_, sha)| *sha)
+}
 
 /// Runner label used by this repository's Ubicloud build and test jobs.
 pub const UBICLOUD_LABEL: &str = "ubicloud-standard-4";
