@@ -17,15 +17,12 @@
 //! that ranges over an empty collection is satisfied by deleting the thing it
 //! guards, which is the failure mode these tests exist to avoid.
 
-use camino::{Utf8Path, Utf8PathBuf};
-use cap_std::{ambient_authority, fs_utf8::Dir};
+use camino::Utf8Path;
 use rstest::rstest;
 
 use crate::workflow_assertions::workflows;
-use crate::workflow_estate::{
-    Workflow, WorkflowError, UPLOAD_CODESCENE_COVERAGE_SHA, WORKFLOW_DIR,
-};
-use crate::workflow_loader::all_steps;
+use crate::workflow_estate::{Workflow, UPLOAD_CODESCENE_COVERAGE_SHA, WORKFLOW_DIR};
+use crate::workflow_loader::{all_steps, repository_workflow_texts};
 
 /// The uploader's coordinate, without its pinned reference.
 const UPLOADER: &str = "leynos/shared-actions/.github/actions/upload-codescene-coverage";
@@ -36,69 +33,11 @@ const DEPRECATED_INPUT: &str = "installer-checksum";
 /// The repository variable that existed only to feed that input.
 const DEPRECATED_VARIABLE: &str = "CODESCENE_CLI_SHA256";
 
-/// The dispatch workflow that refreshed the variable.
-const REFRESH_WORKFLOW: &str = "get-codescene-sha.yml";
-
-/// Returns the workflow directory as an absolute path.
-fn workflow_root() -> Utf8PathBuf {
-    Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(WORKFLOW_DIR)
-}
-
-/// Reads one directory entry as a workflow file name and its text.
+/// The dispatch workflow that refreshed the variable, without its extension.
 ///
-/// Returns `Ok(None)` for an entry that is not a workflow, so a stray file
-/// beside the workflows is skipped rather than failing the read.
-///
-/// # Errors
-///
-/// Returns an error when the entry, its name, or its contents cannot be read.
-fn read_entry(
-    dir: &Dir,
-    entry: Result<cap_std::fs_utf8::DirEntry, std::io::Error>,
-) -> Result<Option<(String, String)>, WorkflowError> {
-    let read = |name: &str| {
-        let owned = name.to_owned();
-        move |err| WorkflowError::Read(owned.clone(), err)
-    };
-    let name = entry
-        .map_err(read(WORKFLOW_DIR))?
-        .file_name()
-        .map_err(read(WORKFLOW_DIR))?;
-    let extension = Utf8Path::new(&name).extension().unwrap_or_default();
-    if !matches!(extension, "yml" | "yaml") {
-        return Ok(None);
-    }
-    let text = dir.read_to_string(&name).map_err(read(&name))?;
-    Ok(Some((name, text)))
-}
-
-/// Reads every workflow file name paired with its raw text.
-///
-/// The text is read rather than the parsed document so that a reference left
-/// in a comment, or in a step commented out, is caught as well. Both of
-/// GitHub's accepted extensions are matched: reading only one would let a
-/// workflow escape every rule below without failing a test.
-///
-/// # Errors
-///
-/// Returns an error when the workflow directory cannot be opened or listed,
-/// or when one of its files cannot be read.
-fn read_workflow_texts() -> Result<Vec<(String, String)>, WorkflowError> {
-    let root = workflow_root();
-    let dir = Dir::open_ambient_dir(&root, ambient_authority())
-        .map_err(|err| WorkflowError::Read(root.to_string(), err))?;
-    let entries = dir
-        .entries()
-        .map_err(|err| WorkflowError::Read(root.to_string(), err))?;
-    let mut found: Vec<(String, String)> = Vec::new();
-    for entry in entries {
-        if let Some(pair) = read_entry(&dir, entry)? {
-            found.push(pair);
-        }
-    }
-    found.sort();
-    Ok(found)
-}
+/// Matched by stem, because GitHub accepts `.yml` and `.yaml` alike and a
+/// rename to the other extension must not bring the dispatch back unseen.
+const REFRESH_WORKFLOW_STEM: &str = "get-codescene-sha";
 
 /// Returns every workflow file name paired with its raw text.
 ///
@@ -107,14 +46,14 @@ fn read_workflow_texts() -> Result<Vec<(String, String)>, WorkflowError> {
 /// Panics when the estate cannot be read, or when it holds no workflow at
 /// all: every rule below would then pass having read nothing.
 fn workflow_texts() -> Vec<(String, String)> {
-    let found = match read_workflow_texts() {
+    let found = match repository_workflow_texts() {
         Ok(found) => found,
         Err(err) => panic!("the workflow estate must be readable: {err}"),
     };
     assert!(
         !found.is_empty(),
-        "no workflow was read from {}, so every rule below would pass having read nothing",
-        workflow_root()
+        "no workflow was read from {WORKFLOW_DIR}, so every rule below would pass having \
+         read nothing"
     );
     found
 }
@@ -177,14 +116,39 @@ fn every_uploader_reference_is_pinned_to_the_approved_commit(workflows: Vec<Work
     );
 }
 
+/// Reports whether a workflow file name is the refresh dispatch, in either
+/// extension.
+fn is_refresh_workflow(name: &str) -> bool {
+    Utf8Path::new(name).file_stem() == Some(REFRESH_WORKFLOW_STEM)
+}
+
 #[rstest]
 fn the_checksum_refresh_workflow_is_absent() {
-    let present = workflow_texts()
+    let present: Vec<String> = workflow_texts()
         .into_iter()
-        .any(|(name, _)| name == REFRESH_WORKFLOW);
+        .map(|(name, _)| name)
+        .filter(|name| is_refresh_workflow(name))
+        .collect();
     assert!(
-        !present,
-        "{REFRESH_WORKFLOW} recomputed {DEPRECATED_VARIABLE}, which no workflow reads any \
-         more; delete it rather than leave a dispatch that refreshes an unused value"
+        present.is_empty(),
+        "{present:?} recomputed {DEPRECATED_VARIABLE}, which no workflow reads any more; \
+         delete it rather than leave a dispatch that refreshes an unused value"
+    );
+}
+
+#[rstest]
+#[case::the_deleted_name("get-codescene-sha.yml", true)]
+#[case::the_other_extension("get-codescene-sha.yaml", true)]
+#[case::another_workflow("ci.yml", false)]
+#[case::a_longer_name("get-codescene-sha-v2.yml", false)]
+fn the_refresh_workflow_is_recognised_in_either_extension(
+    #[case] name: &str,
+    #[case] expected: bool,
+) {
+    assert_eq!(
+        is_refresh_workflow(name),
+        expected,
+        "`{name}` must {}read as the refresh dispatch",
+        if expected { "" } else { "not " }
     );
 }

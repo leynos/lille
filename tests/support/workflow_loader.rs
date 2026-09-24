@@ -328,6 +328,41 @@ pub fn repository_workflow_text(name: &str) -> Result<String, WorkflowError> {
     workflow_text(&root, name)
 }
 
+/// Returns every workflow file name beneath `root` paired with its raw text.
+///
+/// For contracts that must see what the parser drops, such as a reference in
+/// a comment, across the whole estate. Both of GitHub's accepted extensions
+/// are read, in name order, through the same directory capability the parser
+/// uses.
+///
+/// # Errors
+///
+/// Returns an error when the directory cannot be opened or listed, or when a
+/// file cannot be read.
+pub fn workflow_texts_in(root: &Utf8Path) -> Result<Vec<(String, String)>, WorkflowError> {
+    let dir = Dir::open_ambient_dir(root, ambient_authority())
+        .map_err(|err| WorkflowError::Read(root.to_string(), err))?;
+    workflow_names(&dir)?
+        .into_iter()
+        .map(|name| {
+            let text = dir
+                .read_to_string(&name)
+                .map_err(|err| WorkflowError::Read(name.clone(), err))?;
+            Ok((name, text))
+        })
+        .collect()
+}
+
+/// Returns every workflow in this repository paired with its raw text.
+///
+/// # Errors
+///
+/// Returns the same errors as [`workflow_texts_in`].
+pub fn repository_workflow_texts() -> Result<Vec<(String, String)>, WorkflowError> {
+    let root = Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(WORKFLOW_DIR);
+    workflow_texts_in(&root)
+}
+
 /// Loads and parses every workflow in this repository's `.github/workflows`.
 ///
 /// # Errors

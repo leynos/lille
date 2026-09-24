@@ -10,7 +10,7 @@ use camino::Utf8Path;
 use rstest::rstest;
 
 use crate::workflow_estate::WorkflowSource;
-use crate::workflow_loader::{load_workflows_in, parse_workflow};
+use crate::workflow_loader::{load_workflows_in, parse_workflow, workflow_texts_in};
 
 #[rstest]
 #[case::not_a_workflow("scratch.yml", "steps: []")]
@@ -76,6 +76,39 @@ fn every_valid_runs_on_shape_parses(#[case] runs_on: &str, #[case] expected: &[&
     assert!(
         job.runs_on.names_a_runner(),
         "`{runs_on}` names a runner and must say so"
+    );
+}
+
+/// The raw-text reading takes both extensions, in name order, and nothing else.
+#[rstest]
+fn the_raw_text_reading_takes_every_workflow_and_nothing_else() {
+    let scratch = match tempfile::tempdir() {
+        Ok(scratch) => scratch,
+        Err(err) => panic!("a scratch directory must be creatable: {err}"),
+    };
+    for (name, text) in [("b.yaml", "b\n"), ("a.yml", "a\n"), ("notes.txt", "n\n")] {
+        if let Err(err) = std::fs::write(scratch.path().join(name), text) {
+            panic!("{name} must be writable: {err}");
+        }
+    }
+    let Some(root) = Utf8Path::from_path(scratch.path()) else {
+        panic!("the scratch directory must have a UTF-8 path")
+    };
+    let texts = match workflow_texts_in(root) {
+        Ok(texts) => texts,
+        Err(err) => panic!("the scratch workflows must be readable: {err}"),
+    };
+    assert_eq!(
+        texts,
+        [
+            ("a.yml".to_owned(), "a\n".to_owned()),
+            ("b.yaml".to_owned(), "b\n".to_owned())
+        ],
+        "both extensions must be read, in name order, and a stray file skipped"
+    );
+    assert!(
+        workflow_texts_in(Utf8Path::new("this/directory/does/not/exist")).is_err(),
+        "an unreadable directory must surface as an error, not an empty estate"
     );
 }
 
