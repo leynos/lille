@@ -15,8 +15,9 @@ use crate::runner_selection::{
     RunnerSelection,
 };
 use crate::workflow_estate::WorkflowSource;
-use crate::workflow_loader::{load_workflows_in, parse_workflow, workflow_texts_in};
+use crate::workflow_loader::{load_workflows_in, parse_workflow};
 use crate::workflow_model::Job;
+use crate::workflow_texts::workflow_texts_in;
 
 #[rstest]
 #[case::not_a_workflow("scratch.yml", "steps: []")]

@@ -47,6 +47,8 @@ mod workflow_estate;
 mod workflow_loader;
 #[path = "support/workflow_model.rs"]
 mod workflow_model;
+#[path = "support/workflow_texts.rs"]
+mod workflow_texts;
 #[path = "support/workflow_triggers.rs"]
 mod workflow_triggers;
 

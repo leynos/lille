@@ -743,9 +743,11 @@ reads a fork-fallback declaration into its guard and two arms, refusing every
 other spelling rather than repairing it; `tests/support/workflow_estate.rs`
 holds the pinned commits, the whole-file `Workflow` type, and the errors
 parsing reports, which only the contracts need.
-`tests/support/workflow_loader.rs` turns workflow files into those values, and
-`tests/support/workflow_config.rs` reads the other repository files a contract
-needs, currently `actionlint`'s runner registration.
+`tests/support/workflow_loader.rs` turns workflow files into those values;
+`tests/support/workflow_texts.rs` reads the same files as raw text, through the
+same capability and file listing, for contracts that must see what the parser
+drops; and `tests/support/workflow_config.rs` reads the other repository files
+a contract needs, currently `actionlint`'s runner registration.
 `tests/support/shell_reading.rs` holds the bounded shell reading that separates
 a command from text that merely spells one; it sits in `support` because
 `compiler_cache.rs` asks a question through it while `sampler_reading.rs` asks

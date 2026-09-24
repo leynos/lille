@@ -17,7 +17,7 @@ use crate::coverage_publisher::{
 };
 use crate::workflow_assertions::workflows;
 use crate::workflow_estate::Workflow;
-use crate::workflow_loader::repository_workflow_text;
+use crate::workflow_texts::repository_workflow_text;
 
 /// The lane that owns the upload.
 const PUBLISHER_WORKFLOW: &str = "coverage-main.yml";

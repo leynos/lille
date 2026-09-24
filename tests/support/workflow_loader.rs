@@ -295,11 +295,14 @@ pub fn parse_workflow(source: WorkflowSource<'_>) -> Result<Workflow, WorkflowEr
 
 /// Lists the workflow file names inside an opened workflow directory.
 ///
+/// Shared with `workflow_texts`, so the parsed and the raw readings see the
+/// same set of files, both extensions included.
+///
 /// # Errors
 ///
 /// Returns an error when the directory cannot be listed or an entry's name
 /// cannot be read.
-fn workflow_names(dir: &Dir) -> Result<Vec<String>, WorkflowError> {
+pub fn workflow_names(dir: &Dir) -> Result<Vec<String>, WorkflowError> {
     let read = |err| WorkflowError::Read(WORKFLOW_DIR.to_owned(), err);
     let mut names: Vec<String> = Vec::new();
     for entry in dir.entries().map_err(read)? {
@@ -336,69 +339,6 @@ pub fn load_workflows_in(root: &Utf8Path) -> Result<Vec<Workflow>, WorkflowError
             })
         })
         .collect()
-}
-
-/// Returns one workflow file's raw text, read through a directory capability.
-///
-/// The parsed document is not enough for every question: a credential named in
-/// a comment, or in a shape the parser flattened away, is still a credential
-/// the file carries. Reading it here keeps the ambient step in the one module
-/// that already owns it rather than letting a contract reach the filesystem.
-///
-/// # Errors
-///
-/// Returns an error when the workflow directory cannot be opened or the file
-/// cannot be read.
-pub fn workflow_text(root: &Utf8Path, name: &str) -> Result<String, WorkflowError> {
-    let dir = Dir::open_ambient_dir(root, ambient_authority())
-        .map_err(|err| WorkflowError::Read(root.to_string(), err))?;
-    dir.read_to_string(name)
-        .map_err(|err| WorkflowError::Read(name.to_owned(), err))
-}
-
-/// Returns one workflow file's raw text from this repository.
-///
-/// # Errors
-///
-/// Returns the same errors as [`workflow_text`].
-pub fn repository_workflow_text(name: &str) -> Result<String, WorkflowError> {
-    let root = Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(WORKFLOW_DIR);
-    workflow_text(&root, name)
-}
-
-/// Returns every workflow file name beneath `root` paired with its raw text.
-///
-/// For contracts that must see what the parser drops, such as a reference in
-/// a comment, across the whole estate. Both of GitHub's accepted extensions
-/// are read, in name order, through the same directory capability the parser
-/// uses.
-///
-/// # Errors
-///
-/// Returns an error when the directory cannot be opened or listed, or when a
-/// file cannot be read.
-pub fn workflow_texts_in(root: &Utf8Path) -> Result<Vec<(String, String)>, WorkflowError> {
-    let dir = Dir::open_ambient_dir(root, ambient_authority())
-        .map_err(|err| WorkflowError::Read(root.to_string(), err))?;
-    workflow_names(&dir)?
-        .into_iter()
-        .map(|name| {
-            let text = dir
-                .read_to_string(&name)
-                .map_err(|err| WorkflowError::Read(name.clone(), err))?;
-            Ok((name, text))
-        })
-        .collect()
-}
-
-/// Returns every workflow in this repository paired with its raw text.
-///
-/// # Errors
-///
-/// Returns the same errors as [`workflow_texts_in`].
-pub fn repository_workflow_texts() -> Result<Vec<(String, String)>, WorkflowError> {
-    let root = Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(WORKFLOW_DIR);
-    workflow_texts_in(&root)
 }
 
 /// Loads and parses every workflow in this repository's `.github/workflows`.
