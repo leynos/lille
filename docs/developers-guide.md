@@ -702,13 +702,15 @@ two. A workflow contract in `tests/workflow_contracts.rs` fails if a second
 ### Workflow contracts
 
 `tests/workflow_contracts.rs` asserts the rules above. It is a harness rather
-than a test file: the rules live in twelve modules under `tests/contracts/`,
+than a test file: the rules live in fourteen modules under `tests/contracts/`,
 split by the question each asks.
 
 | Module                  | Asks                                                                                                                                                                                                                                                                                    |
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `supply_chain.rs`       | What will the estate execute? Pinned cache and shared-action references, no source-built tools, prebuilt Whitaker and sccache.                                                                                                                                                          |
 | `placement.rs`          | What does it cost, and who owns each cache? Runner placement and labels, bounded timeouts, one owner per cached path, an installer before the first use of what it installs, a single test execution per build job, the uv cache key.                                                   |
+| `fork_fallback.rs`      | Can a fork's pull request start the lane it reaches? The pull-request lane falls back to `ubuntu-latest` for forks through the one prescribed expression, lanes no fork reaches name their runner outright, and no `runs-on` declaration carries a line break.                          |
+| `execution_control.rs`  | Do the readers of `if` and `continue-on-error` tell a constant from a condition that depends on the event, at job and step scope? The rule that consumes them lives in `placement.rs`; these drive the readers with shapes the workflows do not contain.                                |
 | `concurrency.rs`        | Which runs may a newer push cancel? Every workflow a pull request starts declares a group keyed on the pull request, falling back to the run id, and cancels only on the `pull_request` event.                                                                                          |
 | `codescene_uploader.rs` | Does the coverage uploader carry its approved commit and none of the inputs it now rejects? No `installer-checksum`, no `CODESCENE_CLI_SHA256`, and no checksum-refresh dispatch in either extension.                                                                                   |
 | `compiler_cache.rs`     | Is sccache actually working? The two job-level variables, the export, install, start, build, report order, the proxy export, and the resource sampler with its report.                                                                                                                  |
@@ -720,7 +722,7 @@ split by the question each asks.
 | `timeouts.rs`           | Which timer ends a run first? The coverage action's cargo watchdog set explicitly and by value, each coverage job's ceiling above that watchdog plus the measured work around it and equal to the documented 90 minutes, and the two nextest tiers absent rather than silently enabled. |
 | `timeout_budgets.rs`    | Do the readings that ordering rests on say what they claim? The coordinate match, the ceiling predicate, and the two conversions, driven with values chosen to separate a correct reading from a plausible wrong one.                                                                   |
 
-*Table: the twelve contract modules, and the question each one asks of the
+*Table: the fourteen contract modules, and the question each one asks of the
 estate.*
 
 Each module also pins the inputs that make its rules true, so a workflow cannot
@@ -732,10 +734,15 @@ The split is not only about the 400-line limit. `parsing.rs` reads a different
 subject from the other modules, and separating it makes that visible: a failure
 there means the loader is wrong, not that a workflow is.
 
-`tests/support/workflow_model.rs` holds the job, step, and runner-selection
-types the properties and the contracts share;
-`tests/support/workflow_estate.rs` holds the pinned commits, the whole-file
-`Workflow` type, and the errors parsing reports, which only the contracts need.
+`tests/support/workflow_model.rs` holds the job and step types the properties
+and the contracts share. `tests/support/runner_selection.rs` holds the
+`runs-on` shapes, a label, a label list, a group and the fork-fallback
+expression, with the label predicates the placement rules ask through, and
+`tests/support/placement_expression.rs` holds the one expression grammar that
+reads a fork-fallback declaration into its guard and two arms, refusing every
+other spelling rather than repairing it; `tests/support/workflow_estate.rs`
+holds the pinned commits, the whole-file `Workflow` type, and the errors
+parsing reports, which only the contracts need.
 `tests/support/workflow_loader.rs` turns workflow files into those values, and
 `tests/support/workflow_config.rs` reads the other repository files a contract
 needs, currently `actionlint`'s runner registration.
