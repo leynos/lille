@@ -30,6 +30,10 @@ concurrency:
 jobs:
   coverage-upload:
     runs-on: ubicloud-standard-4
+    # The CodeScene token lives in this environment, whose deployment policy
+    # admits `main` alone; the codescene environment contract holds it to
+    # this job.
+    environment: codescene
     # Ubicloud jobs bill by the minute, so a hung step must not run to the
     # 6-hour platform default. The eight-vCPU cold writer took 1,757 s, and
     # this job is always the cold writer, so halving it to four vCPUs is
