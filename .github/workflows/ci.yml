@@ -174,6 +174,8 @@ jobs:
             uv-tools-v1-${{ runner.os }}-${{ runner.arch }}-${{ runner.environment }}-
       - name: Spelling
         run: make spelling
+      - name: Check the CV-005 contracts
+        run: make test-workflow-contracts
       - name: Install mdtablefix
         # `make check-fmt` runs `mdtablefix --check --git`; 0.6.0 is the
         # first release with `--check` and `--git`.
@@ -210,7 +212,7 @@ jobs:
       # evidence and doubled the billed compile. `all-features` names exactly
       # the set the explicit feature list used to name.
       - name: Generate coverage
-        uses: leynos/shared-actions/.github/actions/generate-coverage@c5a54701c8603a0fa756a6b34c49bc2af75a6c11
+        uses: leynos/shared-actions/.github/actions/generate-coverage@a5765019912a8ab6882b12db049c7cde635f3a85
         with:
           all-features: 'true'
           all-targets: 'true'
