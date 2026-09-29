@@ -29,7 +29,8 @@ RUST_FLAGS ?= $(RUSTFLAGS_STRICT)
 # recipe that sets it composes these onto any inherited value (CI's
 # setup-rust exports one), except coverage, which stays on LLVM and the
 # platform linker.
-STANDARD_RUSTFLAGS := -Zthreads=8$(if $(filter Linux,$(shell uname -s)), -Clink-arg=-fuse-ld=mold)
+BUILD_HOST_OS := $(shell uname -s)
+STANDARD_RUSTFLAGS := -Zthreads=8$(if $(filter Linux,$(BUILD_HOST_OS)), -Clink-arg=-fuse-ld=mold)
 RUST_FLAGS_ENV := RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)"
 STANDARD_ENV := RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS)"
 WHITAKER ?= whitaker
