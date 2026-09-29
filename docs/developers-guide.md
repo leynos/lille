@@ -324,6 +324,32 @@ A future constraint of this kind belongs here too: a bare version requirement
 with no explanation is indistinguishable from a real dependency, and the next
 contributor will not know whether removing it is safe.
 
+## The build standard
+
+Development, test, lint and typecheck builds use the parallel `rustc` frontend
+(`-Zthreads=8`) and, on Linux, the `mold` linker (`-Clink-arg=-fuse-ld=mold`).
+These are defaults in `.cargo/config.toml`, which Cargo discovers on its own,
+so a bare `cargo build` gets them. `mold` ships for Linux only, so the linker
+flag lives in a Linux-only table and macOS and Windows keep their platform
+linker. Cargo selects one `rustflags` source rather than merging them, so every
+source repeats the same flags apart from the linker.
+
+An assigned `RUSTFLAGS` replaces the configuration's flags, so the Makefile
+recipes that set it compose the standard's flags onto any inherited value (CI's
+`setup-rust` exports one). Two builds are deliberately excluded: coverage
+assigns `RUSTFLAGS` without the fast flags, because a measurement should not
+depend on them, and release builds keep the platform linker.
+
+### Cranelift
+
+Exception: Cranelift is not the development-profile backend. The full suite was
+measured under it on the pinned `nightly-2025-09-14` on 2026-09-29, and these
+tests fail there while passing under LLVM: the whole suite, because the test
+build fails to link: `mold` reports undefined `aws_lc_0_45_0_*` symbols
+referenced from `aws-lc-rs` (the `rustls` dependency), which the LLVM backend
+links without complaint. Re-measure the whole suite on the next toolchain bump,
+and adopt the backend when it passes.
+
 ## Commit gates
 
 Run the deterministic gates before committing (see `AGENTS.md` and the

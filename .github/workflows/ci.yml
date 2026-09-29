@@ -202,9 +202,13 @@ jobs:
           installer-version: '0.2.7'
           cache-provider: github
       - name: Lint
+        env:
+          # An assigned RUSTFLAGS replaces .cargo/config.toml's rustflags, so
+          # the step restates the build standard's flags beside the deny.
+          RUSTFLAGS: -D warnings -Zthreads=8 -Clink-arg=-fuse-ld=mold
         run: |
           cargo clippy --all-targets --all-features -- -D warnings
-          RUSTFLAGS="-D warnings" whitaker --all -- --all-targets --all-features
+          whitaker --all -- --all-targets --all-features
       # The instrumented run is this workflow's only test execution on Linux:
       # a separate uninstrumented `cargo test` repeated the suite for no extra
       # evidence and doubled the billed compile. `all-features` names exactly
