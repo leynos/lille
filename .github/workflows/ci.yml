@@ -215,6 +215,11 @@ jobs:
       # evidence and doubled the billed compile. `all-features` names exactly
       # the set the explicit feature list used to name.
       - name: Generate coverage
+        env:
+          # One of the two exclusions from the build standard: a coverage build is a
+          # measurement, so it takes neither the parallel frontend nor the mold linker.
+          # Assigning RUSTFLAGS displaces every `rustflags` table in .cargo/config.toml.
+          RUSTFLAGS: -D warnings
         uses: leynos/shared-actions/.github/actions/generate-coverage@c5a54701c8603a0fa756a6b34c49bc2af75a6c11
         with:
           all-features: 'true'
