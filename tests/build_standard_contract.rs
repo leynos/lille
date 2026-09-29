@@ -30,10 +30,10 @@ mod make;
 use rstest::rstest;
 
 use ci_steps::{linker_install_problems, workflow_problems};
-use config::{CONFIG, Flags, Pin, Problems, THREADS_FLAG, TOOLCHAIN, config_problems};
+use config::{config_problems, Flags, Pin, Problems, CONFIG, THREADS_FLAG, TOOLCHAIN};
 use make::{
-    Assignment, Host, assigned_rustflags, commands_from, development_problems, held_out_problems,
-    held_out_target_count,
+    assigned_rustflags, commands_from, development_problems, held_out_problems,
+    held_out_target_count, Assignment, Host,
 };
 
 /// Turns a list of complaints into a test result.

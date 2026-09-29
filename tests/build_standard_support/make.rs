@@ -4,7 +4,7 @@
 
 use std::process::Command;
 
-use super::config::{Flags, LINKER_FLAG, Pin, Problems, THREADS_FLAG};
+use super::config::{Flags, Pin, Problems, LINKER_FLAG, THREADS_FLAG};
 
 /// Makefile targets that build for development. A command in one either assigns
 /// `RUSTFLAGS` with the standard flags or assigns none and so takes the

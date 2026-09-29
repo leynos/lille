@@ -11,8 +11,8 @@ use crate::shared_action;
 use crate::workflow_assertions::{assert_input, job_named, jobs, step_using, workflows};
 use crate::workflow_cache_owners::is_cache_action;
 use crate::workflow_estate::{
-    required_shared_action_sha, Workflow, BUILD_JOB_IDS, CACHE_ACTION_SHA, SHARED_ACTIONS_SHA,
-    UPLOAD_CODESCENE_COVERAGE_SHA,
+    required_shared_action_sha, Workflow, BUILD_JOB_IDS, CACHE_ACTION_SHA, SETUP_RUST_SHA,
+    SHARED_ACTIONS_SHA, UPLOAD_CODESCENE_COVERAGE_SHA,
 };
 use crate::workflow_loader::all_steps;
 
@@ -149,8 +149,12 @@ fn whitaker_is_installed_from_a_pinned_prebuilt_release(workflows: Vec<Workflow>
     "leynos/shared-actions/.github/actions/upload-codescene-coverage",
     UPLOAD_CODESCENE_COVERAGE_SHA
 )]
-#[case::the_default(
+#[case::the_setup_rust_exception(
     "leynos/shared-actions/.github/actions/setup-rust@abc",
+    SETUP_RUST_SHA
+)]
+#[case::the_default(
+    "leynos/shared-actions/.github/actions/install-mdtablefix@abc",
     SHARED_ACTIONS_SHA
 )]
 #[case::a_lookalike(
