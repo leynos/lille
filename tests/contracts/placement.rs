@@ -227,7 +227,8 @@ fn an_installer_precedes_the_first_use_of_its_tool(
 /// command counts only when no word character or hyphen follows it.
 fn runs_command(script: &str, command: &str) -> bool {
     script.match_indices(command).any(|(start, _)| {
-        !script[start + command.len()..]
+        let after = script.get(start + command.len()..).unwrap_or_default();
+        !after
             .chars()
             .next()
             .is_some_and(|next| next.is_alphanumeric() || matches!(next, '-' | '_'))
