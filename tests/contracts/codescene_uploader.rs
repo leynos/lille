@@ -1,6 +1,6 @@
 //! Contracts over the `CodeScene` uploader's deprecated checksum inputs.
 //!
-//! At [`UPLOAD_CODESCENE_COVERAGE_SHA`] the shared uploader's committed
+//! At [`COVERAGE_ACTIONS_SHA`] the shared uploader's committed
 //! `cli-manifest.json` is the trust anchor for the `cs-coverage` archive, and
 //! the action *rejects* a non-empty `installer-checksum` with a hard failure
 //! rather than ignoring it. Both of this repository's callers passed
@@ -21,7 +21,7 @@ use camino::Utf8Path;
 use rstest::rstest;
 
 use crate::workflow_assertions::workflows;
-use crate::workflow_estate::{Workflow, UPLOAD_CODESCENE_COVERAGE_SHA, WORKFLOW_DIR};
+use crate::workflow_estate::{Workflow, COVERAGE_ACTIONS_SHA, WORKFLOW_DIR};
 use crate::workflow_loader::all_steps;
 use crate::workflow_texts::repository_workflow_texts;
 
@@ -74,7 +74,7 @@ fn no_workflow_passes_the_deprecated_installer_checksum() {
     assert!(
         offenders.is_empty(),
         "{DEPRECATED_INPUT} is deprecated and rejected outright by the uploader at \
-         {UPLOAD_CODESCENE_COVERAGE_SHA}; remove it from {offenders:?}"
+         {COVERAGE_ACTIONS_SHA}; remove it from {offenders:?}"
     );
 }
 
@@ -104,7 +104,7 @@ fn every_uploader_reference_is_pinned_to_the_approved_commit(workflows: Vec<Work
         "no upload-codescene-coverage reference was found, so the pin rule below would pass \
          vacuously; this repository uploads coverage from main and checks it on pull requests"
     );
-    let expected = format!("{UPLOADER}@{UPLOAD_CODESCENE_COVERAGE_SHA}");
+    let expected = format!("{UPLOADER}@{COVERAGE_ACTIONS_SHA}");
     let wrong: Vec<String> = references
         .into_iter()
         .filter(|(_, _, uses)| *uses != expected)
@@ -113,7 +113,7 @@ fn every_uploader_reference_is_pinned_to_the_approved_commit(workflows: Vec<Work
     assert!(
         wrong.is_empty(),
         "every upload-codescene-coverage reference must pin \
-         {UPLOAD_CODESCENE_COVERAGE_SHA}: {wrong:?}"
+         {COVERAGE_ACTIONS_SHA}: {wrong:?}"
     );
 }
 

@@ -461,10 +461,12 @@ carry, matching the action by its own name so a lookalike is held to the
 default. The rule is that no reference floats, not that every action moves
 together.
 
-The one exception is `upload-codescene-coverage`, pinned to
-`a5765019912a8ab6882b12db049c7cde635f3a85`. At that revision the action
-verifies the `cs-coverage` archive against its committed `cli-manifest.json`
-and rejects a non-empty `installer-checksum` outright, so
+The exceptions are the two coverage actions, `generate-coverage` and
+`upload-codescene-coverage`, which share `COVERAGE_ACTIONS_SHA`, currently
+`a5765019912a8ab6882b12db049c7cde635f3a85`, so that they carry one commit (the
+shared CV-005 contract holds this as `coverage.selection-parity`). At that
+revision the uploader verifies the `cs-coverage` archive against its committed
+`cli-manifest.json` and rejects a non-empty `installer-checksum` outright, so
 `tests/contracts/codescene_uploader.rs` refuses that input and the
 `CODESCENE_CLI_SHA256` variable that fed it in any workflow, even in a comment,
 requires every uploader reference to carry the approved commit, and requires the
@@ -670,6 +672,17 @@ request can reach may call the CodeScene action, run `cs-coverage`, name
 CV-005, and its reason is availability: a pull request must not turn red
 because an external service or a token did.
 
+`make test-workflow-contracts` holds the rule by running
+`cv005-contracts check`, the shared contract library in `leynos/shared-actions`
+(`packages/cv005-contracts`), from a full commit named by `CV005_CONTRACTS_REF`
+in the Makefile; CI runs it in a "Check the CV-005 contracts" step. A fix to
+the rules is therefore a pin bump. The repository's only parameter is
+`repository` in `.github/cv005.toml`. The library's own suite proves each rule
+refuses the shape it exists to refuse, so this repository keeps no copy of the
+readers or the refusal cases. Workflows are read strictly: a duplicate key, or
+a workflow declaring both a quoted and an unquoted `on` key, is refused rather
+than silently resolved, and a reading failure exits 2 rather than passing.
+
 The credential is bound in no `env` on the publisher. The upload action is
 composite and hands its step's `env` to the `upload-artifact` and cache steps
 nested inside it, so `access-token` is passed straight from
@@ -702,7 +715,7 @@ two. A workflow contract in `tests/workflow_contracts.rs` fails if a second
 ### Workflow contracts
 
 `tests/workflow_contracts.rs` asserts the rules above. It is a harness rather
-than a test file: the rules live in fourteen modules under `tests/contracts/`,
+than a test file: the rules live in eleven modules under `tests/contracts/`,
 split by the question each asks.
 
 | Module                  | Asks                                                                                                                                                                                                                                                                                    |
@@ -716,13 +729,10 @@ split by the question each asks.
 | `compiler_cache.rs`     | Is sccache actually working? The two job-level variables, the export, install, start, build, report order, the proxy export, and the resource sampler with its report.                                                                                                                  |
 | `sampler_reading.rs`    | Does a line in a `run` script actually run? The quoting, comment, escape, and guard reading in `tests/support/shell_reading.rs`, which `compiler_cache.rs` asks its sampling question through, driven with shapes the workflows do not contain.                                         |
 | `parsing.rs`            | Does the loader read workflows correctly? Its subject is the loader, not any workflow in this repository.                                                                                                                                                                               |
-| `coverage_boundary.rs`  | May a pull-request lane publish coverage? No CodeScene action, command, host or credential, no `secrets: inherit`, and no report artefact, over every workflow a pull request reaches and every local workflow those call.                                                              |
-| `coverage_reach.rs`     | What does a pull request reach? The closure of local calls, the trigger forms, and the loader's refusals.                                                                                                                                                                               |
-| `coverage_publisher.rs` | Can the publisher only publish from the trunk, with its credential checked and bound nowhere, without cancelling?                                                                                                                                                                       |
 | `timeouts.rs`           | Which timer ends a run first? The coverage action's cargo watchdog set explicitly and by value, each coverage job's ceiling above that watchdog plus the measured work around it and equal to the documented 90 minutes, and the two nextest tiers absent rather than silently enabled. |
 | `timeout_budgets.rs`    | Do the readings that ordering rests on say what they claim? The coordinate match, the ceiling predicate, and the two conversions, driven with values chosen to separate a correct reading from a plausible wrong one.                                                                   |
 
-*Table: the fourteen contract modules, and the question each one asks of the
+*Table: the eleven contract modules, and the question each one asks of the
 estate.*
 
 Each module also pins the inputs that make its rules true, so a workflow cannot

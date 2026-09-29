@@ -5,28 +5,22 @@
 //! on the change that introduces a violation rather than on the CI run that
 //! suffers from it.
 //!
-//! This file is the harness. The rules live in fourteen modules, split by the
-//! question each asks: `coverage_boundary` for what a pull-request lane may
-//! not publish or hold, `coverage_reach` for the closure of local calls and
-//! the loader beneath it, `coverage_publisher` for the one lane that may
-//! publish, `supply_chain` for what the estate will execute, `placement` for
-//! what it costs and who owns each cache, `fork_fallback` for whether a fork's
-//! pull request can start the lane it reaches, `execution_control` for whether
-//! a scope can run and fail, `compiler_cache` for the sccache wiring and the
-//! resource sampling, `concurrency` for which runs a newer push may cancel,
-//! `sampler_reading` for the cases that hold the `shell_reading` support module
-//! to what a shell would actually run, `codescene_uploader` for the coverage
-//! uploader's pin and the deprecated checksum inputs it rejects,
-//! `timeouts` for the ordering of the timers that can end a run,
-//! `timeout_budgets` for the arithmetic that ordering rests on, and `parsing`
-//! for the loader itself.
+//! This file is the harness. The rules live in eleven modules, split by the
+//! question each asks: `supply_chain` for what the estate will execute,
+//! `placement` for what it costs and who owns each cache, `fork_fallback` for
+//! whether a fork's pull request can start the lane it reaches,
+//! `execution_control` for whether a scope can run and fail, `compiler_cache`
+//! for the sccache wiring and the resource sampling, `concurrency` for which
+//! runs a newer push may cancel, `sampler_reading` for the cases that hold the
+//! `shell_reading` support module to what a shell would actually run,
+//! `codescene_uploader` for the coverage uploader's pin and the deprecated
+//! checksum inputs it rejects, `timeouts` for the ordering of the timers that
+//! can end a run, `timeout_budgets` for the arithmetic that ordering rests on,
+//! and `parsing` for the loader itself.
+//!
+//! The CV-005 `CodeScene` contract is not here: `make test-workflow-contracts`
+//! runs it from the shared `cv005-contracts` library.
 
-#[path = "support/coverage_boundary.rs"]
-mod coverage_boundary;
-#[path = "support/coverage_publisher.rs"]
-mod coverage_publisher;
-#[path = "support/coverage_reach.rs"]
-mod coverage_reach;
 #[path = "support/placement_expression.rs"]
 mod placement_expression;
 #[path = "support/runner_selection.rs"]
@@ -58,12 +52,6 @@ mod codescene_uploader;
 mod compiler_cache;
 #[path = "contracts/concurrency.rs"]
 mod concurrency;
-#[path = "contracts/coverage_boundary.rs"]
-mod coverage_boundary_contract;
-#[path = "contracts/coverage_publisher.rs"]
-mod coverage_publisher_contract;
-#[path = "contracts/coverage_reach.rs"]
-mod coverage_reach_contract;
 #[path = "contracts/execution_control.rs"]
 mod execution_control;
 #[path = "contracts/fork_fallback.rs"]
