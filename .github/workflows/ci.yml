@@ -134,6 +134,7 @@ jobs:
           tool: sccache@0.16.0
           fallback: none
       - name: Reset compiler-cache counters
+        id: sccache-start
         # This starts the sccache server, and starting it here rather than
         # inside `setup-rust` is the point. The shared action's sccache path
         # runs the mozilla sccache-action, whose last act writes
@@ -146,7 +147,26 @@ jobs:
         run: |
           set -euo pipefail
           sccache --version
-          sccache --zero-stats
+          # sccache's 10 s server startup timeout is settable only through the
+          # config file SCCACHE_CONF names, and the backend probe on Ubicloud
+          # intermittently outlasts it. Exported to GITHUB_ENV as well, so every
+          # later step reaches the same server settings.
+          conf="${RUNNER_TEMP}/sccache.toml"
+          printf 'server_startup_timeout_ms = 60000\n' > "$conf"
+          echo "SCCACHE_CONF=${conf}" >> "$GITHUB_ENV"
+          export SCCACHE_CONF="$conf"
+          # A cache is an optimization, so a server that will not start must
+          # not fail the job. An empty RUSTC_WRAPPER counts as unset for Cargo,
+          # so the build compiles uncached. The annotation title is a stable
+          # contract that estate-wide detectors count: never rename it.
+          if sccache --zero-stats; then
+            echo "status=started" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning title=sccache-fallback::sccache server did not start within 60 s; this job compiled without the compiler cache"
+            echo "sccache: FALLBACK (cache disabled for this job)" >> "$GITHUB_STEP_SUMMARY"
+            echo "status=fallback" >> "$GITHUB_OUTPUT"
+            echo "RUSTC_WRAPPER=" >> "$GITHUB_ENV"
+          fi
       - name: Setup Rust
         uses: leynos/shared-actions/.github/actions/setup-rust@c5a54701c8603a0fa756a6b34c49bc2af75a6c11
         with:
@@ -270,6 +290,8 @@ jobs:
       - name: Record compiler-cache effectiveness
         if: always()
         shell: bash
+        env:
+          SCCACHE_STATUS: ${{ steps.sccache-start.outputs.status }}
         run: |
           set -euo pipefail
           # `if: always()` runs this even when an earlier step failed before
@@ -277,6 +299,12 @@ jobs:
           # here would bury the real failure under a second one.
           if ! command -v sccache >/dev/null 2>&1; then
             echo 'sccache is not installed; no compiler-cache statistics to report.'
+            exit 0
+          fi
+          # A server that never started has no statistics, and asking for them
+          # would try to start it again.
+          if [[ "${SCCACHE_STATUS}" != started ]]; then
+            echo 'sccache did not start; no compiler-cache statistics to report.'
             exit 0
           fi
           # Print to the log as well as the job summary: the summary is not

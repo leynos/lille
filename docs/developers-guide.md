@@ -552,6 +552,21 @@ values writes where nothing is reading. The server binds its backend once, at
 start, so starting it before that clobbering happens is what makes it stick.
 Hence `use-sccache: 'false'` in both jobs.
 
+The start is patient and fail-open. sccache's 10 s server startup timeout
+intermittently expires on Ubicloud while the server probes its backend, and it
+is settable only through the file `SCCACHE_CONF` names, so the step writes
+`server_startup_timeout_ms = 60000` to a file under `RUNNER_TEMP` and exports
+it to the server and to `GITHUB_ENV`. If the server still will not start, a
+cache being an optimization, the step clears `RUSTC_WRAPPER` (an empty value
+counts as unset for Cargo) and the job compiles uncached instead of failing. A
+fallback stays detectable: a warning annotation titled `sccache-fallback` (a
+stable contract that estate-wide detectors count, never rename it), the line
+`sccache: FALLBACK (cache disabled for this job)` in the job summary, and the
+step output `status=fallback` (`started` otherwise), which the statistics step
+reads to skip a report a dead server cannot give. The
+`the_compiler_cache_start_is_patient_fail_open_and_detectable` contract holds
+each line.
+
 The failure is silent and total, which is why it is worth this much text. Three
 runs of `build-test` on the same shape, differing only in the shared-actions
 pin and in whether the store had been populated, show both the failure and what
