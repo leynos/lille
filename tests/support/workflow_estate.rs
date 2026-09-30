@@ -25,14 +25,18 @@ pub const CACHE_ACTION_SHA: &str = "55cc8345863c7cc4c66a329aec7e433d2d1c52a9";
 /// Commit that a `leynos/shared-actions` reference must pin by default.
 pub const SHARED_ACTIONS_SHA: &str = "c5a54701c8603a0fa756a6b34c49bc2af75a6c11";
 
-/// Commit the `CodeScene` uploader must pin.
+/// Commit the coverage actions must pin, both of them.
 ///
-/// The uploader moved ahead of the rest of the estate on its own schedule.
-/// At this revision its committed `cli-manifest.json` is the trust anchor
-/// for the `cs-coverage` archive, and the action rejects the deprecated
-/// `installer-checksum` input outright, so a caller that still passes it
-/// fails rather than silently ignoring a checksum nobody checks.
-pub const UPLOAD_CODESCENE_COVERAGE_SHA: &str = "a5765019912a8ab6882b12db049c7cde635f3a85";
+/// The coverage actions moved ahead of the rest of the estate on their own
+/// schedule, and `generate-coverage` and the `CodeScene` uploader must carry
+/// one commit so the baseline the ratchet writes and the report `CodeScene`
+/// reads come from one revision (the shared CV-005 contract holds this as
+/// `coverage.selection-parity`). At this revision the uploader's committed
+/// `cli-manifest.json` is the trust anchor for the `cs-coverage` archive, and
+/// the action rejects the deprecated `installer-checksum` input outright, so a
+/// caller that still passes it fails rather than silently ignoring a checksum
+/// nobody checks.
+pub const COVERAGE_ACTIONS_SHA: &str = "a5765019912a8ab6882b12db049c7cde635f3a85";
 
 /// Commit `setup-rust` must pin.
 ///
@@ -50,8 +54,9 @@ pub const SETUP_RUST_SHA: &str = "8a83824b29dfe8f861714b544dc85fb925ed010c";
 /// nobody asked for. Each exception is named here with the action it
 /// governs, so a reference is still held to a reviewed commit by value and
 /// a new exception has to be added deliberately.
-pub const SHARED_ACTION_PIN_EXCEPTIONS: [(&str, &str); 2] = [
-    ("upload-codescene-coverage", UPLOAD_CODESCENE_COVERAGE_SHA),
+pub const SHARED_ACTION_PIN_EXCEPTIONS: [(&str, &str); 3] = [
+    ("generate-coverage", COVERAGE_ACTIONS_SHA),
+    ("upload-codescene-coverage", COVERAGE_ACTIONS_SHA),
     ("setup-rust", SETUP_RUST_SHA),
 ];
 

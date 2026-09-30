@@ -64,6 +64,8 @@ jobs:
       CARGO_INCREMENTAL: '0'
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       # Ubicloud's `standard-8` label is inherited here, never measured. Sample
       # memory and disk every 15 s so the next shape decision rests on evidence
       # rather than on what a previous change happened to pick. Disk, not
@@ -140,7 +142,7 @@ jobs:
           # measurement, so it takes neither the parallel frontend nor the mold linker.
           # Assigning RUSTFLAGS displaces every `rustflags` table in .cargo/config.toml.
           RUSTFLAGS: -D warnings
-        uses: leynos/shared-actions/.github/actions/generate-coverage@c5a54701c8603a0fa756a6b34c49bc2af75a6c11
+        uses: leynos/shared-actions/.github/actions/generate-coverage@a5765019912a8ab6882b12db049c7cde635f3a85
         with:
           all-features: 'true'
           all-targets: 'true'

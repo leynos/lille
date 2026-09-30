@@ -220,6 +220,42 @@ fn an_installer_precedes_the_first_use_of_its_tool(
     }
 }
 
+/// Returns whether `script` runs `command`, as a whole command.
+///
+/// A bare substring match read `make test-workflow-contracts` as `make test`,
+/// so a contract check would have counted as a second test execution. The
+/// command counts only when no word character or hyphen follows it.
+fn runs_command(script: &str, command: &str) -> bool {
+    script.match_indices(command).any(|(start, _)| {
+        let after = script.get(start + command.len()..).unwrap_or_default();
+        !after
+            .chars()
+            .next()
+            .is_some_and(|next| next.is_alphanumeric() || matches!(next, '-' | '_'))
+    })
+}
+
+/// Scenario: a script is asked whether it runs a command that would repeat the
+/// suite.
+///
+/// Invariant: the command counts as itself, alone or with arguments, and a
+/// target that merely starts with its name does not.
+#[rstest]
+#[case::the_command_alone("make test", "make test", true)]
+#[case::with_arguments("make test JOBS=2", "make test", true)]
+#[case::inside_a_pipeline("set -e\nmake test && echo done", "make test", true)]
+#[case::a_longer_target("make test-workflow-contracts", "make test", false)]
+#[case::an_underscored_target("make test_observers", "make test", false)]
+#[case::the_second_occurrence_counts("make test-x && make test", "make test", true)]
+#[case::not_present("make lint", "make test", false)]
+fn a_command_counts_only_as_a_whole_command(
+    #[case] script: &str,
+    #[case] command: &str,
+    #[case] expected: bool,
+) {
+    assert_eq!(runs_command(script, command), expected);
+}
+
 #[rstest]
 fn coverage_is_the_only_test_execution(workflows: Vec<Workflow>) {
     let duplicates: Vec<String> = all_steps(&workflows)
@@ -228,7 +264,7 @@ fn coverage_is_the_only_test_execution(workflows: Vec<Workflow>) {
         .filter(|(_, _, step)| {
             REPEAT_TEST_COMMANDS
                 .iter()
-                .any(|command| step.run.contains(command))
+                .any(|command| runs_command(&step.run, command))
         })
         .map(|(file, job, step)| format!("{file}:{job}: {}", step.label()))
         .collect();
