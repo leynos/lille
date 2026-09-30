@@ -564,8 +564,8 @@ stable contract that estate-wide detectors count, never rename it), the line
 `sccache: FALLBACK (cache disabled for this job)` in the job summary, and the
 step output `status=fallback` (`started` otherwise), which the statistics step
 reads to skip a report a dead server cannot give. The
-`the_compiler_cache_start_is_patient_fail_open_and_detectable` contract holds
-each line.
+`the_compiler_cache_start_is_patient` and
+`the_compiler_cache_start_falls_back_visibly` contracts hold each line.
 
 The failure is silent and total, which is why it is worth this much text. Three
 runs of `build-test` on the same shape, differing only in the shared-actions

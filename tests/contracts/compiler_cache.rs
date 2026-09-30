@@ -99,48 +99,87 @@ fn the_compiler_cache_is_wired_in_the_only_order_that_works(workflows: Vec<Workf
     }
 }
 
-/// Where `lines` first holds exactly `wanted`, ignoring indentation.
-fn line_index(lines: &[&str], wanted: &str) -> Option<usize> {
-    lines.iter().position(|line| line.trim() == wanted)
+/// The lines of a job's compiler-cache start step, matched whole.
+///
+/// Lines are matched whole and ignoring indentation, so a mention in a comment
+/// or a differently spelled command satisfies nothing.
+struct StartStep<'a> {
+    id: &'a str,
+    lines: Vec<&'a str>,
 }
 
-/// The start step must give the server room and must not fail the job.
+impl<'a> StartStep<'a> {
+    /// Reads the step of `id` that starts the server.
+    fn of(workflows: &'a [Workflow], id: &'a str) -> Self {
+        let Some((_, step)) = job_named(workflows, id).first_step_with("sccache --zero-stats")
+        else {
+            panic!("`{id}` must start the compiler cache");
+        };
+        Self {
+            id,
+            lines: step.run.lines().collect(),
+        }
+    }
+
+    /// Where the step holds exactly `wanted`, or a panic naming the job.
+    fn at(&self, wanted: &str) -> usize {
+        let Some(index) = self.lines.iter().position(|line| line.trim() == wanted) else {
+            panic!("`{}` start step must contain the line `{wanted}`", self.id);
+        };
+        index
+    }
+}
+
+/// The start step must give the server room before it starts.
 ///
 /// sccache's 10 s startup timeout intermittently expires on Ubicloud while the
 /// server probes its backend, and it is settable only through the file
-/// `SCCACHE_CONF` names. A start that still fails must fall back to an uncached
-/// build, and say so in a form a detector can count. Lines are matched whole,
-/// so a mention in a comment or a differently spelled command satisfies
-/// nothing.
+/// `SCCACHE_CONF` names, so the file must exist and be exported before the
+/// guarded start.
 #[rstest]
-fn the_compiler_cache_start_is_patient_fail_open_and_detectable(workflows: Vec<Workflow>) {
+fn the_compiler_cache_start_is_patient(workflows: Vec<Workflow>) {
     for id in BUILD_JOB_IDS {
-        let job = job_named(&workflows, id);
-        let (_, start) = job
-            .first_step_with("sccache --zero-stats")
-            .unwrap_or_else(|| panic!("`{id}` must start the compiler cache"));
-        let lines: Vec<&str> = start.run.lines().collect();
-        let at = |wanted: &str| {
-            line_index(&lines, wanted)
-                .unwrap_or_else(|| panic!("`{id}` start step must contain the line `{wanted}`"))
-        };
-        let timeout = at("printf 'server_startup_timeout_ms = 60000\\n' > \"$conf\"");
-        let export = at("export SCCACHE_CONF=\"$conf\"");
-        let persist = at("echo \"SCCACHE_CONF=${conf}\" >> \"$GITHUB_ENV\"");
-        let guarded = at("if sccache --zero-stats; then");
-        let fallback = at("else");
-        for (earlier, before) in [
-            ("write the timeout config", timeout),
-            ("export SCCACHE_CONF to the server", export),
-            ("export SCCACHE_CONF to later steps", persist),
+        let step = StartStep::of(&workflows, id);
+        let guarded = step.at("if sccache --zero-stats; then");
+        for (earlier, line) in [
+            (
+                "write the timeout config",
+                "printf 'server_startup_timeout_ms = 60000\\n' > \"$conf\"",
+            ),
+            (
+                "export SCCACHE_CONF to the server",
+                "export SCCACHE_CONF=\"$conf\"",
+            ),
+            (
+                "export SCCACHE_CONF to later steps",
+                "echo \"SCCACHE_CONF=${conf}\" >> \"$GITHUB_ENV\"",
+            ),
         ] {
             assert!(
-                before < guarded,
+                step.at(line) < guarded,
                 "`{id}` must {earlier} before the server starts"
             );
         }
-        // Everything the fallback promises has to sit inside the `else`, after
-        // the guarded start, or it would fire on a healthy job.
+    }
+}
+
+/// A start that still fails must fall back to an uncached build, and say so in
+/// a form a detector can count.
+///
+/// Everything the fallback promises has to sit inside the `else`, after the
+/// guarded start, or it would fire on a healthy job; `started` belongs to the
+/// other branch.
+#[rstest]
+fn the_compiler_cache_start_falls_back_visibly(workflows: Vec<Workflow>) {
+    for id in BUILD_JOB_IDS {
+        let step = StartStep::of(&workflows, id);
+        let guarded = step.at("if sccache --zero-stats; then");
+        let started = step.at("echo \"status=started\" >> \"$GITHUB_OUTPUT\"");
+        let fallback = step.at("else");
+        assert!(
+            guarded < started && started < fallback,
+            "`{id}` must report `started` once the server is up, and only then"
+        );
         for wanted in [
             "echo \"::warning title=sccache-fallback::sccache server did not start \
              within 60 s; this job compiled without the compiler cache\"",
@@ -149,15 +188,10 @@ fn the_compiler_cache_start_is_patient_fail_open_and_detectable(workflows: Vec<W
             "echo \"RUSTC_WRAPPER=\" >> \"$GITHUB_ENV\"",
         ] {
             assert!(
-                fallback < at(wanted),
+                fallback < step.at(wanted),
                 "`{id}` must raise `{wanted}` only when the server did not start"
             );
         }
-        let started = at("echo \"status=started\" >> \"$GITHUB_OUTPUT\"");
-        assert!(
-            guarded < started && started < fallback,
-            "`{id}` must report `started` once the server is up, and only then"
-        );
     }
 }
 
