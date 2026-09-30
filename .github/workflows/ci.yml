@@ -148,8 +148,9 @@ jobs:
           sccache --version
           sccache --zero-stats
       - name: Setup Rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@c5a54701c8603a0fa756a6b34c49bc2af75a6c11
+        uses: leynos/shared-actions/.github/actions/setup-rust@8a83824b29dfe8f861714b544dc85fb925ed010c
         with:
+          install-mold: 'true'
           # Sole owner of ~/.cargo/registry and ~/.cargo/git for this job. It
           # runs before the first cargo invocation so the lint step reads a
           # warm registry.
@@ -204,14 +205,23 @@ jobs:
           installer-version: '0.2.7'
           cache-provider: github
       - name: Lint
+        env:
+          # An assigned RUSTFLAGS replaces .cargo/config.toml's rustflags, so
+          # the step restates the build standard's flags beside the deny.
+          RUSTFLAGS: -D warnings -Zthreads=8 -Clink-arg=-fuse-ld=mold
         run: |
           cargo clippy --all-targets --all-features -- -D warnings
-          RUSTFLAGS="-D warnings" whitaker --all -- --all-targets --all-features
+          whitaker --all -- --all-targets --all-features
       # The instrumented run is this workflow's only test execution on Linux:
       # a separate uninstrumented `cargo test` repeated the suite for no extra
       # evidence and doubled the billed compile. `all-features` names exactly
       # the set the explicit feature list used to name.
       - name: Generate coverage
+        env:
+          # One of the two exclusions from the build standard: a coverage build is a
+          # measurement, so it takes neither the parallel frontend nor the mold linker.
+          # Assigning RUSTFLAGS displaces every `rustflags` table in .cargo/config.toml.
+          RUSTFLAGS: -D warnings
         uses: leynos/shared-actions/.github/actions/generate-coverage@a5765019912a8ab6882b12db049c7cde635f3a85
         with:
           all-features: 'true'

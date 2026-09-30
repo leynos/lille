@@ -38,6 +38,13 @@ pub const SHARED_ACTIONS_SHA: &str = "c5a54701c8603a0fa756a6b34c49bc2af75a6c11";
 /// nobody checks.
 pub const COVERAGE_ACTIONS_SHA: &str = "a5765019912a8ab6882b12db049c7cde635f3a85";
 
+/// Commit `setup-rust` must pin.
+///
+/// This is the release that adds the `install-mold` input, which the build
+/// standard's workflows pass so that the Linux jobs have the mold linker the
+/// Cargo configuration names.
+pub const SETUP_RUST_SHA: &str = "8a83824b29dfe8f861714b544dc85fb925ed010c";
+
 /// Shared actions whose reviewed revision is not [`SHARED_ACTIONS_SHA`].
 ///
 /// The estate's rule is that no reference floats, not that every action
@@ -47,9 +54,10 @@ pub const COVERAGE_ACTIONS_SHA: &str = "a5765019912a8ab6882b12db049c7cde635f3a85
 /// nobody asked for. Each exception is named here with the action it
 /// governs, so a reference is still held to a reviewed commit by value and
 /// a new exception has to be added deliberately.
-pub const SHARED_ACTION_PIN_EXCEPTIONS: [(&str, &str); 2] = [
+pub const SHARED_ACTION_PIN_EXCEPTIONS: [(&str, &str); 3] = [
     ("generate-coverage", COVERAGE_ACTIONS_SHA),
     ("upload-codescene-coverage", COVERAGE_ACTIONS_SHA),
+    ("setup-rust", SETUP_RUST_SHA),
 ];
 
 /// Return the commit a `leynos/shared-actions` reference must pin.

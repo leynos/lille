@@ -128,14 +128,20 @@ jobs:
           sccache --version
           sccache --zero-stats
       - name: Setup Rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@c5a54701c8603a0fa756a6b34c49bc2af75a6c11
+        uses: leynos/shared-actions/.github/actions/setup-rust@8a83824b29dfe8f861714b544dc85fb925ed010c
         with:
+          install-mold: 'true'
           # Sole owner of ~/.cargo/registry and ~/.cargo/git for this job, and
           # the trunk writer whose entry every pull-request run restores.
           cache-provider: github
           # The job installs and starts sccache itself, above.
           use-sccache: 'false'
       - name: Generate coverage
+        env:
+          # One of the two exclusions from the build standard: a coverage build is a
+          # measurement, so it takes neither the parallel frontend nor the mold linker.
+          # Assigning RUSTFLAGS displaces every `rustflags` table in .cargo/config.toml.
+          RUSTFLAGS: -D warnings
         uses: leynos/shared-actions/.github/actions/generate-coverage@a5765019912a8ab6882b12db049c7cde635f3a85
         with:
           all-features: 'true'
