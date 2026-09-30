@@ -481,10 +481,8 @@ requires every uploader reference to carry the approved commit, and requires the
 `get-codescene-sha` refresh dispatch to stay deleted under either workflow
 extension.
 
-sccache is installed the same way, by `taiki-e/install-action` with
-`tool: sccache@0.16.0` and `fallback: none`. The fallback matters: without it
-the action would compile sccache from source when no prebuilt binary matched,
-which is the outcome the rule exists to prevent.
+sccache is not installed by this repository: `setup-rust` owns it (see
+[The compiler cache](#the-compiler-cache)).
 
 ### Cache ownership
 
@@ -513,59 +511,41 @@ its own, and `upload-codescene-coverage` does; the next paragraph records it.
 ### The compiler cache
 
 sccache owns compiler output, and nothing archives a `target` tree. Both build
-jobs wire it up as four steps in a fixed order, and the order is the whole
-point: get it wrong and the cache is silently a no-op.
+jobs let `setup-rust` own it, through one pinned call whose position and inputs
+are the contract.
 
-The job sets `RUSTC_WRAPPER: sccache` and `SCCACHE_GHA_ENABLED: 'true'` at job
-level. The first engages the wrapper; the second is what selects the GitHub
-Actions backend. Without the second, sccache falls back to
-`Local disk: ~/.cache/sccache`, which nothing persists between runs, so the
-wrapper becomes pure overhead. `CARGO_INCREMENTAL: '0'` accompanies them
-because sccache cannot cache an incremental compilation.
+`setup-rust` installs sccache, selects the backend by runner, starts the server
+with a 60 s startup timeout, and names sccache as the rustc wrapper. On
+Ubicloud it exports the cache-proxy credentials itself and keeps
+`ACTIONS_CACHE_SERVICE_V2` cleared after the mozilla sccache-action runs; on a
+GitHub-hosted runner it takes local disk. If the server still will not start,
+the action does not fail the job: it clears `RUSTC_WRAPPER`, so Cargo compiles
+uncached, and makes the fallback visible as a warning annotation titled
+`sccache-fallback`, a `sccache: FALLBACK (cache disabled for this job)` line in
+the job summary and the `sccache-status` output (`fallback`, or `started`).
+That behaviour is shared-actions #546, and it is the reason both jobs pin
+`setup-rust` at `6cec89ba` rather than the estate-wide commit.
 
-**Export.** A pinned `actions/github-script` step, after checkout, re-exports
-`ACTIONS_CACHE_URL` and `ACTIONS_RUNTIME_TOKEN` into `GITHUB_ENV` and clears
-`ACTIONS_CACHE_SERVICE_V2`. The runner gives those two variables to action code
-but not to later shell steps, and sccache's backend reads them from the
-environment. On Ubicloud `ACTIONS_CACHE_URL` names the runner's local cache
-proxy, so re-exporting it is what puts the compiler cache in Ubicloud's store
-rather than GitHub's. The v2 cache service bypasses that proxy, so it is
-cleared; exporting `ACTIONS_RESULTS_URL` does not route through the proxy
-either. The step also logs whether an endpoint and a token were present, and
-warns when either is missing, so a misconfigured backend is diagnosable from
-the log rather than from an unexplained slow build. It never prints the token.
+Each job's call carries three inputs and one id:
 
-**Install.** `taiki-e/install-action` places the pinned sccache binary. An
-action step is safe here because installing a binary does not start the sccache
-server.
+- `cache-provider: github`, because the action is the sole owner of
+  `~/.cargo/registry` and `~/.cargo/git` for the job;
+- `expect-cache`, chosen by where the job runs. `build-test` has a fork arm on a
+  GitHub-hosted runner, so it takes `any`. `coverage-upload` runs only on
+  Ubicloud and takes `ubicloud`, which fails the job if the proxy is missing;
+- `use-sccache` left at its default of `true`. Setting it to `false` would
+  leave the job with no cache and no wrapper;
+- `id: setup-rust`, which the statistics step reads `sccache-status` and
+  `cache-backend` through.
 
-**Start.** A `run:` step runs `sccache --zero-stats`, which starts the server.
-It must follow the export, and it must not be `setup-rust`'s job. The reason is
-narrower than it first looks, and the obvious guess is wrong: `run:` steps do
-see what the export wrote, measured on `ubicloud-standard-2`, so the export is
-not being hidden from them. What happens is that `setup-rust` with
-`use-sccache: 'true'` runs the mozilla sccache-action, and that action's last
-act writes `ACTIONS_CACHE_SERVICE_V2=on`, GitHub's results URL and GitHub's
-token back to `GITHUB_ENV`. Every step after it therefore sees GitHub's v2
-cache service instead of Ubicloud's proxy, and a server started under those
-values writes where nothing is reading. The server binds its backend once, at
-start, so starting it before that clobbering happens is what makes it stick.
-Hence `use-sccache: 'false'` in both jobs.
-
-The start is patient and fail-open. sccache's 10 s server startup timeout
-intermittently expires on Ubicloud while the server probes its backend, and it
-is settable only through the file `SCCACHE_CONF` names, so the step writes
-`server_startup_timeout_ms = 60000` to a file under `RUNNER_TEMP` and exports
-it to the server and to `GITHUB_ENV`. If the server still will not start, a
-cache being an optimization, the step clears `RUSTC_WRAPPER` (an empty value
-counts as unset for Cargo) and the job compiles uncached instead of failing. A
-fallback stays detectable: a warning annotation titled `sccache-fallback` (a
-stable contract that estate-wide detectors count, never rename it), the line
-`sccache: FALLBACK (cache disabled for this job)` in the job summary, and the
-step output `status=fallback` (`started` otherwise), which the statistics step
-reads to skip a report a dead server cannot give. The
-`the_compiler_cache_start_is_patient` and
-`the_compiler_cache_start_falls_back_visibly` contracts hold each line.
+`CARGO_INCREMENTAL: '0'` stays at job level because sccache cannot cache an
+incremental compilation. Nothing else about sccache is set by the job:
+`RUSTC_WRAPPER`, `SCCACHE_GHA_ENABLED` and `SCCACHE_CONF` at job level, an
+`actions/github-script` proxy export, a hand-installed sccache and a hand-run
+`sccache --zero-stats` are all retired, and a contract refuses each. This
+repository used to wire them by hand, with `use-sccache: 'false'`, to avoid the
+old sccache-action clobbering the proxy export; #523 made `setup-rust` handle
+that, and two owners would start two servers.
 
 The failure is silent and total, which is why it is worth this much text. Three
 runs of `build-test` on the same shape, differing only in the shared-actions
@@ -588,13 +568,17 @@ which is why it is the slowest. The third reads what the second wrote. The
 cache is worth about nine minutes a run on this workspace, 16m31s warm against
 25m44s for the run that cached nothing at all.
 
-**Report.** `sccache --show-stats` runs after the build, printing the counters
-to the log as well as to the job summary. The log copy is the one that matters:
-the summary cannot be read through the REST API, so it cannot be checked after
-the fact. Read `Cache location` on every run. It must name the GitHub Actions
-backend; `Local disk: ~/.cache/sccache` means the backend was never selected
-and nothing is being cached. A warm build reporting zero hits is a broken
-contract, not a slow one.
+**Report.** `sccache --show-stats` runs after the build, printing the backend
+`setup-rust` chose and then the counters, to the log as well as to the job
+summary. `Cache location` reads `ghac` for the Ubicloud proxy and for GitHub's
+own service alike, so the backend line is what tells them apart. The step skips
+when `sccache-status` is not `started`, since a server that never started has
+no statistics and asking for them would start it again. The log copy is the one
+that matters: the summary cannot be read through the REST API, so it cannot be
+checked after the fact. Read `Cache location` on every run. It must name the
+GitHub Actions backend; `Local disk: ~/.cache/sccache` means the backend was
+never selected and nothing is being cached. A warm build reporting zero hits is
+a broken contract, not a slow one.
 
 Each job also deletes `target/llvm-cov-target` once coverage has been
 generated, printing `df -h` either side. The instrumented tree has no later
@@ -744,13 +728,13 @@ split by the question each asks.
 
 | Module                  | Asks                                                                                                                                                                                                                                                                                    |
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `supply_chain.rs`       | What will the estate execute? Pinned cache and shared-action references, no source-built tools, prebuilt Whitaker and sccache.                                                                                                                                                          |
+| `supply_chain.rs`       | What will the estate execute? Pinned cache and shared-action references, no source-built tools, prebuilt Whitaker, and the `setup-rust` revision that owns the compiler cache.                                                                                                          |
 | `placement.rs`          | What does it cost, and who owns each cache? Runner placement and labels, bounded timeouts, one owner per cached path, an installer before the first use of what it installs, a single test execution per build job, the uv cache key.                                                   |
 | `fork_fallback.rs`      | Can a fork's pull request start the lane it reaches? The pull-request lane falls back to `ubuntu-latest` for forks through the one prescribed expression, lanes no fork reaches name their runner outright, and no `runs-on` declaration carries a line break.                          |
 | `execution_control.rs`  | Do the readers of `if` and `continue-on-error` tell a constant from a condition that depends on the event, at job and step scope? The rule that consumes them lives in `placement.rs`; these drive the readers with shapes the workflows do not contain.                                |
 | `concurrency.rs`        | Which runs may a newer push cancel? Every workflow a pull request starts declares a group keyed on the pull request, falling back to the run id, and cancels only on the `pull_request` event.                                                                                          |
 | `codescene_uploader.rs` | Does the coverage uploader carry its approved commit and none of the inputs it now rejects? No `installer-checksum`, no `CODESCENE_CLI_SHA256`, and no checksum-refresh dispatch in either extension.                                                                                   |
-| `compiler_cache.rs`     | Is sccache actually working? The two job-level variables, the export, install, start, build, report order, the proxy export, and the resource sampler with its report.                                                                                                                  |
+| `compiler_cache.rs`     | Is sccache actually working? `setup-rust` owns it with the inputs and id the report reads, no hand-rolled wrapper, export, install or start survives beside it, it precedes the build and the report follows, and the resource sampler with its report.                                 |
 | `sampler_reading.rs`    | Does a line in a `run` script actually run? The quoting, comment, escape, and guard reading in `tests/support/shell_reading.rs`, which `compiler_cache.rs` asks its sampling question through, driven with shapes the workflows do not contain.                                         |
 | `parsing.rs`            | Does the loader read workflows correctly? Its subject is the loader, not any workflow in this repository.                                                                                                                                                                               |
 | `timeouts.rs`           | Which timer ends a run first? The coverage action's cargo watchdog set explicitly and by value, each coverage job's ceiling above that watchdog plus the measured work around it and equal to the documented 90 minutes, and the two nextest tiers absent rather than silently enabled. |

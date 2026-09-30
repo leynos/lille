@@ -11,7 +11,7 @@ use crate::shared_action;
 use crate::workflow_assertions::{assert_input, job_named, jobs, step_using, workflows};
 use crate::workflow_cache_owners::is_cache_action;
 use crate::workflow_estate::{
-    required_shared_action_sha, Workflow, BUILD_JOB_IDS, CACHE_ACTION_SHA, COVERAGE_ACTIONS_SHA,
+    required_shared_action_sha, Workflow, CACHE_ACTION_SHA, COVERAGE_ACTIONS_SHA, SETUP_RUST_SHA,
     SHARED_ACTIONS_SHA,
 };
 use crate::workflow_loader::all_steps;
@@ -22,9 +22,6 @@ use crate::workflow_loader::all_steps;
 /// strategies fall through to `compile`; the estate's rule is to install from
 /// a verified release archive instead.
 const SOURCE_BUILD_FRAGMENTS: [&str; 3] = ["cargo install", "cargo-binstall ", "cargo binstall"];
-
-/// Pinned prebuilt sccache the build jobs install.
-const SCCACHE_TOOL: &str = "sccache@0.16.0";
 
 #[rstest]
 fn every_cache_reference_is_pinned_to_v6_1_0(workflows: Vec<Workflow>) {
@@ -118,16 +115,6 @@ fn install_action_fails_closed_rather_than_compiling(workflows: Vec<Workflow>) {
 }
 
 #[rstest]
-fn sccache_is_installed_from_a_pinned_prebuilt_release(workflows: Vec<Workflow>) {
-    for id in BUILD_JOB_IDS {
-        let job = job_named(&workflows, id);
-        let step = step_using(job, "taiki-e/install-action");
-        assert_input(id, step, "tool", SCCACHE_TOOL);
-        assert_input(id, step, "fallback", "none");
-    }
-}
-
-#[rstest]
 fn whitaker_is_installed_from_a_pinned_prebuilt_release(workflows: Vec<Workflow>) {
     let job = job_named(&workflows, "build-test");
     let step = step_using(job, &shared_action("install-whitaker"));
@@ -153,8 +140,9 @@ fn whitaker_is_installed_from_a_pinned_prebuilt_release(workflows: Vec<Workflow>
     "leynos/shared-actions/.github/actions/upload-codescene-coverage",
     COVERAGE_ACTIONS_SHA
 )]
+#[case::the_cache_owner("leynos/shared-actions/.github/actions/setup-rust@abc", SETUP_RUST_SHA)]
 #[case::the_default(
-    "leynos/shared-actions/.github/actions/setup-rust@abc",
+    "leynos/shared-actions/.github/actions/install-mdtablefix@abc",
     SHARED_ACTIONS_SHA
 )]
 #[case::a_lookalike(

@@ -13,235 +13,136 @@ use crate::shell_reading::{samples, Measure};
 use crate::workflow_assertions::{assert_input, job_named, step_using, workflows};
 use crate::workflow_estate::{Workflow, BUILD_JOB_IDS};
 
-/// Commit that every `actions/github-script` reference must pin (v8).
-const GITHUB_SCRIPT_SHA: &str = "ed597411d8f924073f98dfc5c65a23a2325f34cd";
+/// The `expect-cache` each build job must declare. `build-test` has a fork
+/// arm on a GitHub-hosted runner, so it takes whichever backend the runner
+/// offers; `coverage-upload` runs only on Ubicloud and must get its proxy.
+const EXPECTED_CACHE: [(&str, &str); 2] = [("build-test", "any"), ("coverage-upload", "ubicloud")];
 
-/// Variables sccache's GitHub Actions backend needs re-exported on Ubicloud.
-const PROXY_VARIABLES: [&str; 3] = [
-    "ACTIONS_CACHE_URL",
-    "ACTIONS_RUNTIME_TOKEN",
-    "ACTIONS_CACHE_SERVICE_V2",
-];
+/// The id the report step reads `setup-rust`'s outputs through.
+const SETUP_RUST_ID: &str = "setup-rust";
 
+/// Env that only a job which owns sccache by hand sets. `setup-rust` exports
+/// the wrapper and selects the backend itself, so either surviving means the
+/// job still carries a second owner.
+const RETIRED_JOB_ENV: [&str; 3] = ["RUSTC_WRAPPER", "SCCACHE_GHA_ENABLED", "SCCACHE_CONF"];
+
+/// `setup-rust` owns the compiler cache: it installs sccache, chooses the
+/// backend by runner, starts the server with a 60 s startup timeout, falls
+/// back to an uncached build if the server will not start, and names sccache
+/// as the wrapper. Turning that off, or dropping the id the report reads its
+/// outputs through, leaves the job compiling uncached or unreported.
 #[rstest]
-fn setup_rust_owns_the_registry_but_not_the_compiler_cache(workflows: Vec<Workflow>) {
-    for id in BUILD_JOB_IDS {
+fn setup_rust_owns_the_compiler_cache(workflows: Vec<Workflow>) {
+    for (id, expected) in EXPECTED_CACHE {
         let job = job_named(&workflows, id);
         let step = step_using(job, &shared_action("setup-rust"));
         assert_input(id, step, "cache-provider", "github");
-        // The action's sccache path runs the mozilla sccache-action, which
-        // writes GitHub's v2 cache service back to `GITHUB_ENV` as its last
-        // act, clobbering the proxy export for every later step. The job
-        // installs and starts sccache itself instead.
-        assert_input(id, step, "use-sccache", "false");
-    }
-}
-
-/// The two variables that make the wrapper more than overhead.
-///
-/// `RUSTC_WRAPPER` engages sccache; `SCCACHE_GHA_ENABLED` selects the Actions
-/// backend. Without the second, sccache writes to a local directory nothing
-/// persists between runs, and every compilation misses.
-#[rstest]
-#[case::wrapper("RUSTC_WRAPPER", "sccache")]
-#[case::backend("SCCACHE_GHA_ENABLED", "true")]
-#[case::no_incremental("CARGO_INCREMENTAL", "0")]
-fn the_compiler_cache_is_engaged_at_job_level(
-    workflows: Vec<Workflow>,
-    #[case] variable: &str,
-    #[case] expected: &str,
-) {
-    for id in BUILD_JOB_IDS {
-        let job = job_named(&workflows, id);
+        assert_input(id, step, "expect-cache", expected);
+        let sccache = step.input("use-sccache");
+        assert!(
+            sccache.is_empty() || sccache == "true",
+            "`{id}` must leave sccache to `setup-rust` (`use-sccache` is `{sccache}`)"
+        );
         assert_eq!(
-            job.env(variable),
-            expected,
-            "`{id}` must export `{variable}: {expected}` at job level"
+            step.id, SETUP_RUST_ID,
+            "`{id}` `setup-rust` must carry the id `{SETUP_RUST_ID}`"
         );
     }
 }
 
-/// The sccache server binds its backend once, when it starts, so the order of
-/// these steps is the contract. Started before the export it binds GitHub's v2
-/// service instead of Ubicloud's proxy; started after `setup-rust`, whose
-/// sccache path rewrites the cache service back into `GITHUB_ENV`, it binds
-/// whatever that left behind; reported before the build it measures nothing.
+/// Only what `setup-rust` does not do stays at job level: sccache cannot cache
+/// incremental compilation, and an incremental build would defeat every hit.
 #[rstest]
-fn the_compiler_cache_is_wired_in_the_only_order_that_works(workflows: Vec<Workflow>) {
+fn the_job_disables_incremental_compilation(workflows: Vec<Workflow>) {
+    for id in BUILD_JOB_IDS {
+        assert_eq!(
+            job_named(&workflows, id).env("CARGO_INCREMENTAL"),
+            "0",
+            "`{id}` must export `CARGO_INCREMENTAL: 0` at job level"
+        );
+    }
+}
+
+/// The pieces `setup-rust` replaced must not survive beside it. Two owners
+/// would start two servers, and the older one, which binds the wrong backend,
+/// would win the race.
+#[rstest]
+fn no_hand_rolled_compiler_cache_survives_beside_setup_rust(workflows: Vec<Workflow>) {
+    for id in BUILD_JOB_IDS {
+        let job = job_named(&workflows, id);
+        for variable in RETIRED_JOB_ENV {
+            assert!(
+                job.env(variable).is_empty(),
+                "`{id}` must not set `{variable}` at job level; `setup-rust` owns it"
+            );
+        }
+        for (retired, needle) in [
+            ("the cache proxy export", "actions/github-script"),
+            ("a hand-installed sccache", "taiki-e/install-action"),
+            ("a hand-started server", "sccache --zero-stats"),
+            ("a hand-started server", "sccache --start-server"),
+        ] {
+            assert!(
+                job.first_step_containing(needle).is_none(),
+                "`{id}` must not carry {retired} (`{needle}`); `setup-rust` owns it"
+            );
+        }
+    }
+}
+
+/// `setup-rust` must run before anything compiles, and the statistics must be
+/// read after the build, or they measure nothing.
+#[rstest]
+fn the_compiler_cache_is_set_up_before_the_build_and_reported_after(workflows: Vec<Workflow>) {
     for id in BUILD_JOB_IDS {
         let job = job_named(&workflows, id);
         let stage = |needle: &str, what: &str| {
-            job.first_step_containing(needle)
-                .unwrap_or_else(|| panic!("`{id}` must {what}"))
+            let Some(at) = job.first_step_containing(needle) else {
+                panic!("`{id}` must {what}");
+            };
+            at
         };
-        let export = stage("actions/github-script", "export the Ubicloud cache proxy");
-        let install = stage("taiki-e/install-action", "install a pinned sccache");
-        let start = stage("sccache --zero-stats", "start the compiler cache");
-        // `setup-rust` stands for the first step that could compile: it puts
-        // the toolchain in place, and nothing before it runs cargo.
         let toolchain = stage("setup-rust", "set up Rust before anything compiles");
         let coverage = stage("generate-coverage", "build the workspace under coverage");
         let report = stage("sccache --show-stats", "report compiler-cache statistics");
-        let order = [
-            ("export the cache proxy", export),
-            ("install sccache", install),
-            ("start sccache", start),
-            ("set up the toolchain", toolchain),
-            ("build", coverage),
-            ("report the statistics", report),
-        ];
-        for ((earlier, before), (later, after)) in order.iter().zip(order.iter().skip(1)) {
-            assert!(
-                before < after,
-                "`{id}` must {earlier} (step {before}) before it can {later} (step {after})"
-            );
-        }
-    }
-}
-
-/// The lines of a job's compiler-cache start step, matched whole.
-///
-/// Lines are matched whole and ignoring indentation, so a mention in a comment
-/// or a differently spelled command satisfies nothing.
-struct StartStep<'a> {
-    id: &'a str,
-    lines: Vec<&'a str>,
-}
-
-impl<'a> StartStep<'a> {
-    /// Reads the step of `id` that starts the server.
-    fn of(workflows: &'a [Workflow], id: &'a str) -> Self {
-        let Some((_, step)) = job_named(workflows, id).first_step_with("sccache --zero-stats")
-        else {
-            panic!("`{id}` must start the compiler cache");
-        };
-        Self {
-            id,
-            lines: step.run.lines().collect(),
-        }
-    }
-
-    /// Where the step holds exactly `wanted`, or a panic naming the job.
-    fn at(&self, wanted: &str) -> usize {
-        let Some(index) = self.lines.iter().position(|line| line.trim() == wanted) else {
-            panic!("`{}` start step must contain the line `{wanted}`", self.id);
-        };
-        index
-    }
-}
-
-/// The start step must give the server room before it starts.
-///
-/// sccache's 10 s startup timeout intermittently expires on Ubicloud while the
-/// server probes its backend, and it is settable only through the file
-/// `SCCACHE_CONF` names, so the file must exist and be exported before the
-/// guarded start.
-#[rstest]
-fn the_compiler_cache_start_is_patient(workflows: Vec<Workflow>) {
-    for id in BUILD_JOB_IDS {
-        let step = StartStep::of(&workflows, id);
-        let guarded = step.at("if sccache --zero-stats; then");
-        for (earlier, line) in [
-            (
-                "write the timeout config",
-                "printf 'server_startup_timeout_ms = 60000\\n' > \"$conf\"",
-            ),
-            (
-                "export SCCACHE_CONF to the server",
-                "export SCCACHE_CONF=\"$conf\"",
-            ),
-            (
-                "export SCCACHE_CONF to later steps",
-                "echo \"SCCACHE_CONF=${conf}\" >> \"$GITHUB_ENV\"",
-            ),
-        ] {
-            assert!(
-                step.at(line) < guarded,
-                "`{id}` must {earlier} before the server starts"
-            );
-        }
-    }
-}
-
-/// A start that still fails must fall back to an uncached build, and say so in
-/// a form a detector can count.
-///
-/// Everything the fallback promises has to sit inside the `else`, after the
-/// guarded start, or it would fire on a healthy job; `started` belongs to the
-/// other branch.
-#[rstest]
-fn the_compiler_cache_start_falls_back_visibly(workflows: Vec<Workflow>) {
-    for id in BUILD_JOB_IDS {
-        let step = StartStep::of(&workflows, id);
-        let guarded = step.at("if sccache --zero-stats; then");
-        let started = step.at("echo \"status=started\" >> \"$GITHUB_OUTPUT\"");
-        let fallback = step.at("else");
         assert!(
-            guarded < started && started < fallback,
-            "`{id}` must report `started` once the server is up, and only then"
+            toolchain < coverage && coverage < report,
+            "`{id}` must set up `setup-rust` (step {toolchain}) before the build (step \
+             {coverage}) and report after it (step {report})"
         );
+    }
+}
+
+/// The statistics step must read what `setup-rust` reports, and say which
+/// backend it chose: `Cache location` reads `ghac` for the Ubicloud proxy and
+/// for GitHub's own service alike, so it cannot tell them apart.
+#[rstest]
+fn compiler_cache_effectiveness_is_measured_and_names_its_backend(workflows: Vec<Workflow>) {
+    for id in BUILD_JOB_IDS {
+        let job = job_named(&workflows, id);
+        let Some((_, report)) = job.first_step_with("sccache --show-stats") else {
+            panic!("`{id}` must report compiler-cache statistics");
+        };
+        assert_eq!(
+            report.env_value("SCCACHE_STATUS"),
+            "${{ steps.setup-rust.outputs.sccache-status }}",
+            "`{id}` must hand `setup-rust`'s `sccache-status` to the report"
+        );
+        assert_eq!(
+            report.env_value("SCCACHE_BACKEND"),
+            "${{ steps.setup-rust.outputs.cache-backend }}",
+            "`{id}` must hand `setup-rust`'s `cache-backend` to the report"
+        );
+        let lines: Vec<&str> = report.run.lines().map(str::trim).collect();
         for wanted in [
-            "echo \"::warning title=sccache-fallback::sccache server did not start \
-             within 60 s; this job compiled without the compiler cache\"",
-            "echo \"sccache: FALLBACK (cache disabled for this job)\" >> \"$GITHUB_STEP_SUMMARY\"",
-            "echo \"status=fallback\" >> \"$GITHUB_OUTPUT\"",
-            "echo \"RUSTC_WRAPPER=\" >> \"$GITHUB_ENV\"",
+            "if [[ \"${SCCACHE_STATUS}\" != started ]]; then",
+            "printf 'backend: %s\\n' \"${SCCACHE_BACKEND}\"",
         ] {
             assert!(
-                fallback < step.at(wanted),
-                "`{id}` must raise `{wanted}` only when the server did not start"
+                lines.contains(&wanted),
+                "`{id}` statistics step must contain the line `{wanted}`"
             );
         }
-    }
-}
-
-#[rstest]
-fn the_cache_proxy_export_is_pinned_and_names_every_variable(workflows: Vec<Workflow>) {
-    for id in BUILD_JOB_IDS {
-        let job = job_named(&workflows, id);
-        let (export_at, export) = job
-            .first_step_with("actions/github-script")
-            .unwrap_or_else(|| panic!("`{id}` must export the Ubicloud cache proxy"));
-        assert!(
-            export.uses.ends_with(GITHUB_SCRIPT_SHA),
-            "`{id}` must pin actions/github-script to {GITHUB_SCRIPT_SHA}"
-        );
-        let checkout_at = job
-            .first_step_containing("actions/checkout")
-            .unwrap_or_else(|| panic!("`{id}` must check out the repository"));
-        assert!(
-            checkout_at < export_at,
-            "`{id}` must export the proxy after checkout"
-        );
-        let script = export.input("script");
-        for variable in PROXY_VARIABLES {
-            assert!(
-                script.contains(variable),
-                "`{id}` must export `{variable}` for sccache's backend"
-            );
-        }
-        assert!(
-            !script.contains("ACTIONS_RESULTS_URL"),
-            "`{id}` must not export ACTIONS_RESULTS_URL; it does not route \
-             through Ubicloud's cache proxy"
-        );
-    }
-}
-
-#[rstest]
-fn compiler_cache_effectiveness_is_measured_around_the_build(workflows: Vec<Workflow>) {
-    for id in BUILD_JOB_IDS {
-        let job = job_named(&workflows, id);
-        let zero_at = job
-            .first_step_containing("sccache --zero-stats")
-            .unwrap_or_else(|| panic!("`{id}` must reset the compiler-cache counters"));
-        let (show_at, report) = job
-            .first_step_with("sccache --show-stats")
-            .unwrap_or_else(|| panic!("`{id}` must report compiler-cache statistics"));
-        assert!(
-            zero_at < show_at,
-            "`{id}` must reset the counters before it reports them"
-        );
         assert!(
             report.run.contains("GITHUB_STEP_SUMMARY"),
             "`{id}` must put the compiler-cache statistics in the job summary"

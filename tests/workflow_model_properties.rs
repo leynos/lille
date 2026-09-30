@@ -63,6 +63,7 @@ fn action_step(name: &str, uses: &str, inputs: &[(&str, &str)]) -> Step {
             .iter()
             .map(|(key, value)| ((*key).to_owned(), (*value).to_owned()))
             .collect::<BTreeMap<String, String>>(),
+        ..Step::default()
     }
 }
 
