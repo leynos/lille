@@ -102,7 +102,7 @@ jobs:
         # GitHub's. `ACTIONS_CACHE_SERVICE_V2` is cleared because the v2
         # service bypasses that proxy; exporting `ACTIONS_RESULTS_URL` does
         # not route through it either (measured 2026-09-04).
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             // Report where the endpoint came from, and whether a token was
