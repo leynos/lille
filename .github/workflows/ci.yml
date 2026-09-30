@@ -212,7 +212,7 @@ jobs:
       # evidence and doubled the billed compile. `all-features` names exactly
       # the set the explicit feature list used to name.
       - name: Generate coverage
-        uses: leynos/shared-actions/.github/actions/generate-coverage@a5765019912a8ab6882b12db049c7cde635f3a85
+        uses: leynos/shared-actions/.github/actions/generate-coverage@abf0dcf2686de1eaf79b6dc9a16662b631bed149
         with:
           all-features: 'true'
           all-targets: 'true'
