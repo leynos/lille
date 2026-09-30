@@ -129,7 +129,7 @@ jobs:
         # rather than compiling sccache from source. Installing inside an
         # action step is safe; starting the server there is not, which is why
         # the next step is a `run:` step.
-        uses: taiki-e/install-action@c7eb1735f09259a5035e8e5d44b1406b1cddc0fb # v2.83.0
+        uses: taiki-e/install-action@7623a79cdfecb99d681017af368ca353d9f49bb5 # v2.87.19
         with:
           tool: sccache@0.16.0
           fallback: none
