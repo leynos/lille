@@ -128,7 +128,7 @@ jobs:
           sccache --version
           sccache --zero-stats
       - name: Setup Rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@c5a54701c8603a0fa756a6b34c49bc2af75a6c11
+        uses: leynos/shared-actions/.github/actions/setup-rust@abf0dcf2686de1eaf79b6dc9a16662b631bed149
         with:
           # Sole owner of ~/.cargo/registry and ~/.cargo/git for this job, and
           # the trunk writer whose entry every pull-request run restores.
