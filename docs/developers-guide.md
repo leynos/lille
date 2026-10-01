@@ -461,12 +461,20 @@ carry, matching the action by its own name so a lookalike is held to the
 default. The rule is that no reference floats, not that every action moves
 together.
 
-The exceptions are the two coverage actions, `generate-coverage` and
-`upload-codescene-coverage`, which share `COVERAGE_ACTIONS_SHA`, currently
-`a5765019912a8ab6882b12db049c7cde635f3a85`, so that they carry one commit (the
-shared CV-005 contract holds this as `coverage.selection-parity`). At that
-revision the uploader verifies the `cs-coverage` archive against its committed
-`cli-manifest.json` and rejects a non-empty `installer-checksum` outright, so
+The exceptions are `install-whitaker` and the two coverage actions.
+`install-whitaker` is held to `WHITAKER_ACTION_SHA`, currently
+`6cec89bac47a21cf756d68d638a9a510998e57f8` (shared-actions #546). It advances
+independently of the estate default because the concordat QG-002 rule accepts
+any shared-actions commit at or after `6dea5677` (#522) that leaves the action
+directory content-identical to it, so repinning it to the estate default would
+break QG-002. The workflow passes `installer-version: '0.2.9'`, the floor the
+action accepts, and `supply_chain.rs` asserts it. The coverage actions,
+`generate-coverage` and `upload-codescene-coverage`, share
+`COVERAGE_ACTIONS_SHA`, currently `a5765019912a8ab6882b12db049c7cde635f3a85`,
+so that they carry one commit (the shared CV-005 contract holds this as
+`coverage.selection-parity`). At that revision the uploader verifies the
+`cs-coverage` archive against its committed `cli-manifest.json` and rejects a
+non-empty `installer-checksum` outright, so
 `tests/contracts/codescene_uploader.rs` refuses that input and the
 `CODESCENE_CLI_SHA256` variable that fed it in any workflow, even in a comment,
 requires every uploader reference to carry the approved commit, and requires the
