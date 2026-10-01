@@ -77,14 +77,30 @@ fn no_hand_rolled_compiler_cache_survives_beside_setup_rust(workflows: Vec<Workf
             );
         }
         for (retired, needle) in [
-            ("the cache proxy export", "actions/github-script"),
-            ("a hand-installed sccache", "taiki-e/install-action"),
             ("a hand-started server", "sccache --zero-stats"),
             ("a hand-started server", "sccache --start-server"),
         ] {
             assert!(
                 job.first_step_containing(needle).is_none(),
                 "`{id}` must not carry {retired} (`{needle}`); `setup-rust` owns it"
+            );
+        }
+        // Only the cache-specific uses of these two actions are retired: a job
+        // may still use either for unrelated work.
+        for step in &job.steps {
+            let exports_proxy = step.uses.starts_with("actions/github-script")
+                && step.input("script").contains("ACTIONS_CACHE_URL");
+            let installs_sccache = step.uses.starts_with("taiki-e/install-action")
+                && step.input("tool").contains("sccache");
+            assert!(
+                !exports_proxy,
+                "`{id}` must not export the cache proxy by hand (`{}`); `setup-rust` owns it",
+                step.label()
+            );
+            assert!(
+                !installs_sccache,
+                "`{id}` must not install sccache by hand (`{}`); `setup-rust` owns it",
+                step.label()
             );
         }
     }
@@ -137,6 +153,7 @@ fn compiler_cache_effectiveness_is_measured_and_names_its_backend(workflows: Vec
         for wanted in [
             "if [[ \"${SCCACHE_STATUS}\" != started ]]; then",
             "printf 'backend: %s\\n' \"${SCCACHE_BACKEND}\"",
+            "printf 'backend: %s\\n\\n' \"${SCCACHE_BACKEND}\"",
         ] {
             assert!(
                 lines.contains(&wanted),

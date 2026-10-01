@@ -243,6 +243,7 @@ jobs:
           printf '%s\n' "$stats"
           {
             printf '### sccache statistics (%s)\n\n' "${GITHUB_JOB}"
+            printf 'backend: %s\n\n' "${SCCACHE_BACKEND}"
             printf '```text\n'
             printf '%s\n' "$stats"
             printf '```\n'
