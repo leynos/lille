@@ -199,9 +199,9 @@ jobs:
         # Downloads the pinned prebuilt installer and verifies it against a
         # digest pinned in the action. The action owns the cache for the
         # installer binary, its version marker, and ~/.local/share/whitaker.
-        uses: leynos/shared-actions/.github/actions/install-whitaker@c5a54701c8603a0fa756a6b34c49bc2af75a6c11
+        uses: leynos/shared-actions/.github/actions/install-whitaker@6cec89bac47a21cf756d68d638a9a510998e57f8
         with:
-          installer-version: '0.2.7'
+          installer-version: '0.2.9'
           cache-provider: github
       - name: Lint
         run: |

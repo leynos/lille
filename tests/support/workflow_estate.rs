@@ -38,6 +38,15 @@ pub const SHARED_ACTIONS_SHA: &str = "c5a54701c8603a0fa756a6b34c49bc2af75a6c11";
 /// nobody checks.
 pub const COVERAGE_ACTIONS_SHA: &str = "a5765019912a8ab6882b12db049c7cde635f3a85";
 
+/// Commit `install-whitaker` must pin.
+///
+/// It is a shared-actions commit at or after `6dea5677` (#522) that leaves the
+/// action directory content-identical to it, which is the set the concordat
+/// QG-002 rule accepts. This one is #546, the merge that also gives sccache's
+/// server startup 60 s. It sits apart from [`SHARED_ACTIONS_SHA`] because
+/// the action moved on its own, ahead of the estate default.
+pub const WHITAKER_ACTION_SHA: &str = "6cec89bac47a21cf756d68d638a9a510998e57f8";
+
 /// Shared actions whose reviewed revision is not [`SHARED_ACTIONS_SHA`].
 ///
 /// The estate's rule is that no reference floats, not that every action
@@ -47,7 +56,8 @@ pub const COVERAGE_ACTIONS_SHA: &str = "a5765019912a8ab6882b12db049c7cde635f3a85
 /// nobody asked for. Each exception is named here with the action it
 /// governs, so a reference is still held to a reviewed commit by value and
 /// a new exception has to be added deliberately.
-pub const SHARED_ACTION_PIN_EXCEPTIONS: [(&str, &str); 2] = [
+pub const SHARED_ACTION_PIN_EXCEPTIONS: [(&str, &str); 3] = [
+    ("install-whitaker", WHITAKER_ACTION_SHA),
     ("generate-coverage", COVERAGE_ACTIONS_SHA),
     ("upload-codescene-coverage", COVERAGE_ACTIONS_SHA),
 ];

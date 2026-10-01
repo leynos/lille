@@ -131,7 +131,7 @@ fn sccache_is_installed_from_a_pinned_prebuilt_release(workflows: Vec<Workflow>)
 fn whitaker_is_installed_from_a_pinned_prebuilt_release(workflows: Vec<Workflow>) {
     let job = job_named(&workflows, "build-test");
     let step = step_using(job, &shared_action("install-whitaker"));
-    assert_input("build-test", step, "installer-version", "0.2.7");
+    assert_input("build-test", step, "installer-version", "0.2.9");
     assert_input("build-test", step, "cache-provider", "github");
 }
 
