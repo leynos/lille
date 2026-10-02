@@ -136,12 +136,14 @@ fn parse_step(raw: &Value, at: &Location) -> Result<Step, WorkflowError> {
         return Err(at.shape("every step must be a mapping"));
     }
     let step = Step {
+        id: optional_string(raw, "id", at)?,
         name: optional_string(raw, "name", at)?,
         uses: optional_string(raw, "uses", at)?,
         run: optional_string(raw, "run", at)?,
         condition: optional_scalar(raw, "if", at)?,
         continue_on_error: optional_scalar(raw, "continue-on-error", at)?,
         with: parse_inputs(raw, at)?,
+        env: parse_scalar_mapping(raw, "env", at)?,
     };
     match (step.uses.is_empty(), step.run.is_empty()) {
         (true, true) => Err(at.shape("every step must set `uses` or `run`")),

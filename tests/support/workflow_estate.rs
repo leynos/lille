@@ -47,6 +47,14 @@ pub const COVERAGE_ACTIONS_SHA: &str = "a5765019912a8ab6882b12db049c7cde635f3a85
 /// the action moved on its own, ahead of the estate default.
 pub const WHITAKER_ACTION_SHA: &str = "6cec89bac47a21cf756d68d638a9a510998e57f8";
 
+/// Commit `setup-rust` must pin.
+///
+/// `setup-rust` owns the compiler cache here, and only this revision (shared-actions
+/// #546) gives the sccache server its 60 s startup timeout and lets a server that
+/// will not start fall back to an uncached build instead of failing the job. It
+/// moved ahead of the rest of the estate for that reason.
+pub const SETUP_RUST_SHA: &str = "6cec89bac47a21cf756d68d638a9a510998e57f8";
+
 /// Shared actions whose reviewed revision is not [`SHARED_ACTIONS_SHA`].
 ///
 /// The estate's rule is that no reference floats, not that every action
@@ -56,8 +64,9 @@ pub const WHITAKER_ACTION_SHA: &str = "6cec89bac47a21cf756d68d638a9a510998e57f8"
 /// nobody asked for. Each exception is named here with the action it
 /// governs, so a reference is still held to a reviewed commit by value and
 /// a new exception has to be added deliberately.
-pub const SHARED_ACTION_PIN_EXCEPTIONS: [(&str, &str); 3] = [
+pub const SHARED_ACTION_PIN_EXCEPTIONS: [(&str, &str); 4] = [
     ("install-whitaker", WHITAKER_ACTION_SHA),
+    ("setup-rust", SETUP_RUST_SHA),
     ("generate-coverage", COVERAGE_ACTIONS_SHA),
     ("upload-codescene-coverage", COVERAGE_ACTIONS_SHA),
 ];

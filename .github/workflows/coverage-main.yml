@@ -59,8 +59,6 @@ jobs:
       RUN_RUST_CARGO_WAIT_TIMEOUT: '3600'
       # See ci.yml. This job is the trunk writer, so it is the run that
       # populates the compiler cache every pull request then reads.
-      RUSTC_WRAPPER: sccache
-      SCCACHE_GHA_ENABLED: 'true'
       CARGO_INCREMENTAL: '0'
     steps:
       - uses: actions/checkout@v7
@@ -92,49 +90,18 @@ jobs:
           chmod +x "$sampler"
           nohup "$sampler" "$RESOURCE_SAMPLES" >/dev/null 2>&1 &
           printf 'RESOURCE_SAMPLES=%s\n' "$RESOURCE_SAMPLES" >> "$GITHUB_ENV"
-      - name: Route the compiler cache into Ubicloud's store
-        # See ci.yml for why each variable is exported, and why this must
-        # precede the step that starts the sccache server.
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
-        with:
-          script: |
-            const cacheUrl = process.env.ACTIONS_CACHE_URL ?? '';
-            const runtimeToken = process.env.ACTIONS_RUNTIME_TOKEN ?? '';
-            core.info(`sccache cache endpoint present: ${Boolean(cacheUrl)}`);
-            core.info(`sccache runtime token present: ${Boolean(runtimeToken)}`);
-            if (!cacheUrl || !runtimeToken) {
-              core.warning(
-                'sccache has no Actions cache endpoint; every compilation ' +
-                  'will miss and the wrapper will only add overhead',
-              );
-            }
-            if (runtimeToken) {
-              core.setSecret(runtimeToken);
-            }
-            core.exportVariable('ACTIONS_CACHE_URL', cacheUrl);
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', runtimeToken);
-            core.exportVariable('ACTIONS_CACHE_SERVICE_V2', '');
-      - name: Install sccache
-        uses: taiki-e/install-action@7623a79cdfecb99d681017af368ca353d9f49bb5 # v2.87.19
-        with:
-          tool: sccache@0.16.0
-          fallback: none
-      - name: Reset compiler-cache counters
-        # Started here rather than inside `setup-rust`, for the reason given
-        # in ci.yml: the shared action's sccache path rewrites `GITHUB_ENV`
-        # back to GitHub's v2 cache service on its way out.
-        run: |
-          set -euo pipefail
-          sccache --version
-          sccache --zero-stats
       - name: Setup Rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@c5a54701c8603a0fa756a6b34c49bc2af75a6c11
+        id: setup-rust
+        uses: leynos/shared-actions/.github/actions/setup-rust@6cec89bac47a21cf756d68d638a9a510998e57f8
         with:
           # Sole owner of ~/.cargo/registry and ~/.cargo/git for this job, and
           # the trunk writer whose entry every pull-request run restores.
           cache-provider: github
-          # The job installs and starts sccache itself, above.
-          use-sccache: 'false'
+          # `setup-rust` owns sccache: it selects the backend by runner, starts
+          # the server with a 60 s startup timeout, and falls back to an
+          # uncached build, with a `sccache-fallback` warning, if the server
+          # will not start.
+          expect-cache: ubicloud
       - name: Generate coverage
         uses: leynos/shared-actions/.github/actions/generate-coverage@a5765019912a8ab6882b12db049c7cde635f3a85
         with:
@@ -184,6 +151,9 @@ jobs:
       - name: Record compiler-cache effectiveness
         if: always()
         shell: bash
+        env:
+          SCCACHE_STATUS: ${{ steps.setup-rust.outputs.sccache-status }}
+          SCCACHE_BACKEND: ${{ steps.setup-rust.outputs.cache-backend }}
         run: |
           set -euo pipefail
           # `if: always()` runs this even when an earlier step failed before
@@ -193,12 +163,23 @@ jobs:
             echo 'sccache is not installed; no compiler-cache statistics to report.'
             exit 0
           fi
+          # A server that never started has no statistics: with no server
+          # `sccache --show-stats` prints empty defaults rather than starting
+          # one, which would read as a broken integration.
+          if [[ "${SCCACHE_STATUS}" != started ]]; then
+            echo 'sccache did not start; no compiler-cache statistics to report.'
+            exit 0
+          fi
+          # `Cache location` reads `ghac` for the Ubicloud proxy and for GitHub's own
+          # service alike, so name the backend `setup-rust` chose.
+          printf 'backend: %s\n' "${SCCACHE_BACKEND}"
           # To the log as well as the summary: the summary is not readable
           # through the REST API.
           stats="$(sccache --show-stats)"
           printf '%s\n' "$stats"
           {
             printf '### sccache statistics (%s)\n\n' "${GITHUB_JOB}"
+            printf 'backend: %s\n\n' "${SCCACHE_BACKEND}"
             printf '```text\n'
             printf '%s\n' "$stats"
             printf '```\n'

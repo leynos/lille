@@ -5,7 +5,7 @@
 //! on the change that introduces a violation rather than on the CI run that
 //! suffers from it.
 //!
-//! This file is the harness. The rules live in eleven modules, split by the
+//! This file is the harness. The rules live in thirteen modules, split by the
 //! question each asks: `supply_chain` for what the estate will execute,
 //! `placement` for what it costs and who owns each cache, `fork_fallback` for
 //! whether a fork's pull request can start the lane it reaches,
@@ -16,7 +16,9 @@
 //! `codescene_uploader` for the coverage uploader's pin and the deprecated
 //! checksum inputs it rejects, `timeouts` for the ordering of the timers that
 //! can end a run, `timeout_budgets` for the arithmetic that ordering rests on,
-//! and `parsing` for the loader itself.
+//! `parsing` for the loader itself, `step_fields` for its step `id` and `env`
+//! fields, and `statistics_report` for running the compiler-cache report step
+//! against a stand-in `sccache`.
 //!
 //! The CV-005 `CodeScene` contract is not here: `make test-workflow-contracts`
 //! runs it from the shared `cv005-contracts` library.
@@ -62,6 +64,11 @@ mod parsing;
 mod placement;
 #[path = "contracts/sampler_reading.rs"]
 mod sampler_reading;
+#[cfg(unix)]
+#[path = "contracts/statistics_report.rs"]
+mod statistics_report;
+#[path = "contracts/step_fields.rs"]
+mod step_fields;
 #[path = "contracts/supply_chain.rs"]
 mod supply_chain;
 #[path = "contracts/timeout_budgets.rs"]
