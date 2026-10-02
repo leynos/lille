@@ -336,6 +336,16 @@ buffered-message compile-pass harness
 `cargo clippy --all-targets --all-features -- -D warnings`, and the Whitaker
 Dylint suite.
 
+### The spelling gate
+
+`make spelling` runs the shared `typos-config-builder gate`, which regenerates
+`typos.toml` from the shared dictionary and `typos.local.toml`, then checks
+spelling and the shared phrase corrections. `TYPOS_CONFIG_BUILDER_VERSION` in
+the `Makefile` pins the release the gate runs (currently `v0.1.3`); raise it
+together with the regenerated `typos.toml`, never on its own. The builder
+requires Python 3.14 or newer, so the target asks `uv` for that interpreter with
+`--python 3.14` and `uv` fetches it when the host lacks one.
+
 ### The Makefile shell
 
 The `Makefile` sets `.ONESHELL:` with `SHELL := bash` and
