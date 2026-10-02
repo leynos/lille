@@ -573,16 +573,17 @@ cache is worth about nine minutes a run on this workspace, 16m31s warm against
 summary. `Cache location` reads `ghac` for the Ubicloud proxy and for GitHub's
 own service alike, so the backend line is what tells them apart. The step skips
 when `sccache-status` is not `started`, since a server that never started has
-no statistics and asking for them would start it again. The log copy is the one
-that matters: the summary cannot be read through the REST API, so it cannot be
-checked after the fact. Read the backend line and `Cache location` on every
-run, against the runner. On Ubicloud the backend is `ubicloud` and
-`Cache location` must name the GitHub Actions backend (`ghac`); anything else
-means the proxy was never selected and nothing is being cached there. On a
-GitHub-hosted runner, which is what a fork's pull request gets, `setup-rust`
-deliberately selects local disk under `runner.temp` and manages its directory
-cache, so local disk is the supported result and not a fault. A warm build
-reporting zero hits is a broken contract, not a slow one.
+no statistics; `sccache --show-stats` would print empty defaults for it, which
+reads as a broken integration. The log copy is the one that matters: the
+summary cannot be read through the REST API, so it cannot be checked after the
+fact. Read the backend line and `Cache location` on every run, against the
+runner. On Ubicloud the backend is `ubicloud` and `Cache location` must name
+the GitHub Actions backend (`ghac`); anything else means the proxy was never
+selected and nothing is being cached there. On a GitHub-hosted runner, which is
+what a fork's pull request gets, `setup-rust` deliberately selects local disk
+under `runner.temp` and manages its directory cache, so local disk is the
+supported result and not a fault. A warm build reporting zero hits is a broken
+contract, not a slow one.
 
 Each job also deletes `target/llvm-cov-target` once coverage has been
 generated, printing `df -h` either side. The instrumented tree has no later

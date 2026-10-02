@@ -72,8 +72,10 @@ fn no_hand_rolled_compiler_cache_survives_beside_setup_rust(workflows: Vec<Workf
         let job = job_named(&workflows, id);
         for variable in RETIRED_JOB_ENV {
             assert!(
-                job.env(variable).is_empty(),
-                "`{id}` must not set `{variable}` at job level; `setup-rust` owns it"
+                !job.env.contains_key(variable),
+                "`{id}` must not set `{variable}` at job level, even to an empty value: \
+                 `setup-rust` treats any present `RUSTC_WRAPPER` as the caller's own and \
+                 skips its export; it owns this"
             );
         }
         for (retired, needle) in [
@@ -118,7 +120,16 @@ fn the_compiler_cache_is_set_up_before_the_build_and_reported_after(workflows: V
             };
             at
         };
-        let toolchain = stage("setup-rust", "set up Rust before anything compiles");
+        // The action itself, by its exact `uses` coordinate: an earlier `run`
+        // step that merely mentions `setup-rust` must not stand in for it.
+        let setup_rust = shared_action("setup-rust");
+        let Some(toolchain) = job
+            .steps
+            .iter()
+            .position(|step| step.uses.split('@').next() == Some(setup_rust.as_str()))
+        else {
+            panic!("`{id}` must run `{setup_rust}` before anything compiles");
+        };
         let coverage = stage("generate-coverage", "build the workspace under coverage");
         let report = stage("sccache --show-stats", "report compiler-cache statistics");
         assert!(
@@ -150,16 +161,29 @@ fn compiler_cache_effectiveness_is_measured_and_names_its_backend(workflows: Vec
             "`{id}` must hand `setup-rust`'s `cache-backend` to the report"
         );
         let lines: Vec<&str> = report.run.lines().map(str::trim).collect();
+        let line_of = |wanted: &str| lines.iter().position(|line| *line == wanted);
         for wanted in [
             "if [[ \"${SCCACHE_STATUS}\" != started ]]; then",
             "printf 'backend: %s\\n' \"${SCCACHE_BACKEND}\"",
             "printf 'backend: %s\\n\\n' \"${SCCACHE_BACKEND}\"",
         ] {
             assert!(
-                lines.contains(&wanted),
+                line_of(wanted).is_some(),
                 "`{id}` statistics step must contain the line `{wanted}`"
             );
         }
+        // The guard must come before the command it protects: present but
+        // after `--show-stats`, a fallback run would still publish empty
+        // statistics. A comment that names the command is not the command.
+        let guard = line_of("if [[ \"${SCCACHE_STATUS}\" != started ]]; then");
+        let asks = lines
+            .iter()
+            .position(|line| !line.starts_with('#') && line.contains("sccache --show-stats"));
+        assert!(
+            matches!((guard, asks), (Some(first), Some(second)) if first < second),
+            "`{id}` must check `SCCACHE_STATUS` (line {guard:?}) before it runs \
+             `sccache --show-stats` (line {asks:?})"
+        );
         assert!(
             report.run.contains("GITHUB_STEP_SUMMARY"),
             "`{id}` must put the compiler-cache statistics in the job summary"
