@@ -336,6 +336,16 @@ buffered-message compile-pass harness
 `cargo clippy --all-targets --all-features -- -D warnings`, and the Whitaker
 Dylint suite.
 
+### The spelling gate
+
+`make spelling` runs the shared `typos-config-builder gate`, which regenerates
+`typos.toml` from the shared dictionary and `typos.local.toml`, then checks
+spelling and the shared phrase corrections. `TYPOS_CONFIG_BUILDER_VERSION` in
+the `Makefile` pins the release the gate runs (currently `v0.1.3`); raise it
+together with the regenerated `typos.toml`, never on its own. The builder
+requires Python 3.14 or newer, so the target asks `uv` for that interpreter with
+`--python 3.14` and `uv` fetches it when the host lacks one.
+
 ### The Makefile shell
 
 The `Makefile` sets `.ONESHELL:` with `SHELL := bash` and
@@ -343,16 +353,18 @@ The `Makefile` sets `.ONESHELL:` with `SHELL := bash` and
 Under `.ONESHELL:` make hands a whole recipe to one shell invocation, so only
 that shell's final exit status reaches make; with make's default `-c` alone, a
 lint or test that fails on an earlier line of a multi-line recipe is reported
-nowhere and the target succeeds. `make spelling` is the case that matters here:
-it depends on `spelling-helper-test`, whose three commands run ruff's formatter
-check, ruff's linter, and pytest in that order, and only the last of them would
-have decided the result. Wildside ran into exactly this, where a job logged
-ruff's `Found 3 errors.` and passed.
+nowhere and the target succeeds. `make spelling` was once the case that
+mattered here: it depended on a helper target whose three commands ran ruff's
+formatter check, ruff's linter, and pytest in that order, and only the last of
+them would have decided the result. It is now one `typos-config-builder gate`
+call, but the reasoning holds for any multi-line recipe. Wildside ran into
+exactly this, where a job logged ruff's `Found 3 errors.` and passed.
 
 `pipefail` covers the half `-e` cannot see. A pipeline reports its last
-command's status, so `spelling`'s `git ls-files -z '*.md' | xargs ... typos`
-would succeed whenever the `git ls-files` side failed and `typos` was handed
-nothing. Any gate written as a pipeline needs it.
+command's status, so the earlier `spelling` recipe's
+`git ls-files -z '*.md' | xargs ... typos` would have succeeded whenever the
+`git ls-files` side failed and `typos` was handed nothing. Any gate written as
+a pipeline needs it.
 
 Keep `-c` when changing `.SHELLFLAGS`; it is make's own default and the shell
 will not read the recipe without it. A recipe that genuinely needs a non-zero
