@@ -92,7 +92,7 @@ jobs:
           printf 'RESOURCE_SAMPLES=%s\n' "$RESOURCE_SAMPLES" >> "$GITHUB_ENV"
       - name: Setup Rust
         id: setup-rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@6cec89bac47a21cf756d68d638a9a510998e57f8
+        uses: leynos/shared-actions/.github/actions/setup-rust@b6eb26ff70e41779a80fb7f4f073011d847ab5fc
         with:
           # Sole owner of ~/.cargo/registry and ~/.cargo/git for this job, and
           # the trunk writer whose entry every pull-request run restores.
