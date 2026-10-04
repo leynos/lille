@@ -126,10 +126,21 @@ pub fn commands_from(stdout: &str) -> Result<Vec<Assignment>, String> {
         .collect()
 }
 
+/// A Makefile target name, typed so a runner takes a target and not just any text.
+#[derive(Clone, Copy, Debug)]
+pub struct Target<'a>(pub &'a str);
+
+impl<'a> Target<'a> {
+    /// Returns the target's name.
+    pub const fn name(self) -> &'a str {
+        self.0
+    }
+}
+
 /// Runs `make -n` for a target on a host and returns what it printed. The tests
 /// that drive real `make` use [`real_make`]; a test of the parsing path passes a
 /// function that returns canned text instead, so no process runs.
-pub type MakeRunner = fn(&str, Host) -> Result<String, String>;
+pub type MakeRunner = fn(Target<'_>, Host) -> Result<String, String>;
 
 /// The integration adapter: runs the real `make -n` in the crate's directory and
 /// reports a spawn failure or an undefined target as an error.
@@ -137,13 +148,14 @@ pub type MakeRunner = fn(&str, Host) -> Result<String, String>;
 /// # Errors
 ///
 /// Returns the reason when `make` cannot run or the target is not defined.
-pub fn real_make(target: &str, host: Host) -> Result<String, String> {
+pub fn real_make(target: Target<'_>, host: Host) -> Result<String, String> {
+    let name = target.name();
     let output = Command::new("make")
         .args([
             "-n",
             "-B",
             &format!("BUILD_HOST_OS={}", host.make_value()),
-            target,
+            name,
         ])
         .current_dir(env!("CARGO_MANIFEST_DIR"))
         .output()
@@ -151,7 +163,7 @@ pub fn real_make(target: &str, host: Host) -> Result<String, String> {
     let stderr = String::from_utf8_lossy(&output.stderr);
     if !output.status.success() {
         return Err(format!(
-            "`make -n {target}` failed, so it is not defined: {stderr}"
+            "`make -n {name}` failed, so it is not defined: {stderr}"
         ));
     }
     Ok(String::from_utf8_lossy(&output.stdout).into_owned())
@@ -159,7 +171,7 @@ pub fn real_make(target: &str, host: Host) -> Result<String, String> {
 
 /// Reads the commands a runner reports for a target on a host.
 fn make_commands(runner: MakeRunner, target: &str, host: Host) -> Result<Vec<Assignment>, String> {
-    commands_from(&runner(target, host)?)
+    commands_from(&runner(Target(target), host)?)
 }
 
 /// Returns the complaint about a development command that assigns no `RUSTFLAGS`.
@@ -244,8 +256,8 @@ pub fn development_problems(
 /// Returns every complaint about one held-out command: it assigns nothing, so
 /// it takes the configuration's flags, or the assignment names a standard flag.
 fn held_out_command_problems(target: &str, assignment: &Assignment) -> Problems {
-    let flags = match assignment {
-        Assignment::Flags(flags, _) => flags,
+    let (flags, inherits) = match assignment {
+        Assignment::Flags(flags, inherits) => (flags, *inherits),
         Assignment::Bare(command) => {
             return vec![format!(
                 "`make {target}` runs `{command}`, which takes the configuration's flags"
@@ -257,11 +269,17 @@ fn held_out_command_problems(target: &str, assignment: &Assignment) -> Problems 
         (flags.names_threads(), THREADS_FLAG),
         (flags.names_linker(), LINKER_FLAG),
     ];
-    named
+    let mut problems: Problems = named
         .into_iter()
         .filter(|(is_named, _)| *is_named)
         .map(|(_, flag)| format!("`make {target}` takes {flag}"))
-        .collect()
+        .collect();
+    // A release build keeps the caller's own flags (a sanitizer, a target feature) while it drops the
+    // standard's; only the coverage build, a measurement, ignores them.
+    if target == "release" && !inherits {
+        problems.push(format!("`make {target}` drops the caller's RUSTFLAGS"));
+    }
+    problems
 }
 
 /// Returns every complaint about the held-out targets, and how many commands it
