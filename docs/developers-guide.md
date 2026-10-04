@@ -728,7 +728,7 @@ two. A workflow contract in `tests/workflow_contracts.rs` fails if a second
 ### Workflow contracts
 
 `tests/workflow_contracts.rs` asserts the rules above. It is a harness rather
-than a test file: the rules live in eleven modules under `tests/contracts/`,
+than a test file: the rules live in thirteen modules under `tests/contracts/`,
 split by the question each asks.
 
 | Module                  | Asks                                                                                                                                                                                                                                                                                    |
@@ -742,10 +742,12 @@ split by the question each asks.
 | `compiler_cache.rs`     | Is sccache actually working? `setup-rust` owns it with the inputs and id the report reads, no hand-rolled wrapper, export, install or start survives beside it, it precedes the build and the report follows, and the resource sampler with its report.                                 |
 | `sampler_reading.rs`    | Does a line in a `run` script actually run? The quoting, comment, escape, and guard reading in `tests/support/shell_reading.rs`, which `compiler_cache.rs` asks its sampling question through, driven with shapes the workflows do not contain.                                         |
 | `parsing.rs`            | Does the loader read workflows correctly? Its subject is the loader, not any workflow in this repository.                                                                                                                                                                               |
+| `step_fields.rs`        | Does the loader keep a step's `id` and `env` as written? Present and absent values, an empty value kept apart from an absent one, `Step::env_value`, and each malformed `env` refused for its own reason.                                                                               |
+| `statistics_report.rs`  | What does the compiler-cache report actually do? Each build job's statistics step is run under `bash` against a stand-in `sccache` for a started server, a fallback, an empty status and a missing binary, and its rendered log and summary are snapshotted. Unix only.                 |
 | `timeouts.rs`           | Which timer ends a run first? The coverage action's cargo watchdog set explicitly and by value, each coverage job's ceiling above that watchdog plus the measured work around it and equal to the documented 90 minutes, and the two nextest tiers absent rather than silently enabled. |
 | `timeout_budgets.rs`    | Do the readings that ordering rests on say what they claim? The coordinate match, the ceiling predicate, and the two conversions, driven with values chosen to separate a correct reading from a plausible wrong one.                                                                   |
 
-*Table: the eleven contract modules, and the question each one asks of the
+*Table: the thirteen contract modules, and the question each one asks of the
 estate.*
 
 Each module also pins the inputs that make its rules true, so a workflow cannot

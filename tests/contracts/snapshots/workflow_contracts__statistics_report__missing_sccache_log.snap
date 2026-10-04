@@ -1,0 +1,5 @@
+---
+source: tests/contracts/statistics_report.rs
+expression: missing.stdout
+---
+sccache is not installed; no compiler-cache statistics to report.

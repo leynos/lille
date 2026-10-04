@@ -1,0 +1,6 @@
+---
+source: tests/contracts/statistics_report.rs
+expression: started.stdout
+---
+backend: ubicloud
+Cache location                  ghac (fake)

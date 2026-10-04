@@ -14,6 +14,7 @@
 //! whose own tests execute them in shared-actions. This repository owns the
 //! report, so the report is what is run here.
 
+use std::io::ErrorKind;
 use std::process::Command;
 
 use camino::Utf8Path;
@@ -53,13 +54,33 @@ struct Outcome {
     calls: String,
 }
 
-/// Runs `script` with `status` as `SCCACHE_STATUS`, with or without the
-/// stand-in `sccache` defined.
+/// Reads a file the run may legitimately not have written.
 ///
 /// # Errors
 ///
-/// Returns a message when the scratch directory cannot be prepared or `bash`
-/// cannot be started.
+/// Returns the empty string only when the file is absent, which for the call
+/// log means no call was recorded. Any other read error is returned, so an
+/// environmental fault cannot pass for an expected empty result.
+fn read_if_written(dir: &Dir, name: &str) -> Result<String, String> {
+    match dir.read_to_string(name) {
+        Ok(text) => Ok(text),
+        Err(err) if err.kind() == ErrorKind::NotFound => Ok(String::new()),
+        Err(err) => Err(format!("cannot read {name}: {err}")),
+    }
+}
+
+/// Runs `script` with `status` as `SCCACHE_STATUS`, with or without the
+/// stand-in `sccache` defined.
+///
+/// With the stand-in, `PATH` holds the system directories the script's own
+/// commands need. Without it, `PATH` is an empty scratch directory, so command
+/// lookup cannot find a host `sccache` and the "not installed" branch is the
+/// one that runs whatever the host has installed.
+///
+/// # Errors
+///
+/// Returns a message when the scratch directory cannot be prepared, `bash`
+/// cannot be started, or a file the run wrote cannot be read.
 fn run_report(script: &str, status: &str, sccache_installed: bool) -> Result<Outcome, String> {
     let scratch = TempDir::new().map_err(|err| format!("a scratch directory: {err}"))?;
     let root = Utf8Path::from_path(scratch.path())
@@ -70,12 +91,25 @@ fn run_report(script: &str, status: &str, sccache_installed: bool) -> Result<Out
         .map_err(|err| format!("a summary file: {err}"))?;
     dir.write("fake.sh", FAKE_SCCACHE)
         .map_err(|err| format!("the stand-in sccache: {err}"))?;
-    let mut command = Command::new("bash");
+    let empty_path = root.join("empty-path");
+    dir.create_dir("empty-path")
+        .map_err(|err| format!("an empty PATH directory: {err}"))?;
+    let path = if sccache_installed {
+        "/usr/bin:/bin".to_owned()
+    } else {
+        empty_path.into_string()
+    };
+    // An absolute path: with `PATH` emptied, a bare `bash` would not be found.
+    let bash = ["/bin/bash", "/usr/bin/bash"]
+        .into_iter()
+        .find(|candidate| Utf8Path::new(candidate).is_file())
+        .ok_or_else(|| "no bash at /bin/bash or /usr/bin/bash".to_owned())?;
+    let mut command = Command::new(bash);
     command
         .arg("-c")
         .arg(script)
         .env_clear()
-        .env("PATH", "/usr/bin:/bin")
+        .env("PATH", path)
         .env("SCCACHE_STATUS", status)
         .env("SCCACHE_BACKEND", "ubicloud")
         .env("GITHUB_JOB", "scratch-job")
@@ -90,8 +124,10 @@ fn run_report(script: &str, status: &str, sccache_installed: bool) -> Result<Out
     Ok(Outcome {
         succeeded: output.status.success(),
         stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
-        summary: dir.read_to_string("summary").unwrap_or_default(),
-        calls: dir.read_to_string("calls").unwrap_or_default(),
+        summary: dir
+            .read_to_string("summary")
+            .map_err(|err| format!("cannot read the job summary: {err}"))?,
+        calls: read_if_written(&dir, "calls")?,
     })
 }
 
@@ -211,5 +247,28 @@ fn a_missing_sccache_is_reported_without_failing(workflows: Vec<Workflow>) -> Re
             format!("`{id}` must write nothing to the summary"),
         )?;
     }
+    Ok(())
+}
+
+/// The deterministic, human-facing output of the report, snapshotted.
+///
+/// The semantic assertions above stay; these pin the rendered text a person
+/// reads in the log and the job summary, which a substring check lets drift. Each
+/// run uses the stand-in's fixed statistics, the fixed backend and the fixed job
+/// name, so nothing in a snapshot comes from the host or the clock.
+#[rstest]
+fn the_rendered_report_is_stable(workflows: Vec<Workflow>) -> Result<(), String> {
+    let (_, script) = report_scripts(&workflows)
+        .into_iter()
+        .next()
+        .ok_or_else(|| "a build job must report compiler-cache statistics".to_owned())?;
+    let started = run_report(&script, "started", true)?;
+    let fallback = run_report(&script, "fallback", true)?;
+    let missing = run_report(&script, "started", false)?;
+
+    insta::assert_snapshot!("started_log", started.stdout);
+    insta::assert_snapshot!("started_summary", started.summary);
+    insta::assert_snapshot!("fallback_log", fallback.stdout);
+    insta::assert_snapshot!("missing_sccache_log", missing.stdout);
     Ok(())
 }
