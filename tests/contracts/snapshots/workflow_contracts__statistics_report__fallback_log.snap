@@ -1,0 +1,5 @@
+---
+source: tests/contracts/statistics_report.rs
+expression: fallback.stdout
+---
+sccache did not start; no compiler-cache statistics to report.
