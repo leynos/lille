@@ -103,7 +103,7 @@ jobs:
           # will not start.
           expect-cache: ubicloud
       - name: Generate coverage
-        uses: leynos/shared-actions/.github/actions/generate-coverage@a5765019912a8ab6882b12db049c7cde635f3a85
+        uses: leynos/shared-actions/.github/actions/generate-coverage@b6eb26ff70e41779a80fb7f4f073011d847ab5fc
         with:
           all-features: 'true'
           all-targets: 'true'
