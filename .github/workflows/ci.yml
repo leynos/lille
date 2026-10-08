@@ -49,12 +49,8 @@ jobs:
       # and 1,800 s would have killed cargo before the job timeout noticed.
       RUN_RUST_CARGO_WAIT_TIMEOUT: '3600'
       # sccache is the sole owner of compiler output: no step archives a
-      # `target` tree. RUSTC_WRAPPER is what engages it, and
-      # SCCACHE_GHA_ENABLED is what points it at the Actions cache. Without
-      # the second, sccache falls back to `~/.cache/sccache`, which nothing
-      # persists, and the wrapper becomes pure overhead.
-      RUSTC_WRAPPER: sccache
-      SCCACHE_GHA_ENABLED: 'true'
+      # `target` tree. `setup-rust` owns it: it installs sccache, starts the
+      # server, and names it as the rustc wrapper.
       # sccache cannot cache incremental compilation, and an incremental
       # build would defeat every hit.
       CARGO_INCREMENTAL: '0'
@@ -93,72 +89,20 @@ jobs:
           chmod +x "$sampler"
           nohup "$sampler" "$RESOURCE_SAMPLES" >/dev/null 2>&1 &
           printf 'RESOURCE_SAMPLES=%s\n' "$RESOURCE_SAMPLES" >> "$GITHUB_ENV"
-      - name: Route the compiler cache into Ubicloud's store
-        # sccache's GitHub Actions backend reads these from the environment,
-        # but the runner exposes them to action code rather than to later
-        # steps, so re-export them for the shell steps that compile. On
-        # Ubicloud `ACTIONS_CACHE_URL` names the runner's local cache proxy,
-        # which is what puts sccache's traffic in Ubicloud's store instead of
-        # GitHub's. `ACTIONS_CACHE_SERVICE_V2` is cleared because the v2
-        # service bypasses that proxy; exporting `ACTIONS_RESULTS_URL` does
-        # not route through it either (measured 2026-09-04).
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
-        with:
-          script: |
-            // Report where the endpoint came from, and whether a token was
-            // present at all, so a misconfigured backend is diagnosable from
-            // the log rather than from a slower build. Never print the token.
-            const cacheUrl = process.env.ACTIONS_CACHE_URL ?? '';
-            const runtimeToken = process.env.ACTIONS_RUNTIME_TOKEN ?? '';
-            core.info(`sccache cache endpoint present: ${Boolean(cacheUrl)}`);
-            core.info(`sccache runtime token present: ${Boolean(runtimeToken)}`);
-            if (!cacheUrl || !runtimeToken) {
-              core.warning(
-                'sccache has no Actions cache endpoint; every compilation ' +
-                  'will miss and the wrapper will only add overhead',
-              );
-            }
-            if (runtimeToken) {
-              core.setSecret(runtimeToken);
-            }
-            core.exportVariable('ACTIONS_CACHE_URL', cacheUrl);
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', runtimeToken);
-            core.exportVariable('ACTIONS_CACHE_SERVICE_V2', '');
-      - name: Install sccache
-        # A pinned prebuilt binary, with `fallback: none` so the action fails
-        # rather than compiling sccache from source. Installing inside an
-        # action step is safe; starting the server there is not, which is why
-        # the next step is a `run:` step.
-        uses: taiki-e/install-action@c7eb1735f09259a5035e8e5d44b1406b1cddc0fb # v2.83.0
-        with:
-          tool: sccache@0.16.0
-          fallback: none
-      - name: Reset compiler-cache counters
-        # This starts the sccache server, and starting it here rather than
-        # inside `setup-rust` is the point. The shared action's sccache path
-        # runs the mozilla sccache-action, whose last act writes
-        # `ACTIONS_CACHE_SERVICE_V2=on`, GitHub's results URL, and GitHub's
-        # token back to `GITHUB_ENV`, clobbering the export above for every
-        # later step. Measured on `ubicloud-standard-2`: `run:` steps do see
-        # the export, so the export itself was never the problem. Starting the
-        # server here means it binds the proxy before anything can overwrite
-        # the endpoint it read.
-        run: |
-          set -euo pipefail
-          sccache --version
-          sccache --zero-stats
       - name: Setup Rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@8a83824b29dfe8f861714b544dc85fb925ed010c
+        id: setup-rust
+        uses: leynos/shared-actions/.github/actions/setup-rust@6cec89bac47a21cf756d68d638a9a510998e57f8
         with:
           install-mold: 'true'
           # Sole owner of ~/.cargo/registry and ~/.cargo/git for this job. It
           # runs before the first cargo invocation so the lint step reads a
           # warm registry.
           cache-provider: github
-          # The job installs and starts sccache itself, above. This action's
-          # sccache path would rewrite `GITHUB_ENV` back to GitHub's v2 cache
-          # service on its way out, so every later step would lose the proxy.
-          use-sccache: 'false'
+          # `setup-rust` owns sccache: it selects the backend by runner, starts
+          # the server with a 60 s startup timeout, and falls back to an
+          # uncached build, with a `sccache-fallback` warning, if the server
+          # will not start.
+          expect-cache: any
       - name: Cache uv tool layers
         # `make spelling` drives uv with repository-local UV_CACHE_DIR and
         # UV_TOOL_DIR, so these two directories are the whole uv surface. This
@@ -200,9 +144,9 @@ jobs:
         # Downloads the pinned prebuilt installer and verifies it against a
         # digest pinned in the action. The action owns the cache for the
         # installer binary, its version marker, and ~/.local/share/whitaker.
-        uses: leynos/shared-actions/.github/actions/install-whitaker@c5a54701c8603a0fa756a6b34c49bc2af75a6c11
+        uses: leynos/shared-actions/.github/actions/install-whitaker@6cec89bac47a21cf756d68d638a9a510998e57f8
         with:
-          installer-version: '0.2.7'
+          installer-version: '0.2.9'
           cache-provider: github
       - name: Lint
         env:
@@ -280,6 +224,9 @@ jobs:
       - name: Record compiler-cache effectiveness
         if: always()
         shell: bash
+        env:
+          SCCACHE_STATUS: ${{ steps.setup-rust.outputs.sccache-status }}
+          SCCACHE_BACKEND: ${{ steps.setup-rust.outputs.cache-backend }}
         run: |
           set -euo pipefail
           # `if: always()` runs this even when an earlier step failed before
@@ -289,6 +236,16 @@ jobs:
             echo 'sccache is not installed; no compiler-cache statistics to report.'
             exit 0
           fi
+          # A server that never started has no statistics: with no server
+          # `sccache --show-stats` prints empty defaults rather than starting
+          # one, which would read as a broken integration.
+          if [[ "${SCCACHE_STATUS}" != started ]]; then
+            echo 'sccache did not start; no compiler-cache statistics to report.'
+            exit 0
+          fi
+          # `Cache location` reads `ghac` for the Ubicloud proxy and for GitHub's own
+          # service alike, so name the backend `setup-rust` chose.
+          printf 'backend: %s\n' "${SCCACHE_BACKEND}"
           # Print to the log as well as the job summary: the summary is not
           # readable through the REST API, so the log copy is what lets anyone
           # confirm `Cache location`, the hit rate, and any read or write
@@ -297,6 +254,7 @@ jobs:
           printf '%s\n' "$stats"
           {
             printf '### sccache statistics (%s)\n\n' "${GITHUB_JOB}"
+            printf 'backend: %s\n\n' "${SCCACHE_BACKEND}"
             printf '```text\n'
             printf '%s\n' "$stats"
             printf '```\n'

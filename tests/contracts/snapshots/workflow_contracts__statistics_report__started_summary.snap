@@ -1,0 +1,11 @@
+---
+source: tests/contracts/statistics_report.rs
+expression: started.summary
+---
+### sccache statistics (scratch-job)
+
+backend: ubicloud
+
+```text
+Cache location                  ghac (fake)
+```

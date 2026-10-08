@@ -56,6 +56,8 @@ pub fn is_constantly_true(condition: &str) -> bool {
 /// One step of a workflow job, reduced to the fields the contracts inspect.
 #[derive(Debug, Clone, Default)]
 pub struct Step {
+    /// Step id, or an empty string when the step declares none.
+    pub id: String,
     /// Display name, or an empty string when the step is unnamed.
     pub name: String,
     /// Action reference, or an empty string for a `run` step.
@@ -71,9 +73,17 @@ pub struct Step {
     pub continue_on_error: Option<String>,
     /// Inputs supplied to the action, rendered as GitHub would pass them.
     pub with: BTreeMap<String, String>,
+    /// Step-level environment, rendered as written.
+    pub env: BTreeMap<String, String>,
 }
 
 impl Step {
+    /// Returns a step-level environment value, or an empty string when unset.
+    #[must_use]
+    pub fn env_value(&self, key: &str) -> &str {
+        self.env.get(key).map_or("", String::as_str)
+    }
+
     /// Reports whether the step's `if` is a constant that never holds.
     #[must_use]
     pub fn never_runs(&self) -> bool {
