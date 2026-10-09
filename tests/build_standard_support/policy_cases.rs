@@ -104,6 +104,7 @@ fn the_test_reader_recognizes_a_test_run_in_each_spelling(
 #[case::a_windows_path(Fixture("C:/tools/cargo.exe check"), Some("cargo check"))]
 #[case::whitaker(Fixture("RUSTFLAGS=\"-D warnings\" whitaker --all"), Some("whitaker"))]
 #[case::a_version_probe(Fixture("cargo nextest --version"), None)]
+#[case::nextest_with_no_action(Fixture("cargo nextest"), None)]
 #[case::a_formatter(Fixture("cargo fmt --all --check"), None)]
 #[case::a_documentation_build(Fixture("cargo doc --no-deps"), None)]
 #[case::not_cargo_at_all(Fixture("echo build"), None)]

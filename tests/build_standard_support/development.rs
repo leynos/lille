@@ -128,6 +128,7 @@ pub fn test_policy_problems(target: Target<'_>, host: Host, commands: &[Command]
 /// tool_key("RUSTFLAGS=\"-D warnings\" cargo +nightly build --release") == Some("cargo build")
 /// tool_key("cargo nextest run --all-targets")                          == Some("cargo nextest run")
 /// tool_key("cargo nextest --version")                                  == None
+/// tool_key("cargo nextest")                                            == None
 /// ```
 pub fn tool_key(command: &str) -> Option<String> {
     if !compiles(command) {
@@ -145,10 +146,8 @@ pub fn tool_key(command: &str) -> Option<String> {
             .then(|| "whitaker".to_owned());
     };
     if subcommand == "nextest" {
-        let action = words
-            .find(|word| !word.starts_with('-'))
-            .unwrap_or_default();
-        return Some(format!("cargo nextest {action}").trim_end().to_owned());
+        let action = words.find(|word| !word.starts_with('-'))?;
+        return Some(format!("cargo nextest {action}"));
     }
     Some(format!("cargo {subcommand}"))
 }

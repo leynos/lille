@@ -127,6 +127,12 @@ pub const COVERAGE_OK: &str = concat!(
     "        uses: org/shared-actions/.github/actions/generate-coverage@0123456789abcdef0123456789abcdef01234567\n",
     "        env:\n          RUSTFLAGS: -D warnings\n"
 );
+/// A coverage step whose only `RUSTFLAGS` key sits under `with:`, so nothing is assigned in `env:`.
+pub const COVERAGE_RUSTFLAGS_UNDER_WITH: &str = concat!(
+    "    steps:\n      - name: Cover\n",
+    "        uses: org/shared-actions/.github/actions/generate-coverage@0123456789abcdef0123456789abcdef01234567\n",
+    "        with:\n          RUSTFLAGS: -D warnings\n"
+);
 /// A coverage step with no assignment.
 pub const COVERAGE_UNASSIGNED: &str = concat!(
     "    steps:\n      - name: Cover\n",

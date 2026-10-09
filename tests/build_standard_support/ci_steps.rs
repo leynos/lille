@@ -87,10 +87,34 @@ impl Step<'_> {
             .any(|line| squeezed(line) == "install-mold:true")
     }
 
-    /// Returns the value of the step's own `RUSTFLAGS:` line, if it has one.
-    fn rustflags(&self) -> Option<&str> {
+    /// Returns the lines of the step's `env:` mapping, below the key and above the next key at its level.
+    fn env_lines(&self) -> Vec<&str> {
+        let Some(at) = self
+            .lines
+            .iter()
+            .position(|line| line.trim().trim_start_matches("- ") == "env:")
+        else {
+            return Vec::new();
+        };
+        let key_indent = self.lines.get(at).map_or(0, |line| indent(line));
         self.lines
             .iter()
+            .skip(at + 1)
+            .copied()
+            .take_while(|line| line.trim().is_empty() || indent(line) > key_indent)
+            .collect()
+    }
+
+    /// Returns the value the step's `env:` mapping gives `RUSTFLAGS`, if it does. A key of that name under
+    /// `with:` or any other mapping is no assignment, so it does not count.
+    fn rustflags(&self) -> Option<&str> {
+        let env = self.env_lines();
+        let level = env
+            .iter()
+            .find(|line| !line.trim().is_empty())
+            .map(|line| indent(line))?;
+        env.iter()
+            .filter(|line| indent(line) == level)
             .find_map(|line| line.trim().strip_prefix("RUSTFLAGS:"))
             .map(str::trim)
     }
