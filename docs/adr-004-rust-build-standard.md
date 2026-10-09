@@ -4,7 +4,7 @@
 
 Accepted on 8 October 2026. Development, test, lint and typecheck builds use
 the parallel `rustc` frontend (`-Zthreads=8`) and, on Linux, the `mold` linker,
-while coverage and release builds stay off the fast flags.
+while the coverage build stays off the fast flags.
 
 ## Date
 
@@ -23,7 +23,7 @@ artefacts also need a baseline that the fast flags would disturb.
 
 - Faster local and CI development builds without changing what the code means.
 - Coverage numbers that do not depend on the fast flags.
-- A release that ships from the platform linker.
+- A direct release build that can still link with the platform linker.
 - A flag lost through a recipe or workflow edit must fail a test, not pass
   quietly.
 
@@ -41,11 +41,10 @@ artefacts also need a baseline that the fast flags would disturb.
 `.cargo/config.toml` carries the flags in every `rustflags` source, and adds the
 `mold` linker flag to the Linux table only. The Makefile composes the same
 flags into each development recipe, keeping the caller's own `RUSTFLAGS`.
-Coverage assigns its own flags and ignores the caller's. The release recipe
-keeps the caller's flags and names neither fast flag, so it ships from the
-platform linker; a direct `cargo build --release` takes the configuration's
-flags unless `RUSTFLAGS` is assigned. Cranelift is not adopted; the developers'
-guide records the reason.
+Coverage assigns its own flags and ignores the caller's. The repository has no
+release recipe; a direct `cargo build --release` takes the configuration's
+flags unless `RUSTFLAGS` is assigned, for example to an empty value. Cranelift
+is not adopted; the developers' guide records the reason.
 
 `tests/build_standard_contract.rs` reads the Cargo configuration sources and
 the commands `make -n` prints for each target, and the `setup-rust` steps of
