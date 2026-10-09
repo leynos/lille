@@ -9,14 +9,24 @@
 //! directories and write files to paths determined by Cargo environment
 //! variables. The `cap_std` capability model cannot be applied here because
 //! Cargo does not provide directory handles.
+use crate::hex::to_lower_hex;
 use anyhow::{anyhow, Context, Result};
 use reqwest::blocking::Client;
 use sha2::{Digest, Sha256};
 use std::fs;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tempfile::NamedTempFile;
+
+/// Maximum response body accepted when downloading the font.
+///
+/// A Fira Sans regular TTF is ~400 KiB, so this leaves generous headroom while
+/// bounding what a hostile or misbehaving origin can make the build allocate.
+/// The checksum can only be verified once the whole body is buffered, so the
+/// cap is the sole defence against unbounded build-time memory use — and the
+/// failure would otherwise land on every developer and CI job.
+const MAX_FONT_BYTES: u64 = 8 * 1024 * 1024;
 
 /// Fetches the binary contents of the Fira Sans font.
 ///
@@ -150,6 +160,22 @@ pub fn download_font_with(
     }
 }
 
+/// Read at most `max_bytes` from `reader`, rejecting anything larger.
+///
+/// The reader is capped at `max_bytes + 1` rather than `max_bytes` because a
+/// plain cap cannot distinguish a body sitting exactly on the limit from one
+/// silently truncated by it. Reading the extra byte makes an oversized body
+/// observable, so it is reported instead of quietly hashed as a short font.
+fn read_capped(reader: impl Read, max_bytes: u64) -> Result<Vec<u8>> {
+    let mut limited = reader.take(max_bytes + 1);
+    let mut bytes = Vec::new();
+    limited.read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > max_bytes {
+        return Err(anyhow!("body exceeds the maximum of {max_bytes} bytes"));
+    }
+    Ok(bytes)
+}
+
 /// Download the font bytes over HTTP and verify the checksum.
 fn fetch_font_data() -> Result<Vec<u8>> {
     const FONT_URL: &str = "https://raw.githubusercontent.com/mozilla/Fira/fd8c8c0a3d353cd99e8ca1662942d165e6961407/ttf/FiraSans-Regular.ttf";
@@ -165,17 +191,15 @@ fn fetch_font_data() -> Result<Vec<u8>> {
         .with_context(|| format!("requesting font from {FONT_URL}"))?
         .error_for_status()
         .with_context(|| format!("unexpected HTTP status for {FONT_URL}"))?;
-    let bytes = resp
-        .bytes()
+    let bytes = read_capped(resp, MAX_FONT_BYTES)
         .with_context(|| format!("reading response body from {FONT_URL}"))?;
-    let digest = Sha256::digest(&bytes);
-    let actual = format!("{digest:x}");
+    let actual = to_lower_hex(&Sha256::digest(&bytes));
     if actual != FONT_SHA256 {
         return Err(anyhow!(
             "font checksum mismatch (expected {FONT_SHA256}, got {actual})"
         ));
     }
-    Ok(bytes.to_vec())
+    Ok(bytes)
 }
 
 #[cfg(test)]
@@ -261,6 +285,28 @@ mod tests {
         for h in handles {
             assert!(h.join().expect("thread panicked"));
         }
+    }
+
+    /// A body at or below the cap is returned intact; the boundary case matters
+    /// because the reader is deliberately given one byte of slack.
+    #[rstest]
+    #[case::empty(0)]
+    #[case::below_cap(3)]
+    #[case::exactly_at_cap(4)]
+    fn read_capped_accepts_bodies_within_the_limit(#[case] len: usize) {
+        let body = vec![0xab; len];
+        let bytes = read_capped(body.as_slice(), 4).expect("body within the cap is accepted");
+        assert_eq!(bytes, body);
+    }
+
+    #[rstest]
+    fn read_capped_rejects_oversized_body() {
+        let body = vec![0xab; 5];
+        let error = read_capped(body.as_slice(), 4).expect_err("oversized body is rejected");
+        assert!(
+            error.to_string().contains("exceeds the maximum of 4 bytes"),
+            "unexpected error: {error}"
+        );
     }
 
     #[rstest]
