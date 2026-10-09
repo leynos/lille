@@ -23,7 +23,16 @@ SHELL := bash
 
 RUSTFLAGS_STRICT := -D warnings
 RUST_FLAGS ?= $(RUSTFLAGS_STRICT)
-RUST_FLAGS_ENV := RUSTFLAGS="$(RUST_FLAGS)"
+# The development build standard (concordat rule `rust-build-defaults`):
+# the parallel rustc frontend and, on Linux, the mold linker. An assigned
+# RUSTFLAGS replaces every `rustflags` table in .cargo/config.toml, so each
+# recipe that sets it composes these onto any inherited value (CI's
+# setup-rust exports one), except coverage, which stays on LLVM and the
+# platform linker.
+BUILD_HOST_OS := $(shell uname -s)
+STANDARD_RUSTFLAGS := -Zthreads=8$(if $(filter Linux,$(BUILD_HOST_OS)), -Clink-arg=-fuse-ld=mold)
+RUST_FLAGS_ENV := RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)"
+STANDARD_ENV := RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS)"
 WHITAKER ?= whitaker
 WORKSPACE_PACKAGES := --package lille --package build_support --package test_utils
 MARKDOWNLINT := $(shell which markdownlint-cli2)
@@ -80,8 +89,8 @@ RUSTDOC_FLAGS ?= --cfg docsrs -D warnings
 
 lint:
 	set -euo pipefail
-	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" cargo doc --workspace --no-deps
-	cargo clippy --all-targets --all-features -- $(RUST_FLAGS)
+	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(STANDARD_ENV) cargo doc --workspace --no-deps
+	$(STANDARD_ENV) cargo clippy --all-targets --all-features -- $(RUST_FLAGS)
 	$(RUST_FLAGS_ENV) $(WHITAKER) --all -- --all-targets --all-features
 
 markdownlint: spelling

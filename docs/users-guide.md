@@ -129,3 +129,25 @@ with `take_from_all()` or equivalent — or records accumulate.
 
 For the full frame lifecycle and rollback API, see the
 [DBSP synchronization developer's guide](dbsp-synchronization-guide.md).
+
+## 3. Build standard
+
+Development builds (`make test`, `make lint`, `make typecheck` and the debug
+build) use the parallel `rustc` frontend (`-Zthreads=8`) and, on Linux, the
+`mold` linker. Install `mold` before building on Linux: the configuration names
+it, so a build without it fails at link time (on Debian or Ubuntu, install the
+`mold` package with `apt-get`). macOS keeps its platform linker, because `mold`
+ships for Linux only.
+
+The flags live in `.cargo/config.toml`, but Cargo applies exactly one
+`rustflags` source and an assigned `RUSTFLAGS` replaces every configuration
+source. The Makefile therefore restates the flags in each recipe and keeps any
+`RUSTFLAGS` already in the environment, appending the standard flags after it.
+One build is held out deliberately: the coverage build in CI assigns its own
+flags, because a measurement should not depend on the fast flags. The
+repository has no release recipe, so a bare `cargo build --release` takes the
+configuration's flags unless `RUSTFLAGS` is assigned, for example
+`RUSTFLAGS="" cargo build --release`, which links with the platform linker.
+
+Cranelift is not adopted; the developers' guide records the reason. See
+[ADR 004](adr-004-rust-build-standard.md) for the reasoning.
