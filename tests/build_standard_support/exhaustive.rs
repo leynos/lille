@@ -32,69 +32,105 @@ pub fn sequences<T: Clone>(alphabet: &[T], max_len: usize) -> Vec<Vec<T>> {
     all
 }
 
-/// Returns whether a channel is a numbered release such as `1.94` or `1.94.0`.
-fn is_numbered_release(channel: &str) -> bool {
-    let digits = |part: &str| !part.is_empty() && part.chars().all(|c| c.is_ascii_digit());
-    channel.contains('.') && channel.split('.').all(digits)
+/// What a generated toolchain line is, declared beside its text so that the expectation never
+/// re-parses the text it judges.
+#[derive(Clone, Copy)]
+enum Line {
+    /// A table header, naming the table that follows.
+    Table(&'static str),
+    /// A well-formed `channel` declaration, with the class the standard gives its value
+    /// (`None` for a channel the standard does not know).
+    Channel(Option<Pin>),
+    /// A `channel` key whose value is malformed.
+    Malformed,
+    /// A lookalike key, a comment or a blank line.
+    Other,
 }
 
-/// Returns the expected classification of a channel the standard knows.
-fn expected_class(channel: &str) -> Option<Pin> {
-    if channel == "nightly" || channel.starts_with("nightly-") {
-        Some(Pin::Nightly)
-    } else if matches!(channel, "stable" | "beta") || is_numbered_release(channel) {
-        Some(Pin::Stable)
-    } else {
-        None
-    }
-}
-
-/// Scenario: every toolchain file made of up to two lines drawn from channel
-/// entries, lookalikes, comments and table headers.
+/// Scenario: every toolchain file made of up to three lines drawn from channel entries,
+/// malformed declarations, lookalikes, comments and table headers.
 ///
-/// Invariant: `Pin::read` accepts a file exactly when one uncommented `channel`
-/// key sits under `[toolchain]` with a quoted, known value, and then returns that
-/// value's class; any other file, with none, a repeated, a lookalike or a
-/// misplaced key, is refused.
+/// Invariant: `Pin::read` accepts a file exactly when one well-formed `channel` declaration sits
+/// under `[toolchain]` with a known value and no malformed one does, and then returns that value's
+/// class; any other file, with none, a repeated, a malformed, a lookalike or a misplaced key, is
+/// refused.
 #[test]
 fn the_pin_reader_agrees_with_an_independent_count_over_every_small_file() {
     let lines = [
-        "[toolchain]",
-        "[other]",
-        "channel = \"nightly-2026-05-28\"",
-        "channel=\"stable\"",
-        "channel = \"1.94.0\"",
-        "channel = \"nightly-preview\"",
-        "channel = stable",
-        "channel_x = \"stable\"",
-        "# channel = \"nightly-2026-05-28\"",
-        "",
+        ("[toolchain]", Line::Table("toolchain")),
+        ("[other]", Line::Table("other")),
+        (
+            "channel = \"nightly-2026-05-28\"",
+            Line::Channel(Some(Pin::Nightly)),
+        ),
+        ("channel=\"stable\"", Line::Channel(Some(Pin::Stable))),
+        ("channel = \"1.94.0\"", Line::Channel(Some(Pin::Stable))),
+        ("channel = \"nightly-preview\"", Line::Channel(None)),
+        ("channel = \"nightly-2026-5-28\"", Line::Channel(None)),
+        ("channel = \"nightly\"", Line::Channel(None)),
+        (
+            "channel = \"stable\" # pinned",
+            Line::Channel(Some(Pin::Stable)),
+        ),
+        ("channel = stable", Line::Malformed),
+        ("channel = \"stable", Line::Malformed),
+        ("channel = \"stable\" junk", Line::Malformed),
+        ("channel_x = \"stable\"", Line::Other),
+        ("# channel = \"nightly-2026-05-28\"", Line::Other),
+        ("", Line::Other),
     ];
     for file in sequences(&lines, 3) {
-        let text = file.join("\n");
-        let mut table = "";
-        let mut found: Vec<&str> = Vec::new();
-        for line in &file {
-            if let Some(name) = line.strip_prefix('[') {
-                table = name.trim_end_matches(']');
-            } else if table == "toolchain" && line.starts_with("channel") {
-                let value = line
-                    .split_once('=')
-                    .filter(|(key, _)| key.trim() == "channel")
-                    .map(|(_, v)| v.trim());
-                found.extend(
-                    value
-                        .and_then(|v| v.strip_prefix('"'))
-                        .and_then(|v| v.split('"').next()),
-                );
-            }
-        }
-        let expected = match found.as_slice() {
-            [channel] => expected_class(channel).ok_or(()),
-            _ => Err(()),
-        };
-        assert_eq!(Pin::read(&text).map_err(|_| ()), expected, "file: {text:?}");
+        let text = file
+            .iter()
+            .map(|(text, _)| *text)
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert_eq!(
+            Pin::read(&text).map_err(|_| ()),
+            expected_read(&file),
+            "file: {text:?}"
+        );
     }
+}
+
+/// What the generated lines of one toolchain file add up to, tracked from the kinds declared
+/// beside each line.
+#[derive(Default)]
+struct Summary {
+    table: &'static str,
+    found: Vec<Option<Pin>>,
+    malformed: bool,
+}
+
+impl Summary {
+    /// Notes one line's declared kind.
+    fn note(&mut self, kind: Line) {
+        let in_toolchain = self.table == "toolchain";
+        match kind {
+            Line::Table(name) => self.table = name,
+            Line::Channel(class) if in_toolchain => self.found.push(class),
+            Line::Malformed if in_toolchain => self.malformed = true,
+            Line::Channel(_) | Line::Malformed | Line::Other => {}
+        }
+    }
+
+    /// Returns what `Pin::read` should answer: the class of the one well-formed declaration, or an
+    /// error for none, a repeated one, an unknown one or a malformed one beside it.
+    fn expected(&self) -> Result<Pin, ()> {
+        match self.found.as_slice() {
+            [class] if !self.malformed => class.ok_or(()),
+            _ => Err(()),
+        }
+    }
+}
+
+/// Returns what `Pin::read` should answer for a generated file.
+fn expected_read(file: &[(&str, Line)]) -> Result<Pin, ()> {
+    let mut summary = Summary::default();
+    for (_, kind) in file {
+        summary.note(*kind);
+    }
+    summary.expected()
 }
 
 /// Returns the flag list with each bare `-C` joined to the word after it.
