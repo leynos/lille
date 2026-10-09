@@ -130,7 +130,7 @@ with `take_from_all()` or equivalent — or records accumulate.
 For the full frame lifecycle and rollback API, see the
 [DBSP synchronization developer's guide](dbsp-synchronization-guide.md).
 
-### Build standard
+## 3. Build standard
 
 Development builds (`make test`, `make lint`, `make typecheck` and the debug
 build) use the parallel `rustc` frontend (`-Zthreads=8`) and, on Linux, the
