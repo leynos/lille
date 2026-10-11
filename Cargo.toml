@@ -92,7 +92,7 @@ ordered-float = { version = "5", features = ["serde", "rkyv_64"] }
 # properties over broader domains; see docs/adr-003-bounded-rstest-over-property-testing.md.
 proptest = "1"
 
-bevy = { version = "0.18.1", default-features = false, features = ["reflect_auto_register"] }
+bevy = { version = "0.19.1", default-features = false, features = ["reflect_auto_register"] }
 
 # `feldera-size-of` 0.1.x pins its optional `ordered-float` dependency at
 # `^3.0.0`, so its `SizeOf` impl for `OrderedFloat`/`NotNan` does not apply to
