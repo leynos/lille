@@ -43,6 +43,21 @@ pub trait FontFetcher {
     ///
     /// # Errors
     /// Returns an error if the font cannot be fetched.
+    ///
+    /// # Examples
+    /// ```
+    /// use anyhow::Result;
+    /// use build_support::font::FontFetcher;
+    ///
+    /// struct Fixed;
+    /// impl FontFetcher for Fixed {
+    ///     fn fetch(&self) -> Result<Vec<u8>> {
+    ///         Ok(vec![1, 2, 3])
+    ///     }
+    /// }
+    ///
+    /// assert_eq!(Fixed.fetch().unwrap(), vec![1, 2, 3]);
+    /// ```
     fn fetch(&self) -> Result<Vec<u8>>;
 }
 
