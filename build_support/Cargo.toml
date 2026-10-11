@@ -22,3 +22,6 @@ test_utils = { path = "../test_utils" }
 name = "build_support_runner"
 path = "src/bin/build_support_runner.rs"
 
+
+[lints.rust]
+missing_docs = "deny"

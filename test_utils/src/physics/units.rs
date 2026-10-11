@@ -5,6 +5,7 @@
 
 use ordered_float::OrderedFloat;
 
+/// Identifier of a simulated entity.
 #[derive(Clone, Copy, Debug)]
 pub struct EntityId(pub i64);
 
@@ -22,6 +23,7 @@ impl EntityId {
     }
 }
 
+/// Identifier of a map block.
 #[derive(Clone, Copy, Debug)]
 pub struct BlockId(pub i64);
 
@@ -39,10 +41,14 @@ impl BlockId {
     }
 }
 
+/// A position or displacement in three dimensions.
 #[derive(Clone, Copy, Debug)]
 pub struct Coords3D {
+    /// X coordinate.
     pub x: f64,
+    /// Y coordinate.
     pub y: f64,
+    /// Z coordinate.
     pub z: f64,
 }
 
@@ -60,10 +66,14 @@ impl Coords3D {
     }
 }
 
+/// Integer coordinates of a map block.
 #[derive(Clone, Copy, Debug)]
 pub struct BlockCoords {
+    /// Block x index.
     pub x: i32,
+    /// Block y index.
     pub y: i32,
+    /// Block z index.
     pub z: i32,
 }
 
@@ -81,9 +91,12 @@ impl BlockCoords {
     }
 }
 
+/// A position or displacement in two dimensions.
 #[derive(Clone, Copy, Debug)]
 pub struct Coords2D {
+    /// X coordinate.
     pub x: f64,
+    /// Y coordinate.
     pub y: f64,
 }
 
@@ -101,10 +114,14 @@ impl Coords2D {
     }
 }
 
+/// A force applied to an entity, split into per-axis components.
 #[derive(Clone, Copy, Debug)]
 pub struct ForceVector {
+    /// Force along x.
     pub x: f64,
+    /// Force along y.
     pub y: f64,
+    /// Force along z.
     pub z: f64,
 }
 
@@ -122,9 +139,12 @@ impl ForceVector {
     }
 }
 
+/// A horizontal slope, as its change per unit distance along each axis.
 #[derive(Clone, Copy, Debug)]
 pub struct Gradient {
+    /// Slope along x.
     pub x: f64,
+    /// Slope along y.
     pub y: f64,
 }
 
@@ -142,6 +162,7 @@ impl Gradient {
     }
 }
 
+/// Mass of an entity.
 #[derive(Clone, Copy, Debug)]
 pub struct Mass(pub f64);
 impl Mass {
@@ -167,6 +188,7 @@ impl From<Mass> for OrderedFloat<f64> {
     }
 }
 
+/// How afraid an entity is.
 #[derive(Clone, Copy, Debug)]
 pub struct FearValue(pub f64);
 impl FearValue {
