@@ -39,6 +39,10 @@ use tempfile::NamedTempFile;
 /// ```
 #[cfg_attr(test, mockall::automock)]
 pub trait FontFetcher {
+    /// Download the font file and return its bytes.
+    ///
+    /// # Errors
+    /// Returns an error if the font cannot be fetched.
     fn fetch(&self) -> Result<Vec<u8>>;
 }
 

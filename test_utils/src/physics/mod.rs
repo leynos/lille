@@ -167,6 +167,15 @@ fn force_inner(entity: EntityId, vec: ForceVector, mass: Option<Mass>) -> Force 
     }
 }
 
+/// Convenience constructor for [`Force`] records without a mass, used in tests.
+///
+/// # Examples
+/// ```rust
+/// use test_utils::physics::force;
+/// let f = force(1, (10.0, 0.0, 0.0));
+/// assert_eq!(f.entity, 1);
+/// assert!(f.mass.is_none());
+/// ```
 pub fn force<E, V>(entity: E, vec: V) -> Force
 where
     E: Into<EntityId>,

@@ -13,3 +13,6 @@ bevy = { workspace = true, default-features = false }
 
 [dev-dependencies]
 rstest = "0.18.0"
+
+[lints.rust]
+missing_docs = "deny"
