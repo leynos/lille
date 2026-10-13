@@ -69,6 +69,10 @@ can take them — and keep them.
 The `build.rs` entry point delegates to the `build_support` crate. This helper
 crate downloads the project font during compilation.
 
+The download is limited to 8 MiB. If fetching or checksum verification fails,
+`build_support` reports a Cargo warning and uses `FALLBACK_FONT_PATH` when set,
+or the platform's default fallback font.
+
 The font download uses the operating system’s certificate store for TLS
 verification. A valid set of root certificates must be present in the
 environment for the HTTPS request to succeed.

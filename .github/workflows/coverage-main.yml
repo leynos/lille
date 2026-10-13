@@ -40,14 +40,11 @@ jobs:
     # what took this lane past its original 60-minute bound and up to the
     # 75 this change replaces.
     #
-    # 90, not 75. The ordering requires the ceiling to clear the 3,600 s
-    # watchdog plus the 900 s allowed for work outside it, which is 75
-    # exactly. A ceiling sitting on its requirement has no slack: the first
-    # cold run that spends the full watchdog is cancelled with budget left,
-    # and a cancellation discards the log that would have explained it.
-    # This carries the same 15 minutes above the requirement that ci.yml's
-    # lane has at 90 against a requirement of 75.
-    timeout-minutes: 90
+    # The pull-request lane reached its 90-minute ceiling while coverage was
+    # still compiling on four vCPUs. Keep the same 120-minute bound here so a
+    # cold main-branch build has room to finish while remaining bounded well
+    # below the platform's six-hour default.
+    timeout-minutes: 120
     permissions:
       contents: read
     env:
