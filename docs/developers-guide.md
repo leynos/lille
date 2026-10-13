@@ -1099,10 +1099,10 @@ sibling has no watchdog for these assertions to be about. A near-miss case
 covers it.
 
 The three-way ceiling decision is a named predicate rather than a branch inside
-the diagnostic. Both lanes sit fifteen minutes above their requirement, so the
-assertion over the workflows cannot tell a predicate that compares correctly
-from one that ignores the allowance entirely; the predicate is therefore driven
-directly with a ceiling on its requirement, one second below it, and none at
-all.
+the diagnostic. Both lanes sit forty-five minutes above their requirement, so
+the assertion over the workflows cannot tell a predicate that compares
+correctly from one that ignores the allowance entirely; the predicate is
+therefore driven directly with a ceiling on its requirement, one second below
+it, and none at all.
 
 [shared-actions-coverage]: https://github.com/leynos/shared-actions/blob/main/.github/actions/generate-coverage/README.md
