@@ -218,10 +218,10 @@ build.
 ### The download is size-capped
 
 `read_capped` bounds the response body at `MAX_FONT_BYTES` (8 MiB, against a
-~400 KiB font). The checksum can only be verified once the body is buffered, so
-without a cap a hostile or misbehaving origin could drive build-time memory use
-arbitrarily high — and because this runs in a build script, the failure would
-land on every developer and CI job.
+~400 KiB font). The current `fetch_font_data` and `FontFetcher::fetch`
+contracts return `Vec<u8>`, so an accepted response is fully materialized
+before checksum verification. SHA-256 itself supports incremental updates; the
+cap bounds memory used by this full-body interface if the origin misbehaves.
 
 The reader is capped at `MAX_FONT_BYTES + 1` rather than `MAX_FONT_BYTES`. A
 plain cap cannot distinguish a body sitting exactly on the limit from one

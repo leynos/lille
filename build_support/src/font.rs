@@ -23,9 +23,9 @@ use tempfile::NamedTempFile;
 ///
 /// A Fira Sans regular TTF is ~400 KiB, so this leaves generous headroom while
 /// bounding what a hostile or misbehaving origin can make the build allocate.
-/// The checksum can only be verified once the whole body is buffered, so the
-/// cap is the sole defence against unbounded build-time memory use — and the
-/// failure would otherwise land on every developer and CI job.
+/// The current fetch contract returns `Vec<u8>`, so accepted responses are
+/// fully materialized before checksum verification. SHA-256 supports
+/// incremental updates; this cap bounds memory used by the current contract.
 const MAX_FONT_BYTES: u64 = 8 * 1024 * 1024;
 
 /// Fetches the binary contents of the Fira Sans font.
@@ -199,23 +199,28 @@ fn read_capped(reader: impl Read, max_bytes: u64) -> Result<Vec<u8>> {
 fn fetch_font_data() -> Result<Vec<u8>> {
     const FONT_URL: &str = "https://raw.githubusercontent.com/mozilla/Fira/fd8c8c0a3d353cd99e8ca1662942d165e6961407/ttf/FiraSans-Regular.ttf";
     const FONT_SHA256: &str = "a389cef71891df1232370fcebd7cfde5f74e741967070399adc91fd069b2094b";
+    fetch_font_data_from(FONT_URL, FONT_SHA256, MAX_FONT_BYTES)
+}
+
+/// Fetch a font response from `font_url`, applying the supplied digest and cap.
+fn fetch_font_data_from(font_url: &str, expected_sha256: &str, max_bytes: u64) -> Result<Vec<u8>> {
     let client = Client::builder()
         .timeout(Duration::from_secs(10))
         .user_agent("lille-build/1.0")
         .build()
         .context("create HTTP client")?;
     let resp = client
-        .get(FONT_URL)
+        .get(font_url)
         .send()
-        .with_context(|| format!("requesting font from {FONT_URL}"))?
+        .with_context(|| format!("requesting font from {font_url}"))?
         .error_for_status()
-        .with_context(|| format!("unexpected HTTP status for {FONT_URL}"))?;
-    let bytes = read_capped(resp, MAX_FONT_BYTES)
-        .with_context(|| format!("reading response body from {FONT_URL}"))?;
+        .with_context(|| format!("unexpected HTTP status for {font_url}"))?;
+    let bytes = read_capped(resp, max_bytes)
+        .with_context(|| format!("reading response body from {font_url}"))?;
     let actual = to_lower_hex(&Sha256::digest(&bytes));
-    if actual != FONT_SHA256 {
+    if actual != expected_sha256 {
         return Err(anyhow!(
-            "font checksum mismatch (expected {FONT_SHA256}, got {actual})"
+            "font checksum mismatch (expected {expected_sha256}, got {actual})"
         ));
     }
     Ok(bytes)
@@ -224,6 +229,7 @@ fn fetch_font_data() -> Result<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
     use rstest::{fixture, rstest};
     use std::fs;
     use std::path::Path;
@@ -328,6 +334,22 @@ mod tests {
         );
     }
 
+    proptest::proptest! {
+        #[test]
+        fn read_capped_preserves_any_body_within_the_limit_or_rejects_it(
+            body in proptest::collection::vec(proptest::prelude::any::<u8>(), 0..=256),
+            max_bytes in 0u64..=256,
+        ) {
+            match read_capped(body.as_slice(), max_bytes) {
+                Ok(bytes) => {
+                    prop_assert!(body.len() as u64 <= max_bytes);
+                    prop_assert_eq!(bytes, body);
+                }
+                Err(_) => prop_assert!(body.len() as u64 > max_bytes),
+            }
+        }
+    }
+
     #[rstest]
     fn fallback_font_path_constant() {
         assert_eq!(
@@ -336,3 +358,7 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "font_http_tests.rs"]
+mod http_tests;

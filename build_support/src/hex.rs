@@ -33,6 +33,7 @@ mod tests {
     //! Tests for the lowercase hexadecimal digest formatter.
 
     use super::*;
+    use proptest::prelude::*;
 
     #[test]
     fn renders_leading_zeroes_with_two_digits() {
@@ -61,6 +62,32 @@ mod tests {
             );
             let parsed = u8::from_str_radix(&rendered, 16).expect("two hex digits parse as a byte");
             assert_eq!(parsed, byte, "round-trip mismatch for byte {byte:#04x}");
+        }
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn arbitrary_byte_slices_render_as_lowercase_round_trips(
+            bytes in proptest::collection::vec(proptest::prelude::any::<u8>(), 0..=256),
+        ) {
+            let rendered = to_lower_hex(&bytes);
+            prop_assert_eq!(rendered.len(), bytes.len() * 2);
+            prop_assert!(
+                rendered.bytes().all(|byte| {
+                    byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)
+                }),
+                "non-lowercase-hex output: {rendered:?}"
+            );
+
+            let decoded = rendered
+                .as_bytes()
+                .chunks_exact(2)
+                .map(|pair| {
+                    let digits = std::str::from_utf8(pair).expect("hex output is ASCII");
+                    u8::from_str_radix(digits, 16).expect("each byte renders as two hex digits")
+                })
+                .collect::<Vec<_>>();
+            prop_assert_eq!(decoded, bytes);
         }
     }
 }
