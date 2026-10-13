@@ -99,7 +99,7 @@ pub const fn required_ceiling(watchdog: u64) -> u64 {
 /// # Examples
 ///
 /// ```ignore
-/// assert_eq!(ceiling_seconds(90), 5_400);
+/// assert_eq!(ceiling_seconds(120), 7_200);
 /// assert_eq!(ceiling_seconds(u64::MAX), u64::MAX);
 /// ```
 pub const fn ceiling_seconds(minutes: u64) -> u64 {
@@ -114,13 +114,13 @@ pub const fn ceiling_seconds(minutes: u64) -> u64 {
 /// constants is what does not: this block fails to build the moment
 /// either function stops being usable where a constant is required.
 ///
-/// The values are the guide's. A ninety-minute ceiling is 5,400 s, and
+/// The values are the guide's. A 120-minute ceiling is 7,200 s, and
 /// the hour-long watchdog requires 4,500 s, so the arithmetic is
 /// checked at compile time as well as in the cases below.
 const _CONST_CONTEXT: () = {
-    const DOCUMENTED_CEILING_SECONDS: u64 = ceiling_seconds(90);
+    const DOCUMENTED_CEILING_SECONDS: u64 = ceiling_seconds(120);
     const DOCUMENTED_REQUIREMENT_SECONDS: u64 = required_ceiling(3_600);
-    assert!(DOCUMENTED_CEILING_SECONDS == 5_400);
+    assert!(DOCUMENTED_CEILING_SECONDS == 7_200);
     assert!(DOCUMENTED_REQUIREMENT_SECONDS == 4_500);
 };
 
@@ -225,7 +225,7 @@ fn the_requirement_saturates_rather_than_wrapping(#[case] watchdog: u64, #[case]
 }
 
 #[rstest]
-#[case::the_documented_ceiling(90, 5_400)]
+#[case::the_documented_ceiling(120, 7_200)]
 #[case::zero(0, 0)]
 #[case::the_largest_representable(u64::MAX, u64::MAX)]
 #[case::just_inside_the_wrap(u64::MAX / 60 + 1, u64::MAX)]

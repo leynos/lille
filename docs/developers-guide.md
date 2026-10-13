@@ -819,21 +819,21 @@ two. A workflow contract in `tests/workflow_contracts.rs` fails if a second
 than a test file: the rules live in thirteen modules under `tests/contracts/`,
 split by the question each asks.
 
-| Module                  | Asks                                                                                                                                                                                                                                                                                    |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `supply_chain.rs`       | What will the estate execute? Pinned cache and shared-action references, no source-built tools, prebuilt Whitaker, and the `setup-rust` revision that owns the compiler cache.                                                                                                          |
-| `placement.rs`          | What does it cost, and who owns each cache? Runner placement and labels, bounded timeouts, one owner per cached path, an installer before the first use of what it installs, a single test execution per build job, the uv cache key.                                                   |
-| `fork_fallback.rs`      | Can a fork's pull request start the lane it reaches? The pull-request lane falls back to `ubuntu-latest` for forks through the one prescribed expression, lanes no fork reaches name their runner outright, and no `runs-on` declaration carries a line break.                          |
-| `execution_control.rs`  | Do the readers of `if` and `continue-on-error` tell a constant from a condition that depends on the event, at job and step scope? The rule that consumes them lives in `placement.rs`; these drive the readers with shapes the workflows do not contain.                                |
-| `concurrency.rs`        | Which runs may a newer push cancel? Every workflow a pull request starts declares a group keyed on the pull request, falling back to the run id, and cancels only on the `pull_request` event.                                                                                          |
-| `codescene_uploader.rs` | Does the coverage uploader carry its approved commit and none of the inputs it now rejects? No `installer-checksum`, no `CODESCENE_CLI_SHA256`, and no checksum-refresh dispatch in either extension.                                                                                   |
-| `compiler_cache.rs`     | Is sccache actually working? `setup-rust` owns it with the inputs and id the report reads, no hand-rolled wrapper, export, install or start survives beside it, it precedes the build and the report follows, and the resource sampler with its report.                                 |
-| `sampler_reading.rs`    | Does a line in a `run` script actually run? The quoting, comment, escape, and guard reading in `tests/support/shell_reading.rs`, which `compiler_cache.rs` asks its sampling question through, driven with shapes the workflows do not contain.                                         |
-| `parsing.rs`            | Does the loader read workflows correctly? Its subject is the loader, not any workflow in this repository.                                                                                                                                                                               |
-| `step_fields.rs`        | Does the loader keep a step's `id` and `env` as written? Present and absent values, an empty value kept apart from an absent one, `Step::env_value`, and each malformed `env` refused for its own reason.                                                                               |
-| `statistics_report.rs`  | What does the compiler-cache report actually do? Each build job's statistics step is run under `bash` against a stand-in `sccache` for a started server, a fallback, an empty status and a missing binary, and its rendered log and summary are snapshotted. Unix only.                 |
-| `timeouts.rs`           | Which timer ends a run first? The coverage action's cargo watchdog set explicitly and by value, each coverage job's ceiling above that watchdog plus the measured work around it and equal to the documented 90 minutes, and the two nextest tiers absent rather than silently enabled. |
-| `timeout_budgets.rs`    | Do the readings that ordering rests on say what they claim? The coordinate match, the ceiling predicate, and the two conversions, driven with values chosen to separate a correct reading from a plausible wrong one.                                                                   |
+| Module                  | Asks                                                                                                                                                                                                                                                                                     |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `supply_chain.rs`       | What will the estate execute? Pinned cache and shared-action references, no source-built tools, prebuilt Whitaker, and the `setup-rust` revision that owns the compiler cache.                                                                                                           |
+| `placement.rs`          | What does it cost, and who owns each cache? Runner placement and labels, bounded timeouts, one owner per cached path, an installer before the first use of what it installs, a single test execution per build job, the uv cache key.                                                    |
+| `fork_fallback.rs`      | Can a fork's pull request start the lane it reaches? The pull-request lane falls back to `ubuntu-latest` for forks through the one prescribed expression, lanes no fork reaches name their runner outright, and no `runs-on` declaration carries a line break.                           |
+| `execution_control.rs`  | Do the readers of `if` and `continue-on-error` tell a constant from a condition that depends on the event, at job and step scope? The rule that consumes them lives in `placement.rs`; these drive the readers with shapes the workflows do not contain.                                 |
+| `concurrency.rs`        | Which runs may a newer push cancel? Every workflow a pull request starts declares a group keyed on the pull request, falling back to the run id, and cancels only on the `pull_request` event.                                                                                           |
+| `codescene_uploader.rs` | Does the coverage uploader carry its approved commit and none of the inputs it now rejects? No `installer-checksum`, no `CODESCENE_CLI_SHA256`, and no checksum-refresh dispatch in either extension.                                                                                    |
+| `compiler_cache.rs`     | Is sccache actually working? `setup-rust` owns it with the inputs and id the report reads, no hand-rolled wrapper, export, install or start survives beside it, it precedes the build and the report follows, and the resource sampler with its report.                                  |
+| `sampler_reading.rs`    | Does a line in a `run` script actually run? The quoting, comment, escape, and guard reading in `tests/support/shell_reading.rs`, which `compiler_cache.rs` asks its sampling question through, driven with shapes the workflows do not contain.                                          |
+| `parsing.rs`            | Does the loader read workflows correctly? Its subject is the loader, not any workflow in this repository.                                                                                                                                                                                |
+| `step_fields.rs`        | Does the loader keep a step's `id` and `env` as written? Present and absent values, an empty value kept apart from an absent one, `Step::env_value`, and each malformed `env` refused for its own reason.                                                                                |
+| `statistics_report.rs`  | What does the compiler-cache report actually do? Each build job's statistics step is run under `bash` against a stand-in `sccache` for a started server, a fallback, an empty status and a missing binary, and its rendered log and summary are snapshotted. Unix only.                  |
+| `timeouts.rs`           | Which timer ends a run first? The coverage action's cargo watchdog set explicitly and by value, each coverage job's ceiling above that watchdog plus the measured work around it and equal to the documented 120 minutes, and the two nextest tiers absent rather than silently enabled. |
+| `timeout_budgets.rs`    | Do the readings that ordering rests on say what they claim? The coordinate match, the ceiling predicate, and the two conversions, driven with values chosen to separate a correct reading from a plausible wrong one.                                                                    |
 
 *Table: the thirteen contract modules, and the question each one asks of the
 estate.*
@@ -1003,12 +1003,12 @@ Four independent timers can end a test run, and the canonical statement of how
 they must be ordered lives in the `generate-coverage` README in
 [`leynos/shared-actions`][shared-actions-coverage]. Two of the four exist here.
 
-| Tier                     | What it bounds                     | Where it is set                                                                | Current value                                 |
-| ------------------------ | ---------------------------------- | ------------------------------------------------------------------------------ | --------------------------------------------- |
-| Per-test `slow-timeout`  | one test                           | nextest, not used here                                                         | absent                                        |
-| nextest `global-timeout` | the whole test run                 | nextest, not used here                                                         | absent                                        |
-| Cargo watchdog           | one `cargo` invocation, wall clock | `RUN_RUST_CARGO_WAIT_TIMEOUT` at job level in `ci.yml` and `coverage-main.yml` | 3,600 s (60 m)                                |
-| Job `timeout-minutes`    | the whole job                      | job level                                                                      | 90 m in both `ci.yml` and `coverage-main.yml` |
+| Tier                     | What it bounds                     | Where it is set                                                                | Current value                                  |
+| ------------------------ | ---------------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------- |
+| Per-test `slow-timeout`  | one test                           | nextest, not used here                                                         | absent                                         |
+| nextest `global-timeout` | the whole test run                 | nextest, not used here                                                         | absent                                         |
+| Cargo watchdog           | one `cargo` invocation, wall clock | `RUN_RUST_CARGO_WAIT_TIMEOUT` at job level in `ci.yml` and `coverage-main.yml` | 3,600 s (60 m)                                 |
+| Job `timeout-minutes`    | the whole job                      | job level                                                                      | 120 m in both `ci.yml` and `coverage-main.yml` |
 
 *Table: the timers that can end a run, innermost first.*
 
@@ -1061,15 +1061,22 @@ window, measured from the worst of several runs rather than one:
 successful `ci.yml` runs and twenty of `coverage-main.yml`.*
 
 The widest gap is 859 s, so the contract allows 15 minutes. That makes the
-requirement 3,600 s + 900 s = 75 minutes, and both lanes are set to 90, which
-is 15 minutes above it.
+requirement 3,600 s + 900 s = 75 minutes, and both lanes are set to 120, which
+is 45 minutes above it.
 
-`coverage-main.yml` was 75, sitting exactly on its requirement. That is enough
-to satisfy the contract and not enough to survive: a ceiling on its requirement
-has no slack, so the first cold run that spends the full watchdog is cancelled
-with budget left, and the cancellation discards the log that would have
-explained it. This job is always the cold writer, so it is the one lane where
-that is not hypothetical.
+That allowance was not enough for every four-vCPU run. PR #315's required
+`build-test` run
+[38434329511](https://github.com/leynos/lille/actions/runs/38434329511) ran for
+90 minutes and ended cancelled while the coverage command was still compiling
+`bevy`. The runner reported 3,827 MiB peak memory, 63,427 MiB least free disk,
+and no sccache timeouts. Both coverage jobs now allow 120 minutes, adding 30
+minutes while remaining well below GitHub's six-hour default.
+
+`coverage-main.yml` previously moved from 75 minutes, exactly its requirement,
+to 90 minutes. The 75-minute value passed the ordering contract but left no
+slack: a cold run spending the full watchdog could be cancelled with budget
+left, and the cancellation would discard the log explaining it. Its 120-minute
+ceiling now matches the pull-request lane.
 
 `tests/contracts/timeouts.rs` asserts all of this by value over every job that
 invokes the coverage action, in both workflows. It requires the watchdog to be
@@ -1079,9 +1086,9 @@ if a job declares no ceiling at all, since that would silently mean GitHub's
 six-hour default.
 
 It pins the two documented values as well as ordering them: the 3,600-second
-watchdog and the 90-minute ceiling. The derived check accepts any ceiling at or
-above 75 minutes, so on its own it would let either value drift away from this
-section without failing anything. Pinning them makes the guide and the
+watchdog and the 120-minute ceiling. The derived check accepts any ceiling at
+or above 75 minutes, so on its own it would let either value drift away from
+this section without failing anything. Pinning them makes the guide and the
 workflows one statement.
 
 The coverage action is matched by its whole path, taking the part of `uses`

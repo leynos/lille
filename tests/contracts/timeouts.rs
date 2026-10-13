@@ -39,9 +39,9 @@ const WATCHDOG_VARIABLE: &str = "RUN_RUST_CARGO_WAIT_TIMEOUT";
 const REQUIRED_WATCHDOG_SECONDS: u64 = 3_600;
 
 /// The ceiling every coverage job must declare, in minutes, likewise
-/// from the guide. It is the requirement plus the fifteen minutes of
-/// slack the guide asks for, so the two arithmetic statements meet here.
-const REQUIRED_CEILING_MINUTES: u64 = 90;
+/// from the guide. It exceeds the derived requirement by 45 minutes to
+/// leave room for the slow four-vCPU coverage build observed in CI.
+const REQUIRED_CEILING_MINUTES: u64 = 120;
 
 /// Returns every job that invokes the coverage action, with its file.
 fn coverage_jobs(workflows: &[Workflow]) -> Vec<(String, crate::workflow_model::Job)> {
@@ -219,8 +219,8 @@ fn every_coverage_job_carries_the_documented_watchdog(workflows: Vec<Workflow>) 
 #[rstest]
 fn every_coverage_job_carries_the_documented_ceiling(workflows: Vec<Workflow>) {
     // Likewise for the outermost tier. The derived check accepts any
-    // ceiling at or above 75 minutes; the guide states 90, which is that
-    // requirement plus the fifteen minutes of slack it asks for.
+    // ceiling at or above 75 minutes; the guide states 120, which leaves
+    // more room for the slow four-vCPU coverage build observed in CI.
     let wrong: Vec<String> = coverage_jobs(&workflows)
         .into_iter()
         .filter(|(_, job)| job.timeout_minutes != Some(REQUIRED_CEILING_MINUTES))

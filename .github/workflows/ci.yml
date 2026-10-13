@@ -32,10 +32,11 @@ jobs:
       ${{ github.event.pull_request.head.repo.fork
       && 'ubuntu-latest' || 'ubicloud-standard-4' }}
     # Ubicloud jobs bill by the minute, so a hung step must not run to the
-    # 6-hour platform default. Measured warm: 1,478 s on eight vCPUs and
-    # 1,215 s on four. A cold run on four vCPUs is the case this bounds, and
-    # 90 minutes leaves room for it without leaving room for a hang.
-    timeout-minutes: 90
+    # 6-hour platform default. A four-vCPU pull-request run ended cancelled
+    # at the 90-minute ceiling while still compiling coverage. The 120-minute
+    # bound gives that path more room without approaching the platform
+    # default.
+    timeout-minutes: 120
     permissions:
       contents: read
     env:

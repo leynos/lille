@@ -135,7 +135,7 @@ fn no_scope_is_dead_or_advisory(workflows: Vec<Workflow>) {
 /// cannot be killed; the upper bound keeps a hung run from billing for hours.
 #[rstest]
 #[case::build_test("build-test", 45, 120)]
-#[case::coverage_upload("coverage-upload", 30, 90)]
+#[case::coverage_upload("coverage-upload", 30, 120)]
 fn build_jobs_keep_their_label_and_a_bounded_timeout(
     workflows: Vec<Workflow>,
     #[case] id: &str,
