@@ -25,6 +25,12 @@ const FORK_FALLBACK_LABEL: &str = "ubuntu-latest";
 /// pull request down one arm.
 const FORK_GUARD: &str = "github.event.pull_request.head.repo.fork";
 
+/// The pull request's author, not `github.actor`: the actor is whoever
+/// triggered the run, so a person pushing to a Dependabot branch would flip the
+/// runner. Dependabot's pull requests take the hosted arm too, because hosted
+/// minutes cost nothing on a public repository.
+const DEPENDABOT_GUARD: &str = "github.event.pull_request.user.login == 'dependabot[bot]'";
+
 /// A fork's pull request must be able to obtain the runner its lane names.
 ///
 /// Without the arm the lane never starts on a fork's pull request, and a
@@ -33,10 +39,11 @@ const FORK_GUARD: &str = "github.event.pull_request.head.repo.fork";
 #[rstest]
 fn the_pull_request_lane_falls_back_to_a_hosted_runner_for_forks(workflows: Vec<Workflow>) {
     let job = job_named(&workflows, "build-test");
+    let hosted_guard = format!("({FORK_GUARD} || {DEPENDABOT_GUARD})");
     assert_eq!(
         job.runs_on.guard(),
-        Some(FORK_GUARD),
-        "`build-test` must branch on `{FORK_GUARD}`; it declares {}",
+        Some(hosted_guard.as_str()),
+        "`build-test` must branch on `{hosted_guard}`; it declares {}",
         job.runs_on
     );
     assert_eq!(
@@ -91,5 +98,25 @@ fn no_runs_on_declaration_carries_a_line_break(workflows: Vec<Workflow>) {
         broken.is_empty(),
         "a `runs-on` must parse to one line; keep a folded scalar's \
          continuation at the same indent as its first line: {broken:?}"
+    );
+}
+
+/// The reader accepts the combined guard and nothing that merely resembles it.
+///
+/// The fork field alone would keep Dependabot's pull requests on Ubicloud, and
+/// `github.actor` is not the pull request's author. Both read as another guard,
+/// so the assertion above reports them rather than this reader repairing them.
+#[rstest]
+#[case::the_fork_field_alone(FORK_GUARD.to_owned())]
+#[case::the_actor_for_the_author(format!(
+    "({FORK_GUARD} || github.actor == 'dependabot[bot]')"
+))]
+fn a_guard_other_than_the_combined_one_is_not_read_as_it(#[case] guard: String) {
+    let hosted_guard = format!("({FORK_GUARD} || {DEPENDABOT_GUARD})");
+    let text = format!("${{{{ {guard} && 'ubuntu-latest' || 'ubicloud-standard-4' }}}}");
+    let read = crate::placement_expression::read(&text);
+    assert!(
+        read.is_none_or(|(read_guard, _)| read_guard != hosted_guard),
+        "`{guard}` must not read as the combined guard"
     );
 }

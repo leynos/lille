@@ -28,8 +28,12 @@ jobs:
     # scalar, so YAML keeps the break and the expression arrives with a
     # newline in it. GitHub evaluates it anyway, so a green run proves
     # nothing; `no_runs_on_declaration_carries_a_line_break` reads it.
+    # Dependabot pull requests run on the hosted pool too (free on a public
+    # repository). The author is tested, not the actor, which changes when
+    # someone else pushes to the branch.
     runs-on: >-
-      ${{ github.event.pull_request.head.repo.fork
+      ${{ (github.event.pull_request.head.repo.fork
+      || github.event.pull_request.user.login == 'dependabot[bot]')
       && 'ubuntu-latest' || 'ubicloud-standard-4' }}
     # Ubicloud jobs bill by the minute, so a hung step must not run to the
     # 6-hour platform default. A four-vCPU pull-request run ended cancelled
