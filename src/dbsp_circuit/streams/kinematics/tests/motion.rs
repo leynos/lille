@@ -155,7 +155,7 @@ fn motion_cases(#[case] scenario: MotionScenario) {
         assert_relative_eq!(actual.y.into_inner(), expected.y.into_inner());
         assert_relative_eq!(actual.z.into_inner(), expected.z.into_inner());
     } else {
-        assert!(pos_out.is_empty());
+        assert_eq!(pos_out.len(), 0);
     }
 
     let vel_out: Vec<NewVelocity> = circuit
@@ -171,7 +171,7 @@ fn motion_cases(#[case] scenario: MotionScenario) {
         assert_relative_eq!(actual.vy.into_inner(), expected.vy.into_inner());
         assert_relative_eq!(actual.vz.into_inner(), expected.vz.into_inner());
     } else {
-        assert!(vel_out.is_empty());
+        assert_eq!(vel_out.len(), 0);
     }
 }
 

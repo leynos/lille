@@ -22,7 +22,7 @@ fn new_state_starts_empty(#[from(state)] state_result: Result<DbspState, dbsp::E
     assert!(state.applied_unsequenced.is_empty());
     assert!(state.health_snapshot.is_empty());
     assert!(state.expected_health_retractions.is_empty());
-    assert!(state.pending_damage_retractions.is_empty());
+    assert_eq!(state.pending_damage_retractions.len(), 0);
     assert_eq!(state.applied_health_duplicates(), 0);
 }
 

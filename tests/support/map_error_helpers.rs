@@ -16,6 +16,5 @@ pub use super::map_test_plugins::CapturedMapErrors;
 pub fn captured_errors(app: &App) -> Vec<LilleMapError> {
     app.world()
         .get_resource::<CapturedMapErrors>()
-        .map(|e| e.0.clone())
-        .unwrap_or_default()
+        .map_or_else(Vec::new, |e| e.0.clone())
 }

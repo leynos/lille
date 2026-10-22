@@ -146,8 +146,7 @@ impl BlockAttachmentFixture {
         let app = self.app_guard();
         app.world()
             .get_resource::<CapturedMapErrors>()
-            .map(|errors| errors.0.clone())
-            .unwrap_or_default()
+            .map_or_else(Vec::new, |errors| errors.0.clone())
     }
 
     fn all_blocks_have_z_zero(&self) -> bool {
@@ -291,7 +290,7 @@ fn map_plugin_attaches_blocks_to_collidable_tiles() {
                 });
 
                 ctx.then("no map errors are emitted", |state| {
-                    assert!(state.captured_map_errors().is_empty());
+                    assert_eq!(state.captured_map_errors().len(), 0);
                 });
             });
         },

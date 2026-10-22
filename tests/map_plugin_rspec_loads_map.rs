@@ -109,8 +109,7 @@ impl MapPluginFixture {
         let app = self.app_guard();
         app.world()
             .get_resource::<CapturedMapErrors>()
-            .map(|errors| errors.0.clone())
-            .unwrap_or_default()
+            .map_or_else(Vec::new, |errors| errors.0.clone())
     }
 }
 
@@ -143,7 +142,7 @@ fn map_plugin_loads_primary_map_hierarchy_without_touching_dbsp() {
                 });
 
                 ctx.then("no DdlogId entities are inferred", |state| {
-                    assert!(state.ddlog_ids().is_empty());
+                    assert_eq!(state.ddlog_ids().len(), 0);
                 });
 
                 ctx.then("no map errors are emitted", |state| {
