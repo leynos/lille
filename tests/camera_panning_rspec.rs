@@ -132,7 +132,6 @@ struct KeyMovementDesc {
 }
 
 /// Helper to test that pressing a key moves the camera in the expected direction.
-#[expect(clippy::expect_used, reason = "test assertions use expect for clarity")]
 fn test_key_movement<F>(
     scenario: &mut Scenario<CameraPanFixture>,
     key: KeyCode,
@@ -160,7 +159,6 @@ fn test_key_movement<F>(
 }
 
 /// Helper to test that no movement occurs when no keys are pressed.
-#[expect(clippy::expect_used, reason = "test assertions use expect for clarity")]
 fn test_no_movement(scenario: &mut Scenario<CameraPanFixture>) {
     scenario.when("no movement keys are pressed", |ctx| {
         ctx.before_each(|state| {
