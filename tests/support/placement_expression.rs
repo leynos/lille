@@ -9,6 +9,12 @@
 //! as the expression shape, which is a grammar with its own cases and its own
 //! reasons for refusing what it refuses.
 //!
+//! The guard is either one field reference, or exactly the fork-or-Dependabot
+//! condition the pull-request lane writes. Dependabot's pull requests take the
+//! hosted arm because hosted minutes cost nothing on a public repository; the
+//! pull request's author is tested, not `github.actor`, which is whoever
+//! triggered the run.
+//!
 //! One spelling is read. A negated guard or a comparison says the same thing
 //! with the arms the other way round, and reading either as the prescribed
 //! form would let two spellings of the same placement drift apart while both
@@ -20,6 +26,10 @@
 //! let read = placement_expression::read("${{ a.b && 'x' || 'y' }}");
 //! assert!(read.is_some());
 //! ```
+
+/// The exact condition under which a pull request takes the hosted arm.
+const HOSTED_GUARD: &str = "(github.event.pull_request.head.repo.fork \
+     || github.event.pull_request.user.login == 'dependabot[bot]')";
 
 /// Returns the text inside `${{` and `}}`, or `None` when it is not wrapped.
 ///
@@ -88,7 +98,7 @@ pub fn read(text: &str) -> Option<(String, [String; 2])> {
     let body = expression_body(text)?;
     let (guard, arms) = body.split_once("&&")?;
     let (fork, owned) = arms.split_once("||")?;
-    if !is_context_path(guard) {
+    if !is_context_path(guard) && guard.trim() != HOSTED_GUARD {
         return None;
     }
     Some((

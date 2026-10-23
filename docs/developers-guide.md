@@ -482,11 +482,17 @@ a hung step cannot bill to the platform's six-hour default.
 ### The fork arm on the pull-request lane
 
 A pull request from a fork cannot obtain an Ubicloud runner, so `build-test`
-names its runner through an expression rather than a label:
+names its runner through an expression rather than a label. A pull request
+Dependabot opened takes the same hosted arm: hosted minutes cost nothing on a
+public repository, and Dependabot opens many pull requests, which therefore
+build cold. The expression tests the pull request's author, not `github.actor`,
+because the actor is whoever triggered the run, so a person pushing to a
+Dependabot branch would flip the runner:
 
 ```yaml
 runs-on: >-
-  ${{ github.event.pull_request.head.repo.fork
+  ${{ (github.event.pull_request.head.repo.fork
+  || github.event.pull_request.user.login == 'dependabot[bot]')
   && 'ubuntu-latest' || 'ubicloud-standard-4' }}
 ```
 
