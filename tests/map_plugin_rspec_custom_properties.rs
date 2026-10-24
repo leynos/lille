@@ -142,8 +142,7 @@ impl MapCustomPropertiesFixture {
         let app = self.app_guard();
         app.world()
             .get_resource::<CapturedMapErrors>()
-            .map(|errors| errors.0.clone())
-            .unwrap_or_default()
+            .map_or_else(Vec::new, |errors| errors.0.clone())
     }
 }
 

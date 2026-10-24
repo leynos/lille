@@ -102,8 +102,7 @@ impl SpawnActorsFixture {
         let app = self.app_guard();
         app.world()
             .get_resource::<CapturedMapErrors>()
-            .map(|errors| errors.0.clone())
-            .unwrap_or_default()
+            .map_or_else(Vec::new, |errors| errors.0.clone())
     }
 
     // --- Player queries ---
@@ -299,7 +298,7 @@ fn map_plugin_spawns_player_at_player_spawn() {
                 });
 
                 ctx.then("no map errors are emitted", |state| {
-                    assert!(state.captured_map_errors().is_empty());
+                    assert_eq!(state.captured_map_errors().len(), 0);
                 });
             });
         },
@@ -372,7 +371,7 @@ fn map_plugin_spawns_npcs_at_spawn_points() {
                 });
 
                 ctx.then("no map errors are emitted", |state| {
-                    assert!(state.captured_map_errors().is_empty());
+                    assert_eq!(state.captured_map_errors().len(), 0);
                 });
             });
         },

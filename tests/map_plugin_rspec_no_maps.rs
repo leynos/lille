@@ -97,13 +97,13 @@ fn map_plugin_disabled_spawn_leaves_dbsp_authoritative_and_is_idempotent() {
             });
 
             scenario.then("no DdlogId entities are inferred", |state| {
-                assert!(state.ddlog_ids().is_empty());
+                assert_eq!(state.ddlog_ids().len(), 0);
             });
 
             scenario.then("subsequent ticks still do not infer entities", |state| {
                 state.tick();
                 assert_eq!(state.world_handle_entity_count(), 0);
-                assert!(state.ddlog_ids().is_empty());
+                assert_eq!(state.ddlog_ids().len(), 0);
             });
         },
     ));

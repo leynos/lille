@@ -141,7 +141,7 @@ fn no_decision_without_target() {
             *decision_ref
         })
         .collect();
-    assert!(decisions.is_empty());
+    assert_eq!(decisions.len(), 0);
 }
 
 #[rstest]
@@ -247,7 +247,7 @@ fn conflicting_targets_normalise_to_one_decision(
             assert_relative_eq!(decision.dx.into_inner(), expected_dx);
             assert_relative_eq!(decision.dy.into_inner(), expected_dy);
         }
-        None => assert!(decisions.is_empty()),
+        None => assert_eq!(decisions.len(), 0),
     }
 }
 

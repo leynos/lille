@@ -117,7 +117,7 @@ fn fall_damage_emits_event() {
     unsupported_in.push(unsupported_pf.clone(), 1);
     velocity_in.push(falling_vel, 1);
     circuit.step().expect("step unsupported phase");
-    assert!(read_events(&output).is_empty());
+    assert_eq!(read_events(&output).len(), 0);
 
     unsupported_in.push(unsupported_pf.clone(), -1);
     standing_in.push(standing_pf.clone(), 1);
@@ -153,7 +153,7 @@ fn multiple_entities_land_without_interference() {
     velocity_in.push(falling_vel_a, 1);
     velocity_in.push(falling_vel_b, 1);
     circuit.step().expect("step unsupported phase");
-    assert!(read_events(&output).is_empty());
+    assert_eq!(read_events(&output).len(), 0);
 
     unsupported_in.push(unsupported_pf_a.clone(), -1);
     unsupported_in.push(unsupported_pf_b.clone(), -1);
@@ -202,7 +202,7 @@ fn safe_speed_emits_no_damage() {
     standing_in.push(standing_pf.clone(), 1);
     circuit.step().expect("landing tick");
 
-    assert!(read_events(&output).is_empty());
+    assert_eq!(read_events(&output).len(), 0);
 }
 
 #[rstest]
@@ -237,7 +237,7 @@ fn cooldown_prevents_rapid_retrigger() {
     standing_in.push(standing_pf.clone(), 1);
     circuit.step().expect("second landing within cooldown");
     let cooldown_events = delta_events(&output, &mut cumulative);
-    assert!(cooldown_events.is_empty());
+    assert_eq!(cooldown_events.len(), 0);
 
     standing_in.push(standing_pf.clone(), -1);
     for _ in 0..LANDING_COOLDOWN_TICKS {

@@ -1,5 +1,4 @@
 //! Tests for the map lifecycle helpers that need no asset backend.
-use bevy::prelude::*;
 use rstest::rstest;
 
 use super::*;

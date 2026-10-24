@@ -189,10 +189,6 @@ type PostPlanFn = fn(&mut HealthEnv) -> Result<()>;
     clippy::unnecessary_wraps,
     reason = "Signature aligns with other post-plan handlers for uniform use with ?"
 )]
-#[expect(
-    clippy::missing_const_for_fn,
-    reason = "Handler operates on runtime state and cannot be const"
-)]
 fn no_follow_up(_: &mut HealthEnv) -> Result<()> {
     Ok(())
 }

@@ -14,12 +14,8 @@ pub(crate) fn within_grace(pf: &PositionFloor) -> bool {
 #[must_use]
 pub(crate) fn advance_tick(tick: &mut Tick) -> Tick {
     let current = *tick;
-    *tick = current.checked_add(1).map_or_else(
-        || {
-            debug_assert!(current != u64::MAX, "tick counter overflowed u64");
-            0
-        },
-        |next| next,
-    );
+    let next = current.checked_add(1);
+    debug_assert!(next.is_some(), "tick counter overflowed u64");
+    *tick = next.unwrap_or(0);
     current
 }

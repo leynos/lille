@@ -130,5 +130,5 @@ fn slope_without_block_yields_no_height() {
         .map(|(fh, (), _timestamp)| fh)
         .collect();
 
-    assert!(vals.is_empty());
+    assert_eq!(vals.len(), 0);
 }
