@@ -57,3 +57,19 @@ the workflows, so a flag lost through a recipe or workflow edit fails there.
 - A change to a recipe or workflow step that assigns `RUSTFLAGS` must restate
   the flags, and the contract says which clause fails when it does not.
 - Revisit Cranelift when the toolchain or the failing tests change.
+
+## Addendum: development-profile footprint (2026-10-24)
+
+The `dev` profile in `Cargo.toml` and `.cargo/config.toml` sets
+`incremental = false` and `debug = 0`. On the pinned `nightly-2026-10-14`,
+`.cargo/config.toml` sets `[unstable] embed-metadata = false`, the native Cargo
+key for dated nightlies from 2026-07-31.
+
+The rationale is that development builds filled the CI disk. Non-incremental
+builds without debug information keep `target` small. This follows the
+concordat rule `rust-dev-build-footprint`.
+
+The consequence is that local backtraces and debugger sessions lack debug
+information unless a developer overrides it for one invocation, with
+`--config 'profile.dev.debug=2'` or `CARGO_PROFILE_DEV_DEBUG=2`. The committed
+profile is not edited to change this.

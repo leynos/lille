@@ -27,6 +27,8 @@ mod development;
 mod exhaustive;
 #[path = "build_standard_support/fixtures.rs"]
 mod fixtures;
+#[path = "build_standard_support/footprint.rs"]
+mod footprint;
 #[path = "build_standard_support/injected.rs"]
 mod injected;
 #[path = "build_standard_support/injected_held_out.rs"]
@@ -47,6 +49,7 @@ use ci_steps::workflow_problems;
 use config::{config_problems, Pin, Problems, CONFIG, TOOLCHAIN};
 use coverage_env::coverage_recipe_problems;
 use development::development_problems;
+use footprint::{footprint_problems, MANIFEST};
 use make::{held_out_problems, held_out_target_count, Host};
 use process::real_make;
 
@@ -109,4 +112,14 @@ fn coverage_and_release_take_neither_flag() -> Result<(), String> {
 #[test]
 fn the_coverage_recipe_assigns_its_recorded_environment() -> Result<(), String> {
     none_of(&coverage_recipe_problems(real_make)?)
+}
+
+/// Scenario: the repository as committed.
+///
+/// Invariant: `[profile.dev]` sets debug and incremental off in both the manifest and the Cargo
+/// configuration, the unstable key matches the pinned nightly's window, and no `rustflags` line
+/// names `metadata`.
+#[test]
+fn the_dev_build_footprint_matches_the_pin() -> Result<(), String> {
+    none_of(&footprint_problems(CONFIG, MANIFEST, TOOLCHAIN))
 }
