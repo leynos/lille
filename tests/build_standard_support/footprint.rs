@@ -139,31 +139,13 @@ fn names_metadata_in_rustflags(config: &str) -> bool {
         .any(|(start, _)| span_names_metadata(lines.iter().skip(start).copied()))
 }
 
-/// Returns the quoted value of a `channel = "..."` line, or `None` for any other line.
-fn channel_name(line: &str) -> Option<&str> {
-    let (key, value) = line.split_once('=')?;
-    let (name, _) = value.trim().strip_prefix('"')?.split_once('"')?;
-    (key.trim() == "channel").then_some(name)
-}
-
 /// Returns the channel a toolchain file names under `[toolchain]`. `Pin::read` has already
 /// checked that there is exactly one.
-fn pinned_channel(toolchain: &str) -> Option<&str> {
-    let mut table = "";
-    for line in toolchain
-        .lines()
-        .map(str::trim)
-        .filter(|line| !line.starts_with('#'))
-    {
-        if let Some(header) = line.strip_prefix('[') {
-            table = header.trim_end_matches(']').trim();
-        } else if table == "toolchain" {
-            if let Some(name) = channel_name(line) {
-                return Some(name);
-            }
-        }
-    }
-    None
+fn pinned_channel(toolchain: &str) -> Option<String> {
+    entries(toolchain)
+        .into_iter()
+        .find(|(table, key, _)| table == "toolchain" && key == "channel")
+        .map(|(_, _, value)| value.trim_matches('"').to_owned())
 }
 
 /// Returns whether the parts of a date are `YYYY`, `MM` and `DD` in that order.
@@ -188,11 +170,9 @@ fn is_digits(part: &str, width: usize) -> bool {
 fn nightly_key(channel: &str) -> Option<u32> {
     let date = channel.strip_prefix("nightly-")?;
     let parts: Vec<&str> = date.split('-').collect();
-    if is_date_parts(&parts) {
-        date.replace('-', "").parse().ok()
-    } else {
-        None
-    }
+    is_date_parts(&parts)
+        .then(|| date.replace('-', "").parse().ok())
+        .flatten()
 }
 
 /// Returns the complaints for a nightly from the window that takes `embed-metadata = false`.
@@ -224,7 +204,7 @@ fn nightly_problems(config: &str, toolchain: &str) -> Problems {
     let Some(channel) = pinned_channel(toolchain) else {
         return vec!["rust-toolchain.toml names no readable channel".to_owned()];
     };
-    let Some(key) = nightly_key(channel) else {
+    let Some(key) = nightly_key(&channel) else {
         return vec![format!("`{channel}` is not a dated nightly")];
     };
     match window(key) {
