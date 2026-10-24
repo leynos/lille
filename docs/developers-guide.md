@@ -8,7 +8,7 @@ historical record and must not be used to infer current versions.
 
 ## Toolchain
 
-- `rust-toolchain.toml` pins `nightly-2025-09-14` (rustc 1.91.0-nightly) with
+- `rust-toolchain.toml` pins `nightly-2026-10-14` (rustc 1.101.0-nightly) with
   the `rustfmt` and `clippy` components.
 - The nightly channel is required: `src/lib.rs` uses
   `#![cfg_attr(docsrs, feature(doc_cfg))]`, and `make lint` builds the docs with
@@ -389,6 +389,27 @@ flag lost through a recipe or workflow edit fails there. The decision is
 recorded in [ADR 004](adr-004-rust-build-standard.md). The contract runs
 `make -n`, so a direct `cargo test` needs GNU make on the `PATH`. It fails when
 `make` is missing instead of skipping, so a missing tool cannot read as a pass.
+
+### Development-profile defaults
+
+Development, test, lint and typecheck builds use the default `dev` profile.
+`Cargo.toml` and `.cargo/config.toml` both set it to `incremental = false` and
+`debug = 0`, so non-incremental builds without debug information keep `target`
+small. The settings exist because development builds filled the CI disk.
+
+Debug information is therefore absent by default, so backtraces and debugger
+sessions lack source locations. Enable it for one invocation rather than by
+editing the committed profile: pass `--config 'profile.dev.debug=2'` to one
+`cargo` command, optionally with `--config 'profile.dev.incremental=true'`, or
+set `CARGO_PROFILE_DEV_DEBUG=2` in the environment for that command only.
+
+The `[unstable] embed-metadata = false` key in `.cargo/config.toml` is the
+native Cargo key for dated nightlies from 2026-07-31. Nightlies from 2025-06-26
+to 2026-07-18 take `no-embed-metadata = true` instead, and nightlies from
+2026-07-19 to 2026-07-30 are unproven under either key. Stable and beta ignore
+the key. Whoever moves the pin in `rust-toolchain.toml` must switch the key to
+match the new pin family. Raw rustc metadata flags must not be used in its
+place, because they broke build scripts.
 
 ### Cranelift
 
