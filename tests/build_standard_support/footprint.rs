@@ -47,23 +47,32 @@ fn strip_comment(text: &str) -> &str {
     text.split(" #").next().unwrap_or_default().trim()
 }
 
+/// Returns the table named by a `[table]` header line, or `None` for any other line.
+fn table_header(line: &str) -> Option<&str> {
+    line.strip_prefix('[')
+        .map(|name| name.trim_end_matches(']').trim())
+}
+
+/// Returns the `(key, value)` of a `key = value` line, without any trailing comment.
+fn assignment(line: &str) -> Option<(&str, &str)> {
+    line.split_once('=')
+        .map(|(key, raw)| (key.trim(), strip_comment(raw)))
+}
+
 /// Returns the `(table, key, value)` triples of a TOML text, skipping blank and comment lines.
 fn entries(text: &str) -> Vec<(String, String, String)> {
     let mut table = String::new();
-    let mut found = Vec::new();
-    for line in text
-        .lines()
+    text.lines()
         .map(str::trim)
         .filter(|line| !line.is_empty() && !line.starts_with('#'))
-    {
-        if let Some(name) = line.strip_prefix('[') {
-            table = name.trim_end_matches(']').trim().to_owned();
-        } else if let Some((key, raw)) = line.split_once('=') {
-            let value = strip_comment(raw).to_owned();
-            found.push((table.clone(), key.trim().to_owned(), value));
-        }
-    }
-    found
+        .filter_map(|line| {
+            if let Some(name) = table_header(line) {
+                name.clone_into(&mut table);
+                return None;
+            }
+            assignment(line).map(|(key, value)| (table.clone(), key.to_owned(), value.to_owned()))
+        })
+        .collect()
 }
 
 /// Returns whether a table sets a key to exactly this value.
@@ -102,27 +111,32 @@ fn opens_rustflags(line: &str) -> bool {
     rest.trim_start().starts_with('=')
 }
 
-/// Returns whether a `rustflags` assignment in the configuration names `metadata`. A value may span
-/// several lines, so every line from the assignment to its closing bracket is read.
+/// Returns whether the lines from a `rustflags` assignment to its closing bracket name `metadata`.
+/// A value may span several lines, so the span ends at the first line holding `]`.
+fn span_names_metadata<'a>(lines: impl Iterator<Item = &'a str>) -> bool {
+    let mut closed = false;
+    lines
+        .take_while(|line| {
+            let open = !closed;
+            closed = line.contains(']');
+            open
+        })
+        .any(|line| line.contains("metadata"))
+}
+
+/// Returns whether a `rustflags` assignment in the configuration names `metadata`.
 fn names_metadata_in_rustflags(config: &str) -> bool {
-    let mut in_rustflags = false;
-    for line in config
+    let lines: Vec<&str> = config
         .lines()
         .map(str::trim)
         .filter(|line| !line.starts_with('#'))
         .map(strip_comment)
-    {
-        if opens_rustflags(line) {
-            in_rustflags = true;
-        }
-        if in_rustflags && line.contains("metadata") {
-            return true;
-        }
-        if line.contains(']') {
-            in_rustflags = false;
-        }
-    }
-    false
+        .collect();
+    lines
+        .iter()
+        .enumerate()
+        .filter(|(_, line)| opens_rustflags(line))
+        .any(|(start, _)| span_names_metadata(lines.iter().skip(start).copied()))
 }
 
 /// Returns the quoted value of a `channel = "..."` line, or `None` for any other line.
