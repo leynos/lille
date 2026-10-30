@@ -44,8 +44,8 @@ pub const COVERAGE_ACTIONS_SHA: &str = "a5765019912a8ab6882b12db049c7cde635f3a85
 /// action directory content-identical to it, which is the set the concordat
 /// QG-002 rule accepts. This one is #651, the merge that makes the action
 /// default to installer 0.2.11 with its verified Clippy snapshot. It sits apart
-/// from [] because the action moved on its own, ahead of
-/// the estate default.
+/// from [`SHARED_ACTIONS_SHA`] because the action moved on its own,
+/// ahead of the estate default.
 pub const WHITAKER_ACTION_SHA: &str = "5a99aed78ce68dcebd3052b75c31e6f173162b1e";
 
 /// Commit `setup-rust` must pin.
