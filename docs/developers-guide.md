@@ -392,7 +392,7 @@ own `RUSTFLAGS`), the coverage steps of the CI workflows (each assigns its own
 `RUSTFLAGS`) and their `setup-rust` steps (each must pass `install-mold`), so a
 flag lost through a recipe or workflow edit fails there. For Whitaker the
 contract runs the other way: a Whitaker command that carries a development
-flag, inherits the caller's flags, drops `-D warnings` or assigns nothing
+flag, inherits the caller's flags, drops `-D warnings`, or assigns nothing
 fails. The decision is recorded in [ADR 004](adr-004-rust-build-standard.md).
 The contract runs `make -n`, so a direct `cargo test` needs GNU make on the
 `PATH`. It fails when `make` is missing instead of skipping, so a missing tool
