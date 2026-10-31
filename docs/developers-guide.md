@@ -371,12 +371,17 @@ source repeats the same flags apart from the linker.
 
 An assigned `RUSTFLAGS` replaces the configuration's flags, so the Makefile
 recipes that set it compose the standard's flags onto any inherited value (CI's
-`setup-rust` exports one). One build is deliberately excluded: the coverage
-step in CI assigns `RUSTFLAGS` without the fast flags because a measurement
-should not depend on them. The repository has no release recipe or workflow.
-Cargo has no per-profile `rustflags`, so a direct `cargo build --release` takes
-the configuration's flags unless `RUSTFLAGS` is assigned (even an empty value
-displaces the configuration).
+`setup-rust` exports one). The `lint` recipe's Whitaker command is a deliberate
+exception: Whitaker runs on its installer-managed toolchain, which must not
+inherit the repository's development flags, so it assigns
+`RUSTFLAGS="$(RUST_FLAGS)"` (`-D warnings`) alone, keeps none of the caller's
+flags and takes neither `-Zthreads=8` nor `mold`, while Clippy in the same
+recipe keeps the standard's flags. One build is also deliberately excluded: the
+coverage step in CI assigns `RUSTFLAGS` without the fast flags because a
+measurement should not depend on them. The repository has no release recipe or
+workflow. Cargo has no per-profile `rustflags`, so a direct
+`cargo build --release` takes the configuration's flags unless `RUSTFLAGS` is
+assigned (even an empty value displaces the configuration).
 
 On Linux, install `mold` before building: the configuration names it, so a
 build without it fails at link time. CI installs it through `setup-rust`'s
@@ -385,10 +390,13 @@ reads the configuration sources, the commands `make -n` prints for each
 development target on a Linux host and a macOS host (each keeping the caller's
 own `RUSTFLAGS`), the coverage steps of the CI workflows (each assigns its own
 `RUSTFLAGS`) and their `setup-rust` steps (each must pass `install-mold`), so a
-flag lost through a recipe or workflow edit fails there. The decision is
-recorded in [ADR 004](adr-004-rust-build-standard.md). The contract runs
-`make -n`, so a direct `cargo test` needs GNU make on the `PATH`. It fails when
-`make` is missing instead of skipping, so a missing tool cannot read as a pass.
+flag lost through a recipe or workflow edit fails there. For Whitaker the
+contract runs the other way: a Whitaker command that carries a development
+flag, inherits the caller's flags, drops `-D warnings`, or assigns nothing
+fails. The decision is recorded in [ADR 004](adr-004-rust-build-standard.md).
+The contract runs `make -n`, so a direct `cargo test` needs GNU make on the
+`PATH`. It fails when `make` is missing instead of skipping, so a missing tool
+cannot read as a pass.
 
 ### Development-profile defaults
 
@@ -414,12 +422,19 @@ place, because they broke build scripts.
 ### Cranelift
 
 Exception: Cranelift is not the development-profile backend. The full suite was
-measured under it on the pinned `nightly-2025-09-14` on 2026-09-29. The whole
-suite fails there while passing under LLVM, because the test build fails to
-link. `mold` reports undefined `aws_lc_0_45_0_*` symbols referenced from
-`aws-lc-rs` (the `rustls` dependency), which the LLVM backend links without
-complaint. Re-measure the whole suite on the next toolchain bump, and adopt the
-backend when it passes.
+measured under it on the pinned `nightly-2026-10-30` on 2026-10-31
+(`cargo test --features test-support --no-fail-fast`, Cranelift selected for the
+`dev` profile through `--config`, with the standard `RUSTFLAGS`). The test
+build now links: the `aws_lc_0_45_0_*` undefined symbols that `mold` reported
+on the earlier `nightly-2025-09-14` measurement of 2026-09-29 are gone. But 15
+of the integration test targets abort at run time (the map, `map_plugin` and
+`dbsp_spawn_sync` families, including their `rspec` variants), because
+rustc_codegen_cranelift panics with "`llvm.x86.sse2.pmulhu.w` is not yet
+supported"
+([rustc_codegen_cranelift#171](https://github.com/rust-lang/rustc_codegen_cranelift/issues/171)),
+which is a non-unwinding panic. The unit tests and doctests pass, and the
+whole suite passes under LLVM. Re-measure the whole suite on the next toolchain
+bump, and adopt the backend when it passes.
 
 ## Commit gates
 

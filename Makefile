@@ -91,7 +91,7 @@ lint:
 	set -euo pipefail
 	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(STANDARD_ENV) cargo doc --workspace --no-deps
 	$(STANDARD_ENV) cargo clippy --all-targets --all-features -- $(RUST_FLAGS)
-	$(RUST_FLAGS_ENV) $(WHITAKER) --all -- --all-targets --all-features
+	RUSTFLAGS="$(RUST_FLAGS)" $(WHITAKER) --all -- --all-targets --all-features
 
 markdownlint: spelling
 	if [[ -n "$(MD_FILES)" && -n "$(MARKDOWNLINT)" ]]; then $(MARKDOWNLINT) $(MD_FILES); fi
