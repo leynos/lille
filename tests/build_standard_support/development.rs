@@ -54,18 +54,29 @@ fn bare_problem(target: Target<'_>, host: Host, command: &str) -> String {
 
 /// Returns the complaint about one development command, if any: an assigned
 /// `RUSTFLAGS` keeps the caller's own flags and restates the frontend flag on a
-/// nightly pin, and mold on Linux.
+/// nightly pin, and mold on Linux. A direct Whitaker command is the exception:
+/// its installer-managed toolchain must not inherit the development flags, so it
+/// must assign `RUSTFLAGS` without the frontend or linker flag.
 pub fn development_problem(
     target: Target<'_>,
     host: Host,
     pin: Pin,
-    assignment: &Assignment,
+    command: &Command,
 ) -> Option<String> {
-    let (flags, inherits) = match assignment {
+    let isolated = tool_key(&command.text).as_deref() == Some("whitaker");
+    let (flags, inherits) = match &command.assignment {
         Assignment::Flags(flags, inherits) => (flags, inherits),
-        Assignment::Bare(command) => return Some(bare_problem(target, host, command)),
+        Assignment::Bare(text) => return Some(bare_problem(target, host, text)),
         Assignment::Unassigned => return None,
     };
+    if isolated {
+        return (flags.names_threads() || flags.names_linker()).then(|| {
+            format!(
+                "`make {target}` on {} gives Whitaker the development flags: {flags:?}",
+                host.make_value()
+            )
+        });
+    }
     if !inherits {
         return Some(format!(
             "`make {target}` on {} drops the caller's RUSTFLAGS",
@@ -229,7 +240,7 @@ pub fn development_problems_expecting(
         problems.extend(
             commands
                 .iter()
-                .filter_map(|command| development_problem(target, host, pin, &command.assignment)),
+                .filter_map(|command| development_problem(target, host, pin, command)),
         );
         problems.extend(test_policy_problems(target, host, &commands));
     }

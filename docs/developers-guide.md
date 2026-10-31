@@ -414,12 +414,19 @@ place, because they broke build scripts.
 ### Cranelift
 
 Exception: Cranelift is not the development-profile backend. The full suite was
-measured under it on the pinned `nightly-2025-09-14` on 2026-09-29. The whole
-suite fails there while passing under LLVM, because the test build fails to
-link. `mold` reports undefined `aws_lc_0_45_0_*` symbols referenced from
-`aws-lc-rs` (the `rustls` dependency), which the LLVM backend links without
-complaint. Re-measure the whole suite on the next toolchain bump, and adopt the
-backend when it passes.
+measured under it on the pinned `nightly-2026-10-30` on 2026-10-31
+(`cargo test --features test-support --no-fail-fast`, Cranelift selected for the
+`dev` profile through `--config`, with the standard `RUSTFLAGS`). The test
+build now links: the `aws_lc_0_45_0_*` undefined symbols that `mold` reported
+on the earlier `nightly-2025-09-14` measurement of 2026-09-29 are gone. But 15
+of the integration test targets abort at run time (the map, `map_plugin` and
+`dbsp_spawn_sync` families, including their `rspec` variants), because
+rustc_codegen_cranelift panics with "`llvm.x86.sse2.pmulhu.w` is not yet
+supported"
+([rustc_codegen_cranelift#171](https://github.com/rust-lang/rustc_codegen_cranelift/issues/171)),
+which is a non-unwinding panic. The unit tests and doctests pass, and the
+whole suite passes under LLVM. Re-measure the whole suite on the next toolchain
+bump, and adopt the backend when it passes.
 
 ## Commit gates
 

@@ -103,6 +103,36 @@ fn chained_bare_make(_target: Target<'_>, host: Host) -> Result<String, String> 
     ))
 }
 
+/// A fake runner whose `lint` target runs Whitaker with the given `RUSTFLAGS` value, beside a compliant
+/// Clippy command; every other target runs a compliant `cargo test`.
+fn whitaker_flags_make(
+    target: Target<'_>,
+    host: Host,
+    whitaker_flags: &str,
+) -> Result<String, String> {
+    let linker = linker_flag(host);
+    let compliant =
+        format!("RUSTFLAGS=\"${{RUSTFLAGS:+$RUSTFLAGS }}-D warnings {THREADS_FLAG}{linker}\"");
+    if target.name() == "lint" {
+        canned(format_args!(
+            "{compliant} cargo clippy --all-targets\nRUSTFLAGS=\"{whitaker_flags}\" whitaker --all\n"
+        ))
+    } else {
+        canned(format_args!("{compliant} cargo test\n"))
+    }
+}
+
+/// A fake runner whose Whitaker command is isolated: it assigns only the warning policy.
+fn isolated_whitaker_make(target: Target<'_>, host: Host) -> Result<String, String> {
+    whitaker_flags_make(target, host, "-D warnings")
+}
+
+/// A fake runner whose Whitaker command inherits the development flags.
+fn contaminated_whitaker_make(target: Target<'_>, host: Host) -> Result<String, String> {
+    let flags = format!("-D warnings {THREADS_FLAG}{}", linker_flag(host));
+    whitaker_flags_make(target, host, &flags)
+}
+
 /// A fake runner for a target that is not defined.
 pub(super) fn undefined_make(target: Target<'_>, _host: Host) -> Result<String, String> {
     Err(format!(
@@ -258,5 +288,31 @@ fn a_target_that_stops_running_a_recorded_tool_is_refused() -> Result<(), String
             .iter()
             .all(|problem| !problem.contains("no longer runs")),
         "a kept tool was reported missing",
+    )
+}
+
+/// Scenario: a direct Whitaker command, whose installer-managed toolchain must not inherit the
+/// repository's development flags (Concordat `rust-build-defaults` BD-008).
+///
+/// Invariant: an isolated command that assigns only the warning policy raises nothing, and a
+/// command that carries the frontend or linker flag is refused by target name.
+#[test]
+fn a_direct_whitaker_command_must_stay_isolated_from_the_development_flags() -> Result<(), String> {
+    for host in [Host::Linux, Host::Darwin] {
+        let (isolated, _) =
+            development_problems_expecting(isolated_whitaker_make, host, Pin::Nightly, &[])?;
+        ensure(
+            isolated.is_empty(),
+            "an isolated Whitaker command was refused",
+        )?;
+    }
+    let (contaminated, _) =
+        development_problems_expecting(contaminated_whitaker_make, Host::Linux, Pin::Nightly, &[])?;
+    ensure(
+        contaminated.iter().any(|problem| {
+            problem.contains("`make lint`")
+                && problem.contains("gives Whitaker the development flags")
+        }),
+        "a Whitaker command carrying the development flags passed",
     )
 }
