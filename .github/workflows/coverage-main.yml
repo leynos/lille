@@ -53,7 +53,7 @@ jobs:
       # See ci.yml. This job is the cold writer, so it is the one that would
       # have hit the old 1,800 s cargo cap first: its eight-vCPU run already
       # took 1,757 s.
-      RUN_RUST_CARGO_WAIT_TIMEOUT: '3600'
+      RUN_RUST_CARGO_WAIT_TIMEOUT: '5400'
       # See ci.yml. This job is the trunk writer, so it is the run that
       # populates the compiler cache every pull request then reads.
       CARGO_INCREMENTAL: '0'

@@ -52,7 +52,7 @@ jobs:
       # slowest single build rather than the median job. On eight vCPUs the
       # cold writer's job took 1,757 s in total; four vCPUs are slower again,
       # and 1,800 s would have killed cargo before the job timeout noticed.
-      RUN_RUST_CARGO_WAIT_TIMEOUT: '3600'
+      RUN_RUST_CARGO_WAIT_TIMEOUT: '5400'
       # sccache is the sole owner of compiler output: no step archives a
       # `target` tree. `setup-rust` owns it: it installs sccache, starts the
       # server, and names it as the rustc wrapper.

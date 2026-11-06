@@ -1049,7 +1049,7 @@ they must be ordered lives in the `generate-coverage` README in
 | ------------------------ | ---------------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------- |
 | Per-test `slow-timeout`  | one test                           | nextest, not used here                                                         | absent                                         |
 | nextest `global-timeout` | the whole test run                 | nextest, not used here                                                         | absent                                         |
-| Cargo watchdog           | one `cargo` invocation, wall clock | `RUN_RUST_CARGO_WAIT_TIMEOUT` at job level in `ci.yml` and `coverage-main.yml` | 3,600 s (60 m)                                 |
+| Cargo watchdog           | one `cargo` invocation, wall clock | `RUN_RUST_CARGO_WAIT_TIMEOUT` at job level in `ci.yml` and `coverage-main.yml` | 5,400 s (90 m)                                 |
 | Job `timeout-minutes`    | the whole job                      | job level                                                                      | 120 m in both `ci.yml` and `coverage-main.yml` |
 
 *Table: the timers that can end a run, innermost first.*
@@ -1073,7 +1073,7 @@ taken 1,728 s on run 33940327512.
 When it fires the step prints:
 
 ```text
-::error::cargo did not exit within 3600s; killing. This is a budget, not a
+::error::cargo did not exit within 5400s; killing. This is a budget, not a
 detected hang: raise the cargo-wait-timeout input, or
 RUN_RUST_CARGO_WAIT_TIMEOUT, if the build is legitimately slower. A cold
 sccache store makes the first run on a branch compile everything inside this
@@ -1103,8 +1103,12 @@ window, measured from the worst of several runs rather than one:
 successful `ci.yml` runs and twenty of `coverage-main.yml`.*
 
 The widest gap is 859 s, so the contract allows 15 minutes. That makes the
-requirement 3,600 s + 900 s = 75 minutes, and both lanes are set to 120, which
-is 45 minutes above it.
+requirement 5,400 s + 900 s = 105 minutes, and both lanes are set to 120, which
+is 15 minutes above it.
+
+The watchdog was 3,600 s until run 41200557385 of `coverage-main.yml` hit it on
+31 October after an hour, before the CodeScene upload. Earlier successful runs
+took up to 107 minutes end to end, so the budget is now 90 minutes.
 
 That allowance was not enough for every four-vCPU run. PR #315's required
 `build-test` run
@@ -1127,9 +1131,9 @@ requires each job's ceiling to clear the watchdog plus the allowance, and fails
 if a job declares no ceiling at all, since that would silently mean GitHub's
 six-hour default.
 
-It pins the two documented values as well as ordering them: the 3,600-second
+It pins the two documented values as well as ordering them: the 5,400-second
 watchdog and the 120-minute ceiling. The derived check accepts any ceiling at
-or above 75 minutes, so on its own it would let either value drift away from
+or above 105 minutes, so on its own it would let either value drift away from
 this section without failing anything. Pinning them makes the guide and the
 workflows one statement.
 
