@@ -36,11 +36,10 @@ const WATCHDOG_VARIABLE: &str = "RUN_RUST_CARGO_WAIT_TIMEOUT";
 /// `docs/developers-guide.md` records it. Pinned rather than merely
 /// checked for shape: the ordering below holds for a wide range of
 /// values, so nothing else would notice this one drifting.
-const REQUIRED_WATCHDOG_SECONDS: u64 = 3_600;
+const REQUIRED_WATCHDOG_SECONDS: u64 = 5_400;
 
 /// The ceiling every coverage job must declare, in minutes, likewise
-/// from the guide. It exceeds the derived requirement by 45 minutes to
-/// leave room for the slow four-vCPU coverage build observed in CI.
+/// from the guide. It exceeds the derived requirement by 15 minutes.
 const REQUIRED_CEILING_MINUTES: u64 = 120;
 
 /// Returns every job that invokes the coverage action, with its file.
