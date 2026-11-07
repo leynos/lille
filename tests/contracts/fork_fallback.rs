@@ -10,7 +10,7 @@
 use rstest::rstest;
 
 use crate::workflow_assertions::{job_named, jobs, workflows};
-use crate::workflow_estate::{Workflow, UBICLOUD_LABEL};
+use crate::workflow_estate::{Workflow, BASELINE_LABEL, HOSTED_COVERAGE_LABEL, UBICLOUD_LABEL};
 
 /// The runner a fork's pull request falls back to.
 ///
@@ -60,17 +60,24 @@ fn the_pull_request_lane_falls_back_to_a_hosted_runner_for_forks(workflows: Vec<
 
 /// A lane no fork reaches must not carry an arm nothing takes.
 ///
-/// `coverage-upload` runs on push, so the expression would add a branch to
-/// keep correct for a case that cannot occur. Asserted so the arm does not
-/// spread by imitation.
+/// The main-branch coverage jobs run on push, so the expression would add a
+/// branch to keep correct for a case that cannot occur. Asserted so the arm
+/// does not spread by imitation.
 #[rstest]
-fn lanes_no_fork_reaches_name_their_runner_outright(workflows: Vec<Workflow>) {
-    let job = job_named(&workflows, "coverage-upload");
+#[case::coverage_upload("coverage-upload", HOSTED_COVERAGE_LABEL)]
+#[case::coverage_baseline("coverage-baseline", BASELINE_LABEL)]
+#[case::coverage_warmup("coverage-warmup", UBICLOUD_LABEL)]
+fn lanes_no_fork_reaches_name_their_runner_outright(
+    workflows: Vec<Workflow>,
+    #[case] id: &str,
+    #[case] label: &str,
+) {
+    let job = job_named(&workflows, id);
     assert_eq!(
         job.runs_on.labels(),
-        [UBICLOUD_LABEL],
-        "`coverage-upload` is on no pull-request lane, so it must name its \
-         runner outright; it declares {}",
+        [label],
+        "`{id}` is on no pull-request lane, so it must name its runner \
+         outright; it declares {}",
         job.runs_on
     );
 }

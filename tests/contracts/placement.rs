@@ -14,7 +14,7 @@ use crate::workflow_assertions::{assert_input, job_named, jobs, step_using, work
 use crate::workflow_cache_owners;
 use crate::workflow_config::registered_runner_labels;
 use crate::workflow_estate::{
-    Workflow, WorkflowSource, BUILD_JOB_IDS, HOSTED_UBUNTU_LABEL, UBICLOUD_LABEL,
+    job_runner_label, Workflow, WorkflowSource, BASELINE_JOB_ID, BUILD_JOB_IDS, HOSTED_UBUNTU_LABEL,
 };
 use crate::workflow_loader::{all_steps, parse_workflow};
 
@@ -63,6 +63,8 @@ fn misplaced_non_build_jobs(workflows: &[Workflow]) -> Vec<String> {
         .into_iter()
         .filter(|(_, job)| job.runs_on.names_a_runner())
         .filter(|(_, job)| !BUILD_JOB_IDS.contains(&job.id.as_str()))
+        // The baseline publisher must sit on Ubicloud; `coverage_split` holds it.
+        .filter(|(_, job)| job.id != BASELINE_JOB_ID)
         .filter(|(_, job)| job.runs_on.owned_label() != Some(HOSTED_UBUNTU_LABEL))
         .map(|(file, job)| format!("{file}:{}: {}", job.id, job.runs_on))
         .collect()
@@ -136,6 +138,7 @@ fn no_scope_is_dead_or_advisory(workflows: Vec<Workflow>) {
 #[rstest]
 #[case::build_test("build-test", 45, 120)]
 #[case::coverage_upload("coverage-upload", 30, 120)]
+#[case::coverage_warmup("coverage-warmup", 30, 120)]
 fn build_jobs_keep_their_label_and_a_bounded_timeout(
     workflows: Vec<Workflow>,
     #[case] id: &str,
@@ -143,9 +146,10 @@ fn build_jobs_keep_their_label_and_a_bounded_timeout(
     #[case] highest: u64,
 ) {
     let job = job_named(&workflows, id);
+    let expected = job_runner_label(id);
     assert_eq!(
         job.runs_on.owned_label(),
-        Some(UBICLOUD_LABEL),
+        Some(expected),
         "`{id}` must keep its measured runner label for this repository's own \
          branches; it declares {}",
         job.runs_on

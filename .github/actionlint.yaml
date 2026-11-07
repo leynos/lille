@@ -1,6 +1,7 @@
 self-hosted-runner:
   # Labels of self-hosted runner in array of strings.
   labels:
+    - ubicloud-standard-2
     - ubicloud-standard-4
 
 # Configuration variables in array of strings defined in your repository or
