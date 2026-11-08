@@ -92,13 +92,11 @@ jobs:
           install-mold: 'true'
           # Sole owner of ~/.cargo/registry and ~/.cargo/git for this job.
           cache-provider: github
-          # `setup-rust` owns sccache: it selects the backend by runner, starts
-          # the server with a 60 s startup timeout, and falls back to an
-          # uncached build, with a `sccache-fallback` warning, if the server
-          # will not start. On this hosted runner the backend is GitHub's
-          # store, so `ubicloud` would fail closed; successive hosted runs
-          # warm each other, and the Ubicloud lanes do not read this store.
-          expect-cache: any
+          # No compiler cache on a hosted runner: it can only reach GitHub's
+          # store, which throttles sccache's writes and which no Ubicloud lane
+          # reads. The job compiles cold and costs nothing; the statistics
+          # step below reports that sccache did not start.
+          use-sccache: 'false'
       - name: Generate coverage
         env:
           # One of the two exclusions from the build standard: a coverage build is a

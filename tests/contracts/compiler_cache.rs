@@ -11,16 +11,16 @@ use rstest::rstest;
 use crate::shared_action;
 use crate::shell_reading::{samples, Measure};
 use crate::workflow_assertions::{assert_input, job_named, step_using, workflows};
-use crate::workflow_estate::{Workflow, BUILD_JOB_IDS, SAMPLED_JOB_IDS};
+use crate::workflow_estate::{Workflow, BUILD_JOB_IDS, HOSTED_COVERAGE_JOB_ID, SAMPLED_JOB_IDS};
 
 /// The `expect-cache` each build job must declare. `build-test` has a fork
 /// arm on a GitHub-hosted runner, so it takes whichever backend the runner
-/// offers; `coverage-upload` runs only on a hosted runner, where `ubicloud`
-/// would fail closed, so it takes `any`; `coverage-warmup` runs only on
-/// Ubicloud and must get its proxy.
+/// offers; `coverage-upload` runs only on a hosted runner with sccache off, so
+/// its entry is never read; `coverage-warmup` runs only on Ubicloud and must
+/// get its proxy.
 const EXPECTED_CACHE: [(&str, &str); 3] = [
     ("build-test", "any"),
-    ("coverage-upload", "any"),
+    ("coverage-upload", "unused"),
     ("coverage-warmup", "ubicloud"),
 ];
 
@@ -43,12 +43,18 @@ fn setup_rust_owns_the_compiler_cache(workflows: Vec<Workflow>) {
         let job = job_named(&workflows, id);
         let step = step_using(job, &shared_action("setup-rust"));
         assert_input(id, step, "cache-provider", "github");
-        assert_input(id, step, "expect-cache", expected);
         let sccache = step.input("use-sccache");
-        assert!(
-            sccache.is_empty() || sccache == "true",
-            "`{id}` must leave sccache to `setup-rust` (`use-sccache` is `{sccache}`)"
-        );
+        if id == HOSTED_COVERAGE_JOB_ID {
+            // A hosted runner only reaches GitHub's throttled store, which no
+            // Ubicloud lane reads, so the job compiles without sccache.
+            assert_eq!(sccache, "false", "`{id}` must run with sccache off");
+        } else {
+            assert_input(id, step, "expect-cache", expected);
+            assert!(
+                sccache.is_empty() || sccache == "true",
+                "`{id}` must leave sccache to `setup-rust` (`use-sccache` is `{sccache}`)"
+            );
+        }
         assert_eq!(
             step.id, SETUP_RUST_ID,
             "`{id}` `setup-rust` must carry the id `{SETUP_RUST_ID}`"
