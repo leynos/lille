@@ -510,9 +510,10 @@ each was proved.
 ## Continuous integration
 
 Two workflows do the work. `ci.yml`'s `build-test` job runs on every pull
-request on the `ubicloud-standard-4` runner label, which is registered in
-`.github/actionlint.yaml`. `coverage-main.yml` runs on every push to `main` as
-three jobs:
+request, on the `ubicloud-standard-4` runner label by default (registered in
+`.github/actionlint.yaml`); fork and Dependabot pull requests take the hosted
+arm described in the next section. `coverage-main.yml` runs on every push to
+`main` as three jobs:
 
 - `coverage-upload` measures coverage and uploads it to CodeScene on a
   GitHub-hosted `ubuntu-24.04` runner, which is free on a public repository. It
