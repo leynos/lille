@@ -5,8 +5,10 @@
 //! on the change that introduces a violation rather than on the CI run that
 //! suffers from it.
 //!
-//! This file is the harness. The rules live in thirteen modules, split by the
-//! question each asks: `supply_chain` for what the estate will execute,
+//! This file is the harness. The rules live in fourteen modules, split by the
+//! question each asks: `coverage_split` for the hand-off between the hosted
+//! coverage job, the baseline publisher and the warm-up,
+//! `supply_chain` for what the estate will execute,
 //! `placement` for what it costs and who owns each cache, `fork_fallback` for
 //! whether a fork's pull request can start the lane it reaches,
 //! `execution_control` for whether a scope can run and fail, `compiler_cache`
@@ -54,6 +56,8 @@ mod codescene_uploader;
 mod compiler_cache;
 #[path = "contracts/concurrency.rs"]
 mod concurrency;
+#[path = "contracts/coverage_split.rs"]
+mod coverage_split;
 #[path = "contracts/execution_control.rs"]
 mod execution_control;
 #[path = "contracts/fork_fallback.rs"]

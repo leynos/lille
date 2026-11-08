@@ -65,7 +65,7 @@ pub const COVERAGE_DENIES_WARNINGS: bool = true;
 /// How many coverage steps the listed workflows hold. Pinned both ways, so removing a coverage step
 /// (and with it the assertions about its `RUSTFLAGS`) fails the contract instead of reading as
 /// success, and adding one is a deliberate edit of this number.
-pub const COVERAGE_STEP_COUNT: usize = 2;
+pub const COVERAGE_STEP_COUNT: usize = 3;
 
 /// A step of a workflow file, found by the action it uses.
 struct Step<'a> {

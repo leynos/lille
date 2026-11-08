@@ -36,7 +36,7 @@ pub const SHARED_ACTIONS_SHA: &str = "c5a54701c8603a0fa756a6b34c49bc2af75a6c11";
 /// the action rejects the deprecated `installer-checksum` input outright, so a
 /// caller that still passes it fails rather than silently ignoring a checksum
 /// nobody checks.
-pub const COVERAGE_ACTIONS_SHA: &str = "a5765019912a8ab6882b12db049c7cde635f3a85";
+pub const COVERAGE_ACTIONS_SHA: &str = "f84a7def5646a6fc7ba77c1f486906f66a0fed96";
 
 /// Commit `install-whitaker` must pin.
 ///
@@ -65,11 +65,12 @@ pub const SETUP_RUST_SHA: &str = "6cec89bac47a21cf756d68d638a9a510998e57f8";
 /// nobody asked for. Each exception is named here with the action it
 /// governs, so a reference is still held to a reviewed commit by value and
 /// a new exception has to be added deliberately.
-pub const SHARED_ACTION_PIN_EXCEPTIONS: [(&str, &str); 4] = [
+pub const SHARED_ACTION_PIN_EXCEPTIONS: [(&str, &str); 5] = [
     ("install-whitaker", WHITAKER_ACTION_SHA),
     ("setup-rust", SETUP_RUST_SHA),
     ("generate-coverage", COVERAGE_ACTIONS_SHA),
     ("upload-codescene-coverage", COVERAGE_ACTIONS_SHA),
+    ("publish-coverage-baseline", COVERAGE_ACTIONS_SHA),
 ];
 
 /// Return the commit a `leynos/shared-actions` reference must pin.
@@ -99,8 +100,38 @@ pub const HOSTED_UBUNTU_LABEL: &str = "ubuntu-latest";
 /// Publisher whose composite actions this repository is allowed to call.
 pub const SHARED_ACTIONS_OWNER: &str = "leynos/shared-actions";
 
-/// Jobs that build or test the crate and therefore keep an Ubicloud label.
-pub const BUILD_JOB_IDS: [&str; 2] = ["build-test", "coverage-upload"];
+/// Jobs that build or test the crate. Each owns the compiler cache and its
+/// resource shape; where it runs is [`job_runner_label`]'s question, because
+/// the main-branch measurement runs on a hosted runner and the rest on Ubicloud.
+pub const BUILD_JOB_IDS: [&str; 3] = ["build-test", "coverage-upload", "coverage-warmup"];
+
+/// Build jobs that sample memory and disk, and report the peaks. The warm-up
+/// only compiles on the lane's runner shape, so the lane's samples stand for it.
+pub const SAMPLED_JOB_IDS: [&str; 2] = ["build-test", "coverage-upload"];
+
+/// The main-branch coverage job. It measures and uploads on a GitHub-hosted
+/// runner, where compute is free, and saves no cache the Ubicloud lanes read.
+pub const HOSTED_COVERAGE_JOB_ID: &str = "coverage-upload";
+
+/// The runner image the hosted coverage job pins.
+pub const HOSTED_COVERAGE_LABEL: &str = "ubuntu-24.04";
+
+/// The job that checks and saves the ratchet baseline on the Ubicloud cache
+/// store the pull-request lanes read. It compiles nothing.
+pub const BASELINE_JOB_ID: &str = "coverage-baseline";
+
+/// The smallest Ubicloud size, which is all the baseline job needs.
+pub const BASELINE_LABEL: &str = "ubicloud-standard-2";
+
+/// The runner label a build job must name for this repository's own branches.
+#[must_use]
+pub fn job_runner_label(id: &str) -> &'static str {
+    if id == HOSTED_COVERAGE_JOB_ID {
+        HOSTED_COVERAGE_LABEL
+    } else {
+        UBICLOUD_LABEL
+    }
+}
 
 /// Failure encountered while reading or parsing the workflow estate.
 #[derive(Debug)]

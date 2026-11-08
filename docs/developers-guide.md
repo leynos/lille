@@ -509,11 +509,30 @@ each was proved.
 
 ## Continuous integration
 
-Two workflows do the developer-blocking work. `ci.yml`'s `build-test` job runs
-on every pull request, and `coverage-main.yml`'s `coverage-upload` job runs on
-every push to `main`. Both use the `ubicloud-standard-4` runner label, which is
-registered in `.github/actionlint.yaml`, and both declare `timeout-minutes` so
-a hung step cannot bill to the platform's six-hour default.
+Two workflows do the work. `ci.yml`'s `build-test` job runs on every pull
+request, on the `ubicloud-standard-4` runner label by default (registered in
+`.github/actionlint.yaml`); fork and Dependabot pull requests take the hosted
+arm described in the next section. `coverage-main.yml` runs on every push to
+`main` as three jobs:
+
+- `coverage-upload` measures coverage and uploads it to CodeScene on a
+  GitHub-hosted `ubuntu-24.04` runner, which is free on a public repository. It
+  saves no ratchet baseline (`publish-baseline: never`), because a hosted
+  runner writes GitHub's cache store and the Ubicloud pull-request lanes never
+  read it. It hands the figures on as the `coverage-baseline-handover`
+  artefact. Its compiler cache lives in GitHub's store and warms only the next
+  hosted run.
+- `coverage-baseline` runs on `ubicloud-standard-2`, only when `coverage-upload`
+  passed. It checks the handed-over figures against the stored baseline and
+  saves them under the key the pull-request ratchet restores. It compiles
+  nothing.
+- `coverage-warmup` runs on `ubicloud-standard-4`, the lane's own shape, and
+  depends on nothing. It compiles the instrumented tests without running them
+  (`build-only`, under the lane's `RUSTFLAGS`), so the lane's compiler-cache
+  reads on Ubicloud hit. It is the only writer of that cache.
+
+Every job declares `timeout-minutes` so a hung step cannot bill, or run, to the
+platform's six-hour default.
 
 ### The fork arm on the pull-request lane
 
@@ -536,11 +555,11 @@ Without the arm the job never starts on a fork's pull request, and a required
 check that never reports presents as a pull request waiting rather than as a
 placement fault.
 
-`coverage-upload` keeps the plain label. It runs on push events, so a fork's
-pull request cannot reach it, and a fallback arm there would be a branch
-nothing ever takes: one more expression to keep correct, with no case that
-exercises it. The contract asserts that absence as well as the two arms, so the
-expression does not spread by imitation.
+The three `coverage-main.yml` jobs name their runner outright. They run on push
+events, so a fork's pull request cannot reach them, and a fallback arm there
+would be a branch nothing ever takes: one more expression to keep correct, with
+no case that exercises it. The contract asserts that absence as well as the two
+arms, so the expression does not spread by imitation.
 
 Keep the continuation at the same indent as the first line. A more-indented
 line inside a folded scalar keeps its break, so the expression arrives with a
@@ -601,7 +620,7 @@ break QG-002. The workflow passes `installer-version: '0.2.11'`, the first
 installer with Whitaker's verified Clippy snapshot, and `supply_chain.rs`
 asserts it. The coverage actions, `generate-coverage` and
 `upload-codescene-coverage`, share `COVERAGE_ACTIONS_SHA`, currently
-`a5765019912a8ab6882b12db049c7cde635f3a85`, so that they carry one commit (the
+`f84a7def5646a6fc7ba77c1f486906f66a0fed96`, so that they carry one commit (the
 shared CV-005 contract holds this as `coverage.selection-parity`). At that
 revision the uploader verifies the `cs-coverage` archive against its committed
 `cli-manifest.json` and rejects a non-empty `installer-checksum` outright, so
@@ -619,13 +638,13 @@ sccache is not installed by this repository: `setup-rust` owns it (see
 Each mutable path has exactly one owner, so no two steps race to write it and
 every miss is explainable from the rendered key.
 
-| Path                                                                             | Owner                                         | Key inputs                                                                           |
-| -------------------------------------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `~/.cargo/registry`, `~/.cargo/git`                                              | `setup-rust` (`cache-provider: github`)       | `runner.os`, `rust-toolchain.toml` and `Cargo.lock` hash                             |
-| `~/.cargo/bin/whitaker-installer`, its version marker, `~/.local/share/whitaker` | `install-whitaker` (`cache-provider: github`) | `runner.os`, `runner.arch`, installer version, `dylint.toml` hash                    |
-| `.uv-cache`, `.uv-tools`                                                         | the `Cache uv tool layers` step in `ci.yml`   | `runner.os`, `runner.arch`, `runner.environment`, `Makefile` and `scripts/*.py` hash |
-| coverage ratchet baseline files                                                  | `generate-coverage`'s split restore and save  | `runner.os`, run id                                                                  |
-| compiler output                                                                  | `sccache`, through its GitHub Actions backend | compiler flags and toolchain, hashed by sccache itself                               |
+| Path                                                                             | Owner                                             | Key inputs                                                                           |
+| -------------------------------------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `~/.cargo/registry`, `~/.cargo/git`                                              | `setup-rust` (`cache-provider: github`)           | `runner.os`, `rust-toolchain.toml` and `Cargo.lock` hash                             |
+| `~/.cargo/bin/whitaker-installer`, its version marker, `~/.local/share/whitaker` | `install-whitaker` (`cache-provider: github`)     | `runner.os`, `runner.arch`, installer version, `dylint.toml` hash                    |
+| `.uv-cache`, `.uv-tools`                                                         | the `Cache uv tool layers` step in `ci.yml`       | `runner.os`, `runner.arch`, `runner.environment`, `Makefile` and `scripts/*.py` hash |
+| coverage ratchet baseline files                                                  | `publish-coverage-baseline` (`coverage-baseline`) | `runner.os`, run id                                                                  |
+| compiler output                                                                  | `sccache`, through its GitHub Actions backend     | compiler flags and toolchain, hashed by sccache itself                               |
 
 *Table 1: Cache ownership and cache-key inputs.*
 
@@ -661,8 +680,10 @@ Each job's call carries three inputs and one id:
 - `cache-provider: github`, because the action is the sole owner of
   `~/.cargo/registry` and `~/.cargo/git` for the job;
 - `expect-cache`, chosen by where the job runs. `build-test` has a fork arm on a
-  GitHub-hosted runner, so it takes `any`. `coverage-upload` runs only on
-  Ubicloud and takes `ubicloud`, which fails the job if the proxy is missing;
+  GitHub-hosted runner, so it takes `any`, and so does `coverage-upload`, which
+  runs only on a hosted runner where `ubicloud` would fail closed.
+  `coverage-warmup` runs only on Ubicloud and takes `ubicloud`, which fails the
+  job if the proxy is missing;
 - `use-sccache` left at its default of `true`. Setting it to `false` would
   leave the job with no cache and no wrapper;
 - `id: setup-rust`, which the statistics step reads `sccache-status` and
@@ -858,11 +879,12 @@ two. A workflow contract in `tests/workflow_contracts.rs` fails if a second
 ### Workflow contracts
 
 `tests/workflow_contracts.rs` asserts the rules above. It is a harness rather
-than a test file: the rules live in thirteen modules under `tests/contracts/`,
+than a test file: the rules live in fourteen modules under `tests/contracts/`,
 split by the question each asks.
 
 | Module                  | Asks                                                                                                                                                                                                                                                                                     |
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `coverage_split.rs`     | Does main coverage hand off correctly? The baseline publisher sits on the smallest Ubicloud runner with a bounded timeout, the hosted job saves no baseline and names the artefact the publisher reads, and the warm-up compiles the lane's build without running it.                    |
 | `supply_chain.rs`       | What will the estate execute? Pinned cache and shared-action references, no source-built tools, prebuilt Whitaker, and the `setup-rust` revision that owns the compiler cache.                                                                                                           |
 | `placement.rs`          | What does it cost, and who owns each cache? Runner placement and labels, bounded timeouts, one owner per cached path, an installer before the first use of what it installs, a single test execution per build job, the uv cache key.                                                    |
 | `fork_fallback.rs`      | Can a fork's pull request start the lane it reaches? The pull-request lane falls back to `ubuntu-latest` for forks through the one prescribed expression, lanes no fork reaches name their runner outright, and no `runs-on` declaration carries a line break.                           |
@@ -877,7 +899,7 @@ split by the question each asks.
 | `timeouts.rs`           | Which timer ends a run first? The coverage action's cargo watchdog set explicitly and by value, each coverage job's ceiling above that watchdog plus the measured work around it and equal to the documented 120 minutes, and the two nextest tiers absent rather than silently enabled. |
 | `timeout_budgets.rs`    | Do the readings that ordering rests on say what they claim? The coordinate match, the ceiling predicate, and the two conversions, driven with values chosen to separate a correct reading from a plausible wrong one.                                                                    |
 
-*Table: the thirteen contract modules, and the question each one asks of the
+*Table: the fourteen contract modules, and the question each one asks of the
 estate.*
 
 Each module also pins the inputs that make its rules true, so a workflow cannot
@@ -1100,7 +1122,9 @@ window, measured from the worst of several runs rather than one:
 | `coverage-main.yml` `coverage-upload` | 1,728 s             | 1,775 s         | 286 s            | 31892219565 |
 
 *Table: measured coverage-step and whole-job durations, read across fifteen
-successful `ci.yml` runs and twenty of `coverage-main.yml`.*
+successful `ci.yml` runs and twenty of `coverage-main.yml`. The
+`coverage-upload` figures were measured on Ubicloud, before the job moved to a
+hosted runner; they still size its 120-minute ceiling.*
 
 The widest gap is 859 s, so the contract allows 15 minutes. That makes the
 requirement 5,400 s + 900 s = 105 minutes, and both lanes are set to 120, which

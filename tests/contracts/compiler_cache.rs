@@ -11,12 +11,18 @@ use rstest::rstest;
 use crate::shared_action;
 use crate::shell_reading::{samples, Measure};
 use crate::workflow_assertions::{assert_input, job_named, step_using, workflows};
-use crate::workflow_estate::{Workflow, BUILD_JOB_IDS};
+use crate::workflow_estate::{Workflow, BUILD_JOB_IDS, SAMPLED_JOB_IDS};
 
 /// The `expect-cache` each build job must declare. `build-test` has a fork
 /// arm on a GitHub-hosted runner, so it takes whichever backend the runner
-/// offers; `coverage-upload` runs only on Ubicloud and must get its proxy.
-const EXPECTED_CACHE: [(&str, &str); 2] = [("build-test", "any"), ("coverage-upload", "ubicloud")];
+/// offers; `coverage-upload` runs only on a hosted runner, where `ubicloud`
+/// would fail closed, so it takes `any`; `coverage-warmup` runs only on
+/// Ubicloud and must get its proxy.
+const EXPECTED_CACHE: [(&str, &str); 3] = [
+    ("build-test", "any"),
+    ("coverage-upload", "any"),
+    ("coverage-warmup", "ubicloud"),
+];
 
 /// The id the report step reads `setup-rust`'s outputs through.
 const SETUP_RUST_ID: &str = "setup-rust";
@@ -202,7 +208,7 @@ fn compiler_cache_effectiveness_is_measured_and_names_its_backend(workflows: Vec
 /// disk is the one that has killed jobs silently elsewhere in this rollout.
 #[rstest]
 fn both_build_jobs_sample_and_report_their_resource_use(workflows: Vec<Workflow>) {
-    for id in BUILD_JOB_IDS {
+    for id in SAMPLED_JOB_IDS {
         let job = job_named(&workflows, id);
         let start = job
             .first_step_containing("sample-resources.sh")

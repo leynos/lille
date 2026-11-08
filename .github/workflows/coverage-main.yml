@@ -28,22 +28,21 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Measures coverage and uploads it to CodeScene, on a GitHub-hosted runner
+  # (free on a public repository). It saves no ratchet baseline: a hosted
+  # runner writes GitHub's cache store, which the Ubicloud pull-request lanes
+  # never read. It hands the figures on as an artefact, and `coverage-baseline`
+  # below checks and saves them where the lanes can see them.
   coverage-upload:
-    runs-on: ubicloud-standard-4
+    runs-on: ubuntu-24.04
     # The CodeScene token lives in this environment, whose deployment policy
     # admits `main` alone; the codescene environment contract holds it to
     # this job.
     environment: codescene
-    # Ubicloud jobs bill by the minute, so a hung step must not run to the
-    # 6-hour platform default. The eight-vCPU cold writer took 1,757 s, and
-    # this job is always the cold writer, so halving it to four vCPUs is
-    # what took this lane past its original 60-minute bound and up to the
-    # 75 this change replaces.
-    #
-    # The pull-request lane reached its 90-minute ceiling while coverage was
-    # still compiling on four vCPUs. Keep the same 120-minute bound here so a
-    # cold main-branch build has room to finish while remaining bounded well
-    # below the platform's six-hour default.
+    # A hung step must not run to the 6-hour platform default. A cold
+    # instrumented build on a hosted four-vCPU runner finished inside 120
+    # minutes, lint included (the Dependabot lane runs the same build there),
+    # and the pull-request lane uses the same 120-minute bound on Ubicloud.
     timeout-minutes: 120
     permissions:
       contents: read
@@ -54,8 +53,7 @@ jobs:
       # have hit the old 1,800 s cargo cap first: its eight-vCPU run already
       # took 1,757 s.
       RUN_RUST_CARGO_WAIT_TIMEOUT: '5400'
-      # See ci.yml. This job is the trunk writer, so it is the run that
-      # populates the compiler cache every pull request then reads.
+      # See ci.yml. sccache cannot cache incremental compilation.
       CARGO_INCREMENTAL: '0'
     steps:
       - uses: actions/checkout@v7
@@ -92,21 +90,22 @@ jobs:
         uses: leynos/shared-actions/.github/actions/setup-rust@6cec89bac47a21cf756d68d638a9a510998e57f8
         with:
           install-mold: 'true'
-          # Sole owner of ~/.cargo/registry and ~/.cargo/git for this job, and
-          # the trunk writer whose entry every pull-request run restores.
+          # Sole owner of ~/.cargo/registry and ~/.cargo/git for this job.
           cache-provider: github
           # `setup-rust` owns sccache: it selects the backend by runner, starts
           # the server with a 60 s startup timeout, and falls back to an
           # uncached build, with a `sccache-fallback` warning, if the server
-          # will not start.
-          expect-cache: ubicloud
+          # will not start. On this hosted runner the backend is GitHub's
+          # store, so `ubicloud` would fail closed; successive hosted runs
+          # warm each other, and the Ubicloud lanes do not read this store.
+          expect-cache: any
       - name: Generate coverage
         env:
           # One of the two exclusions from the build standard: a coverage build is a
           # measurement, so it takes neither the parallel frontend nor the mold linker.
           # Assigning RUSTFLAGS displaces every `rustflags` table in .cargo/config.toml.
           RUSTFLAGS: -D warnings
-        uses: leynos/shared-actions/.github/actions/generate-coverage@a5765019912a8ab6882b12db049c7cde635f3a85
+        uses: leynos/shared-actions/.github/actions/generate-coverage@f84a7def5646a6fc7ba77c1f486906f66a0fed96
         with:
           all-features: 'true'
           all-targets: 'true'
@@ -115,6 +114,10 @@ jobs:
           format: lcov
           use-cargo-nextest: 'false'
           with-ratchet: 'true'
+          # No baseline is read or saved here; see the job comment. The figures
+          # travel to `coverage-baseline` as an artefact.
+          publish-baseline: never
+          baseline-artefact-name: coverage-baseline-handover
           # `setup-rust` above already owns ~/.cargo/registry and ~/.cargo/git.
           cache-provider: external
       - name: Reclaim the coverage scratch tree
@@ -201,7 +204,96 @@ jobs:
         # main is this workflow's only trigger: a dispatch trigger added later
         # could otherwise upload another branch's report as the project's.
         if: steps.codescene-credential.outputs.available == 'true' && github.ref == 'refs/heads/main'
-        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@a5765019912a8ab6882b12db049c7cde635f3a85
+        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@f84a7def5646a6fc7ba77c1f486906f66a0fed96
         with:
           format: lcov
           access-token: ${{ secrets.CS_ACCESS_TOKEN }}
+
+  # Checks the handed-over figures against the stored baseline and saves them
+  # under the key the pull-request ratchet restores. It runs on Ubicloud, the
+  # cache store those lanes read, and compiles nothing. It runs only when
+  # `coverage-upload` passed, so a failed run never advances the baseline.
+  coverage-baseline:
+    needs: coverage-upload
+    runs-on: ubicloud-standard-2
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Publish the ratchet baseline
+        uses: leynos/shared-actions/.github/actions/publish-coverage-baseline@f84a7def5646a6fc7ba77c1f486906f66a0fed96
+        with:
+          artefact-name: coverage-baseline-handover
+
+  # Compiles the instrumented tests the pull-request lane builds, without
+  # running them, so that lane's compiler-cache reads hit. It is the only
+  # writer of the Ubicloud compiler cache, on the lane's own runner shape, and
+  # depends on nothing: a failing test is no reason to leave the cache cold.
+  coverage-warmup:
+    runs-on: ubicloud-standard-4
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    env:
+      CARGO_TERM_COLOR: always
+      BUILD_PROFILE: debug
+      RUN_RUST_CARGO_WAIT_TIMEOUT: '5400'
+      CARGO_INCREMENTAL: '0'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Setup Rust
+        id: setup-rust
+        uses: leynos/shared-actions/.github/actions/setup-rust@6cec89bac47a21cf756d68d638a9a510998e57f8
+        with:
+          install-mold: 'true'
+          cache-provider: github
+          expect-cache: ubicloud
+      - name: Compile the instrumented tests
+        env:
+          # The same RUSTFLAGS as the lane's coverage step, so the compiler
+          # cache keys match.
+          RUSTFLAGS: -D warnings
+        uses: leynos/shared-actions/.github/actions/generate-coverage@f84a7def5646a6fc7ba77c1f486906f66a0fed96
+        with:
+          all-features: 'true'
+          all-targets: 'true'
+          doctests: 'true'
+          output-path: lcov.info
+          format: lcov
+          use-cargo-nextest: 'false'
+          build-only: 'true'
+          cache-provider: external
+      - name: Reclaim the coverage scratch tree
+        if: always()
+        run: rm -rf -- target/llvm-cov-target
+      - name: Record compiler-cache effectiveness
+        if: always()
+        shell: bash
+        env:
+          SCCACHE_STATUS: ${{ steps.setup-rust.outputs.sccache-status }}
+          SCCACHE_BACKEND: ${{ steps.setup-rust.outputs.cache-backend }}
+        run: |
+          set -euo pipefail
+          # `if: always()` runs this even when an earlier step failed before
+          # sccache was installed. Reporting nothing is correct there; failing
+          # here would bury the real failure under a second one.
+          if ! command -v sccache >/dev/null 2>&1; then
+            echo 'sccache is not installed; no compiler-cache statistics to report.'
+            exit 0
+          fi
+          if [[ "${SCCACHE_STATUS}" != started ]]; then
+            echo 'sccache did not start; no compiler-cache statistics to report.'
+            exit 0
+          fi
+          printf 'backend: %s\n' "${SCCACHE_BACKEND}"
+          stats="$(sccache --show-stats)"
+          printf '%s\n' "$stats"
+          {
+            printf '### sccache statistics (%s)\n\n' "${GITHUB_JOB}"
+            printf 'backend: %s\n\n' "${SCCACHE_BACKEND}"
+            printf '```text\n'
+            printf '%s\n' "$stats"
+            printf '```\n'
+          } >> "${GITHUB_STEP_SUMMARY}"
