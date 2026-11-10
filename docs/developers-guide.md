@@ -520,8 +520,7 @@ arm described in the next section. `coverage-main.yml` runs on every push to
   saves no ratchet baseline (`publish-baseline: never`), because a hosted
   runner writes GitHub's cache store and the Ubicloud pull-request lanes never
   read it. It hands the figures on as the `coverage-baseline-handover`
-  artefact. Its compiler cache lives in GitHub's store and warms only the next
-  hosted run.
+  artefact. It runs with sccache off, so every run compiles cold.
 - `coverage-baseline` runs on `ubicloud-standard-2`, only when `coverage-upload`
   passed. It checks the handed-over figures against the stored baseline and
   saves them under the key the pull-request ratchet restores. It compiles
@@ -680,12 +679,13 @@ Each job's call carries three inputs and one id:
 - `cache-provider: github`, because the action is the sole owner of
   `~/.cargo/registry` and `~/.cargo/git` for the job;
 - `expect-cache`, chosen by where the job runs. `build-test` has a fork arm on a
-  GitHub-hosted runner, so it takes `any`, and so does `coverage-upload`, which
-  runs only on a hosted runner where `ubicloud` would fail closed.
-  `coverage-warmup` runs only on Ubicloud and takes `ubicloud`, which fails the
-  job if the proxy is missing;
-- `use-sccache` left at its default of `true`. Setting it to `false` would
-  leave the job with no cache and no wrapper;
+  GitHub-hosted runner, so it takes `any`. `coverage-warmup` runs only on
+  Ubicloud and takes `ubicloud`, which fails the job if the proxy is missing.
+  `coverage-upload` sets neither, because it runs with sccache off;
+- `use-sccache` left at its default of `true`, except on `coverage-upload`,
+  which sets it to `false`: a hosted runner can only reach GitHub's cache
+  service, which throttles sccache's writes and which no Ubicloud lane reads,
+  so that job compiles cold;
 - `id: setup-rust`, which the statistics step reads `sccache-status` and
   `cache-backend` through.
 
