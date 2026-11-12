@@ -611,18 +611,18 @@ together.
 
 The exceptions are `install-whitaker` and the two coverage actions.
 `install-whitaker` is held to `WHITAKER_ACTION_SHA`, currently
-`5a99aed78ce68dcebd3052b75c31e6f173162b1e` (shared-actions #651). It advances
+`0eabb6bc07148981de5da395e30cd78d83f5c7c2` (shared-actions #673). It advances
 independently of the estate default because the concordat QG-002 rule accepts
 any shared-actions commit at or after `6dea5677` (#522) that leaves the action
 directory content-identical to it, so repinning it to the estate default would
-break QG-002. The workflow passes `installer-version: '0.2.11'`, the first
-installer with Whitaker's verified Clippy snapshot, and `supply_chain.rs`
-asserts it. The coverage actions, `generate-coverage` and
-`upload-codescene-coverage`, share `COVERAGE_ACTIONS_SHA`, currently
-`f84a7def5646a6fc7ba77c1f486906f66a0fed96`, so that they carry one commit (the
-shared CV-005 contract holds this as `coverage.selection-parity`). At that
-revision the uploader verifies the `cs-coverage` archive against its committed
-`cli-manifest.json` and rejects a non-empty `installer-checksum` outright, so
+break QG-002. The workflow passes `installer-version: '0.2.12'`, which keeps
+Whitaker's verified Clippy snapshot, and `supply_chain.rs` asserts it. The
+coverage actions, `generate-coverage` and `upload-codescene-coverage`, share
+`COVERAGE_ACTIONS_SHA`, currently `f84a7def5646a6fc7ba77c1f486906f66a0fed96`,
+so that they carry one commit (the shared CV-005 contract holds this as
+`coverage.selection-parity`). At that revision the uploader verifies the
+`cs-coverage` archive against its committed `cli-manifest.json` and rejects a
+non-empty `installer-checksum` outright, so
 `tests/contracts/codescene_uploader.rs` refuses that input and the
 `CODESCENE_CLI_SHA256` variable that fed it in any workflow, even in a comment,
 requires every uploader reference to carry the approved commit, and requires the
