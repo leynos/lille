@@ -200,7 +200,7 @@ mod properties {
     //! lifecycle calls instead, where the interesting failures are ordering ones —
     //! a repeated stash overwriting the true pre-frame values, or a commit failing
     //! to disarm a later rollback. See
-    //! `docs/adr-003-bounded-rstest-over-property-testing.md`.
+    //! `docs/adrs/adr-0003-bounded-rstest-over-property-testing.md`.
 
     use super::*;
     use proptest::prelude::*;

@@ -14,7 +14,7 @@ For the health and damage synchronization protocol in more depth, see §3.5 of
 test-writing patterns used throughout `dbsp_sync`, see
 [Testing declarative game logic in DBSP](testing-declarative-game-logic-in-dbsp.md).
 For the `observers-v1-spike` feature's effect on scheduling, see
-[ADR-001: DBSP Observers V1 spike](adr-001-dbsp-observers-v1-spike.md).
+[ADR-001: DBSP Observers V1 spike](adrs/adr-0001-dbsp-observers-v1-spike.md).
 
 ## 1. Frame lifecycle
 
@@ -356,6 +356,6 @@ reaches value classes no handwritten matrix enumerates.
 
 The rationale for keeping the deterministic matrices, and the record of when
 `proptest` was adopted alongside them, is in
-[ADR-003: bounded `rstest` matrices over a property-testing framework](adr-003-bounded-rstest-over-property-testing.md).
+[ADR-003: bounded `rstest` matrices over a property-testing framework](adrs/adr-0003-bounded-rstest-over-property-testing.md).
 Should a domain warrant assurance stronger than sampling, a bounded model
 checker such as Kani would be the next escalation.

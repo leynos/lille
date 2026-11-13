@@ -5,7 +5,7 @@
 //! logic behaves over the wider domain of jobs a future edit could produce:
 //! arbitrary step orderings, repeated display names, interleaved unrelated
 //! steps, and split caches whose halves agree or disagree on a key. Per
-//! `docs/adr-003-bounded-rstest-over-property-testing.md`, `proptest`
+//! `docs/adrs/adr-0003-bounded-rstest-over-property-testing.md`, `proptest`
 //! supplements the bounded matrices for exactly that kind of broader domain.
 //!
 //! Each property is checked against a small oracle expressed independently of

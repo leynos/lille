@@ -3,7 +3,7 @@
 //! The matrices pin a handful of representative shapes exactly; these
 //! properties sample the broader domain of weighted decision sets, including
 //! extreme `i64` weights, and check the invariants that must hold across all
-//! of it. See `docs/adr-003-bounded-rstest-over-property-testing.md`.
+//! of it. See `docs/adrs/adr-0003-bounded-rstest-over-property-testing.md`.
 
 use super::*;
 use proptest::prelude::*;

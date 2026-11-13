@@ -149,7 +149,7 @@ exclude = ["third_party/feldera-size-of"]
 ```
 
 Full details of the fork's provenance and changes are recorded in
-[`third_party/README.md`](../third_party/README.md).
+[`third_party/README.md`](../../third_party/README.md).
 
 ## Known Risks and Limitations
 

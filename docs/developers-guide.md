@@ -93,10 +93,10 @@ requires for keys, joins, and aggregations. Those records also derive
 major `ordered-float` upgrade is the reason for the arrangement described here.
 
 For the full decision record, see
-[ADR 002](adr-002-ordered-float-v5-vendored-feldera-size-of-fork.md). The fork
-itself is documented in [`third_party/README.md`](../third_party/README.md).
-Fork lifecycle and removal are tracked in
-[issue #294](https://github.com/leynos/lille/issues/294).
+[ADR 002](adrs/adr-0002-ordered-float-v5-vendored-feldera-size-of-fork.md). The
+fork itself is documented in
+[`third_party/README.md`](../third_party/README.md). Fork lifecycle and removal
+are tracked in [issue #294](https://github.com/leynos/lille/issues/294).
 
 ### Why `ordered-float` is pinned at v5
 
@@ -393,10 +393,10 @@ own `RUSTFLAGS`), the coverage steps of the CI workflows (each assigns its own
 flag lost through a recipe or workflow edit fails there. For Whitaker the
 contract runs the other way: a Whitaker command that carries a development
 flag, inherits the caller's flags, drops `-D warnings`, or assigns nothing
-fails. The decision is recorded in [ADR 004](adr-004-rust-build-standard.md).
-The contract runs `make -n`, so a direct `cargo test` needs GNU make on the
-`PATH`. It fails when `make` is missing instead of skipping, so a missing tool
-cannot read as a pass.
+fails. The decision is recorded in
+[ADR 004](adrs/adr-0004-rust-build-standard.md). The contract runs `make -n`,
+so a direct `cargo test` needs GNU make on the `PATH`. It fails when `make` is
+missing instead of skipping, so a missing tool cannot read as a pass.
 
 ### Development-profile defaults
 
@@ -964,7 +964,7 @@ part of.
   in a comment.
 
 Two assurance methods are used together, following
-[ADR 003](adr-003-bounded-rstest-over-property-testing.md). The contract
+[ADR 003](adrs/adr-0003-bounded-rstest-over-property-testing.md). The contract
 modules hold bounded `rstest` cases over the workflow files as they stand, and
 `tests/workflow_model_properties.rs` samples the wider domain with `proptest`:
 arbitrary step orderings, repeated display names, interleaved unrelated steps,

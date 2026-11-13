@@ -150,4 +150,4 @@ configuration's flags unless `RUSTFLAGS` is assigned, for example
 `RUSTFLAGS="" cargo build --release`, which links with the platform linker.
 
 Cranelift is not adopted; the developers' guide records the reason. See
-[ADR 004](adr-004-rust-build-standard.md) for the reasoning.
+[ADR 004](adrs/adr-0004-rust-build-standard.md) for the reasoning.
