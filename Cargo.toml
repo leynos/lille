@@ -89,7 +89,7 @@ anyhow = "1"
 glam = "0.33"
 ordered-float = { version = "5", features = ["serde", "rkyv_64"] }
 # Development-only. Supplements the bounded `rstest` matrices with sampled
-# properties over broader domains; see docs/adr-003-bounded-rstest-over-property-testing.md.
+# properties over broader domains; see docs/adrs/adr-0003-bounded-rstest-over-property-testing.md.
 proptest = "1"
 
 bevy = { version = "0.18.1", default-features = false, features = ["reflect_auto_register"] }

@@ -5,7 +5,7 @@
 //! cannot tell a correct reading from several plausible wrong ones. These
 //! drive the readings with values chosen to separate them, and with
 //! `proptest` where the domain is too large to enumerate, following the
-//! split [ADR 003](../../docs/adr-003-bounded-rstest-over-property-testing.md)
+//! split [ADR 003](../../docs/adrs/adr-0003-bounded-rstest-over-property-testing.md)
 //! records.
 //!
 //! Separated from `timeouts`, whose subject is the workflows as they

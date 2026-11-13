@@ -5,7 +5,7 @@ provide further detail:
 
 - [Architecture](architecture.md)
 - [ADR-003: bounded `rstest` matrices over a property-testing framework](
-  adr-003-bounded-rstest-over-property-testing.md)
+  adrs/adr-0003-bounded-rstest-over-property-testing.md)
 - [Developer's guide](developers-guide.md)
 - [Bevy headless testing](bevy-headless-testing.md)
 - [Bevy 0.16+ migration plan (archived)](bevy-0-16-plus-migration-plan.md)

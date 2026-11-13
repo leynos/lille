@@ -174,7 +174,7 @@ mod properties {
     //! [`validate_asset_path_component_matrix`] enumerates a fixed set of
     //! components and both separator styles exhaustively; this samples arbitrary
     //! strings instead, including the separator and prefix shapes an attacker
-    //! would reach for. See `docs/adr-003-bounded-rstest-over-property-testing.md`.
+    //! would reach for. See `docs/adrs/adr-0003-bounded-rstest-over-property-testing.md`.
 
     use super::*;
     use proptest::prelude::*;
