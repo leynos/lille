@@ -96,7 +96,7 @@ jobs:
           printf 'RESOURCE_SAMPLES=%s\n' "$RESOURCE_SAMPLES" >> "$GITHUB_ENV"
       - name: Setup Rust
         id: setup-rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@6cec89bac47a21cf756d68d638a9a510998e57f8
+        uses: leynos/shared-actions/.github/actions/setup-rust@fc0e10220207b951bf693aba2ce4f9dafc1a0206
         with:
           install-mold: 'true'
           # Sole owner of ~/.cargo/registry and ~/.cargo/git for this job. It
@@ -129,7 +129,7 @@ jobs:
       - name: Install mdtablefix
         # `make check-fmt` runs `mdtablefix --check --git`; 0.6.0 is the
         # first release with `--check` and `--git`.
-        uses: leynos/shared-actions/.github/actions/install-mdtablefix@c5a54701c8603a0fa756a6b34c49bc2af75a6c11
+        uses: leynos/shared-actions/.github/actions/install-mdtablefix@fc0e10220207b951bf693aba2ce4f9dafc1a0206
         with:
           version: "0.6.1"
 
@@ -149,7 +149,7 @@ jobs:
         # Downloads the pinned prebuilt installer and verifies it against a
         # digest pinned in the action. The action owns the cache for the
         # installer binary, its version marker, and ~/.local/share/whitaker.
-        uses: leynos/shared-actions/.github/actions/install-whitaker@0eabb6bc07148981de5da395e30cd78d83f5c7c2
+        uses: leynos/shared-actions/.github/actions/install-whitaker@fc0e10220207b951bf693aba2ce4f9dafc1a0206
         with:
           installer-version: '0.2.12'
           cache-provider: github
@@ -171,7 +171,7 @@ jobs:
           # measurement, so it takes neither the parallel frontend nor the mold linker.
           # Assigning RUSTFLAGS displaces every `rustflags` table in .cargo/config.toml.
           RUSTFLAGS: -D warnings
-        uses: leynos/shared-actions/.github/actions/generate-coverage@f84a7def5646a6fc7ba77c1f486906f66a0fed96
+        uses: leynos/shared-actions/.github/actions/generate-coverage@fc0e10220207b951bf693aba2ce4f9dafc1a0206
         with:
           all-features: 'true'
           all-targets: 'true'
