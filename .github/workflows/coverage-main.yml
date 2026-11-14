@@ -87,7 +87,7 @@ jobs:
           printf 'RESOURCE_SAMPLES=%s\n' "$RESOURCE_SAMPLES" >> "$GITHUB_ENV"
       - name: Setup Rust
         id: setup-rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@6cec89bac47a21cf756d68d638a9a510998e57f8
+        uses: leynos/shared-actions/.github/actions/setup-rust@fc0e10220207b951bf693aba2ce4f9dafc1a0206
         with:
           install-mold: 'true'
           # Sole owner of ~/.cargo/registry and ~/.cargo/git for this job.
@@ -103,7 +103,7 @@ jobs:
           # measurement, so it takes neither the parallel frontend nor the mold linker.
           # Assigning RUSTFLAGS displaces every `rustflags` table in .cargo/config.toml.
           RUSTFLAGS: -D warnings
-        uses: leynos/shared-actions/.github/actions/generate-coverage@f84a7def5646a6fc7ba77c1f486906f66a0fed96
+        uses: leynos/shared-actions/.github/actions/generate-coverage@fc0e10220207b951bf693aba2ce4f9dafc1a0206
         with:
           all-features: 'true'
           all-targets: 'true'
@@ -202,7 +202,7 @@ jobs:
         # main is this workflow's only trigger: a dispatch trigger added later
         # could otherwise upload another branch's report as the project's.
         if: steps.codescene-credential.outputs.available == 'true' && github.ref == 'refs/heads/main'
-        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@f84a7def5646a6fc7ba77c1f486906f66a0fed96
+        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@fc0e10220207b951bf693aba2ce4f9dafc1a0206
         with:
           format: lcov
           access-token: ${{ secrets.CS_ACCESS_TOKEN }}
@@ -219,7 +219,7 @@ jobs:
       contents: read
     steps:
       - name: Publish the ratchet baseline
-        uses: leynos/shared-actions/.github/actions/publish-coverage-baseline@f84a7def5646a6fc7ba77c1f486906f66a0fed96
+        uses: leynos/shared-actions/.github/actions/publish-coverage-baseline@fc0e10220207b951bf693aba2ce4f9dafc1a0206
         with:
           artefact-name: coverage-baseline-handover
 
@@ -243,7 +243,7 @@ jobs:
           persist-credentials: false
       - name: Setup Rust
         id: setup-rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@6cec89bac47a21cf756d68d638a9a510998e57f8
+        uses: leynos/shared-actions/.github/actions/setup-rust@fc0e10220207b951bf693aba2ce4f9dafc1a0206
         with:
           install-mold: 'true'
           cache-provider: github
@@ -253,7 +253,7 @@ jobs:
           # The same RUSTFLAGS as the lane's coverage step, so the compiler
           # cache keys match.
           RUSTFLAGS: -D warnings
-        uses: leynos/shared-actions/.github/actions/generate-coverage@f84a7def5646a6fc7ba77c1f486906f66a0fed96
+        uses: leynos/shared-actions/.github/actions/generate-coverage@fc0e10220207b951bf693aba2ce4f9dafc1a0206
         with:
           all-features: 'true'
           all-targets: 'true'
