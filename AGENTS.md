@@ -435,8 +435,8 @@ project:
 
 - Validate Markdown files using `make markdownlint`. This target also enforces
   en-GB-oxendict spelling.
-- Run `make fmt` after any documentation changes to format all Markdown files
-  and fix table markup.
+- Run `make fmt` after any documentation changes to format Markdown files and
+  fix table markup.
 - Validate Mermaid diagrams in Markdown files by running `make nixie`.
 - Markdown paragraphs and bullet points must be wrapped at 80 columns.
 - Code blocks must be wrapped at 120 columns.
