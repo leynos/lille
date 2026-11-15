@@ -402,8 +402,12 @@ missing instead of skipping, so a missing tool cannot read as a pass.
 
 Development, test, lint and typecheck builds use the default `dev` profile.
 `Cargo.toml` and `.cargo/config.toml` both set it to `incremental = false` and
-`debug = 0`, so non-incremental builds without debug information keep `target`
-small. The settings exist because development builds filled the CI disk.
+no debug information, so non-incremental builds without debug information keep
+`target` small. `.cargo/config.toml` spells the latter `debug = 0`;
+`Cargo.toml` spells it `debug = false`, which Cargo treats identically, because
+`trybuild` re-serializes the manifest's profile into its generated crate and
+mis-writes an integer `debug` there. The settings exist because development
+builds filled the CI disk.
 
 Debug information is therefore absent by default, so backtraces and debugger
 sessions lack source locations. Enable it for one invocation rather than by
