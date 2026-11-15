@@ -234,15 +234,7 @@ const fn mixes_job_modes(job: &Job, declares_steps: bool) -> bool {
 fn parse_job(id: &str, raw: &Value, file: &Location) -> Result<Job, WorkflowError> {
     let at = file.job(id);
     let declares_steps = raw.get("steps").is_some();
-    let steps = match raw.get("steps") {
-        None => Vec::new(),
-        Some(value) => value
-            .as_sequence()
-            .ok_or_else(|| at.shape("`steps` must be a sequence"))?
-            .iter()
-            .map(|step| parse_step(step, &at))
-            .collect::<Result<Vec<Step>, WorkflowError>>()?,
-    };
+    let steps = parse_job_steps(raw, &at)?;
     let job = Job {
         id: id.to_owned(),
         runs_on: parse_runs_on(raw, &at)?,
@@ -253,15 +245,43 @@ fn parse_job(id: &str, raw: &Value, file: &Location) -> Result<Job, WorkflowErro
         env: parse_scalar_mapping(raw, "env", &at)?,
         steps,
     };
+    check_job_modes(&job, declares_steps, &at)?;
+    Ok(job)
+}
+
+/// Parses the `steps` of a job; a job with no `steps` key has none.
+///
+/// # Errors
+///
+/// Returns an error when `steps` is not a sequence or a step is malformed.
+fn parse_job_steps(raw: &Value, at: &Location) -> Result<Vec<Step>, WorkflowError> {
+    let Some(value) = raw.get("steps") else {
+        return Ok(Vec::new());
+    };
+    value
+        .as_sequence()
+        .ok_or_else(|| at.shape("`steps` must be a sequence"))?
+        .iter()
+        .map(|step| parse_step(step, at))
+        .collect()
+}
+
+/// Rejects a job that names neither a runner nor a reusable workflow, or that
+/// mixes the two shapes.
+///
+/// # Errors
+///
+/// Returns a shape error naming the violated rule.
+fn check_job_modes(job: &Job, declares_steps: bool, at: &Location) -> Result<(), WorkflowError> {
     if !job.runs_on.names_a_runner() && job.uses.is_empty() {
         return Err(at.shape("a job must set `runs-on` or `uses`"));
     }
     // Accepting the mixture would let the contracts reason about a job the
     // runner would never schedule.
-    if mixes_job_modes(&job, declares_steps) {
+    if mixes_job_modes(job, declares_steps) {
         return Err(at.shape("a job that sets `uses` must not also set `runs-on` or `steps`"));
     }
-    Ok(job)
+    Ok(())
 }
 
 /// Parses one workflow document.

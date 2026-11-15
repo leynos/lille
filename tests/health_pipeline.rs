@@ -151,22 +151,24 @@ fn apply_damage_sequence(
     env.push_damage_twice(base)?;
     env.update()?;
 
-    if plan.replay_same_tick {
-        env.push_damage(base)?;
-        env.update()?;
-    }
-
-    if let Some(next) = plan.next_tick {
-        env.push_damage(next)?;
-        env.update()?;
-    }
-
-    if let Some(heal_event) = plan.heal {
-        env.push_damage(heal_event)?;
-        env.update()?;
+    // Follow-ups run in plan order: the same-tick replay, the next tick, then the heal.
+    let follow_ups = plan
+        .replay_same_tick
+        .then_some(base)
+        .into_iter()
+        .chain(plan.next_tick)
+        .chain(plan.heal);
+    for event in follow_ups {
+        push_damage_and_update(env, event)?;
     }
 
     Ok(())
+}
+
+/// Push one damage event and run a single update.
+fn push_damage_and_update(env: &mut HealthEnv, event: DamageEvent) -> Result<()> {
+    env.push_damage(event)?;
+    env.update()
 }
 
 /// Push unsequenced damage twice within the same tick and update.
