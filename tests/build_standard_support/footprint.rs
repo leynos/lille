@@ -94,8 +94,8 @@ fn sets(text: &str, key: &str) -> bool {
 /// Returns the complaints about one source's `[profile.dev]` debug and incremental settings.
 fn dev_profile_problems(source: &str, text: &str) -> Problems {
     let mut problems = Vec::new();
-    if !holds(text, "profile.dev", "debug", "0") {
-        problems.push(format!("{source} does not set `debug = 0`"));
+    if !holds(text, "profile.dev", "debug", "0") && !holds(text, "profile.dev", "debug", "false") {
+        problems.push(format!("{source} does not set `debug = 0` (or `false`)"));
     }
     if !holds(text, "profile.dev", "incremental", "false") {
         problems.push(format!("{source} does not set `incremental = false`"));
@@ -271,6 +271,7 @@ const CONFIG_SPLIT: &str = concat!(
     "[unstable]\nembed-metadata = false\n",
 );
 const MANIFEST_OK: &str = "[profile.dev]\ndebug = 0\nincremental = false\n";
+const MANIFEST_DEBUG_FALSE: &str = "[profile.dev]\ndebug = false\nincremental = false\n";
 const MANIFEST_DEBUG_ON: &str = "[profile.dev]\ndebug = 2\nincremental = false\n";
 
 /// Returns how many complaints a configuration, a manifest and a pinned channel draw.
@@ -281,7 +282,7 @@ fn problem_count(config: &str, manifest: &str, channel: &str) -> usize {
 
 /// Scenario: the dev profile in the Cargo configuration and in the manifest.
 ///
-/// Invariant: both set `debug = 0` and `incremental = false` under `[profile.dev]`, and a
+/// Invariant: both set `debug = 0` (or its equivalent `debug = false`) and `incremental = false` under `[profile.dev]`, and a
 /// commented line sets nothing.
 #[test]
 fn the_dev_profile_wants_debug_off_and_incremental_off() {
@@ -290,6 +291,7 @@ fn the_dev_profile_wants_debug_off_and_incremental_off() {
     assert_eq!(problem_count(CONFIG_NO_DEBUG, MANIFEST_OK, nightly), 1);
     assert_eq!(problem_count(CONFIG_INCR_ON, MANIFEST_OK, nightly), 1);
     assert_eq!(problem_count(CONFIG_COMMENTED, MANIFEST_OK, nightly), 2);
+    assert_eq!(problem_count(CONFIG_OK, MANIFEST_DEBUG_FALSE, nightly), 0);
     assert_eq!(problem_count(CONFIG_OK, MANIFEST_DEBUG_ON, nightly), 1);
 }
 
