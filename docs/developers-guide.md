@@ -406,7 +406,7 @@ no debug information, so non-incremental builds without debug information keep
 `target` small. `.cargo/config.toml` spells the latter `debug = 0`;
 `Cargo.toml` spells it `debug = false`, which Cargo treats identically, because
 `trybuild` re-serializes the manifest's profile into its generated crate and
-mis-writes an integer `debug` there. The settings exist because development
+writes an integer `debug` there wrongly. The settings exist because development
 builds filled the CI disk.
 
 Debug information is therefore absent by default, so backtraces and debugger
