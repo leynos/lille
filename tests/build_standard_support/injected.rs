@@ -202,6 +202,13 @@ fn the_development_policy_runs_against_an_injected_runner() -> Result<(), String
 fn a_development_command_without_an_assignment_is_refused_and_an_exempt_one_is_not(
 ) -> Result<(), String> {
     let pin = Pin::Nightly;
+    ensure_bare_commands_refused(pin)?;
+    ensure_chained_bare_command_refused(pin)?;
+    ensure_exempt_commands_pass(pin)
+}
+
+/// Checks that a test command and lint commands that assign no `RUSTFLAGS` are refused.
+fn ensure_bare_commands_refused(pin: Pin) -> Result<(), String> {
     let (bare_test, _) = development_problems_expecting(bare_test_make, Host::Linux, pin, &[])?;
     ensure(
         !bare_test.is_empty(),
@@ -211,15 +218,23 @@ fn a_development_command_without_an_assignment_is_refused_and_an_exempt_one_is_n
     ensure(
         !bare_lint.is_empty(),
         "lint commands that assign no RUSTFLAGS passed",
-    )?;
+    )
+}
+
+/// Checks that a bare command chained beside an assigning probe is refused, and only that one.
+fn ensure_chained_bare_command_refused(pin: Pin) -> Result<(), String> {
     let (chained, _) = development_problems_expecting(chained_bare_make, Host::Linux, pin, &[])?;
+    let all_name_the_bare_command = chained
+        .iter()
+        .all(|problem| problem.contains("nextest run"));
     ensure(
-        !chained.is_empty()
-            && chained
-                .iter()
-                .all(|problem| problem.contains("nextest run")),
+        !chained.is_empty() && all_name_the_bare_command,
         &format!("a bare command chained beside an assigning probe raised {chained:?}"),
-    )?;
+    )
+}
+
+/// Checks that a formatter, a metadata probe and a documentation build are not refused.
+fn ensure_exempt_commands_pass(pin: Pin) -> Result<(), String> {
     let (exempt, exempt_read) =
         development_problems_expecting(exempt_commands_make, Host::Linux, pin, &[])?;
     ensure(
@@ -321,6 +336,12 @@ fn a_direct_whitaker_command_must_stay_isolated_from_the_development_flags() -> 
             "an isolated Whitaker command was refused",
         )?;
     }
+    ensure_contaminated_whitaker_refused()
+}
+
+/// Checks that Whitaker commands carrying the development flags, inheriting the caller's flags or
+/// dropping the warning policy are each refused for the `make lint` target with the matching reason.
+fn ensure_contaminated_whitaker_refused() -> Result<(), String> {
     let refused = [
         (
             contaminated_whitaker_make as MakeRunner,

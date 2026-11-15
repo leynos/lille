@@ -232,30 +232,54 @@ pub(super) fn handle_unload_primary_map(
     spawned_query: Query<Entity, With<MapSpawned>>,
     mut tracking: ResMut<PrimaryMapAssetTracking>,
 ) {
-    let mut unloaded_any = false;
-
-    // Note: Bevy 0.17's despawn() handles ChildOf relationships automatically,
-    // removing all descendant entities (tiles, layers) when the root is despawned.
-    for map_entity in &map_query {
-        commands.entity(map_entity).despawn();
-        unloaded_any = true;
-        log::info!("Unloaded primary map entity {map_entity:?}");
-    }
-
-    // Note: Bevy 0.17's despawn() handles ChildOf relationships automatically,
-    // removing any child entities (sprites, effects) when the actor is despawned.
-    for spawned_entity in &spawned_query {
-        commands.entity(spawned_entity).despawn();
-        log::debug!("Despawned map-spawned entity {spawned_entity:?}");
-    }
-
-    tracking.asset_path = None;
-    tracking.handle = None;
-    tracking.has_finalised = false;
+    let unloaded_any = despawn_primary_maps(&mut commands, &map_query);
+    despawn_map_spawned_entities(&mut commands, &spawned_query);
+    reset_primary_map_tracking(&mut tracking);
 
     if unloaded_any {
         commands.trigger(PrimaryMapUnloaded);
     }
+}
+
+/// Despawns every `PrimaryTiledMap` entity and returns whether there was one.
+///
+/// Note: Bevy 0.17's `despawn()` handles `ChildOf` relationships automatically,
+/// removing all descendant entities (tiles, layers) when the root is despawned.
+/// Scope: the unload observer only.
+fn despawn_primary_maps(
+    commands: &mut Commands,
+    map_query: &Query<Entity, With<PrimaryTiledMap>>,
+) -> bool {
+    let mut unloaded_any = false;
+    for map_entity in map_query {
+        commands.entity(map_entity).despawn();
+        unloaded_any = true;
+        log::info!("Unloaded primary map entity {map_entity:?}");
+    }
+    unloaded_any
+}
+
+/// Despawns every `MapSpawned` entity.
+///
+/// Note: Bevy 0.17's `despawn()` handles `ChildOf` relationships automatically,
+/// removing any child entities (sprites, effects) when the actor is despawned.
+/// Scope: the unload observer only.
+fn despawn_map_spawned_entities(
+    commands: &mut Commands,
+    spawned_query: &Query<Entity, With<MapSpawned>>,
+) {
+    for spawned_entity in spawned_query {
+        commands.entity(spawned_entity).despawn();
+        log::debug!("Despawned map-spawned entity {spawned_entity:?}");
+    }
+}
+
+/// Clears the tracked asset path and handle so a new map load can start.
+/// Scope: the unload observer only.
+fn reset_primary_map_tracking(tracking: &mut PrimaryMapAssetTracking) {
+    tracking.asset_path = None;
+    tracking.handle = None;
+    tracking.has_finalised = false;
 }
 
 pub(super) fn log_map_unloaded(_event: bevy::ecs::prelude::On<PrimaryMapUnloaded>) {
