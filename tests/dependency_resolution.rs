@@ -17,8 +17,7 @@
 //! Remove it with the constraint itself, per
 //! <https://github.com/leynos/lille/issues/340>.
 
-use std::process::Command;
-
+use cap_std::{ambient_authority, fs_utf8::Dir};
 use rstest::rstest;
 
 /// Crate whose resolved version this workspace constrains.
@@ -61,37 +60,96 @@ impl ResolvedVersion {
     }
 }
 
-/// Returns every version of a crate that `cargo metadata` resolved.
+/// Returns the quoted value of a `key = "value"` line of `Cargo.lock`, if the
+/// line is that key.
+fn lock_value<'a>(line: &'a str, key: &str) -> Option<&'a str> {
+    line.strip_prefix(key)?
+        .strip_prefix(" = \"")?
+        .strip_suffix('"')
+}
+
+/// Returns every version of a crate that the lockfile records.
 ///
-/// Returns an error rather than panicking so the test reports a resolution
-/// failure and a parse failure differently.
+/// The build that compiled this test has already resolved and written
+/// `Cargo.lock`, which is exactly what Cargo resolved, for every target and
+/// without any network or child process. Reading it directly replaces a
+/// `cargo metadata` spawn, which would need every target's packages cached to
+/// stay offline.
+///
+/// Returns an error rather than panicking so the test reports a missing lock
+/// and a parse failure differently.
 fn resolved_versions(name: &str) -> Result<Vec<ResolvedVersion>, String> {
-    let output = Command::new(env!("CARGO"))
-        .args(["metadata", "--format-version", "1"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .output()
-        .map_err(|err| format!("cannot run `cargo metadata`: {err}"))?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("`cargo metadata` failed: {stderr}"));
-    }
-    let metadata: serde_json::Value = serde_json::from_slice(&output.stdout)
-        .map_err(|err| format!("cannot parse `cargo metadata` output: {err}"))?;
-    let packages = metadata
-        .get("packages")
-        .and_then(serde_json::Value::as_array)
-        .ok_or_else(|| "`cargo metadata` reported no packages".to_owned())?;
-    packages
-        .iter()
-        .filter(|package| package.get("name").and_then(serde_json::Value::as_str) == Some(name))
-        .map(|package| {
-            let version = package
-                .get("version")
-                .and_then(serde_json::Value::as_str)
-                .ok_or_else(|| format!("`{name}` has no version string"))?;
-            ResolvedVersion::parse(version)
+    // The one ambient step: the lock is read through a capability on the
+    // workspace root.
+    let root = Dir::open_ambient_dir(env!("CARGO_MANIFEST_DIR"), ambient_authority())
+        .map_err(|err| format!("cannot open the workspace root: {err}"))?;
+    let lock = root
+        .read_to_string("Cargo.lock")
+        .map_err(|err| format!("cannot read `Cargo.lock`: {err}"))?;
+    package_versions(&lock, name)
+}
+
+/// Returns the first `key = "value"` of a lockfile block, or `None`.
+fn block_value<'a>(block: &'a str, key: &str) -> Option<&'a str> {
+    block.lines().find_map(|line| lock_value(line, key))
+}
+
+/// Returns the version of every `[[package]]` block of *lock* named *name*.
+fn package_versions(lock: &str, name: &str) -> Result<Vec<ResolvedVersion>, String> {
+    lock.split("[[package]]")
+        .filter(|block| block_value(block, "name") == Some(name))
+        .map(|block| {
+            block_value(block, "version")
+                .ok_or_else(|| format!("a `{name}` entry in Cargo.lock has no version"))
+                .and_then(ResolvedVersion::parse)
         })
         .collect()
+}
+
+/// A lockfile fragment with unrelated, matching and versionless entries.
+const SAMPLE_LOCK: &str = "\
+[[package]]
+name = \"other\"
+version = \"9.9.9\"
+
+[[package]]
+name = \"tinyvec\"
+version = \"1.12.0\"
+
+[[package]]
+name = \"tinyvec\"
+version = \"1.13.1\"
+";
+
+#[rstest]
+fn the_lockfile_reader_returns_every_matching_version() {
+    let versions = package_versions(SAMPLE_LOCK, "tinyvec").expect("the sample lock is valid");
+    let texts: Vec<&str> = versions
+        .iter()
+        .map(|version| version.text.as_str())
+        .collect();
+    assert_eq!(texts, ["1.12.0", "1.13.1"], "both entries must be read");
+    assert_eq!(
+        versions
+            .iter()
+            .filter(|version| version.is_broken_or_later())
+            .count(),
+        1,
+        "only 1.13.1 is at or beyond the broken release"
+    );
+}
+
+#[rstest]
+fn the_lockfile_reader_ignores_unrelated_packages() {
+    let versions = package_versions(SAMPLE_LOCK, "absent").expect("the sample lock is valid");
+    assert!(versions.is_empty(), "no entry is named `absent`");
+}
+
+#[rstest]
+fn the_lockfile_reader_rejects_a_matching_entry_without_a_version() {
+    let lock = "[[package]]\nname = \"tinyvec\"\n\n[[package]]\nname = \"tinyvec\"\nversion = \"1.12.0\"\n";
+    let error = package_versions(lock, "tinyvec").expect_err("a versionless entry is an error");
+    assert!(error.contains("no version"), "unexpected error: {error}");
 }
 
 #[rstest]
