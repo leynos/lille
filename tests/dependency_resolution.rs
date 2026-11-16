@@ -98,9 +98,58 @@ fn block_value<'a>(block: &'a str, key: &str) -> Option<&'a str> {
 fn package_versions(lock: &str, name: &str) -> Result<Vec<ResolvedVersion>, String> {
     lock.split("[[package]]")
         .filter(|block| block_value(block, "name") == Some(name))
-        .filter_map(|block| block_value(block, "version"))
-        .map(ResolvedVersion::parse)
+        .map(|block| {
+            block_value(block, "version")
+                .ok_or_else(|| format!("a `{name}` entry in Cargo.lock has no version"))
+                .and_then(ResolvedVersion::parse)
+        })
         .collect()
+}
+
+/// A lockfile fragment with unrelated, matching and versionless entries.
+const SAMPLE_LOCK: &str = "\
+[[package]]
+name = \"other\"
+version = \"9.9.9\"
+
+[[package]]
+name = \"tinyvec\"
+version = \"1.12.0\"
+
+[[package]]
+name = \"tinyvec\"
+version = \"1.13.1\"
+";
+
+#[rstest]
+fn the_lockfile_reader_returns_every_matching_version() {
+    let versions = package_versions(SAMPLE_LOCK, "tinyvec").expect("the sample lock is valid");
+    let texts: Vec<&str> = versions
+        .iter()
+        .map(|version| version.text.as_str())
+        .collect();
+    assert_eq!(texts, ["1.12.0", "1.13.1"], "both entries must be read");
+    assert_eq!(
+        versions
+            .iter()
+            .filter(|version| version.is_broken_or_later())
+            .count(),
+        1,
+        "only 1.13.1 is at or beyond the broken release"
+    );
+}
+
+#[rstest]
+fn the_lockfile_reader_ignores_unrelated_packages() {
+    let versions = package_versions(SAMPLE_LOCK, "absent").expect("the sample lock is valid");
+    assert!(versions.is_empty(), "no entry is named `absent`");
+}
+
+#[rstest]
+fn the_lockfile_reader_rejects_a_matching_entry_without_a_version() {
+    let lock = "[[package]]\nname = \"tinyvec\"\n\n[[package]]\nname = \"tinyvec\"\nversion = \"1.12.0\"\n";
+    let error = package_versions(lock, "tinyvec").expect_err("a versionless entry is an error");
+    assert!(error.contains("no version"), "unexpected error: {error}");
 }
 
 #[rstest]
