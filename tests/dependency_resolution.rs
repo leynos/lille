@@ -17,8 +17,7 @@
 //! Remove it with the constraint itself, per
 //! <https://github.com/leynos/lille/issues/340>.
 
-use std::{fs, path::Path};
-
+use cap_std::{ambient_authority, fs_utf8::Dir};
 use rstest::rstest;
 
 /// Crate whose resolved version this workspace constrains.
@@ -80,9 +79,13 @@ fn lock_value<'a>(line: &'a str, key: &str) -> Option<&'a str> {
 /// Returns an error rather than panicking so the test reports a missing lock
 /// and a parse failure differently.
 fn resolved_versions(name: &str) -> Result<Vec<ResolvedVersion>, String> {
-    let lock_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.lock");
-    let lock = fs::read_to_string(&lock_path)
-        .map_err(|err| format!("cannot read `{}`: {err}", lock_path.display()))?;
+    // The one ambient step: the lock is read through a capability on the
+    // workspace root.
+    let root = Dir::open_ambient_dir(env!("CARGO_MANIFEST_DIR"), ambient_authority())
+        .map_err(|err| format!("cannot open the workspace root: {err}"))?;
+    let lock = root
+        .read_to_string("Cargo.lock")
+        .map_err(|err| format!("cannot read `Cargo.lock`: {err}"))?;
     let mut current_name: Option<&str> = None;
     let mut versions = Vec::new();
     for line in lock.lines() {
