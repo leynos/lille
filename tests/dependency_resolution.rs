@@ -17,7 +17,7 @@
 //! Remove it with the constraint itself, per
 //! <https://github.com/leynos/lille/issues/340>.
 
-use std::process::Command;
+use std::{fs, path::Path};
 
 use rstest::rstest;
 
@@ -61,40 +61,42 @@ impl ResolvedVersion {
     }
 }
 
-/// Returns every version of a crate that `cargo metadata` resolved.
+/// Returns the quoted value of a `key = "value"` line of `Cargo.lock`, if the
+/// line is that key.
+fn lock_value<'a>(line: &'a str, key: &str) -> Option<&'a str> {
+    line.strip_prefix(key)?
+        .strip_prefix(" = \"")?
+        .strip_suffix('"')
+}
+
+/// Returns every version of a crate that the lockfile records.
 ///
-/// Returns an error rather than panicking so the test reports a resolution
-/// failure and a parse failure differently.
+/// The build that compiled this test has already resolved and written
+/// `Cargo.lock`, which is exactly what Cargo resolved, for every target and
+/// without any network or child process. Reading it directly replaces a
+/// `cargo metadata` spawn, which would need every target's packages cached to
+/// stay offline.
+///
+/// Returns an error rather than panicking so the test reports a missing lock
+/// and a parse failure differently.
 fn resolved_versions(name: &str) -> Result<Vec<ResolvedVersion>, String> {
-    let output = Command::new(env!("CARGO"))
-        // `--frozen` (locked and offline): by the time this test runs, the build
-        // that compiled it has already resolved and written `Cargo.lock`, so this
-        // read of that resolution needs no network and must not re-resolve.
-        .args(["metadata", "--frozen", "--format-version", "1"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .output()
-        .map_err(|err| format!("cannot run `cargo metadata`: {err}"))?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("`cargo metadata` failed: {stderr}"));
+    let lock_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.lock");
+    let lock = fs::read_to_string(&lock_path)
+        .map_err(|err| format!("cannot read `{}`: {err}", lock_path.display()))?;
+    let mut current_name: Option<&str> = None;
+    let mut versions = Vec::new();
+    for line in lock.lines() {
+        if line == "[[package]]" {
+            current_name = None;
+        } else if let Some(package) = lock_value(line, "name") {
+            current_name = Some(package);
+        } else if let Some(version) = lock_value(line, "version") {
+            if current_name == Some(name) {
+                versions.push(ResolvedVersion::parse(version)?);
+            }
+        }
     }
-    let metadata: serde_json::Value = serde_json::from_slice(&output.stdout)
-        .map_err(|err| format!("cannot parse `cargo metadata` output: {err}"))?;
-    let packages = metadata
-        .get("packages")
-        .and_then(serde_json::Value::as_array)
-        .ok_or_else(|| "`cargo metadata` reported no packages".to_owned())?;
-    packages
-        .iter()
-        .filter(|package| package.get("name").and_then(serde_json::Value::as_str) == Some(name))
-        .map(|package| {
-            let version = package
-                .get("version")
-                .and_then(serde_json::Value::as_str)
-                .ok_or_else(|| format!("`{name}` has no version string"))?;
-            ResolvedVersion::parse(version)
-        })
-        .collect()
+    Ok(versions)
 }
 
 #[rstest]
