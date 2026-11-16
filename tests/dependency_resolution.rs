@@ -67,7 +67,10 @@ impl ResolvedVersion {
 /// failure and a parse failure differently.
 fn resolved_versions(name: &str) -> Result<Vec<ResolvedVersion>, String> {
     let output = Command::new(env!("CARGO"))
-        .args(["metadata", "--format-version", "1"])
+        // `--frozen` (locked and offline): by the time this test runs, the build
+        // that compiled it has already resolved and written `Cargo.lock`, so this
+        // read of that resolution needs no network and must not re-resolve.
+        .args(["metadata", "--frozen", "--format-version", "1"])
         .current_dir(env!("CARGO_MANIFEST_DIR"))
         .output()
         .map_err(|err| format!("cannot run `cargo metadata`: {err}"))?;
