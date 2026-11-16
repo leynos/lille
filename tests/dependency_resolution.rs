@@ -86,20 +86,21 @@ fn resolved_versions(name: &str) -> Result<Vec<ResolvedVersion>, String> {
     let lock = root
         .read_to_string("Cargo.lock")
         .map_err(|err| format!("cannot read `Cargo.lock`: {err}"))?;
-    let mut current_name: Option<&str> = None;
-    let mut versions = Vec::new();
-    for line in lock.lines() {
-        if line == "[[package]]" {
-            current_name = None;
-        } else if let Some(package) = lock_value(line, "name") {
-            current_name = Some(package);
-        } else if let Some(version) = lock_value(line, "version") {
-            if current_name == Some(name) {
-                versions.push(ResolvedVersion::parse(version)?);
-            }
-        }
-    }
-    Ok(versions)
+    package_versions(&lock, name)
+}
+
+/// Returns the first `key = "value"` of a lockfile block, or `None`.
+fn block_value<'a>(block: &'a str, key: &str) -> Option<&'a str> {
+    block.lines().find_map(|line| lock_value(line, key))
+}
+
+/// Returns the version of every `[[package]]` block of *lock* named *name*.
+fn package_versions(lock: &str, name: &str) -> Result<Vec<ResolvedVersion>, String> {
+    lock.split("[[package]]")
+        .filter(|block| block_value(block, "name") == Some(name))
+        .filter_map(|block| block_value(block, "version"))
+        .map(ResolvedVersion::parse)
+        .collect()
 }
 
 #[rstest]
