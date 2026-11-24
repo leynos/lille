@@ -12,8 +12,7 @@
 //! `placement` for what it costs and who owns each cache, `fork_fallback` for
 //! whether a fork's pull request can start the lane it reaches,
 //! `execution_control` for whether a scope can run and fail, `compiler_cache`
-//! for the sccache wiring and the resource sampling, `concurrency` for which
-//! runs a newer push may cancel, `sampler_reading` for the cases that hold the
+//! for the sccache wiring and the resource sampling, `sampler_reading` for the cases that hold the
 //! `shell_reading` support module to what a shell would actually run,
 //! `codescene_uploader` for the coverage uploader's pin and the deprecated
 //! checksum inputs it rejects, `timeouts` for the ordering of the timers that
@@ -35,8 +34,6 @@ mod shell_reading;
 mod workflow_assertions;
 #[path = "support/workflow_cache_owners.rs"]
 mod workflow_cache_owners;
-#[path = "support/workflow_concurrency.rs"]
-mod workflow_concurrency;
 #[path = "support/workflow_config.rs"]
 mod workflow_config;
 #[path = "support/workflow_estate.rs"]
@@ -54,8 +51,6 @@ mod workflow_triggers;
 mod codescene_uploader;
 #[path = "contracts/compiler_cache.rs"]
 mod compiler_cache;
-#[path = "contracts/concurrency.rs"]
-mod concurrency;
 #[path = "contracts/coverage_split.rs"]
 mod coverage_split;
 #[path = "contracts/execution_control.rs"]
