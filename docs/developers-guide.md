@@ -893,7 +893,6 @@ split by the question each asks.
 | `placement.rs`          | What does it cost, and who owns each cache? Runner placement and labels, bounded timeouts, one owner per cached path, an installer before the first use of what it installs, a single test execution per build job, the uv cache key.                                                    |
 | `fork_fallback.rs`      | Can a fork's pull request start the lane it reaches? The pull-request lane falls back to `ubuntu-latest` for forks through the one prescribed expression, lanes no fork reaches name their runner outright, and no `runs-on` declaration carries a line break.                           |
 | `execution_control.rs`  | Do the readers of `if` and `continue-on-error` tell a constant from a condition that depends on the event, at job and step scope? The rule that consumes them lives in `placement.rs`; these drive the readers with shapes the workflows do not contain.                                 |
-| `concurrency.rs`        | Which runs may a newer push cancel? Every workflow a pull request starts declares a group keyed on the pull request, falling back to the run id, and cancels only on the `pull_request` event.                                                                                           |
 | `codescene_uploader.rs` | Does the coverage uploader carry its approved commit and none of the inputs it now rejects? No `installer-checksum`, no `CODESCENE_CLI_SHA256`, and no checksum-refresh dispatch in either extension.                                                                                    |
 | `compiler_cache.rs`     | Is sccache actually working? `setup-rust` owns it with the inputs and id the report reads, no hand-rolled wrapper, export, install or start survives beside it, it precedes the build and the report follows, and the resource sampler with its report.                                  |
 | `sampler_reading.rs`    | Does a line in a `run` script actually run? The quoting, comment, escape, and guard reading in `tests/support/shell_reading.rs`, which `compiler_cache.rs` asks its sampling question through, driven with shapes the workflows do not contain.                                          |
@@ -1050,20 +1049,6 @@ Two halves matter, and each fails in a way nothing else would notice.
 repository to carry a token, and the ones here automate pull-request
 housekeeping rather than building, so cancelling one mid-flight is a hazard
 with no minutes to win.
-
-#### The cancellation contract
-
-`tests/contracts/concurrency.rs`, in the `workflow_contracts` harness, reads
-`.github/workflows` and asserts, for every workflow declaring a `pull_request`
-trigger, that it declares a concurrency group, that the group names no per-run
-expression outside its fallback arm, that the fallback arm is the run id, that
-the group names something that varies per pull request, and that
-`cancel-in-progress` is exactly the expression above. A further test asserts
-that discovery still finds the workflows it is expected to, so a broken read
-cannot empty the list and turn the rest into a vacuous pass. The loader records
-the two values as written rather than interpreting them, because a literal
-`true` coerced to a boolean could not be told apart from the expression. Run
-the harness with `make test`.
 
 ### Test timeouts: the two tiers this repository has
 

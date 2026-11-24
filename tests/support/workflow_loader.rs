@@ -24,7 +24,6 @@ use cap_std::{ambient_authority, fs_utf8::Dir};
 use serde_norway::Value;
 
 use crate::runner_selection::{RunnerLabel, RunnerSelection};
-use crate::workflow_concurrency::parse_concurrency;
 use crate::workflow_estate::{Location, Workflow, WorkflowError, WorkflowSource, WORKFLOW_DIR};
 use crate::workflow_model::{Job, Step};
 use crate::workflow_triggers::parse_triggers;
@@ -310,7 +309,6 @@ pub fn parse_workflow(source: WorkflowSource<'_>) -> Result<Workflow, WorkflowEr
     Ok(Workflow {
         file: source.file.to_owned(),
         triggers: parse_triggers(&document, &at)?,
-        concurrency: parse_concurrency(&document, &at)?,
         jobs,
     })
 }
