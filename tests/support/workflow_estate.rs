@@ -55,6 +55,13 @@ pub const WHITAKER_ACTION_SHA: &str = "0eabb6bc07148981de5da395e30cd78d83f5c7c2"
 /// moved ahead of the rest of the estate for that reason.
 pub const SETUP_RUST_SHA: &str = "6cec89bac47a21cf756d68d638a9a510998e57f8";
 
+/// Commit the reusable delayed PR comment workflow must pin.
+///
+/// This is the shared-actions merge of #706, which validates the delay and
+/// posts the comment without interpolating inputs into shell. The workflow only
+/// sleeps and posts, so it moves on its own rather than with the estate pin.
+pub const DELAYED_PR_COMMENT_SHA: &str = "8091b7cb5f9bab2d4a76ced2e749fd4c1bccdb02";
+
 /// Shared actions whose reviewed revision is not [`SHARED_ACTIONS_SHA`].
 ///
 /// The estate's rule is that no reference floats, not that every action
@@ -64,12 +71,13 @@ pub const SETUP_RUST_SHA: &str = "6cec89bac47a21cf756d68d638a9a510998e57f8";
 /// nobody asked for. Each exception is named here with the action it
 /// governs, so a reference is still held to a reviewed commit by value and
 /// a new exception has to be added deliberately.
-pub const SHARED_ACTION_PIN_EXCEPTIONS: [(&str, &str); 5] = [
+pub const SHARED_ACTION_PIN_EXCEPTIONS: [(&str, &str); 6] = [
     ("install-whitaker", WHITAKER_ACTION_SHA),
     ("setup-rust", SETUP_RUST_SHA),
     ("generate-coverage", COVERAGE_ACTIONS_SHA),
     ("upload-codescene-coverage", COVERAGE_ACTIONS_SHA),
     ("publish-coverage-baseline", COVERAGE_ACTIONS_SHA),
+    ("delayed-pr-comment.yml", DELAYED_PR_COMMENT_SHA),
 ];
 
 /// Return the commit a `leynos/shared-actions` reference must pin.
