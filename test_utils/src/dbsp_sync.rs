@@ -27,6 +27,8 @@ pub fn install_error_observer(app: &mut App) {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for the DBSP synchronisation test helpers.
+
     use super::*;
     use lille::dbsp_sync::DbspSyncErrorContext;
 

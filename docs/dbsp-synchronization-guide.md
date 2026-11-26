@@ -243,7 +243,7 @@ lint:
 	set -euo pipefail
 	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" cargo doc --workspace --no-deps
 	cargo clippy --all-targets --all-features -- $(RUST_FLAGS)
-	$(RUST_FLAGS_ENV) $(WHITAKER) --all -- --all-targets --all-features
+	$(RUST_FLAGS_ENV) $(WHITAKER) --all -- --workspace --all-targets --all-features
 ```
 
 1. `cargo doc --workspace --no-deps` with `RUSTDOCFLAGS` set to
@@ -251,9 +251,10 @@ lint:
    warnings fail the build.
 2. `cargo clippy --all-targets --all-features -- -D warnings`.
 3. The Whitaker Dylint suite, invoked as
-   `whitaker --all -- --all-targets --all-features` (the `whitaker` binary is
-   looked up on `PATH` by default; override it by setting the `WHITAKER` make
-   variable).
+   `whitaker --all -- --workspace --all-targets --all-features` (the `whitaker`
+   binary is looked up on `PATH` by default; override it by setting the
+   `WHITAKER` make variable). `--workspace` is required: without it Cargo
+   selects only the root package.
 
 CI (`.github/workflows/ci.yml`) runs the same clippy and Whitaker checks in its
 "Lint" step, but first has to ensure the `whitaker-installer` and `whitaker`
