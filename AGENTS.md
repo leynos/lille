@@ -225,7 +225,7 @@ project:
     ```sh
     RUSTDOCFLAGS="--cfg docsrs -D warnings" cargo doc --workspace --no-deps
     cargo clippy --all-targets --all-features -- -D warnings
-    RUSTFLAGS="-D warnings" whitaker --all -- --all-targets --all-features
+    RUSTFLAGS="-D warnings" whitaker --all -- --workspace --all-targets --all-features
     ```
 
     building documentation for the workspace and linting every target with all
