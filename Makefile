@@ -65,10 +65,10 @@ build:
 	$(RUST_FLAGS_ENV) cargo build
 
 test:
-	$(RUST_FLAGS_ENV) cargo test --features test-support
+	$(RUST_FLAGS_ENV) cargo test --workspace --features test-support
 
 test-observers-v1:
-	$(RUST_FLAGS_ENV) cargo test --features "test-support observers-v1-spike"
+	$(RUST_FLAGS_ENV) cargo test --workspace --features "test-support observers-v1-spike"
 
 typecheck:
 	$(RUST_FLAGS_ENV) cargo check $(WORKSPACE_PACKAGES)
@@ -90,7 +90,7 @@ RUSTDOC_FLAGS ?= --cfg docsrs -D warnings
 lint:
 	set -euo pipefail
 	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(STANDARD_ENV) cargo doc --workspace --no-deps
-	$(STANDARD_ENV) cargo clippy --all-targets --all-features -- $(RUST_FLAGS)
+	$(STANDARD_ENV) cargo clippy --workspace --all-targets --all-features -- $(RUST_FLAGS)
 	RUSTFLAGS="$(RUST_FLAGS)" $(WHITAKER) --all -- --workspace --all-targets --all-features
 
 markdownlint: spelling

@@ -449,8 +449,8 @@ buffered-message compile-pass harness
 (`cargo test --features test-support --test compile_pass`; see
 [Buffered events use the Message API](#buffered-events-use-the-message-api)).
 `make lint` runs rustdoc (`--cfg docsrs`),
-`cargo clippy --all-targets --all-features -- -D warnings`, and the Whitaker
-Dylint suite.
+`cargo clippy --workspace --all-targets --all-features -- -D warnings`, and the
+Whitaker Dylint suite.
 
 Cognitive complexity is not gated by Clippy. Clippy's `cognitive_complexity`
 scores code after macro expansion, so it counts branching a macro generated,
