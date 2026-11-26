@@ -224,7 +224,7 @@ project:
 
     ```sh
     RUSTDOCFLAGS="--cfg docsrs -D warnings" cargo doc --workspace --no-deps
-    cargo clippy --all-targets --all-features -- -D warnings
+    cargo clippy --workspace --all-targets --all-features -- -D warnings
     RUSTFLAGS="-D warnings" whitaker --all -- --workspace --all-targets --all-features
     ```
 
@@ -237,7 +237,7 @@ project:
   - `make test` executes:
 
     ```sh
-    cargo test --features test-support
+    cargo test --workspace --features test-support
     ```
 
     running the test suite through plain `cargo test`, with no `cargo-nextest`
