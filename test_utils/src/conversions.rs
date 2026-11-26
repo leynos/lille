@@ -95,6 +95,8 @@ impl_coords2_conversions!(Gradient, f64);
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for the conversion helpers.
+
     use super::*;
 
     #[test]

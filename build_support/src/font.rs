@@ -228,6 +228,8 @@ fn fetch_font_data_from(font_url: &str, expected_sha256: &str, max_bytes: u64) -
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for the font download and verification helpers.
+
     use super::*;
     use proptest::prelude::*;
     use rstest::{fixture, rstest};
