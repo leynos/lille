@@ -242,14 +242,14 @@ Run `make lint` to check the whole workspace before committing changes under
 lint:
 	set -euo pipefail
 	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" cargo doc --workspace --no-deps
-	cargo clippy --all-targets --all-features -- $(RUST_FLAGS)
+	cargo clippy --workspace --all-targets --all-features -- $(RUST_FLAGS)
 	$(RUST_FLAGS_ENV) $(WHITAKER) --all -- --workspace --all-targets --all-features
 ```
 
 1. `cargo doc --workspace --no-deps` with `RUSTDOCFLAGS` set to
    `--cfg docsrs -D warnings`, so broken intra-doc links or other rustdoc
    warnings fail the build.
-2. `cargo clippy --all-targets --all-features -- -D warnings`.
+2. `cargo clippy --workspace --all-targets --all-features -- -D warnings`.
 3. The Whitaker Dylint suite, invoked as
    `whitaker --all -- --workspace --all-targets --all-features` (the `whitaker`
    binary is looked up on `PATH` by default; override it by setting the
