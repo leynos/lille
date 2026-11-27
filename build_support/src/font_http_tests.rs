@@ -13,7 +13,8 @@ fn serve_http_body(body: Vec<u8>) -> (String, thread::JoinHandle<()>) {
     let server = thread::spawn(move || {
         let (mut stream, _) = listener.accept().expect("accept HTTP request");
         let mut request = [0; 1024];
-        stream.read(&mut request).expect("read HTTP request");
+        let read = stream.read(&mut request).expect("read HTTP request");
+        assert!(read > 0, "the client should send a request");
         write!(
             stream,
             "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",

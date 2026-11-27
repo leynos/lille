@@ -159,7 +159,7 @@ jobs:
           # the step restates the build standard's flags beside the deny.
           RUSTFLAGS: -D warnings -Zthreads=8 -Clink-arg=-fuse-ld=mold
         run: |
-          cargo clippy --all-targets --all-features -- -D warnings
+          cargo clippy --workspace --all-targets --all-features -- -D warnings
           whitaker --all -- --workspace --all-targets --all-features
       # The instrumented run is this workflow's only test execution on Linux:
       # a separate uninstrumented `cargo test` repeated the suite for no extra
