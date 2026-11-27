@@ -17,6 +17,8 @@
 //! # Ok::<(), workflow_estate::WorkflowError>(())
 //! ```
 
+use std::collections::BTreeSet;
+
 use camino::Utf8PathBuf;
 use cap_std::{ambient_authority, fs_utf8::Dir};
 use serde_norway::Value;
@@ -69,4 +71,40 @@ pub fn registered_runner_labels() -> Result<Vec<String>, WorkflowError> {
             render_scalar(label).ok_or_else(|| at.shape("every registered label must be a scalar"))
         })
         .collect()
+}
+
+/// Whether a registry entry names a label: exactly, or as a trailing `*` glob.
+fn registry_entry_covers(entry: &str, label: &str) -> bool {
+    entry
+        .strip_suffix('*')
+        .map_or(entry == label, |prefix| label.starts_with(prefix))
+}
+
+/// Compares the registry with the labels in use, returning the labels no entry
+/// covers and the entries that cover no label.
+///
+/// An entry is an exact label or a trailing `*` glob, the spelling `actionlint`
+/// accepts, so `ubicloud-*` covers every `ubicloud-` shape the workflows use.
+#[must_use]
+pub fn registry_mismatches<'a>(
+    declared: &'a [String],
+    in_use: &'a BTreeSet<String>,
+) -> (Vec<&'a String>, Vec<&'a String>) {
+    let unregistered = in_use
+        .iter()
+        .filter(|label| {
+            !declared
+                .iter()
+                .any(|entry| registry_entry_covers(entry, label))
+        })
+        .collect();
+    let unused = declared
+        .iter()
+        .filter(|entry| {
+            !in_use
+                .iter()
+                .any(|label| registry_entry_covers(entry, label))
+        })
+        .collect();
+    (unregistered, unused)
 }

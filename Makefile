@@ -1,5 +1,5 @@
 .PHONY: all clean build fmt check-fmt test test-observers-v1 lint build-support-run \
-	markdownlint nixie typecheck spelling test-workflow-contracts
+	markdownlint nixie typecheck spelling test-workflow-contracts yamllint actionlint
 
 # `make fmt` and `make check-fmt` call mdtablefix directly. `--git` selects the
 # Markdown files Git tracks and `--include-untracked` adds the untracked files
@@ -34,6 +34,8 @@ STANDARD_RUSTFLAGS := -Zthreads=8$(if $(filter Linux,$(BUILD_HOST_OS)), -Clink-a
 RUST_FLAGS_ENV := RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)"
 STANDARD_ENV := RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS)"
 WHITAKER ?= whitaker
+YAMLLINT ?= yamllint
+ACTIONLINT ?= actionlint
 WORKSPACE_PACKAGES := --package lille --package build_support --package test_utils
 MARKDOWNLINT := $(shell which markdownlint-cli2)
 MD_FILES := $(shell git ls-files -co --exclude-standard '*.md')
@@ -92,11 +94,19 @@ build-support-run:
 
 RUSTDOC_FLAGS ?= --cfg docsrs -D warnings
 
-lint:
+lint: yamllint actionlint
 	set -euo pipefail
 	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(STANDARD_ENV) cargo doc --workspace --no-deps
 	$(STANDARD_ENV) cargo clippy --workspace --all-targets --all-features -- $(RUST_FLAGS)
 	RUSTFLAGS="$(RUST_FLAGS)" $(WHITAKER) --all -- --workspace --all-targets --all-features
+
+# yamllint reads `.yamllint.yml`, which extends `.yamllint-estate.yml`, and
+# resolves that path against the current directory, so run it from the root.
+yamllint:
+	git ls-files -z '*.yml' '*.yaml' | xargs -0 -r $(YAMLLINT) --strict --
+
+actionlint:
+	$(ACTIONLINT)
 
 markdownlint: spelling
 	if [[ -n "$(MD_FILES)" && -n "$(MARKDOWNLINT)" ]]; then $(MARKDOWNLINT) $(MD_FILES); fi

@@ -621,7 +621,12 @@ carry, matching the action by its own name so a lookalike is held to the
 default. The rule is that no reference floats, not that every action moves
 together.
 
-The exceptions are `install-whitaker` and the two coverage actions.
+`install-yaml-lint`, which puts yamllint and actionlint on the path for
+`make lint`, is held to `INSTALL_YAML_LINT_SHA`, currently
+`a108423efa7fb83565089449f2647d34286a48a4`, the commit concordat's
+`yaml-lint-baseline` rule adopts for the estate.
+
+The other exceptions are `install-whitaker` and the two coverage actions.
 `install-whitaker` is held to `WHITAKER_ACTION_SHA`, currently
 `0eabb6bc07148981de5da395e30cd78d83f5c7c2` (shared-actions #673). It advances
 independently of the estate default because the concordat QG-002 rule accepts

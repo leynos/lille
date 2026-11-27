@@ -153,14 +153,13 @@ jobs:
         with:
           installer-version: '0.2.12'
           cache-provider: github
+      - name: Install the YAML lint tools
+        uses: leynos/shared-actions/.github/actions/install-yaml-lint@a108423efa7fb83565089449f2647d34286a48a4
       - name: Lint
-        env:
-          # An assigned RUSTFLAGS replaces .cargo/config.toml's rustflags, so
-          # the step restates the build standard's flags beside the deny.
-          RUSTFLAGS: -D warnings -Zthreads=8 -Clink-arg=-fuse-ld=mold
-        run: |
-          cargo clippy --workspace --all-targets --all-features -- -D warnings
-          whitaker --all -- --workspace --all-targets --all-features
+        # `make lint` runs rustdoc, Clippy, Whitaker, yamllint and actionlint;
+        # the Makefile composes the build standard's flags onto the RUSTFLAGS
+        # that setup-rust exports.
+        run: make lint
       # The instrumented run is this workflow's only test execution on Linux:
       # a separate uninstrumented `cargo test` repeated the suite for no extra
       # evidence and doubled the billed compile. `all-features` names exactly
