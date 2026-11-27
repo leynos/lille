@@ -448,9 +448,17 @@ Run the deterministic gates before committing (see `AGENTS.md` and the
 buffered-message compile-pass harness
 (`cargo test --features test-support --test compile_pass`; see
 [Buffered events use the Message API](#buffered-events-use-the-message-api)).
-`make lint` runs rustdoc (`--cfg docsrs`),
+`make lint` first runs its prerequisites, `make yamllint` and
+`make actionlint`, then rustdoc (`--cfg docsrs`),
 `cargo clippy --all-targets --all-features -- -D warnings`, and the Whitaker
-Dylint suite.
+Dylint suite. `make yamllint` runs `yamllint --strict` over every tracked
+`.yml` and `.yaml` file with `.yamllint.yml`, which extends the estate base
+`.yamllint-estate.yml`; run it from the repository root, because yamllint
+resolves `extends` against the current directory. `make actionlint` checks the
+workflows and their shell scripts. Both tools must be on `PATH`, and the
+`YAMLLINT` and `ACTIONLINT` variables name the commands to run when they are
+not (for example `make lint YAMLLINT=/opt/bin/yamllint`). CI installs them with
+the `install-yaml-lint` action before it runs `make lint`.
 
 Cognitive complexity is not gated by Clippy. Clippy's `cognitive_complexity`
 scores code after macro expansion, so it counts branching a macro generated,
@@ -621,8 +629,14 @@ carry, matching the action by its own name so a lookalike is held to the
 default. The rule is that no reference floats, not that every action moves
 together.
 
-The exceptions are `install-whitaker` and the two coverage actions.
-`install-whitaker` is held to `WHITAKER_ACTION_SHA`, currently
+`install-yaml-lint`, which puts yamllint and actionlint on the path for
+`make lint`, is held to `INSTALL_YAML_LINT_SHA`, currently
+`a108423efa7fb83565089449f2647d34286a48a4`, the commit concordat's
+`yaml-lint-baseline` rule adopts for the estate.
+
+The other exceptions are `install-whitaker`, `setup-rust`, the three coverage
+actions and the delayed pull-request comment workflow. `install-whitaker` is
+held to `WHITAKER_ACTION_SHA`, currently
 `0eabb6bc07148981de5da395e30cd78d83f5c7c2` (shared-actions #673). It advances
 independently of the estate default because the concordat QG-002 rule accepts
 any shared-actions commit at or after `6dea5677` (#522) that leaves the action
@@ -891,26 +905,27 @@ two. A workflow contract in `tests/workflow_contracts.rs` fails if a second
 ### Workflow contracts
 
 `tests/workflow_contracts.rs` asserts the rules above. It is a harness rather
-than a test file: the rules live in fourteen modules under `tests/contracts/`,
+than a test file: the rules live in fifteen modules under `tests/contracts/`,
 split by the question each asks.
 
-| Module                  | Asks                                                                                                                                                                                                                                                                                     |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `coverage_split.rs`     | Does main coverage hand off correctly? The baseline publisher sits on the smallest Ubicloud runner with a bounded timeout, the hosted job saves no baseline and names the artefact the publisher reads, and the warm-up compiles the lane's build without running it.                    |
-| `supply_chain.rs`       | What will the estate execute? Pinned cache and shared-action references, no source-built tools, prebuilt Whitaker, and the `setup-rust` revision that owns the compiler cache.                                                                                                           |
-| `placement.rs`          | What does it cost, and who owns each cache? Runner placement and labels, bounded timeouts, one owner per cached path, an installer before the first use of what it installs, a single test execution per build job, the uv cache key.                                                    |
-| `fork_fallback.rs`      | Can a fork's pull request start the lane it reaches? The pull-request lane falls back to `ubuntu-latest` for forks through the one prescribed expression, lanes no fork reaches name their runner outright, and no `runs-on` declaration carries a line break.                           |
-| `execution_control.rs`  | Do the readers of `if` and `continue-on-error` tell a constant from a condition that depends on the event, at job and step scope? The rule that consumes them lives in `placement.rs`; these drive the readers with shapes the workflows do not contain.                                 |
-| `codescene_uploader.rs` | Does the coverage uploader carry its approved commit and none of the inputs it now rejects? No `installer-checksum`, no `CODESCENE_CLI_SHA256`, and no checksum-refresh dispatch in either extension.                                                                                    |
-| `compiler_cache.rs`     | Is sccache actually working? `setup-rust` owns it with the inputs and id the report reads, no hand-rolled wrapper, export, install or start survives beside it, it precedes the build and the report follows, and the resource sampler with its report.                                  |
-| `sampler_reading.rs`    | Does a line in a `run` script actually run? The quoting, comment, escape, and guard reading in `tests/support/shell_reading.rs`, which `compiler_cache.rs` asks its sampling question through, driven with shapes the workflows do not contain.                                          |
-| `parsing.rs`            | Does the loader read workflows correctly? Its subject is the loader, not any workflow in this repository.                                                                                                                                                                                |
-| `step_fields.rs`        | Does the loader keep a step's `id` and `env` as written? Present and absent values, an empty value kept apart from an absent one, `Step::env_value`, and each malformed `env` refused for its own reason.                                                                                |
-| `statistics_report.rs`  | What does the compiler-cache report actually do? Each build job's statistics step is run under `bash` against a stand-in `sccache` for a started server, a fallback, an empty status and a missing binary, and its rendered log and summary are snapshotted. Unix only.                  |
-| `timeouts.rs`           | Which timer ends a run first? The coverage action's cargo watchdog set explicitly and by value, each coverage job's ceiling above that watchdog plus the measured work around it and equal to the documented 120 minutes, and the two nextest tiers absent rather than silently enabled. |
-| `timeout_budgets.rs`    | Do the readings that ordering rests on say what they claim? The coordinate match, the ceiling predicate, and the two conversions, driven with values chosen to separate a correct reading from a plausible wrong one.                                                                    |
+| Module                   | Asks                                                                                                                                                                                                                                                                                     |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `actionlint_registry.rs` | Does the registry compare with the labels in use? An exact label, a trailing `*` glob, a label no entry covers and an entry that covers no label, with no file read.                                                                                                                     |
+| `coverage_split.rs`      | Does main coverage hand off correctly? The baseline publisher sits on the smallest Ubicloud runner with a bounded timeout, the hosted job saves no baseline and names the artefact the publisher reads, and the warm-up compiles the lane's build without running it.                    |
+| `supply_chain.rs`        | What will the estate execute? Pinned cache and shared-action references, no source-built tools, prebuilt Whitaker, and the `setup-rust` revision that owns the compiler cache.                                                                                                           |
+| `placement.rs`           | What does it cost, and who owns each cache? Runner placement and labels, bounded timeouts, one owner per cached path, an installer before the first use of what it installs, a single test execution per build job, the uv cache key.                                                    |
+| `fork_fallback.rs`       | Can a fork's pull request start the lane it reaches? The pull-request lane falls back to `ubuntu-latest` for forks through the one prescribed expression, lanes no fork reaches name their runner outright, and no `runs-on` declaration carries a line break.                           |
+| `execution_control.rs`   | Do the readers of `if` and `continue-on-error` tell a constant from a condition that depends on the event, at job and step scope? The rule that consumes them lives in `placement.rs`; these drive the readers with shapes the workflows do not contain.                                 |
+| `codescene_uploader.rs`  | Does the coverage uploader carry its approved commit and none of the inputs it now rejects? No `installer-checksum`, no `CODESCENE_CLI_SHA256`, and no checksum-refresh dispatch in either extension.                                                                                    |
+| `compiler_cache.rs`      | Is sccache actually working? `setup-rust` owns it with the inputs and id the report reads, no hand-rolled wrapper, export, install or start survives beside it, it precedes the build and the report follows, and the resource sampler with its report.                                  |
+| `sampler_reading.rs`     | Does a line in a `run` script actually run? The quoting, comment, escape, and guard reading in `tests/support/shell_reading.rs`, which `compiler_cache.rs` asks its sampling question through, driven with shapes the workflows do not contain.                                          |
+| `parsing.rs`             | Does the loader read workflows correctly? Its subject is the loader, not any workflow in this repository.                                                                                                                                                                                |
+| `step_fields.rs`         | Does the loader keep a step's `id` and `env` as written? Present and absent values, an empty value kept apart from an absent one, `Step::env_value`, and each malformed `env` refused for its own reason.                                                                                |
+| `statistics_report.rs`   | What does the compiler-cache report actually do? Each build job's statistics step is run under `bash` against a stand-in `sccache` for a started server, a fallback, an empty status and a missing binary, and its rendered log and summary are snapshotted. Unix only.                  |
+| `timeouts.rs`            | Which timer ends a run first? The coverage action's cargo watchdog set explicitly and by value, each coverage job's ceiling above that watchdog plus the measured work around it and equal to the documented 120 minutes, and the two nextest tiers absent rather than silently enabled. |
+| `timeout_budgets.rs`     | Do the readings that ordering rests on say what they claim? The coordinate match, the ceiling predicate, and the two conversions, driven with values chosen to separate a correct reading from a plausible wrong one.                                                                    |
 
-*Table: the fourteen contract modules, and the question each one asks of the
+*Table: the fifteen contract modules, and the question each one asks of the
 estate.*
 
 Each module also pins the inputs that make its rules true, so a workflow cannot
@@ -969,10 +984,12 @@ part of.
   `actions/cache-audit` shares the prefix, caches nothing, and would otherwise
   contribute an invented claim on whatever `path` input it carried.
 - Runner labels are compared against the parsed
-  `self-hosted-runner.labels` list in `.github/actionlint.yaml`, by equality.
-  Searching the file as text would accept `standard-8` because
-  `ubicloud-standard-8` contains it, and would accept a label that appears only
-  in a comment.
+  `self-hosted-runner.labels` list in `.github/actionlint.yaml`. An entry is an
+  exact label or a trailing `*` glob, so the estate's `ubicloud-*` covers every
+  `ubicloud-` shape; `registry_mismatches` reports a label no entry covers and
+  an entry that covers no label. Searching the file as text would accept
+  `standard-8` because `ubicloud-standard-8` contains it, and would accept a
+  label that appears only in a comment.
 
 Two assurance methods are used together, following
 [ADR 003](adrs/adr-0003-bounded-rstest-over-property-testing.md). The contract

@@ -5,8 +5,10 @@
 //! on the change that introduces a violation rather than on the CI run that
 //! suffers from it.
 //!
-//! This file is the harness. The rules live in fourteen modules, split by the
-//! question each asks: `coverage_split` for the hand-off between the hosted
+//! This file is the harness. The rules live in fifteen modules, split by the
+//! question each asks: `actionlint_registry` for the comparison between the
+//! registered runner labels and the labels in use, `coverage_split` for the
+//! hand-off between the hosted
 //! coverage job, the baseline publisher and the warm-up,
 //! `supply_chain` for what the estate will execute,
 //! `placement` for what it costs and who owns each cache, `fork_fallback` for
@@ -47,6 +49,8 @@ mod workflow_texts;
 #[path = "support/workflow_triggers.rs"]
 mod workflow_triggers;
 
+#[path = "contracts/actionlint_registry.rs"]
+mod actionlint_registry;
 #[path = "contracts/codescene_uploader.rs"]
 mod codescene_uploader;
 #[path = "contracts/compiler_cache.rs"]

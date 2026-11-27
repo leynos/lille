@@ -62,6 +62,13 @@ pub const SETUP_RUST_SHA: &str = "6cec89bac47a21cf756d68d638a9a510998e57f8";
 /// sleeps and posts, so it moves on its own rather than with the estate pin.
 pub const DELAYED_PR_COMMENT_SHA: &str = "8091b7cb5f9bab2d4a76ced2e749fd4c1bccdb02";
 
+/// Commit `install-yaml-lint` must pin.
+///
+/// The action arrived in shared-actions #618, after the estate default, so it
+/// takes a commit of its own: the one concordat's `yaml-lint-baseline` rule
+/// tells every repository to adopt.
+pub const INSTALL_YAML_LINT_SHA: &str = "a108423efa7fb83565089449f2647d34286a48a4";
+
 /// Shared actions whose reviewed revision is not [`SHARED_ACTIONS_SHA`].
 ///
 /// The estate's rule is that no reference floats, not that every action
@@ -71,8 +78,9 @@ pub const DELAYED_PR_COMMENT_SHA: &str = "8091b7cb5f9bab2d4a76ced2e749fd4c1bccdb
 /// nobody asked for. Each exception is named here with the action it
 /// governs, so a reference is still held to a reviewed commit by value and
 /// a new exception has to be added deliberately.
-pub const SHARED_ACTION_PIN_EXCEPTIONS: [(&str, &str); 6] = [
+pub const SHARED_ACTION_PIN_EXCEPTIONS: [(&str, &str); 7] = [
     ("install-whitaker", WHITAKER_ACTION_SHA),
+    ("install-yaml-lint", INSTALL_YAML_LINT_SHA),
     ("setup-rust", SETUP_RUST_SHA),
     ("generate-coverage", COVERAGE_ACTIONS_SHA),
     ("upload-codescene-coverage", COVERAGE_ACTIONS_SHA),

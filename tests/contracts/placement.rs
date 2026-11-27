@@ -12,7 +12,7 @@ use crate::runner_selection::{is_github_hosted_label, RunnerLabel};
 use crate::shared_action;
 use crate::workflow_assertions::{assert_input, job_named, jobs, step_using, workflows};
 use crate::workflow_cache_owners;
-use crate::workflow_config::registered_runner_labels;
+use crate::workflow_config::{registered_runner_labels, registry_mismatches};
 use crate::workflow_estate::{
     job_runner_label, Workflow, WorkflowSource, BASELINE_JOB_ID, BUILD_JOB_IDS, HOSTED_UBUNTU_LABEL,
 };
@@ -191,13 +191,13 @@ fn every_runner_label_is_registered_with_actionlint(workflows: Vec<Workflow>) {
         .map(|label: RunnerLabel| label.as_str().to_owned())
         .filter(|label| !is_github_hosted_label(label))
         .collect();
-    let registered: BTreeSet<String> = declared.into_iter().collect();
-    assert_eq!(
-        registered, in_use,
-        "`.github/actionlint.yaml` must register exactly the self-hosted \
-         labels the workflows use. An unregistered label fails actionlint; a \
-         registered but unused one hides a runner assignment that has already \
-         been retired"
+    let (unregistered, unused) = registry_mismatches(&declared, &in_use);
+    assert!(
+        unregistered.is_empty() && unused.is_empty(),
+        "`.github/actionlint.yaml` must register the self-hosted labels the \
+         workflows use, and only those. An unregistered label fails actionlint; \
+         a registered but unused entry hides a runner assignment that has \
+         already been retired. Unregistered: {unregistered:?}; unused: {unused:?}"
     );
 }
 

@@ -223,17 +223,24 @@ project:
     `--cfg docsrs -D warnings`, and `RUST_FLAGS` defaults to `-D warnings`:
 
     ```sh
+    git ls-files -z '*.yml' '*.yaml' | xargs -0 -r yamllint --strict --
+    actionlint
     RUSTDOCFLAGS="--cfg docsrs -D warnings" cargo doc --workspace --no-deps
     cargo clippy --workspace --all-targets --all-features -- -D warnings
     RUSTFLAGS="-D warnings" whitaker --all -- --workspace --all-targets --all-features
     ```
 
-    building documentation for the workspace and linting every target with all
-    features enabled. The documentation and Clippy stages compose the
-    development build flags onto any inherited `RUSTFLAGS`: `-Zthreads=8` and,
-    on Linux, `-Clink-arg=-fuse-ld=mold`. The Whitaker stage assigns its own
-    `RUSTFLAGS` and so does not inherit either those flags or the caller's
-    value. Documentation warnings and Clippy warnings fail the command.
+    first linting the tracked YAML with `yamllint` (which reads
+    `.yamllint.yml`, extending the estate base `.yamllint-estate.yml`) and the
+    workflows with `actionlint`, as the `yamllint` and `actionlint`
+    prerequisites; both tools must be on `PATH`, and the `YAMLLINT` and
+    `ACTIONLINT` variables name them otherwise. It then builds documentation
+    for the workspace and lints every target with all features enabled. The
+    documentation and Clippy stages compose the development build flags onto
+    any inherited `RUSTFLAGS`: `-Zthreads=8` and, on Linux,
+    `-Clink-arg=-fuse-ld=mold`. The Whitaker stage assigns its own `RUSTFLAGS`
+    and so does not inherit either those flags or the caller's value.
+    Documentation warnings and Clippy warnings fail the command.
   - `make test` executes:
 
     ```sh
