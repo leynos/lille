@@ -10,7 +10,7 @@ use std::collections::BTreeSet;
 
 use rstest::rstest;
 
-use crate::workflow_config::registry_mismatches;
+use crate::workflow_config::{registry_entry_covers, registry_mismatches};
 
 /// Builds an owned list of labels from string literals.
 fn owned(labels: &[&str]) -> Vec<String> {
@@ -36,7 +36,11 @@ fn mismatches(declared: &[&str], in_use: &[&str]) -> (Vec<String>, Vec<String>) 
 #[case::exact_and_glob(&["ubicloud-*", "self-hosted-x"], &["ubicloud-standard-4", "self-hosted-x"])]
 #[case::nothing_in_use_nothing_declared(&[], &[])]
 fn a_matching_registry_has_no_mismatch(#[case] declared: &[&str], #[case] in_use: &[&str]) {
-    assert_eq!(mismatches(declared, in_use), (Vec::new(), Vec::new()));
+    assert_eq!(
+        mismatches(declared, in_use),
+        (Vec::new(), Vec::new()),
+        "registry {declared:?} must name exactly the labels {in_use:?}, with no mismatch"
+    );
 }
 
 /// A label no entry covers is unregistered, and an entry that covers no label is unused.
@@ -70,6 +74,30 @@ fn a_mismatched_registry_reports_both_lists(
 ) {
     assert_eq!(
         mismatches(declared, in_use),
-        (owned(unregistered), owned(unused))
+        (owned(unregistered), owned(unused)),
+        "registry {declared:?} against labels {in_use:?} must report unregistered \
+         {unregistered:?} and unused {unused:?}"
+    );
+}
+
+/// An entry covers a label exactly, or as a trailing `*` glob over its prefix.
+#[rstest]
+#[case::exact_match("ubicloud-standard-4", "ubicloud-standard-4", true)]
+#[case::exact_differs("ubicloud-standard-4", "ubicloud-standard-2", false)]
+#[case::glob_prefix("ubicloud-*", "ubicloud-standard-4", true)]
+#[case::glob_needs_the_hyphen("ubicloud-*", "ubicloud", false)]
+#[case::glob_other_family("ubicloud-*", "ubuntu-latest", false)]
+#[case::bare_star_covers_everything("*", "anything", true)]
+#[case::exact_is_not_a_substring("standard-8", "ubicloud-standard-8", false)]
+fn an_entry_covers_a_label_exactly_or_by_trailing_glob(
+    #[case] entry: &str,
+    #[case] label: &str,
+    #[case] expected: bool,
+) {
+    assert_eq!(
+        registry_entry_covers(entry, label),
+        expected,
+        "entry {entry:?} against label {label:?} must {}cover it",
+        if expected { "" } else { "not " }
     );
 }

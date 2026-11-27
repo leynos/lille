@@ -74,7 +74,8 @@ pub fn registered_runner_labels() -> Result<Vec<String>, WorkflowError> {
 }
 
 /// Whether a registry entry names a label: exactly, or as a trailing `*` glob.
-fn registry_entry_covers(entry: &str, label: &str) -> bool {
+#[must_use]
+pub fn registry_entry_covers(entry: &str, label: &str) -> bool {
     entry
         .strip_suffix('*')
         .map_or(entry == label, |prefix| label.starts_with(prefix))
