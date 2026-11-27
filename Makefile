@@ -64,7 +64,12 @@ clean:
 build:
 	$(RUST_FLAGS_ENV) cargo build
 
+# The trybuild compile-pass test builds its fixture in a tree of its own
+# (`<target>/tests/trybuild`) that a plain compile never fills, so it is run
+# once first, under the pass's feature set, outside the timed pass.
 test:
+	$(RUST_FLAGS_ENV) cargo test --workspace --no-run --features test-support
+	$(RUST_FLAGS_ENV) cargo test --workspace --features test-support --test compile_pass
 	$(RUST_FLAGS_ENV) cargo test --workspace --features test-support
 
 test-observers-v1:
