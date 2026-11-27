@@ -448,15 +448,17 @@ Run the deterministic gates before committing (see `AGENTS.md` and the
 buffered-message compile-pass harness
 (`cargo test --features test-support --test compile_pass`; see
 [Buffered events use the Message API](#buffered-events-use-the-message-api)).
-`make lint` runs rustdoc (`--cfg docsrs`),
+`make lint` first runs its prerequisites, `make yamllint` and
+`make actionlint`, then rustdoc (`--cfg docsrs`),
 `cargo clippy --all-targets --all-features -- -D warnings`, and the Whitaker
-Dylint suite, then `make yamllint` and `make actionlint`. `make yamllint` runs
-`yamllint --strict` over every tracked `.yml` and `.yaml` file with
-`.yamllint.yml`, which extends the estate base `.yamllint-estate.yml`; run it
-from the repository root, because yamllint resolves `extends` against the
-current directory. `make actionlint` checks the workflows and their shell
-scripts. Both tools must be on `PATH`; CI installs them with the
-`install-yaml-lint` action before it runs `make lint`.
+Dylint suite. `make yamllint` runs `yamllint --strict` over every tracked
+`.yml` and `.yaml` file with `.yamllint.yml`, which extends the estate base
+`.yamllint-estate.yml`; run it from the repository root, because yamllint
+resolves `extends` against the current directory. `make actionlint` checks the
+workflows and their shell scripts. Both tools must be on `PATH`, and the
+`YAMLLINT` and `ACTIONLINT` variables name the commands to run when they are
+not (for example `make lint YAMLLINT=/opt/bin/yamllint`). CI installs them with
+the `install-yaml-lint` action before it runs `make lint`.
 
 Cognitive complexity is not gated by Clippy. Clippy's `cognitive_complexity`
 scores code after macro expansion, so it counts branching a macro generated,
